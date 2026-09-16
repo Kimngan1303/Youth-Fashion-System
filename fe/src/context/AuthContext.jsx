@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/auth.service';
 
 export const AuthContext = createContext(null);
@@ -6,12 +6,45 @@ export const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    if (savedUser) {
+      try {
+        return JSON.parse(savedUser);
+      } catch (e) {
+        // fallback
+      }
+    }
+    return {
+      customer_id: 1,
+      email: 'thaomy.nguyen@atelier-youth.vn',
+      full_name: 'Nguyễn Hoàng Thảo My',
+      phone: '0908 123 456',
+      avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
+      is_verified: true,
+      member_since: 'Từ Tháng 03/2023',
+      tier: 'VIP GOLD ATELIER MEMBER',
+      points: '3.450 pts',
+      points_cash: 'Quy đổi 345.000đ',
+      total_spent: '34.5M',
+      discount: 'Chiết khấu 10% trọn đời',
+      dob: '10/18/1994',
+      dob_details: { day: '18', month: '10', year: '1994' },
+      gender: 'Nữ',
+      address: {
+        province: 'Thành phố Hồ Chí Minh',
+        district: 'Quận 1',
+        ward: 'Phường Bến Nghé',
+        detail: 'Số 154, Đường Đồng Khởi'
+      }
+    };
   });
+
   const [accessToken, setAccessToken] = useState(() => localStorage.getItem('accessToken') || null);
   const [loading, setLoading] = useState(false);
 
-  // Listen to silent logout event from axios interceptor
+  const [wishlist, setWishlist] = useState([1, 3]);
+  const [cartCount, setCartCount] = useState(2);
+  const [orders, setOrders] = useState([]);
+
   useEffect(() => {
     const handleLogoutEvent = () => {
       setUser(null);
@@ -23,6 +56,18 @@ export function AuthProvider({ children }) {
     window.addEventListener('auth:logout', handleLogoutEvent);
     return () => window.removeEventListener('auth:logout', handleLogoutEvent);
   }, []);
+
+  const toggleWishlist = (productId) => {
+    setWishlist(prev => 
+      prev.includes(productId) 
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  const updateUserProfile = (updatedData) => {
+    setUser(prev => ({ ...prev, ...updatedData }));
+  };
 
   const login = async ({ email, password, user_type = 'CUSTOMER' }) => {
     setLoading(true);
@@ -84,15 +129,25 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{
         user,
+        setUser,
+        updateUserProfile,
         accessToken,
         loading,
         isAuthenticated: !!user,
         login,
         register,
         logout,
+        wishlist,
+        toggleWishlist,
+        cartCount,
+        setCartCount,
+        orders,
+        setOrders
       }}
     >
       {children}
     </AuthContext.Provider>
   );
 }
+
+export const useAuth = () => useContext(AuthContext);
