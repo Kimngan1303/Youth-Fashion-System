@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
 /**
@@ -749,9 +749,9 @@ export default function Login() {
                 {/* Footer Link */}
                 <div className="registration-note-footer">
                   <span>Chưa có tài khoản?</span>
-                  <a href="#register" className="register-now-link">
+                  <Link to="/register" className="register-now-link">
                     Đăng ký tài khoản ngay
-                  </a>
+                  </Link>
                 </div>
               </>
             )}
