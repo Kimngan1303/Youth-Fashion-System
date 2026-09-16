@@ -48,8 +48,20 @@ export default function LookbookPage() {
     };
   }, []);
 
-  const primaryLookbook = lookbooks[0] || {};
-  const outfits = primaryLookbook.outfits || [];
+  const heroItem = lookbooks.find(l => l.type === 'hero' || l.position === 6) || lookbooks[0];
+  const look1 = lookbooks.find(l => l.position === 1 || l.lookCode === 'LOOK 01');
+  const look2 = lookbooks.find(l => l.position === 2 || l.lookCode === 'LOOK 02');
+  const look3 = lookbooks.find(l => l.position === 3 || l.lookCode === 'LOOK 03');
+  const look4 = lookbooks.find(l => l.position === 4 || l.lookCode === 'LOOK 04');
+  const backstageItem = lookbooks.find(l => l.type === 'backstage' || l.position === 5 || l.lookCode === 'MỤC 05');
+  const extraLooks = lookbooks.filter(l => 
+    l.id !== heroItem?.id && 
+    l.id !== look1?.id && 
+    l.id !== look2?.id && 
+    l.id !== look3?.id && 
+    l.id !== look4?.id && 
+    l.id !== backstageItem?.id
+  );
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -682,425 +694,476 @@ export default function LookbookPage() {
         </div>
       ) : (
         <>
-          {/* 2. Hero Cinematic Banner */}
-          <section className="lb-hero-editorial">
-        <img
-          src="https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1600"
-          alt="L'Automne Éternel Campaign"
-          className="lb-hero-bg-img"
-        />
-        <div className="lb-hero-overlay" />
+          {/* 2. Hero Cinematic Banner (Mục 06) */}
+          {heroItem && (
+            <section className="lb-hero-editorial">
+              <img
+                src={heroItem.image || "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1600"}
+                alt={heroItem.title}
+                className="lb-hero-bg-img"
+              />
+              <div className="lb-hero-overlay" />
 
-        <div className="lb-hero-content">
-          <span className="lb-hero-campaign-tag">
-            BỘ SƯU TẬP MÙA THU ĐÔNG 2025 • CHIẾN DỊCH CHÍNH THỨC
-          </span>
-          <h1 className="lb-hero-main-heading">
-            L'AUTOMNE ÉTERNEL.
-          </h1>
-          <p className="lb-hero-desc">
-            {primaryLookbook.heroSubtitle || "Khúc xạ của thu vĩnh cửu giữa đại lộ Paris — Nơi phong cách hòa cùng nghệ thuật may đo thủ công Pháp."}
-          </p>
+              <div className="lb-hero-content">
+                <span className="lb-hero-campaign-tag">
+                  {heroItem.season ? `${heroItem.season.toUpperCase()} • CHIẾN DỊCH CHÍNH THỨC` : "BỘ SƯU TẬP MÙA THU ĐÔNG 2025 • CHIẾN DỊCH CHÍNH THỨC"}
+                </span>
+                <h1 className="lb-hero-main-heading">
+                  {heroItem.title.replace('Ảnh Bìa Hero Banner: ', '')}
+                </h1>
+                <p className="lb-hero-desc">
+                  {heroItem.description || "Khúc xạ của thu vĩnh cửu giữa đại lộ Paris — Nơi phong cách hòa cùng nghệ thuật may đo thủ công Pháp."}
+                </p>
 
-          {/* Audio / Soundtrack glass pill */}
-          <div 
-            className="lb-audio-glass-card" 
-            onClick={() => {
-              setIsPlayingAudio(!isPlayingAudio);
-              showToast(isPlayingAudio ? 'Đã tắt âm thanh nền' : 'Đang phát âm thanh Paris Autumn Symphony');
-            }}
-          >
-            <div className="lb-audio-icon-btn">
-              {isPlayingAudio ? <Volume2 size={15} /> : <Play size={14} fill="#111" />}
-            </div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                BẢN GHI PHONG CÁCH
-              </div>
-              <div style={{ fontSize: '12.5px', color: '#ECEAE4' }}>
-                {primaryLookbook.campaignAudio || "Paris Autumn Symphony • 3:42 mins"}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. Filter Navigation Tabs */}
-      <div className="lb-nav-tabs-container">
-        <div className="lb-filter-pill-group">
-          <button
-            type="button"
-            className={`lb-filter-pill ${activeFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('all')}
-          >
-            Tất cả trang phục
-          </button>
-          <button
-            type="button"
-            className={`lb-filter-pill ${activeFilter === 'coat' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('coat')}
-          >
-            Áo Khoác & Măng Tô
-          </button>
-          <button
-            type="button"
-            className={`lb-filter-pill ${activeFilter === 'dress' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('dress')}
-          >
-            Đầm Dạ Tiệc & Lụa
-          </button>
-          <button
-            type="button"
-            className={`lb-filter-pill ${activeFilter === 'chic' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('chic')}
-          >
-            Set Phối Parisian Chic
-          </button>
-          <button
-            type="button"
-            className={`lb-filter-pill ${activeFilter === 'accessories' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('accessories')}
-          >
-            Phụ Kiện Da & Khăn Len
-          </button>
-        </div>
-
-        <div className="lb-count-indicator">
-          Hiển thị <strong>8/8 Phối Đồ Tuyển Chọn</strong>
-        </div>
-      </div>
-
-      {/* 4. Main Editorial Looks Content */}
-      <main className="lb-editorial-body">
-
-        {/* SECTION 1: LOOK 01 (Camel Belted Cashmere Coat) */}
-        <section className="lb-split-look-card">
-          <div className="lb-photo-relative">
-            <img
-              src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=1000"
-              alt="Look 01 - Coat"
-              className="lb-editorial-img"
-            />
-            {/* Interactive Hotspot 1 on Coat */}
-            <div 
-              className="lb-hotspot" 
-              style={{ top: '38%', left: '46%' }}
-              onClick={() => setActiveHotspot(activeHotspot === 1 ? null : 1)}
-            >
-              +
-              {activeHotspot === 1 && (
-                <div className="lb-hotspot-popover">
-                  Áo Măng Tô Dạ Camel — 3.850.000₫
+                {/* Audio / Soundtrack glass pill */}
+                <div 
+                  className="lb-audio-glass-card" 
+                  onClick={() => {
+                    setIsPlayingAudio(!isPlayingAudio);
+                    showToast(isPlayingAudio ? 'Đã tắt âm thanh nền' : 'Đang phát âm thanh Paris Autumn Symphony');
+                  }}
+                >
+                  <div className="lb-audio-icon-btn">
+                    {isPlayingAudio ? <Volume2 size={15} /> : <Play size={14} fill="#111" />}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                      BẢN GHI PHONG CÁCH
+                    </div>
+                    <div style={{ fontSize: '12.5px', color: '#ECEAE4' }}>
+                      {heroItem.campaignAudio || "Paris Autumn Symphony • 3:42 mins"}
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
-
-            {/* Interactive Hotspot 2 on Boots */}
-            <div 
-              className="lb-hotspot" 
-              style={{ top: '82%', left: '54%' }}
-              onClick={() => setActiveHotspot(activeHotspot === 2 ? null : 2)}
-            >
-              +
-              {activeHotspot === 2 && (
-                <div className="lb-hotspot-popover">
-                  Bốt Da Nappa Cổ Điển — 2.100.000₫
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="lb-look-details-col">
-            <div>
-              <div className="lb-look-tag-row">
-                <span className="lb-look-category">PHONG CÁCH THU ĐÔNG • LOOK 01</span>
-                <span className="lb-badge-pill">SIGNATURE</span>
               </div>
+            </section>
+          )}
 
-              <h2 className="lb-look-title">
-                Áo Măng Tô Belted Dạ Camel Cashmere Quý Phái Thời Đại
-              </h2>
-
-              <p className="lb-look-desc">
-                Cắt may thủ công từ 100% len lông cừu Merino pha Cashmere tự nhiên, cổ bẻ kinh điển cùng thắt lưng tôn dáng sang trọng.
-              </p>
-
-              <div className="lb-products-subheading">DANH SÁCH SẢN PHẨM PHỐI:</div>
-              <div className="lb-product-row">
-                <span className="lb-product-name">Áo Măng Tô Dạ Camel Cashmere</span>
-                <span className="lb-product-price">3.850.000₫</span>
-              </div>
-              <div className="lb-product-row">
-                <span className="lb-product-name">Áo Len Cổ Lọ Cream Knitwear</span>
-                <span className="lb-product-price">950.000₫</span>
-              </div>
-              <div className="lb-product-row">
-                <span className="lb-product-name">Quần Âu Ống Suông Wool Tencel</span>
-                <span className="lb-product-price">1.250.000₫</span>
-              </div>
-            </div>
-
-            <div className="lb-cta-container">
-              <button 
-                type="button" 
-                className="btn-buy-combo"
-                onClick={() => showToast('Đã thêm trọn bộ Look 01 (tiết kiệm 10%) vào giỏ hàng!')}
+          {/* 3. Filter Navigation Tabs */}
+          <div className="lb-nav-tabs-container">
+            <div className="lb-filter-pill-group">
+              <button
+                type="button"
+                className={`lb-filter-pill ${activeFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setActiveFilter('all')}
               >
-                <ShoppingBag size={16} />
-                <span>Mua Trọn Bộ Phối Đồ (Tiết Kiệm 10%) • 5.445.000₫</span>
+                Tất cả trang phục
+              </button>
+              <button
+                type="button"
+                className={`lb-filter-pill ${activeFilter === 'coat' ? 'active' : ''}`}
+                onClick={() => setActiveFilter('coat')}
+              >
+                Áo Khoác & Măng Tô
+              </button>
+              <button
+                type="button"
+                className={`lb-filter-pill ${activeFilter === 'dress' ? 'active' : ''}`}
+                onClick={() => setActiveFilter('dress')}
+              >
+                Đầm Dạ Tiệc & Lụa
+              </button>
+              <button
+                type="button"
+                className={`lb-filter-pill ${activeFilter === 'chic' ? 'active' : ''}`}
+                onClick={() => setActiveFilter('chic')}
+              >
+                Set Phối Parisian Chic
+              </button>
+              <button
+                type="button"
+                className={`lb-filter-pill ${activeFilter === 'accessories' ? 'active' : ''}`}
+                onClick={() => setActiveFilter('accessories')}
+              >
+                Phụ Kiện Da & Khăn Len
               </button>
             </div>
-          </div>
-        </section>
 
-        {/* SECTION 2: LOOK 02 (Emerald Pleated Gown - Inverted Split) */}
-        <section className="lb-split-look-card inverted">
-          <div className="lb-look-details-col">
-            <div>
-              <div className="lb-look-tag-row">
-                <span className="lb-look-category">DẠ TIỆC & HAUTE COUTURE • LOOK 02</span>
-                <span className="lb-badge-pill" style={{ background: '#DCFCE7', color: '#15803D', borderColor: '#BBF7D0' }}>
-                  PHIÊN BẢN GIỚI HẠN
-                </span>
-              </div>
-
-              <h2 className="lb-look-title">
-                Đầm Xếp Ly Emerald Lộng Lẫy Tơ Tằm Cao Cấp
-              </h2>
-
-              <p className="lb-look-desc">
-                Chất tơ tằm dệt ánh ngọc lục bảo rực rỡ, đường xếp ly accordion tỉ mỉ tạo độ xòe bồng bềnh tựa dải sóng khi chuyển động.
-              </p>
-
-              <div className="lb-quote-card">
-                "Thiết kế được lựa chọn trình diễn tại Paris Fashion Week 2025, mang hơi thở quý phái vượt thời gian."
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '8px' }}>
-                <span style={{ fontSize: '26px', fontWeight: 700, color: '#111', fontFamily: "'Playfair Display', Georgia, serif" }}>
-                  2.950.000₫
-                </span>
-                <span style={{ fontSize: '12px', color: '#B45309', fontWeight: 600 }}>
-                  • Chỉ còn 5 chiếc size S, M
-                </span>
-              </div>
-            </div>
-
-            <div className="lb-cta-container">
-              <button 
-                type="button" 
-                className="btn-buy-combo"
-                onClick={() => showToast('Đã thêm Đầm Xếp Ly Emerald vào giỏ hàng!')}
-              >
-                <ShoppingBag size={16} />
-                <span>ĐẶT MUA NGAY</span>
-              </button>
+            <div className="lb-count-indicator">
+              Hiển thị <strong>{lookbooks.length}/{lookbooks.length} Mục Tuyển Chọn</strong>
             </div>
           </div>
 
-          <div className="lb-photo-relative">
-            <img
-              src="https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=1000"
-              alt="Look 02 - Emerald Gown"
-              className="lb-editorial-img"
-            />
-            <span 
-              className="lb-badge-pill" 
-              style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(0,0,0,0.65)', color: '#FFFFFF', borderColor: 'transparent' }}
-            >
-              HAUTE COUTURE EDITION
-            </span>
-          </div>
-        </section>
+          {/* 4. Main Editorial Looks Content */}
+          <main className="lb-editorial-body">
 
-        {/* SECTION 3: TWO COLUMNS (Look 03 Ivory Tweed & Look 04 Charcoal Blazer) */}
-        <section className="lb-two-cols-grid">
-          {/* Card Left: Ivory Tweed */}
-          <div className="lb-vertical-look-card">
-            <div className="lb-vert-img-box">
-              <img
-                src="https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&q=80&w=800"
-                alt="Look 03 - Tweed Ivory"
-                className="lb-editorial-img"
-              />
-              <span className="lb-badge-pill" style={{ position: 'absolute', top: '16px', left: '16px', background: '#FFFFFF' }}>
-                LOOK 03
-              </span>
-            </div>
-            <div className="lb-vert-body">
-              <div>
-                <span className="lb-look-category">PARISIAN CHIC</span>
-                <h3 className="lb-look-title" style={{ fontSize: '20px', margin: '6px 0 10px 0' }}>
-                  Set Áo Tweed Ivory & Quần Âu Cắt May Cổ Điển
-                </h3>
-                <p className="lb-look-desc" style={{ fontSize: '13px', marginBottom: '16px' }}>
-                  Sự tương phản kinh điển giữa trắng kem ngà và đen tuyền, nút kim loại mạ vàng chạm khắc thủ công.
-                </p>
-                <div className="lb-product-row" style={{ fontSize: '12.5px' }}>
-                  <span>Áo Khoác Tweed Ivory Cropped</span>
-                  <strong>2.150.000₫</strong>
+            {/* SECTION 1: LOOK 01 (Mục 01 - Coat) */}
+            {look1 && (
+              <section className="lb-split-look-card">
+                <div className="lb-photo-relative">
+                  <img
+                    src={look1.image || "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=1000"}
+                    alt={look1.title}
+                    className="lb-editorial-img"
+                  />
+                  {look1.hotspots?.map((hs, idx) => (
+                    <div 
+                      key={idx}
+                      className="lb-hotspot" 
+                      style={{ top: hs.top, left: hs.left }}
+                      onClick={() => setActiveHotspot(activeHotspot === idx ? null : idx)}
+                    >
+                      +
+                      {activeHotspot === idx && (
+                        <div className="lb-hotspot-popover">
+                          {hs.label}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <div className="lb-product-row" style={{ fontSize: '12.5px' }}>
-                  <span>Quần Tây Slim Fit Black</span>
-                  <strong>890.000₫</strong>
+
+                <div className="lb-look-details-col">
+                  <div>
+                    <div className="lb-look-tag-row">
+                      <span className="lb-look-category">
+                        {look1.season || 'PHONG CÁCH THU ĐÔNG'} • {look1.lookCode || 'LOOK 01'}
+                      </span>
+                      <span className="lb-badge-pill">{look1.badge || 'SIGNATURE'}</span>
+                    </div>
+
+                    <h2 className="lb-look-title">
+                      {look1.title}
+                    </h2>
+
+                    <p className="lb-look-desc">
+                      {look1.description}
+                    </p>
+
+                    {look1.products && look1.products.length > 0 && (
+                      <>
+                        <div className="lb-products-subheading">DANH SÁCH SẢN PHẨM PHỐI:</div>
+                        {look1.products.map((p, i) => (
+                          <div key={i} className="lb-product-row">
+                            <span className="lb-product-name">{p.name}</span>
+                            <span className="lb-product-price">{p.price}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+
+                  <div className="lb-cta-container">
+                    <button 
+                      type="button" 
+                      className="btn-buy-combo"
+                      onClick={() => showToast(`Đã thêm trọn bộ ${look1.lookCode || 'Look 01'} vào giỏ hàng!`)}
+                    >
+                      <ShoppingBag size={16} />
+                      <span>{look1.ctaText || `Mua Trọn Bộ Phối Đồ • ${look1.price || ''}`}</span>
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* SECTION 2: LOOK 02 (Mục 02 - Emerald Gown) */}
+            {look2 && (
+              <section className="lb-split-look-card inverted">
+                <div className="lb-look-details-col">
+                  <div>
+                    <div className="lb-look-tag-row">
+                      <span className="lb-look-category">
+                        {look2.season || 'DẠ TIỆC & HAUTE COUTURE'} • {look2.lookCode || 'LOOK 02'}
+                      </span>
+                      <span className="lb-badge-pill" style={{ background: '#DCFCE7', color: '#15803D', borderColor: '#BBF7D0' }}>
+                        {look2.badge || 'PHIÊN BẢN GIỚI HẠN'}
+                      </span>
+                    </div>
+
+                    <h2 className="lb-look-title">
+                      {look2.title}
+                    </h2>
+
+                    <p className="lb-look-desc">
+                      {look2.description}
+                    </p>
+
+                    <div className="lb-quote-card">
+                      "{look2.quote || "Thiết kế được lựa chọn trình diễn tại Paris Fashion Week 2025, mang hơi thở quý phái vượt thời gian."}"
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '26px', fontWeight: 700, color: '#111', fontFamily: "'Playfair Display', Georgia, serif" }}>
+                        {look2.price || '2.950.000₫'}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#B45309', fontWeight: 600 }}>
+                        {look2.stockInfo || '• Chỉ còn 5 chiếc size S, M'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="lb-cta-container">
+                    <button 
+                      type="button" 
+                      className="btn-buy-combo"
+                      onClick={() => showToast(`Đã thêm ${look2.title} vào giỏ hàng!`)}
+                    >
+                      <ShoppingBag size={16} />
+                      <span>{look2.ctaText || 'ĐẶT MUA NGAY'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="lb-photo-relative">
+                  <img
+                    src={look2.image || "https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=1000"}
+                    alt={look2.title}
+                    className="lb-editorial-img"
+                  />
+                  <span 
+                    className="lb-badge-pill" 
+                    style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(0,0,0,0.65)', color: '#FFFFFF', borderColor: 'transparent' }}
+                  >
+                    HAUTE COUTURE EDITION
+                  </span>
+                </div>
+              </section>
+            )}
+
+            {/* SECTION 3: TWO COLUMNS (Mục 03 Ivory Tweed & Mục 04 Charcoal Blazer) */}
+            {(look3 || look4) && (
+              <section className="lb-two-cols-grid">
+                {/* Look 03 */}
+                {look3 && (
+                  <div className="lb-vertical-look-card">
+                    <div className="lb-vert-img-box">
+                      <img
+                        src={look3.image || "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&q=80&w=800"}
+                        alt={look3.title}
+                        className="lb-editorial-img"
+                      />
+                      <span className="lb-badge-pill" style={{ position: 'absolute', top: '16px', left: '16px', background: '#FFFFFF' }}>
+                        {look3.lookCode || 'LOOK 03'}
+                      </span>
+                    </div>
+                    <div className="lb-vert-body">
+                      <div>
+                        <span className="lb-look-category">{look3.season || 'PARISIAN CHIC'}</span>
+                        <h3 className="lb-look-title" style={{ fontSize: '20px', margin: '6px 0 10px 0' }}>
+                          {look3.title}
+                        </h3>
+                        <p className="lb-look-desc" style={{ fontSize: '13px', marginBottom: '16px' }}>
+                          {look3.description}
+                        </p>
+                        {look3.products?.map((p, i) => (
+                          <div key={i} className="lb-product-row" style={{ fontSize: '12.5px' }}>
+                            <span>{p.name}</span>
+                            <strong>{p.price}</strong>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                        <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>{look3.price || '3.040.000₫'}</span>
+                        <button 
+                          type="button" 
+                          className="btn-buy-combo" 
+                          style={{ width: 'auto', padding: '10px 18px' }}
+                          onClick={() => showToast(`Đã thêm ${look3.title} vào giỏ hàng!`)}
+                        >
+                          {look3.ctaText || 'Mua Ngay'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Look 04 */}
+                {look4 && (
+                  <div className="lb-vertical-look-card">
+                    <div className="lb-vert-img-box">
+                      <img
+                        src={look4.image || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=800"}
+                        alt={look4.title}
+                        className="lb-editorial-img"
+                      />
+                      <span className="lb-badge-pill" style={{ position: 'absolute', top: '16px', left: '16px', background: '#FFFFFF' }}>
+                        {look4.lookCode || 'LOOK 04'}
+                      </span>
+                    </div>
+                    <div className="lb-vert-body">
+                      <div>
+                        <span className="lb-look-category">{look4.season || 'MODERN TAILORING'}</span>
+                        <h3 className="lb-look-title" style={{ fontSize: '20px', margin: '6px 0 10px 0' }}>
+                          {look4.title}
+                        </h3>
+                        <p className="lb-look-desc" style={{ fontSize: '13px', marginBottom: '16px' }}>
+                          {look4.description}
+                        </p>
+                        {look4.products?.map((p, i) => (
+                          <div key={i} className="lb-product-row" style={{ fontSize: '12.5px' }}>
+                            <span>{p.name}</span>
+                            <strong>{p.price}</strong>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                        <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>{look4.price || '2.700.000₫'}</span>
+                        <button 
+                          type="button" 
+                          className="btn-buy-combo" 
+                          style={{ width: 'auto', padding: '10px 18px' }}
+                          onClick={() => showToast(`Đã thêm ${look4.title} vào giỏ hàng!`)}
+                        >
+                          {look4.ctaText || 'Mua Ngay'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Extra Looks (Any additional looks created by manager) */}
+            {extraLooks.length > 0 && (
+              <section className="lb-two-cols-grid">
+                {extraLooks.map((item) => (
+                  <div key={item.id} className="lb-vertical-look-card">
+                    <div className="lb-vert-img-box">
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        className="lb-editorial-img"
+                      />
+                      <span className="lb-badge-pill" style={{ position: 'absolute', top: '16px', left: '16px', background: '#FFFFFF' }}>
+                        {item.lookCode || `LOOK ${item.position}`}
+                      </span>
+                    </div>
+                    <div className="lb-vert-body">
+                      <div>
+                        <span className="lb-look-category">{item.season || 'BỘ SƯU TẬP'}</span>
+                        <h3 className="lb-look-title" style={{ fontSize: '20px', margin: '6px 0 10px 0' }}>
+                          {item.title}
+                        </h3>
+                        <p className="lb-look-desc" style={{ fontSize: '13px', marginBottom: '16px' }}>
+                          {item.description}
+                        </p>
+                      </div>
+                      <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                        <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>{item.price || ''}</span>
+                        <button 
+                          type="button" 
+                          className="btn-buy-combo" 
+                          style={{ width: 'auto', padding: '10px 18px' }}
+                          onClick={() => showToast(`Đã thêm ${item.title} vào giỏ hàng!`)}
+                        >
+                          Mua Ngay
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </section>
+            )}
+
+            {/* SECTION 4 (MỤC 05): CRAFTSMANSHIP & BACKSTAGE ("Hậu Trường & Kỷ Họa Ý Tưởng") */}
+            {backstageItem && (
+              <section className="lb-craftsmanship-card">
+                <div className="lb-craft-img-box">
+                  <img
+                    src={backstageItem.image || "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?auto=format&fit=crop&q=80&w=1000"}
+                    alt={backstageItem.title}
+                    className="lb-editorial-img"
+                  />
+                  <span 
+                    className="lb-badge-pill" 
+                    style={{ position: 'absolute', bottom: '16px', left: '16px', background: 'rgba(0,0,0,0.7)', color: '#FFFFFF', borderColor: 'transparent' }}
+                  >
+                    XƯỞNG MAY THỦ CÔNG PARIS • ATELIER NO. 12
+                  </span>
+                </div>
+
+                <div className="lb-craft-content">
+                  <span className="lb-look-category">{backstageItem.season || 'NGHỆ THUẬT MAY ĐO BESPOKE'}</span>
+                  <h2 className="lb-look-title" style={{ fontSize: '28px', margin: '8px 0 14px 0' }}>
+                    {backstageItem.title}
+                  </h2>
+                  <p className="lb-look-desc" style={{ margin: 0 }}>
+                    {backstageItem.description}
+                  </p>
+
+                  <div className="lb-stats-3-col">
+                    {backstageItem.metrics ? backstageItem.metrics.map((m, idx) => (
+                      <div key={idx}>
+                        <div className="lb-stat-big-num">{m.num}</div>
+                        <div className="lb-stat-desc">{m.desc}</div>
+                      </div>
+                    )) : (
+                      <>
+                        <div>
+                          <div className="lb-stat-big-num">180h</div>
+                          <div className="lb-stat-desc">Thời gian may đo & thêu tay chuẩn Haute Couture</div>
+                        </div>
+                        <div>
+                          <div className="lb-stat-big-num">100%</div>
+                          <div className="lb-stat-desc">Sợi tự nhiên len cừu Merino & Cashmere Ý</div>
+                        </div>
+                        <div>
+                          <div className="lb-stat-big-num">12+</div>
+                          <div className="lb-stat-desc">Nghệ nhân may đo kinh nghiệm 20 năm tại xưởng</div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <button 
+                    type="button" 
+                    className="btn-share-editorial"
+                    style={{ fontSize: '13px', marginTop: '4px', textDecoration: 'underline' }}
+                    onClick={() => showToast('Đang tải phim tài liệu hậu trường Youth Fashion 2025...')}
+                  >
+                    Xem Phim Ngắn Hậu Trường Chiến Dịch →
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {/* SECTION 5: STORE VALUE PROPS / GUARANTEES */}
+            <section className="lb-value-props-grid">
+              <div className="lb-value-prop-item">
+                <div className="lb-value-prop-icon">
+                  <Truck size={18} />
+                </div>
+                <div>
+                  <div className="lb-value-prop-title">Giao Hàng Nhanh</div>
+                  <div className="lb-value-prop-sub">Miễn phí toàn quốc cho đơn hàng từ 1.000.000₫</div>
                 </div>
               </div>
-              <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>3.040.000₫</span>
-                <button 
-                  type="button" 
-                  className="btn-buy-combo" 
-                  style={{ width: 'auto', padding: '10px 18px' }}
-                  onClick={() => showToast('Đã thêm Set Áo Tweed Ivory vào giỏ hàng!')}
-                >
-                  Mua Ngay
-                </button>
-              </div>
-            </div>
-          </div>
 
-          {/* Card Right: Charcoal Blazer */}
-          <div className="lb-vertical-look-card">
-            <div className="lb-vert-img-box">
-              <img
-                src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=800"
-                alt="Look 04 - Charcoal Blazer"
-                className="lb-editorial-img"
-              />
-              <span className="lb-badge-pill" style={{ position: 'absolute', top: '16px', left: '16px', background: '#FFFFFF' }}>
-                LOOK 04
-              </span>
-            </div>
-            <div className="lb-vert-body">
-              <div>
-                <span className="lb-look-category">MODERN TAILORING</span>
-                <h3 className="lb-look-title" style={{ fontSize: '20px', margin: '6px 0 10px 0' }}>
-                  Oversized Charcoal Blazer & Minimalist Shirt
-                </h3>
-                <p className="lb-look-desc" style={{ fontSize: '13px', marginBottom: '16px' }}>
-                  Phong thái nữ quyền độc lập và tự do, phom dáng rộng thoải mái cùng đường may vai sắc nét chuẩn quý cô Paris.
-                </p>
-                <div className="lb-product-row" style={{ fontSize: '12.5px' }}>
-                  <span>Áo Blazer Kẻ Sọc Pinstripe</span>
-                  <strong>1.950.000₫</strong>
+              <div className="lb-value-prop-item">
+                <div className="lb-value-prop-icon">
+                  <RotateCcw size={18} />
                 </div>
-                <div className="lb-product-row" style={{ fontSize: '12.5px' }}>
-                  <span>Sơ Mi Poplin Cotton Trắng</span>
-                  <strong>750.000₫</strong>
+                <div>
+                  <div className="lb-value-prop-title">Đổi Hàng 30 Ngày</div>
+                  <div className="lb-value-prop-sub">Thử đồ tại nhà, hỗ trợ đổi size tận nơi dễ dàng</div>
                 </div>
               </div>
-              <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>2.700.000₫</span>
-                <button 
-                  type="button" 
-                  className="btn-buy-combo" 
-                  style={{ width: 'auto', padding: '10px 18px' }}
-                  onClick={() => showToast('Đã thêm Set Charcoal Blazer vào giỏ hàng!')}
-                >
-                  Mua Ngay
-                </button>
+
+              <div className="lb-value-prop-item">
+                <div className="lb-value-prop-icon">
+                  <Scissors size={18} />
+                </div>
+                <div>
+                  <div className="lb-value-prop-title">May Đo Riêng (Bespoke)</div>
+                  <div className="lb-value-prop-sub">Chỉnh sửa phom dáng chuẩn theo số đo của quý khách</div>
+                </div>
               </div>
-            </div>
-          </div>
-        </section>
 
-        {/* SECTION 4: CRAFTSMANSHIP & BACKSTAGE ("Hậu Trường & Kỷ Họa Ý Tưởng") */}
-        <section className="lb-craftsmanship-card">
-          <div className="lb-craft-img-box">
-            <img
-              src="https://images.unsplash.com/photo-1558769132-cb1aea458c5e?auto=format&fit=crop&q=80&w=1000"
-              alt="Atelier Workshop Paris"
-              className="lb-editorial-img"
-            />
-            <span 
-              className="lb-badge-pill" 
-              style={{ position: 'absolute', bottom: '16px', left: '16px', background: 'rgba(0,0,0,0.7)', color: '#FFFFFF', borderColor: 'transparent' }}
-            >
-              XƯỞNG MAY THỦ CÔNG PARIS • ATELIER NO. 12
-            </span>
-          </div>
-
-          <div className="lb-craft-content">
-            <span className="lb-look-category">NGHỆ THUẬT MAY ĐO BESPOKE</span>
-            <h2 className="lb-look-title" style={{ fontSize: '28px', margin: '8px 0 14px 0' }}>
-              Hậu Trường & Kỷ Họa Ý Tưởng
-            </h2>
-            <p className="lb-look-desc" style={{ margin: 0 }}>
-              Mỗi tác phẩm trong tuyển tập Fall/Winter 2025 là kết tinh của hơn 180 giờ chế tác thủ công, tuyển chọn từ những thước vải tự nhiên thượng hạng nhất từ Ý và Pháp.
-            </p>
-
-            <div className="lb-stats-3-col">
-              <div>
-                <div className="lb-stat-big-num">180h</div>
-                <div className="lb-stat-desc">Thời gian may đo & thêu tay chuẩn Haute Couture</div>
+              <div className="lb-value-prop-item">
+                <div className="lb-value-prop-icon">
+                  <ShieldCheck size={18} />
+                </div>
+                <div>
+                  <div className="lb-value-prop-title">Bảo Hành Trọn Đời</div>
+                  <div className="lb-value-prop-sub">Bảo dưỡng cúc, đường may và chăm sóc vải miễn phí</div>
+                </div>
               </div>
-              <div>
-                <div className="lb-stat-big-num">100%</div>
-                <div className="lb-stat-desc">Sợi tự nhiên len cừu Merino & Cashmere Ý</div>
-              </div>
-              <div>
-                <div className="lb-stat-big-num">12+</div>
-                <div className="lb-stat-desc">Nghệ nhân may đo kinh nghiệm 20 năm tại xưởng</div>
-              </div>
-            </div>
+            </section>
 
-            <button 
-              type="button" 
-              className="btn-share-editorial"
-              style={{ fontSize: '13px', marginTop: '4px', textDecoration: 'underline' }}
-              onClick={() => showToast('Đang tải phim tài liệu hậu trường Youth Fashion 2025...')}
-            >
-              Xem Phim Ngắn Hậu Trường Chiến Dịch →
-            </button>
-          </div>
-        </section>
-
-        {/* SECTION 5: STORE VALUE PROPS / GUARANTEES */}
-        <section className="lb-value-props-grid">
-          <div className="lb-value-prop-item">
-            <div className="lb-value-prop-icon">
-              <Truck size={18} />
-            </div>
-            <div>
-              <div className="lb-value-prop-title">Giao Hàng Nhanh</div>
-              <div className="lb-value-prop-sub">Miễn phí toàn quốc cho đơn hàng từ 1.000.000₫</div>
-            </div>
-          </div>
-
-          <div className="lb-value-prop-item">
-            <div className="lb-value-prop-icon">
-              <RotateCcw size={18} />
-            </div>
-            <div>
-              <div className="lb-value-prop-title">Đổi Hàng 30 Ngày</div>
-              <div className="lb-value-prop-sub">Thử đồ tại nhà, hỗ trợ đổi size tận nơi dễ dàng</div>
-            </div>
-          </div>
-
-          <div className="lb-value-prop-item">
-            <div className="lb-value-prop-icon">
-              <Scissors size={18} />
-            </div>
-            <div>
-              <div className="lb-value-prop-title">May Đo Riêng (Bespoke)</div>
-              <div className="lb-value-prop-sub">Chỉnh sửa phom dáng chuẩn theo số đo của quý khách</div>
-            </div>
-          </div>
-
-          <div className="lb-value-prop-item">
-            <div className="lb-value-prop-icon">
-              <ShieldCheck size={18} />
-            </div>
-            <div>
-              <div className="lb-value-prop-title">Bảo Hành Trọn Đời</div>
-              <div className="lb-value-prop-sub">Bảo dưỡng cúc, đường may và chăm sóc vải miễn phí</div>
-            </div>
-          </div>
-        </section>
-
-      </main>
-    </>
-  )}
-</div>
+          </main>
+        </>
+      )}
+    </div>
   );
 }

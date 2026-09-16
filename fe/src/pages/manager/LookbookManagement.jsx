@@ -15,9 +15,10 @@ import {
   Check, 
   Sparkles,
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  RotateCcw
 } from 'lucide-react';
-import { getStoredLookbooks, saveStoredLookbooks } from '../../services/lookbookData';
+import { getStoredLookbooks, saveStoredLookbooks, resetToDefaultLookbooks } from '../../services/lookbookData';
 
 export default function LookbookManagement() {
   const [lookbooks, setLookbooks] = useState(() => getStoredLookbooks());
@@ -28,10 +29,10 @@ export default function LookbookManagement() {
   };
   const [currentTab, setCurrentTab] = useState('all'); // 'all', 'published', 'hidden'
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('newest'); // 'newest', 'oldest', 'position', 'productCount'
+  const [sortBy, setSortBy] = useState('position'); // Defaults to sequential position 1, 2, 3, 4, 5...
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 10;
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,9 +43,13 @@ export default function LookbookManagement() {
   const [formData, setFormData] = useState({
     title: '',
     code: '',
+    lookCode: '',
+    sectionRole: '',
     season: '',
+    badge: '',
     position: 1,
     productCount: 1,
+    price: '',
     status: 'published',
     image: '',
     description: ''
@@ -172,14 +177,19 @@ export default function LookbookManagement() {
   // Open Create Modal
   const handleOpenCreate = () => {
     setEditingLookbook(null);
+    const nextPos = lookbooks.length + 1;
     setFormData({
       title: '',
-      code: `LB - NEW${new Date().getFullYear().toString().slice(-2)} - 0${lookbooks.length + 1}`,
-      season: 'Mùa Thu Đông',
-      position: lookbooks.length + 1,
+      code: `LB - LOOK0${nextPos}`,
+      lookCode: `LOOK 0${nextPos}`,
+      sectionRole: `Khối Look 0${nextPos} bổ sung trên trang`,
+      season: 'PHONG CÁCH THU ĐÔNG',
+      badge: 'MỚI',
+      position: nextPos,
       productCount: 1,
+      price: '3.000.000₫',
       status: 'published',
-      image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600',
+      image: 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&q=80&w=1000',
       description: ''
     });
     setIsModalOpen(true);
@@ -190,10 +200,14 @@ export default function LookbookManagement() {
     setEditingLookbook(lookbook);
     setFormData({
       title: lookbook.title,
-      code: lookbook.code,
-      season: lookbook.season,
+      code: lookbook.code || '',
+      lookCode: lookbook.lookCode || '',
+      sectionRole: lookbook.sectionRole || '',
+      season: lookbook.season || '',
+      badge: lookbook.badge || '',
       position: lookbook.position,
-      productCount: lookbook.productCount,
+      productCount: lookbook.productCount || 1,
+      price: lookbook.price || '',
       status: lookbook.status,
       image: lookbook.image,
       description: lookbook.description || ''
@@ -231,9 +245,9 @@ export default function LookbookManagement() {
         position: Number(formData.position),
         productCount: Number(formData.productCount),
         conversionRate: '0%',
-        outfits: []
+        products: []
       };
-      updateLookbooks([newLookbook, ...lookbooks]);
+      updateLookbooks([...lookbooks, newLookbook]);
     }
 
     setIsModalOpen(false);
@@ -1067,6 +1081,35 @@ export default function LookbookManagement() {
           </div>
 
           <div className="lb-bulk-actions">
+            <button
+              type="button"
+              className="btn-reset-defaults"
+              onClick={() => {
+                if (window.confirm('Khôi phục danh sách lookbook về cấu hình chuẩn ban đầu (Mục 1 đến 6 theo thiết kế)?')) {
+                  const reset = resetToDefaultLookbooks();
+                  setLookbooks(reset);
+                  setSelectedIds([]);
+                }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                background: '#FFFFFF',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#374151',
+                cursor: 'pointer'
+              }}
+              title="Khôi phục thứ tự chuẩn 1, 2, 3, 4, 5, 6 theo các ảnh giao diện ban đầu"
+            >
+              <RotateCcw size={12} />
+              <span>Khôi phục chuẩn (1-6)</span>
+            </button>
+            <span style={{ color: '#E7E5E4' }}>|</span>
             <span className="lb-selected-count">
               Đã chọn: <strong>{selectedIds.length} mục</strong>
             </span>
@@ -1078,7 +1121,7 @@ export default function LookbookManagement() {
               onClick={handleBulkDelete}
             >
               <Trash2 size={13} />
-              <span>Xóa các mục đã chọn</span>
+              <span>Xóa đã chọn</span>
             </button>
           </div>
         </div>
@@ -1103,8 +1146,8 @@ export default function LookbookManagement() {
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
             >
+              <option value="position">Thứ tự điều khiển (1, 2, 3, 4, 5...)</option>
               <option value="newest">Mới cập nhật nhất</option>
-              <option value="position">Thứ tự ưu tiên (1 - 12)</option>
               <option value="productCount">Số lượng sản phẩm</option>
               <option value="oldest">Cũ nhất</option>
             </select>
@@ -1124,9 +1167,9 @@ export default function LookbookManagement() {
                     onChange={handleSelectAll}
                   />
                 </th>
-                <th>LOOKBOOK & MÙA CHIẾN DỊCH</th>
-                <th style={{ textAlign: 'center', width: '90px' }}>VỊ TRÍ</th>
-                <th style={{ width: '160px' }}>SỐ LƯỢNG SẢN PHẨM</th>
+                <th style={{ textAlign: 'center', width: '110px' }}>THỨ TỰ (VỊ TRÍ)</th>
+                <th>MỤC & LOOKBOOK ĐIỀU KHIỂN</th>
+                <th style={{ width: '150px' }}>GIÁ & SẢN PHẨM</th>
                 <th style={{ textAlign: 'center', width: '130px' }}>TRẠNG THÁI</th>
                 <th style={{ textAlign: 'center', width: '120px' }}>THAO TÁC</th>
               </tr>
@@ -1155,7 +1198,40 @@ export default function LookbookManagement() {
                         />
                       </td>
 
-                      {/* Title & Thumbnail */}
+                      {/* Position Selector Column */}
+                      <td style={{ textAlign: 'center' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                          <select
+                            className={`lb-position-badge ${isTopRank ? 'top-rank' : 'normal-rank'}`}
+                            value={lb.position}
+                            onChange={(e) => handleUpdatePosition(lb.id, e.target.value)}
+                            style={{
+                              cursor: 'pointer',
+                              outline: 'none',
+                              border: isTopRank ? 'none' : '1px solid #E7E5E4',
+                              textAlign: 'center',
+                              padding: '3px 8px',
+                              fontWeight: 700,
+                              fontSize: '12px',
+                              borderRadius: '6px',
+                              width: 'auto',
+                              height: 'auto'
+                            }}
+                            title={`Thứ tự điều khiển vị trí #${lb.position} trên trang (${lb.position === 1 ? 'Nổi bật Homepage & Look 01' : 'Nhấp để chuyển vị trí'})`}
+                          >
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(num => (
+                              <option key={num} value={num} style={{ background: '#FFFFFF', color: '#111111' }}>
+                                Vị trí #{num}
+                              </option>
+                            ))}
+                          </select>
+                          <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: 600 }}>
+                            {lb.lookCode || `MỤC 0${lb.position}`}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Title & Section Role Description */}
                       <td>
                         <div className="lb-item-cell">
                           <img
@@ -1167,51 +1243,40 @@ export default function LookbookManagement() {
                             }}
                           />
                           <div>
-                            <div className="lb-title-text">{lb.title}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                              <span style={{
+                                fontSize: '10.5px',
+                                fontWeight: 700,
+                                background: '#111111',
+                                color: '#FFFFFF',
+                                padding: '2px 6px',
+                                borderRadius: '4px'
+                              }}>
+                                {lb.lookCode || `LOOK 0${lb.position}`}
+                              </span>
+                              <div className="lb-title-text" style={{ margin: 0 }}>
+                                {lb.title}
+                              </div>
+                            </div>
+                            <div className="lb-meta-text" style={{ color: '#047857', fontWeight: 600, margin: '2px 0' }}>
+                              📍 Điều khiển: {lb.sectionRole || `Khối Look ${lb.position} trên trang`}
+                            </div>
                             <div className="lb-meta-text">
-                              {lb.code} • {lb.season}
+                              {lb.code} • {lb.season} {lb.badge && `• [${lb.badge}]`}
                             </div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Position (Controls Homepage Featured Lookbook) */}
-                      <td style={{ textAlign: 'center' }}>
-                        <select
-                          className={`lb-position-badge ${isTopRank ? 'top-rank' : 'normal-rank'}`}
-                          value={lb.position}
-                          onChange={(e) => handleUpdatePosition(lb.id, e.target.value)}
-                          style={{
-                            cursor: 'pointer',
-                            outline: 'none',
-                            border: isTopRank ? 'none' : '1px solid #E7E5E4',
-                            textAlign: 'center',
-                            appearance: 'none',
-                            WebkitAppearance: 'none',
-                            padding: 0
-                          }}
-                          title={`Vị trí #${lb.position} (${lb.position === 1 ? 'Hiển thị chính trên Trang Chủ Homepage' : 'Nhấp để đổi thứ tự'})`}
-                        >
-                          {Array.from({ length: 12 }, (_, i) => i + 1).map(num => (
-                            <option key={num} value={num} style={{ background: '#FFFFFF', color: '#111111' }}>
-                              {num}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-
-                      {/* Product Count & Mini bar */}
+                      {/* Price & Product count */}
                       <td>
-                        <div className="lb-product-count-wrapper">
-                          <span className="lb-product-count-text">
-                            {lb.productCount} Sản phẩm
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span style={{ fontWeight: 700, fontSize: '13px', color: '#111111' }}>
+                            {lb.price || '5.445.000₫'}
                           </span>
-                          <div className="lb-product-bar-bg">
-                            <div
-                              className={`lb-product-bar-fill ${lb.status === 'hidden' ? 'muted' : ''}`}
-                              style={{ width: `${Math.min(100, lb.productCount * 20)}%` }}
-                            />
-                          </div>
+                          <span style={{ fontSize: '11.5px', color: '#6B7280' }}>
+                            {lb.productCount || 1} sản phẩm phối
+                          </span>
                         </div>
                       </td>
 
@@ -1221,7 +1286,7 @@ export default function LookbookManagement() {
                           type="button"
                           className={`lb-status-pill ${lb.status}`}
                           onClick={() => handleToggleStatus(lb.id)}
-                          title="Nhấp để thay đổi trạng thái"
+                          title="Nhấp để chuyển Phát hành / Tạm ẩn"
                         >
                           {lb.status === 'published' ? 'Phát hành' : 'Tạm ẩn'}
                         </button>
@@ -1314,7 +1379,7 @@ export default function LookbookManagement() {
           <div className="lb-modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="lb-modal-header">
               <h3 className="lb-modal-title">
-                {editingLookbook ? 'Chỉnh Sửa Tuyển Tập Lookbook' : 'Tạo Lookbook Mới'}
+                {editingLookbook ? 'Chỉnh Sửa Mục Lookbook' : 'Tạo Lookbook Mới'}
               </h3>
               <button 
                 type="button" 
@@ -1328,35 +1393,46 @@ export default function LookbookManagement() {
             <form onSubmit={handleSaveForm}>
               <div className="lb-modal-form">
                 <div className="lb-form-group">
-                  <label className="lb-form-label">Tên Tuyển Tập Lookbook *</label>
+                  <label className="lb-form-label">Tên Mục / Tuyển Tập Lookbook *</label>
                   <input
                     type="text"
                     className="lb-form-input"
-                    placeholder="VD: Fall/Winter 2025: L'Automne Éternel"
+                    placeholder="VD: Áo Măng Tô Belted Dạ Camel Cashmere Quý Phái Thời Đại"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     required
                   />
                 </div>
 
+                <div className="lb-form-group">
+                  <label className="lb-form-label">Mục điều khiển trên giao diện (Vị trí & Khối)</label>
+                  <input
+                    type="text"
+                    className="lb-form-input"
+                    placeholder="VD: Khối Look 01 (Áo Măng Tô & Nổi Bật Trang Chủ)"
+                    value={formData.sectionRole}
+                    onChange={(e) => setFormData({ ...formData, sectionRole: e.target.value })}
+                  />
+                </div>
+
                 <div className="lb-form-row-2">
                   <div className="lb-form-group">
-                    <label className="lb-form-label">Mã Tuyển Tập</label>
+                    <label className="lb-form-label">Mã Hiển Thị (VD: LOOK 01, MỤC 05...)</label>
                     <input
                       type="text"
                       className="lb-form-input"
-                      placeholder="VD: LB - FW25 - 01"
-                      value={formData.code}
-                      onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                      placeholder="VD: LOOK 01"
+                      value={formData.lookCode}
+                      onChange={(e) => setFormData({ ...formData, lookCode: e.target.value })}
                     />
                   </div>
 
                   <div className="lb-form-group">
-                    <label className="lb-form-label">Mùa Chiến Dịch / Chủ Đề</label>
+                    <label className="lb-form-label">Phong Cách / Mùa</label>
                     <input
                       type="text"
                       className="lb-form-input"
-                      placeholder="VD: Mùa Thu Đông / Ready-To-Wear"
+                      placeholder="VD: PHONG CÁCH THU ĐÔNG"
                       value={formData.season}
                       onChange={(e) => setFormData({ ...formData, season: e.target.value })}
                     />
@@ -1365,7 +1441,7 @@ export default function LookbookManagement() {
 
                 <div className="lb-form-row-2">
                   <div className="lb-form-group">
-                    <label className="lb-form-label">Vị Trí Ưu Tiên (Thứ tự)</label>
+                    <label className="lb-form-label">Thứ Tự Vị Trí (1, 2, 3, 4, 5...)</label>
                     <input
                       type="number"
                       min="1"
@@ -1376,13 +1452,13 @@ export default function LookbookManagement() {
                   </div>
 
                   <div className="lb-form-group">
-                    <label className="lb-form-label">Số Lượng Sản Phẩm Gắn Tag</label>
+                    <label className="lb-form-label">Giá Hiển Thị / Combo</label>
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
                       className="lb-form-input"
-                      value={formData.productCount}
-                      onChange={(e) => setFormData({ ...formData, productCount: e.target.value })}
+                      placeholder="VD: 5.445.000₫"
+                      value={formData.price}
+                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                     />
                   </div>
                 </div>
