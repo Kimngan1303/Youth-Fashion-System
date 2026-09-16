@@ -157,6 +157,18 @@ export default function LookbookManagement() {
     updateLookbooks(updated);
   };
 
+  // Quick update position (controls homepage featured display)
+  const handleUpdatePosition = (id, newPos) => {
+    const target = Number(newPos);
+    const updated = lookbooks.map(lb => {
+      if (lb.id === id) {
+        return { ...lb, position: target };
+      }
+      return lb;
+    });
+    updateLookbooks(updated);
+  };
+
   // Open Create Modal
   const handleOpenCreate = () => {
     setEditingLookbook(null);
@@ -1163,11 +1175,29 @@ export default function LookbookManagement() {
                         </div>
                       </td>
 
-                      {/* Position */}
+                      {/* Position (Controls Homepage Featured Lookbook) */}
                       <td style={{ textAlign: 'center' }}>
-                        <span className={`lb-position-badge ${isTopRank ? 'top-rank' : 'normal-rank'}`}>
-                          {lb.position}
-                        </span>
+                        <select
+                          className={`lb-position-badge ${isTopRank ? 'top-rank' : 'normal-rank'}`}
+                          value={lb.position}
+                          onChange={(e) => handleUpdatePosition(lb.id, e.target.value)}
+                          style={{
+                            cursor: 'pointer',
+                            outline: 'none',
+                            border: isTopRank ? 'none' : '1px solid #E7E5E4',
+                            textAlign: 'center',
+                            appearance: 'none',
+                            WebkitAppearance: 'none',
+                            padding: 0
+                          }}
+                          title={`Vị trí #${lb.position} (${lb.position === 1 ? 'Hiển thị chính trên Trang Chủ Homepage' : 'Nhấp để đổi thứ tự'})`}
+                        >
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map(num => (
+                            <option key={num} value={num} style={{ background: '#FFFFFF', color: '#111111' }}>
+                              {num}
+                            </option>
+                          ))}
+                        </select>
                       </td>
 
                       {/* Product Count & Mini bar */}

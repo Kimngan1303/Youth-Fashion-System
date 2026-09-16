@@ -1,9 +1,28 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Hammer, Users, Menu, Heart, Star, Edit3, RotateCcw, UserCheck } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
+import { getStoredLookbooks } from '../services/lookbookData';
 
 const HomePage = ({ onOpenAISearch }) => {
+  const [publishedLookbooks, setPublishedLookbooks] = useState([]);
+
+  useEffect(() => {
+    const loadLookbooks = () => {
+      const all = getStoredLookbooks();
+      const published = all
+        .filter(item => item.status === 'published')
+        .sort((a, b) => Number(a.position) - Number(b.position));
+      setPublishedLookbooks(published);
+    };
+
+    loadLookbooks();
+    window.addEventListener('lookbook-updated', loadLookbooks);
+    return () => window.removeEventListener('lookbook-updated', loadLookbooks);
+  }, []);
+
+  const featuredLookbook = publishedLookbooks[0] || null;
+
   const newProducts = [
     {
       id: 1,
@@ -94,45 +113,49 @@ const HomePage = ({ onOpenAISearch }) => {
         </div>
       </section>
 
-      {/* 4. LOOKBOOK CHIẾN DỊCH THU ĐÔNG 2025 SECTION */}
-      <section className="section-lookbook-split container">
-        <div className="lookbook-left-card">
-          <span className="lookbook-sub">BỘ SƯU TẬP MÙA THU ĐÔNG 2025</span>
-          <h2 className="lookbook-title font-serif">
-            L'Automne Éternel: Khúc Xạ Của Thu Vĩnh Cửu
-          </h2>
-          <p className="lookbook-desc">
-            Nơi phong cách thanh lịch hòa cùng nghệ thuật may đo thủ công Pháp. Khám phá các thiết kế măng tô dạ Cashmere, đầm xếp ly tơ tằm quý phái cùng phối đồ Parisian Chic đương đại.
-          </p>
-          <Link to="/lookbook" className="btn-black lookbook-btn">
-            KHÁM PHÁ TUYỂN TẬP LOOKBOOK &rarr;
-          </Link>
-        </div>
+      {/* 4. LOOKBOOK SECTION - ĐƯỢC ĐIỀU KHIỂN THEO VỊ TRÍ TỪ BẢNG QUẢN LÝ */}
+      {featuredLookbook && (
+        <section className="section-lookbook-split container">
+          <div className="lookbook-left-card">
+            <span className="lookbook-sub">
+              {featuredLookbook.season ? `BỘ SƯU TẬP • ${featuredLookbook.season.toUpperCase()}` : 'BỘ SƯU TẬP NỔI BẬT'} (VỊ TRÍ #{featuredLookbook.position})
+            </span>
+            <h2 className="lookbook-title font-serif">
+              {featuredLookbook.title}
+            </h2>
+            <p className="lookbook-desc">
+              {featuredLookbook.description || "Nơi phong cách thanh lịch hòa cùng nghệ thuật may đo thủ công Pháp. Khám phá các thiết kế thời thượng tôn vinh thần thái của bạn."}
+            </p>
+            <Link to="/lookbook" className="btn-black lookbook-btn">
+              KHÁM PHÁ TUYỂN TẬP LOOKBOOK &rarr;
+            </Link>
+          </div>
 
-        <div className="lookbook-photos-grid">
-          <div className="lb-photo-col">
-            <img 
-              src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=600" 
-              alt="Lookbook Coat" 
-              className="lb-img"
-            />
+          <div className="lookbook-photos-grid">
+            <div className="lb-photo-col">
+              <img 
+                src={featuredLookbook.image || "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=600"} 
+                alt={featuredLookbook.title} 
+                className="lb-img"
+              />
+            </div>
+            <div className="lb-photo-col">
+              <img 
+                src={publishedLookbooks[1]?.image || featuredLookbook.outfits?.[0]?.image || "https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=600"} 
+                alt={publishedLookbooks[1]?.title || "Lookbook Highlight 2"} 
+                className="lb-img"
+              />
+            </div>
+            <div className="lb-photo-col">
+              <img 
+                src={publishedLookbooks[2]?.image || featuredLookbook.outfits?.[1]?.image || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600"} 
+                alt={publishedLookbooks[2]?.title || "Lookbook Highlight 3"} 
+                className="lb-img"
+              />
+            </div>
           </div>
-          <div className="lb-photo-col">
-            <img 
-              src="https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=600" 
-              alt="Lookbook Gown" 
-              className="lb-img"
-            />
-          </div>
-          <div className="lb-photo-col">
-            <img 
-              src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600" 
-              alt="Lookbook Tailoring" 
-              className="lb-img"
-            />
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
 
 
