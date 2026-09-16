@@ -86,9 +86,9 @@ const Footer = () => {
           </div>
         </div>
 
-        {/* Column 1: Contact / Info Links */}
+        {/* Column 1: Info Links */}
         <div className="footer-col">
-          <h4 className="footer-title">LIÊN LẠC</h4>
+          <h4 className="footer-title">THÔNG TIN</h4>
           <ul className="footer-links">
             <li><Link to="/about">Về chúng tôi</Link></li>
             <li><a href="#faq">Câu hỏi thường gặp</a></li>
