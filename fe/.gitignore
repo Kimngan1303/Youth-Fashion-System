@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment variables
+.env
+.env.local
+
+# Production Build & Logs
+dist/
+*.log
