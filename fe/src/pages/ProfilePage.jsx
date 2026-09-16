@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { 
   User, Package, Lock, Heart, LogOut, CheckCircle, 
-  Camera, MapPin, Calendar, Clock, CreditCard, ChevronRight, AlertCircle, Tag, Copy
+  Camera, MapPin, Calendar, Clock, CreditCard, ChevronRight, AlertCircle, Tag, Copy, RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ProductCard from '../components/ProductCard';
@@ -14,6 +14,7 @@ const ProfilePage = () => {
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
+  const fileInputRef = useRef(null);
   
   // Form State initialized from user context
   const [formData, setFormData] = useState({
@@ -63,6 +64,35 @@ const ProfilePage = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleAvatarFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Vui lòng chọn file ảnh có dung lượng dưới 5MB!');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64Url = reader.result;
+      setFormData(prev => ({ ...prev, avatar_url: base64Url }));
+      updateUserProfile({ avatar_url: base64Url });
+      setSaveSuccessMsg('Đã cập nhật ảnh đại diện thành công!');
+      setTimeout(() => setSaveSuccessMsg(''), 4000);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleResetAvatar = () => {
+    const defaultUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400';
+    setFormData(prev => ({ ...prev, avatar_url: defaultUrl }));
+    updateUserProfile({ avatar_url: defaultUrl });
+    setSaveSuccessMsg('Đã đặt lại ảnh đại diện mặc định!');
+    setTimeout(() => setSaveSuccessMsg(''), 4000);
+  };
+
   const handleSaveProfile = (e) => {
     e.preventDefault();
     updateUserProfile({
@@ -70,6 +100,7 @@ const ProfilePage = () => {
       phone: formData.phone,
       gender: formData.gender,
       dob: formData.dob,
+      avatar_url: formData.avatar_url,
       address: {
         province: formData.province,
         district: formData.district,
@@ -186,39 +217,58 @@ const ProfilePage = () => {
         {/* 2. Top Luxury Membership Header Banner */}
         <div className="profile-hero-banner">
           <div className="hero-banner-left">
-            <div className="hero-avatar-box">
+            <div 
+              className="hero-avatar-box editable"
+              onClick={() => fileInputRef.current?.click()}
+              title="Nhấp để thay đổi ảnh đại diện"
+            >
               <img 
-                src={formData.avatar_url} 
-                alt={user?.full_name || 'Nguyễn Hoàng Thảo My'} 
+                src={formData.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400'} 
+                alt={formData.full_name || 'Avatar'} 
                 className="hero-avatar-img" 
               />
+              <div className="hero-avatar-overlay">
+                <Camera size={22} className="avatar-camera-icon" />
+                <span className="avatar-overlay-text">ĐỔI ẢNH</span>
+              </div>
               <div className="hero-avatar-badge" title="Tài khoản VIP đã xác thực">
                 <CheckCircle size={15} className="check-badge-icon" />
               </div>
             </div>
 
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              accept="image/*" 
+              onChange={handleAvatarFileChange} 
+              style={{ display: 'none' }} 
+            />
+
             <div className="hero-info-content">
               <div className="hero-subtitle">
                 <span className="gold-text-hero">THÀNH VIÊN ĐẶC QUYỀN</span> <span className="dot">•</span> {user?.member_since || 'Từ Tháng 03/2023'}
               </div>
-              <h1 className="hero-user-name font-serif">{user?.full_name || 'Nguyễn Hoàng Thảo My'}</h1>
-              <div className="hero-tier-pill">
-                <span className="tier-medal">🏅</span>
-                <span>{user?.tier || 'VIP GOLD ATELIER MEMBER'}</span>
+              <h1 className="hero-user-name font-serif">{formData.full_name || user?.full_name || 'Nguyễn Hoàng Thảo My'}</h1>
+              <div className="hero-tier-row">
+                <div className="hero-tier-pill">
+                  <span className="tier-medal">🏅</span>
+                  <span>{user?.tier || 'VIP GOLD ATELIER MEMBER'}</span>
+                </div>
+                <button 
+                  type="button" 
+                  className="btn-hero-change-avatar" 
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Thay đổi ảnh đại diện"
+                >
+                  <Camera size={13} />
+                  <span>Đổi Avatar</span>
+                </button>
               </div>
             </div>
           </div>
 
           <div className="hero-banner-right">
             <div className="stats-box">
-              <div className="stat-col">
-                <span className="stat-label">ĐIỂM TÍCH LŨY</span>
-                <span className="stat-value">{user?.points || '3.450 pts'}</span>
-                <span className="stat-sub">{user?.points_cash || 'Quy đổi 345.000đ'}</span>
-              </div>
-              
-              <div className="stat-divider" />
-              
               <div className="stat-col">
                 <span className="stat-label">TỔNG CHI TIÊU</span>
                 <span className="stat-value">{user?.total_spent || '34.5M'}</span>
@@ -688,6 +738,10 @@ const ProfilePage = () => {
           position: relative;
         }
 
+        .hero-avatar-box.editable {
+          cursor: pointer;
+        }
+
         .hero-avatar-img {
           width: 92px;
           height: 92px;
@@ -695,6 +749,40 @@ const ProfilePage = () => {
           object-fit: cover;
           border: 2px solid rgba(212, 175, 55, 0.5);
           box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          display: block;
+        }
+
+        .hero-avatar-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 92px;
+          height: 92px;
+          border-radius: 12px;
+          background: rgba(0, 0, 0, 0.65);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          opacity: 0;
+          transition: opacity 0.2s ease;
+          color: #ffffff;
+        }
+
+        .hero-avatar-box.editable:hover .hero-avatar-overlay {
+          opacity: 1;
+        }
+
+        .avatar-camera-icon {
+          color: #ffffff;
+        }
+
+        .avatar-overlay-text {
+          font-size: 10.5px;
+          font-weight: 700;
+          letter-spacing: 0.8px;
+          color: #ffffff;
         }
 
         .hero-avatar-badge {
@@ -710,6 +798,7 @@ const ProfilePage = () => {
           align-items: center;
           justify-content: center;
           border: 2px solid #121316;
+          z-index: 2;
         }
 
         .check-badge-icon {
@@ -750,6 +839,13 @@ const ProfilePage = () => {
           margin: 0;
         }
 
+        .hero-tier-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
         .hero-tier-pill {
           display: inline-flex;
           align-items: center;
@@ -763,11 +859,31 @@ const ProfilePage = () => {
           padding: 5px 14px;
           border-radius: 20px;
           width: fit-content;
-          margin-top: 2px;
         }
 
         .tier-medal {
           font-size: 12px;
+        }
+
+        .btn-hero-change-avatar {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: rgba(255, 255, 255, 0.1);
+          color: #f3f4f6;
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          border-radius: 20px;
+          padding: 5px 14px;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .btn-hero-change-avatar:hover {
+          background: rgba(212, 175, 55, 0.25);
+          color: #ffffff;
+          border-color: #d4af37;
         }
 
         /* Right Stats Box */
