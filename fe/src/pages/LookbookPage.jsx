@@ -33,13 +33,19 @@ export default function LookbookPage() {
   useEffect(() => {
     const loadData = () => {
       const all = getStoredLookbooks();
-      const published = all.filter(item => item.status === 'published');
+      const published = all
+        .filter(item => item.status === 'published')
+        .sort((a, b) => Number(a.position) - Number(b.position));
       setLookbooks(published);
     };
 
     loadData();
     window.addEventListener('lookbook-updated', loadData);
-    return () => window.removeEventListener('lookbook-updated', loadData);
+    window.addEventListener('storage', loadData);
+    return () => {
+      window.removeEventListener('lookbook-updated', loadData);
+      window.removeEventListener('storage', loadData);
+    };
   }, []);
 
   const primaryLookbook = lookbooks[0] || {};
@@ -662,8 +668,22 @@ export default function LookbookPage() {
         </button>
       </div>
 
-      {/* 2. Hero Cinematic Banner */}
-      <section className="lb-hero-editorial">
+      {lookbooks.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '120px 20px', minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '28px', color: '#111', marginBottom: '12px' }}>
+            Chưa có Tuyển Tập Lookbook nào được phát hành
+          </h2>
+          <p style={{ fontSize: '14px', color: '#78716C', maxWidth: '480px', margin: '0 auto 24px auto', lineHeight: '1.6' }}>
+            Các bộ sưu tập đã được gỡ bỏ khỏi hệ thống quản lý. Quý khách vui lòng quay lại sau!
+          </p>
+          <Link to="/" style={{ padding: '12px 28px', background: '#111', color: '#FFF', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}>
+            VỀ TRANG CHỦ
+          </Link>
+        </div>
+      ) : (
+        <>
+          {/* 2. Hero Cinematic Banner */}
+          <section className="lb-hero-editorial">
         <img
           src="https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1600"
           alt="L'Automne Éternel Campaign"
@@ -1079,6 +1099,8 @@ export default function LookbookPage() {
         </section>
 
       </main>
-    </div>
+    </>
+  )}
+</div>
   );
 }

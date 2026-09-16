@@ -18,7 +18,11 @@ const HomePage = ({ onOpenAISearch }) => {
 
     loadLookbooks();
     window.addEventListener('lookbook-updated', loadLookbooks);
-    return () => window.removeEventListener('lookbook-updated', loadLookbooks);
+    window.addEventListener('storage', loadLookbooks);
+    return () => {
+      window.removeEventListener('lookbook-updated', loadLookbooks);
+      window.removeEventListener('storage', loadLookbooks);
+    };
   }, []);
 
   const featuredLookbook = publishedLookbooks[0] || null;
