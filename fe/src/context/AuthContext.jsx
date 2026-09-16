@@ -54,7 +54,11 @@ export function AuthProvider({ children }) {
       const result = await authService.register(userData);
       return { success: true, message: result.message, data: result.data };
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại!';
+      const serverData = error.response?.data;
+      let errorMsg = serverData?.message || 'Đăng ký thất bại. Vui lòng thử lại!';
+      if (serverData?.errors && Array.isArray(serverData.errors) && serverData.errors.length > 0) {
+        errorMsg = `${serverData.message}: ${serverData.errors.join(', ')}`;
+      }
       return { success: false, message: errorMsg };
     } finally {
       setLoading(false);
