@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -17,181 +17,15 @@ import {
   ExternalLink,
   ChevronDown
 } from 'lucide-react';
-
-const INITIAL_LOOKBOOKS = [
-  {
-    id: 1,
-    title: "Fall/Winter 2025: L'Automne Éternel",
-    code: "LB - FW25 - 01",
-    season: "Mùa Thu Đông",
-    position: 1,
-    productCount: 5,
-    status: "published", // published: Phát hành, hidden: Tạm ẩn
-    image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600",
-    description: "Bộ sưu tập mang hơi thở thu đông Paris với các chất liệu len dạ cao cấp, phom dáng bespoke quý phái.",
-    conversionRate: "36%",
-    outfits: [
-      { name: "Set Dạ Tweed Quý Tộc", price: "4.200.000₫", items: 2 },
-      { name: "Blazer Cashmere & Chân Váy Xếp Ly", price: "3.850.000₫", items: 3 }
-    ]
-  },
-  {
-    id: 2,
-    title: "The Modern Tailoring & Parisian Chic",
-    code: "LB - RTW25 - 02",
-    season: "Ready-To-Wear",
-    position: 2,
-    productCount: 3,
-    status: "published",
-    image: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=600",
-    description: "Tôn vinh đường nét cắt may tối giản, kết hợp phong cách đường phố đương đại của giới trẻ Paris.",
-    conversionRate: "28%",
-    outfits: [
-      { name: "Pantsuit Minimalist", price: "2.900.000₫", items: 2 }
-    ]
-  },
-  {
-    id: 3,
-    title: "Evening Gala & Haute Couture Atelier",
-    code: "LB - GALA25 - 03",
-    season: "Gala Dạ Tiệc",
-    position: 3,
-    productCount: 2,
-    status: "published",
-    image: "https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=600",
-    description: "Những thiết kế đầm tiệc lộng lẫy điểm xuyết sequin và lụa tơ tằm thượng hạng cho đêm dạ vũ.",
-    conversionRate: "24%",
-    outfits: [
-      { name: "Đầm Lụa Dạ Tiệc Midnight", price: "5.600.000₫", items: 2 }
-    ]
-  },
-  {
-    id: 4,
-    title: "Minimalist Silk & Cashmere Sensations",
-    code: "LB - SILK25 - 04",
-    season: "Phong cách Tối Giản",
-    position: 4,
-    productCount: 3,
-    status: "published",
-    image: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&q=80&w=600",
-    description: "Sự thăng hoa của cảm giác mượt mà trên làn da, phom dáng suông rộng thanh lịch vượt thời gian.",
-    conversionRate: "21%",
-    outfits: [
-      { name: "Sơ Mi Silk & Quần Suông Tencel", price: "2.350.000₫", items: 2 }
-    ]
-  },
-  {
-    id: 5,
-    title: "Spring Essence: Whispers of Spring 2026",
-    code: "LB - SS26 - 05",
-    season: "Mùa Xuân Hè",
-    position: 5,
-    productCount: 1,
-    status: "hidden",
-    image: "https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?auto=format&fit=crop&q=80&w=600",
-    description: "Sắc màu tươi mới chuẩn bị ra mắt cho mùa lễ hội mùa xuân sắp tới.",
-    conversionRate: "12%",
-    outfits: [
-      { name: "Váy Cotton Hoa Nhí", price: "1.650.000₫", items: 1 }
-    ]
-  },
-  {
-    id: 6,
-    title: "Heritage Wool & Bespoke Overcoats",
-    code: "LB - WOOL25 - 06",
-    season: "Áo Khoác & Len",
-    position: 6,
-    productCount: 2,
-    status: "published",
-    image: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&q=80&w=600",
-    description: "Dòng áo khoác mang tính di sản, sử dụng 100% len cừu nguyên chất từ Úc.",
-    conversionRate: "19%",
-    outfits: [
-      { name: "Áo Măng Tô Dạ Cổ Điển", price: "4.800.000₫", items: 2 }
-    ]
-  },
-  {
-    id: 7,
-    title: "Urban Monochrome: Streetwear Luxury",
-    code: "LB - URB25 - 07",
-    season: "Dạo Phố & Streetwear",
-    position: 7,
-    productCount: 4,
-    status: "published",
-    image: "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=600",
-    description: "Phối màu đen trắng kinh điển với các chi tiết kim loại góc cạnh, phá cách cho giới trẻ.",
-    conversionRate: "22%",
-    outfits: []
-  },
-  {
-    id: 8,
-    title: "Resort Voyage: Coastal Breeze & Linen",
-    code: "LB - RES25 - 08",
-    season: "Kỳ Nghỉ & Du Lịch",
-    position: 8,
-    productCount: 3,
-    status: "published",
-    image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&q=80&w=600",
-    description: "Chất liệu đũi thoáng mát cùng phom dáng phóng khoáng dành cho các kỳ nghỉ sang trọng.",
-    conversionRate: "25%",
-    outfits: []
-  },
-  {
-    id: 9,
-    title: "Old Money Elegance: Neo-Classic",
-    code: "LB - CLAS25 - 09",
-    season: "Phong cách Cổ Điển",
-    position: 9,
-    productCount: 2,
-    status: "hidden",
-    image: "https://images.unsplash.com/photo-1485230895905-ec40ba36b9bc?auto=format&fit=crop&q=80&w=600",
-    description: "Vẻ đẹp vượt thời gian mang phong cách quý tộc châu Âu tinh tế và kín đáo.",
-    conversionRate: "16%",
-    outfits: []
-  },
-  {
-    id: 10,
-    title: "Denim Redefined: Artisanal Indigo",
-    code: "LB - DNM25 - 10",
-    season: "Denim & Casual",
-    position: 10,
-    productCount: 3,
-    status: "hidden",
-    image: "https://images.unsplash.com/photo-1542272604-780c96856592?auto=format&fit=crop&q=80&w=600",
-    description: "Kỹ thuật wash thủ công và đường chỉ nổi ấn tượng trên nền denim Nhật Bản.",
-    conversionRate: "14%",
-    outfits: []
-  },
-  {
-    id: 11,
-    title: "Velvet Night: Royal Glamour",
-    code: "LB - VEL25 - 11",
-    season: "Dạ Hội Quý Phái",
-    position: 11,
-    productCount: 4,
-    status: "hidden",
-    image: "https://images.unsplash.com/photo-1518049362265-d5b2a6467637?auto=format&fit=crop&q=80&w=600",
-    description: "Chất nhung tuyết đen tuyền kiêu sa, bắt sáng tinh tế dưới ánh đèn rực rỡ.",
-    conversionRate: "18%",
-    outfits: []
-  },
-  {
-    id: 12,
-    title: "Pre-Fall Transition: Earthy Moods",
-    code: "LB - PF25 - 12",
-    season: "Chớm Thu",
-    position: 12,
-    productCount: 2,
-    status: "published",
-    image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600",
-    description: "Tông màu đất ấm áp nâu be, đất nung mang lại cảm xúc dịu dàng lúc giao mùa.",
-    conversionRate: "20%",
-    outfits: []
-  }
-];
+import { getStoredLookbooks, saveStoredLookbooks } from '../../services/lookbookData';
 
 export default function LookbookManagement() {
-  const [lookbooks, setLookbooks] = useState(INITIAL_LOOKBOOKS);
+  const [lookbooks, setLookbooks] = useState(() => getStoredLookbooks());
+
+  const updateLookbooks = (newItems) => {
+    setLookbooks(newItems);
+    saveStoredLookbooks(newItems);
+  };
   const [currentTab, setCurrentTab] = useState('all'); // 'all', 'published', 'hidden'
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('newest'); // 'newest', 'oldest', 'position', 'productCount'
@@ -291,7 +125,8 @@ export default function LookbookManagement() {
   const handleBulkDelete = () => {
     if (selectedIds.length === 0) return;
     if (window.confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.length} lookbook đã chọn không?`)) {
-      setLookbooks(prev => prev.filter(lb => !selectedIds.includes(lb.id)));
+      const updated = lookbooks.filter(lb => !selectedIds.includes(lb.id));
+      updateLookbooks(updated);
       setSelectedIds([]);
       if (currentPage > 1 && currentItems.length === selectedIds.length) {
         setCurrentPage(currentPage - 1);
@@ -302,14 +137,15 @@ export default function LookbookManagement() {
   // Single Delete
   const handleDeleteOne = (id) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa lookbook này không?')) {
-      setLookbooks(prev => prev.filter(lb => lb.id !== id));
+      const updated = lookbooks.filter(lb => lb.id !== id);
+      updateLookbooks(updated);
       setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
     }
   };
 
   // Toggle Publish/Hidden
   const handleToggleStatus = (id) => {
-    setLookbooks(prev => prev.map(lb => {
+    const updated = lookbooks.map(lb => {
       if (lb.id === id) {
         return {
           ...lb,
@@ -317,7 +153,8 @@ export default function LookbookManagement() {
         };
       }
       return lb;
-    }));
+    });
+    updateLookbooks(updated);
   };
 
   // Open Create Modal
@@ -362,7 +199,7 @@ export default function LookbookManagement() {
 
     if (editingLookbook) {
       // Update
-      setLookbooks(prev => prev.map(lb => {
+      const updated = lookbooks.map(lb => {
         if (lb.id === editingLookbook.id) {
           return {
             ...lb,
@@ -372,7 +209,8 @@ export default function LookbookManagement() {
           };
         }
         return lb;
-      }));
+      });
+      updateLookbooks(updated);
     } else {
       // Create new
       const newLookbook = {
@@ -383,7 +221,7 @@ export default function LookbookManagement() {
         conversionRate: '0%',
         outfits: []
       };
-      setLookbooks(prev => [newLookbook, ...prev]);
+      updateLookbooks([newLookbook, ...lookbooks]);
     }
 
     setIsModalOpen(false);

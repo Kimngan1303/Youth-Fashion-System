@@ -94,40 +94,40 @@ const HomePage = ({ onOpenAISearch }) => {
         </div>
       </section>
 
-      {/* 4. LOOKBOOK XUÂN HÈ 2026 SECTION */}
+      {/* 4. LOOKBOOK CHIẾN DỊCH THU ĐÔNG 2025 SECTION */}
       <section className="section-lookbook-split container">
         <div className="lookbook-left-card">
-          <span className="lookbook-sub">LOOKBOOK XUÂN HÈ 2026</span>
+          <span className="lookbook-sub">BỘ SƯU TẬP MÙA THU ĐÔNG 2025</span>
           <h2 className="lookbook-title font-serif">
-            Thiết Kế Vượt Thời Gian Cho Mọi Khoảnh Khắc
+            L'Automne Éternel: Khúc Xạ Của Thu Vĩnh Cửu
           </h2>
           <p className="lookbook-desc">
-            Khám phá bộ sưu tập Xuân Hè 2026 tôn vinh sự trẻ trung hiện đại, phóng khoáng và thần thái tự nhiên cuốn hút.
+            Nơi phong cách thanh lịch hòa cùng nghệ thuật may đo thủ công Pháp. Khám phá các thiết kế măng tô dạ Cashmere, đầm xếp ly tơ tằm quý phái cùng phối đồ Parisian Chic đương đại.
           </p>
           <Link to="/lookbook" className="btn-black lookbook-btn">
-            KHÁM PHÁ LOOKBOOK &rarr;
+            KHÁM PHÁ TUYỂN TẬP LOOKBOOK &rarr;
           </Link>
         </div>
 
         <div className="lookbook-photos-grid">
           <div className="lb-photo-col">
             <img 
-              src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600" 
-              alt="Lookbook 1" 
-              className="lb-img grayscale"
-            />
-          </div>
-          <div className="lb-photo-col">
-            <img 
               src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=600" 
-              alt="Lookbook 2" 
+              alt="Lookbook Coat" 
               className="lb-img"
             />
           </div>
           <div className="lb-photo-col">
             <img 
-              src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&q=80&w=600" 
-              alt="Lookbook 3" 
+              src="https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=600" 
+              alt="Lookbook Gown" 
+              className="lb-img"
+            />
+          </div>
+          <div className="lb-photo-col">
+            <img 
+              src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600" 
+              alt="Lookbook Tailoring" 
               className="lb-img"
             />
           </div>
