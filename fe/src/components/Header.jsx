@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 const Header = ({ onOpenAISearch }) => {
   const location = useLocation();
-  const { user, wishlist, cartCount, logout } = useAuth();
+  const { user, wishlist, cartCount } = useAuth();
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSearchInput, setShowSearchInput] = useState(false);
@@ -138,8 +138,12 @@ const Header = ({ onOpenAISearch }) => {
             onMouseEnter={() => setShowUserMenu(true)}
             onMouseLeave={() => setShowUserMenu(false)}
           >
-            <Link to="/profile" className="user-avatar-btn" title="Tài khoản cá nhân">
-              <User size={19} strokeWidth={1.8} className="user-icon-svg" />
+            <Link to="/profile" className="action-icon user-avatar-btn" title="Tài khoản">
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt={user.full_name} className="header-avatar" />
+              ) : (
+                <User size={18} />
+              )}
             </Link>
 
             {showUserMenu && user && (
@@ -149,11 +153,11 @@ const Header = ({ onOpenAISearch }) => {
                   <span className="user-email">{user.email}</span>
                 </div>
                 <hr />
-                <Link to="/profile" className="dropdown-item">Hồ sơ tài khoản</Link>
+                <Link to="/profile" className="dropdown-item">Thông tin tài khoản</Link>
                 <Link to="/profile?tab=orders" className="dropdown-item">Lịch sử đơn hàng</Link>
                 <Link to="/profile?tab=wishlist" className="dropdown-item">Danh sách yêu thích</Link>
                 <hr />
-                <button className="dropdown-item text-danger" onClick={logout}>Đăng xuất</button>
+                <button className="dropdown-item text-danger">Đăng xuất</button>
               </div>
             )}
           </div>
@@ -390,29 +394,11 @@ const Header = ({ onOpenAISearch }) => {
           position: relative;
         }
 
-        .user-avatar-btn {
-          width: 36px;
-          height: 36px;
-          border-radius: 10px;
-          background-color: transparent;
-          color: #111827;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: all 0.22s ease;
-          border: 1px solid transparent;
-        }
-
-        .user-avatar-btn:hover {
-          background-color: #000000;
-          color: #ffffff;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
-          transform: translateY(-1px);
-        }
-
-        .user-icon-svg {
-          transition: color 0.2s ease;
+        .header-avatar {
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          object-fit: cover;
         }
 
         .user-dropdown {

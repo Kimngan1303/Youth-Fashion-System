@@ -8,11 +8,7 @@ export function AuthProvider({ children }) {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
       try {
-        const parsed = JSON.parse(savedUser);
-        if (parsed && !parsed.avatar_url) {
-          parsed.avatar_url = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400';
-        }
-        return parsed;
+        return JSON.parse(savedUser);
       } catch (e) {
         // fallback
       }
@@ -70,15 +66,7 @@ export function AuthProvider({ children }) {
   };
 
   const updateUserProfile = (updatedData) => {
-    setUser(prev => {
-      const newUser = { ...(prev || {}), ...updatedData };
-      try {
-        localStorage.setItem('user', JSON.stringify(newUser));
-      } catch (err) {
-        console.warn('Could not save user to localStorage:', err);
-      }
-      return newUser;
-    });
+    setUser(prev => ({ ...prev, ...updatedData }));
   };
 
   const login = async ({ email, password, user_type = 'CUSTOMER' }) => {
@@ -86,14 +74,10 @@ export function AuthProvider({ children }) {
     try {
       const result = await authService.login({ email, password, user_type });
       const { user: userData, accessToken: token } = result.data;
-      const userWithAvatar = {
-        ...userData,
-        avatar_url: userData?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400'
-      };
 
-      setUser(userWithAvatar);
+      setUser(userData);
       setAccessToken(token);
-      localStorage.setItem('user', JSON.stringify(userWithAvatar));
+      localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('accessToken', token);
 
       return { success: true, message: result.message, data: result.data };
