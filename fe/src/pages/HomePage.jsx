@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Hammer, Users, Menu, Heart, Star, Edit3, RotateCcw, UserCheck } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
-import { getStoredLookbooks } from '../services/lookbookData';
+import { getStoredLookbooks, getLookbookPositionValue } from '../services/lookbookData';
 
 const HomePage = ({ onOpenAISearch }) => {
   const [publishedLookbooks, setPublishedLookbooks] = useState([]);
@@ -12,7 +12,7 @@ const HomePage = ({ onOpenAISearch }) => {
       const all = getStoredLookbooks();
       const published = all
         .filter(item => item.status === 'published')
-        .sort((a, b) => Number(a.position) - Number(b.position));
+        .sort((a, b) => getLookbookPositionValue(a.position) - getLookbookPositionValue(b.position));
       setPublishedLookbooks(published);
     };
 
@@ -25,7 +25,11 @@ const HomePage = ({ onOpenAISearch }) => {
     };
   }, []);
 
-  const featuredLookbook = publishedLookbooks[0] || null;
+  // Featured lookbook on homepage: prioritize position 1, or first non-banner published item
+  const featuredLookbook = publishedLookbooks.find(l => String(l.position) === '1')
+    || publishedLookbooks.find(l => l.position !== 'banner')
+    || publishedLookbooks[0]
+    || null;
 
   const newProducts = [
     {

@@ -17,7 +17,7 @@ import {
   ArrowRight,
   Info
 } from 'lucide-react';
-import { getStoredLookbooks } from '../services/lookbookData';
+import { getStoredLookbooks, getLookbookPositionValue } from '../services/lookbookData';
 import { useAuth } from '../context/AuthContext';
 
 export default function LookbookPage() {
@@ -35,7 +35,7 @@ export default function LookbookPage() {
       const all = getStoredLookbooks();
       const published = all
         .filter(item => item.status === 'published')
-        .sort((a, b) => Number(a.position) - Number(b.position));
+        .sort((a, b) => getLookbookPositionValue(a.position) - getLookbookPositionValue(b.position));
       setLookbooks(published);
     };
 
@@ -48,12 +48,12 @@ export default function LookbookPage() {
     };
   }, []);
 
-  const heroItem = lookbooks.find(l => l.type === 'hero' || l.position === 6) || lookbooks[0];
-  const look1 = lookbooks.find(l => l.position === 1 || l.lookCode === 'LOOK 01');
-  const look2 = lookbooks.find(l => l.position === 2 || l.lookCode === 'LOOK 02');
-  const look3 = lookbooks.find(l => l.position === 3 || l.lookCode === 'LOOK 03');
-  const look4 = lookbooks.find(l => l.position === 4 || l.lookCode === 'LOOK 04');
-  const backstageItem = lookbooks.find(l => l.type === 'backstage' || l.position === 5 || l.lookCode === 'MỤC 05');
+  const heroItem = lookbooks.find(l => l.position === 'banner' || l.type === 'hero' || l.lookCode === 'BANNER') || lookbooks[0];
+  const look1 = lookbooks.find(l => String(l.position) === '1' || l.lookCode === 'LOOK 01');
+  const look2 = lookbooks.find(l => String(l.position) === '2' || l.lookCode === 'LOOK 02');
+  const look3 = lookbooks.find(l => String(l.position) === '3' || l.lookCode === 'LOOK 03');
+  const look4 = lookbooks.find(l => String(l.position) === '4' || l.lookCode === 'LOOK 04');
+  const backstageItem = lookbooks.find(l => String(l.position) === '5' || l.type === 'backstage' || l.lookCode === 'MỤC 05');
   const extraLooks = lookbooks.filter(l => 
     l.id !== heroItem?.id && 
     l.id !== look1?.id && 

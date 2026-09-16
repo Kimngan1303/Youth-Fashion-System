@@ -1,7 +1,30 @@
 // Shared Lookbook Data Service for Manager & Client (User/Guest)
-const STORAGE_KEY = 'youthfashion_lookbooks_v2'; // bumped key to ensure clean sync of 1,2,3,4,5,6
+const STORAGE_KEY = 'youthfashion_lookbooks_v3'; // bumped key to support 'banner' position
+
+export const getLookbookPositionValue = (pos) => {
+  if (pos === 'banner' || pos === 'BANNER' || pos === 0) return 0;
+  const n = Number(pos);
+  return isNaN(n) ? 999 : n;
+};
 
 export const INITIAL_LOOKBOOK_ITEMS = [
+  {
+    id: 6,
+    type: "hero",
+    lookCode: "BANNER",
+    sectionRole: "Banner (Ảnh trên cùng - Hero Cover đầu trang)",
+    title: "Ảnh Bìa Hero Banner: L'Automne Éternel",
+    code: "LB - HERO00",
+    season: "CHIẾN DỊCH CHÍNH THỨC",
+    badge: "HERO COVER",
+    position: "banner",
+    productCount: 1,
+    status: "published",
+    image: "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1600",
+    description: "Khúc xạ của thu vĩnh cửu giữa đại lộ Paris — Nơi phong cách hòa cùng nghệ thuật may đo thủ công Pháp.",
+    campaignAudio: "Paris Autumn Symphony • 3:42 mins",
+    conversionRate: "42%"
+  },
   {
     id: 1,
     type: "look",
@@ -117,23 +140,6 @@ export const INITIAL_LOOKBOOK_ITEMS = [
       { num: "12+", desc: "Nghệ nhân may đo kinh nghiệm 20 năm tại xưởng" }
     ],
     conversionRate: "19%"
-  },
-  {
-    id: 6,
-    type: "hero",
-    lookCode: "MỤC 06",
-    sectionRole: "Khối Mục 06 (Banner Bìa Hero Chiến Dịch Đầu Trang)",
-    title: "Ảnh Bìa Hero Banner: L'Automne Éternel",
-    code: "LB - HERO06",
-    season: "CHIẾN DỊCH CHÍNH THỨC",
-    badge: "HERO COVER",
-    position: 6,
-    productCount: 1,
-    status: "published",
-    image: "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1600",
-    description: "Khúc xạ của thu vĩnh cửu giữa đại lộ Paris — Nơi phong cách hòa cùng nghệ thuật may đo thủ công Pháp.",
-    campaignAudio: "Paris Autumn Symphony • 3:42 mins",
-    conversionRate: "42%"
   }
 ];
 
@@ -142,14 +148,14 @@ export const getStoredLookbooks = () => {
     const data = localStorage.getItem(STORAGE_KEY);
     if (data) {
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].lookCode) {
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed.some(item => item.position === 'banner')) {
         return parsed;
       }
     }
   } catch (e) {
     console.error('Failed to load lookbooks from storage', e);
   }
-  // Initialize with the 6 structured items
+  // Initialize with the 6 structured items (Banner + 1,2,3,4,5)
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_LOOKBOOK_ITEMS));
   } catch (e) {}

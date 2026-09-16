@@ -18,7 +18,7 @@ import {
   ChevronDown,
   RotateCcw
 } from 'lucide-react';
-import { getStoredLookbooks, saveStoredLookbooks, resetToDefaultLookbooks } from '../../services/lookbookData';
+import { getStoredLookbooks, saveStoredLookbooks, resetToDefaultLookbooks, getLookbookPositionValue } from '../../services/lookbookData';
 
 export default function LookbookManagement() {
   const [lookbooks, setLookbooks] = useState(() => getStoredLookbooks());
@@ -29,7 +29,7 @@ export default function LookbookManagement() {
   };
   const [currentTab, setCurrentTab] = useState('all'); // 'all', 'published', 'hidden'
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('position'); // Defaults to sequential position 1, 2, 3, 4, 5...
+  const [sortBy, setSortBy] = useState('position'); // Defaults to sequential position: Banner, 1, 2, 3, 4, 5...
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -47,7 +47,7 @@ export default function LookbookManagement() {
     sectionRole: '',
     season: '',
     badge: '',
-    position: 1,
+    position: '1',
     productCount: 1,
     price: '',
     status: 'published',
@@ -62,7 +62,7 @@ export default function LookbookManagement() {
   
   // Prominent lookbook (featured)
   const prominentLookbook = useMemo(() => {
-    return lookbooks.find(lb => lb.id === 1) || lookbooks[0];
+    return lookbooks.find(lb => String(lb.position) === '1') || lookbooks.find(lb => lb.position !== 'banner') || lookbooks[0];
   }, [lookbooks]);
 
   // Filtered & Sorted Lookbooks
@@ -92,7 +92,7 @@ export default function LookbookManagement() {
     } else if (sortBy === 'oldest') {
       result.sort((a, b) => a.id - b.id);
     } else if (sortBy === 'position') {
-      result.sort((a, b) => a.position - b.position);
+      result.sort((a, b) => getLookbookPositionValue(a.position) - getLookbookPositionValue(b.position));
     } else if (sortBy === 'productCount') {
       result.sort((a, b) => b.productCount - a.productCount);
     }
@@ -162,12 +162,35 @@ export default function LookbookManagement() {
     updateLookbooks(updated);
   };
 
-  // Quick update position (controls homepage featured display)
+  // Quick update position (controls banner or lookbook order with automatic swap)
   const handleUpdatePosition = (id, newPos) => {
-    const target = Number(newPos);
+    const target = newPos === 'banner' ? 'banner' : Number(newPos);
+    const currentItem = lookbooks.find(lb => lb.id === id);
+    const oldPos = currentItem ? currentItem.position : 1;
+
+    // If another item already holds this target position, swap their positions!
+    const existingWithTarget = lookbooks.find(lb => lb.id !== id && String(lb.position) === String(target));
+
     const updated = lookbooks.map(lb => {
       if (lb.id === id) {
-        return { ...lb, position: target };
+        return { 
+          ...lb, 
+          position: target,
+          lookCode: target === 'banner' ? 'BANNER' : (lb.lookCode === 'BANNER' ? `LOOK 0${target}` : lb.lookCode),
+          sectionRole: target === 'banner' 
+            ? 'Banner (Ảnh trên cùng - Hero Cover đầu trang)' 
+            : (lb.sectionRole && lb.sectionRole.includes('Banner') ? `Khối Look 0${target} trên trang` : lb.sectionRole)
+        };
+      }
+      if (existingWithTarget && lb.id === existingWithTarget.id) {
+        return { 
+          ...lb, 
+          position: oldPos,
+          lookCode: oldPos === 'banner' ? 'BANNER' : (lb.lookCode === 'BANNER' ? `LOOK 0${oldPos}` : lb.lookCode),
+          sectionRole: oldPos === 'banner'
+            ? 'Banner (Ảnh trên cùng - Hero Cover đầu trang)'
+            : (lb.sectionRole && lb.sectionRole.includes('Banner') ? `Khối Look 0${oldPos} trên trang` : lb.sectionRole)
+        };
       }
       return lb;
     });
@@ -185,7 +208,7 @@ export default function LookbookManagement() {
       sectionRole: `Khối Look 0${nextPos} bổ sung trên trang`,
       season: 'PHONG CÁCH THU ĐÔNG',
       badge: 'MỚI',
-      position: nextPos,
+      position: String(nextPos),
       productCount: 1,
       price: '3.000.000₫',
       status: 'published',
@@ -205,7 +228,7 @@ export default function LookbookManagement() {
       sectionRole: lookbook.sectionRole || '',
       season: lookbook.season || '',
       badge: lookbook.badge || '',
-      position: lookbook.position,
+      position: lookbook.position === 'banner' ? 'banner' : String(lookbook.position),
       productCount: lookbook.productCount || 1,
       price: lookbook.price || '',
       status: lookbook.status,
@@ -223,6 +246,8 @@ export default function LookbookManagement() {
       return;
     }
 
+    const pos = formData.position === 'banner' ? 'banner' : Number(formData.position);
+
     if (editingLookbook) {
       // Update
       const updated = lookbooks.map(lb => {
@@ -230,7 +255,7 @@ export default function LookbookManagement() {
           return {
             ...lb,
             ...formData,
-            position: Number(formData.position),
+            position: pos,
             productCount: Number(formData.productCount)
           };
         }
@@ -242,7 +267,7 @@ export default function LookbookManagement() {
       const newLookbook = {
         id: Date.now(),
         ...formData,
-        position: Number(formData.position),
+        position: pos,
         productCount: Number(formData.productCount),
         conversionRate: '0%',
         products: []
@@ -1202,13 +1227,15 @@ export default function LookbookManagement() {
                       <td style={{ textAlign: 'center' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                           <select
-                            className={`lb-position-badge ${isTopRank ? 'top-rank' : 'normal-rank'}`}
+                            className={`lb-position-badge ${lb.position === 'banner' ? 'banner-rank' : isTopRank ? 'top-rank' : 'normal-rank'}`}
                             value={lb.position}
                             onChange={(e) => handleUpdatePosition(lb.id, e.target.value)}
                             style={{
                               cursor: 'pointer',
                               outline: 'none',
-                              border: isTopRank ? 'none' : '1px solid #E7E5E4',
+                              border: lb.position === 'banner' ? '1px solid #111827' : isTopRank ? 'none' : '1px solid #E7E5E4',
+                              background: lb.position === 'banner' ? '#111827' : undefined,
+                              color: lb.position === 'banner' ? '#FBBF24' : undefined,
                               textAlign: 'center',
                               padding: '3px 8px',
                               fontWeight: 700,
@@ -1217,16 +1244,26 @@ export default function LookbookManagement() {
                               width: 'auto',
                               height: 'auto'
                             }}
-                            title={`Thứ tự điều khiển vị trí #${lb.position} trên trang (${lb.position === 1 ? 'Nổi bật Homepage & Look 01' : 'Nhấp để chuyển vị trí'})`}
+                            title={`Vị trí: ${lb.position === 'banner' ? 'Banner ảnh trên cùng' : '#' + lb.position}`}
                           >
+                            <option value="banner" style={{ background: '#111827', color: '#FBBF24', fontWeight: 'bold' }}>
+                              Banner
+                            </option>
                             {Array.from({ length: 12 }, (_, i) => i + 1).map(num => (
                               <option key={num} value={num} style={{ background: '#FFFFFF', color: '#111111' }}>
-                                Vị trí #{num}
+                                {num}
                               </option>
                             ))}
                           </select>
-                          <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: 600 }}>
-                            {lb.lookCode || `MỤC 0${lb.position}`}
+                          <span style={{ 
+                            fontSize: '10.5px', 
+                            color: lb.position === 'banner' ? '#D97706' : '#6B7280', 
+                            fontWeight: 700,
+                            background: lb.position === 'banner' ? '#FEF3C7' : 'transparent',
+                            padding: lb.position === 'banner' ? '1px 6px' : '0',
+                            borderRadius: '4px'
+                          }}>
+                            {lb.position === 'banner' ? 'BANNER' : (lb.lookCode || `MỤC 0${lb.position}`)}
                           </span>
                         </div>
                       </td>
@@ -1441,14 +1478,22 @@ export default function LookbookManagement() {
 
                 <div className="lb-form-row-2">
                   <div className="lb-form-group">
-                    <label className="lb-form-label">Thứ Tự Vị Trí (1, 2, 3, 4, 5...)</label>
-                    <input
-                      type="number"
-                      min="1"
-                      className="lb-form-input"
+                    <label className="lb-form-label">Thứ Tự Vị Trí (Banner, 1, 2, 3, 4, 5...)</label>
+                    <select
+                      className="lb-form-select"
                       value={formData.position}
                       onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                    />
+                      style={{ fontWeight: 600 }}
+                    >
+                      <option value="banner" style={{ fontWeight: 700, color: '#D97706' }}>
+                        ★ Banner (Ảnh bìa lớn trên cùng)
+                      </option>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(num => (
+                        <option key={num} value={num}>
+                          Vị trí #{num} {num === 1 ? '(Look 01 & Nổi bật Trang Chủ)' : num === 2 ? '(Look 02)' : num === 3 ? '(Look 03)' : num === 4 ? '(Look 04)' : num === 5 ? '(Mục 05)' : ''}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="lb-form-group">
