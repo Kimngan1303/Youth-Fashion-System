@@ -499,8 +499,8 @@ export default function Register() {
       return;
     }
 
-    if (password.length < 8) {
-      setErrorMessage('Mật khẩu phải có tối thiểu 8 ký tự.');
+    if (password.length < 6) {
+      setErrorMessage('Mật khẩu phải có tối thiểu 6 ký tự.');
       return;
     }
 

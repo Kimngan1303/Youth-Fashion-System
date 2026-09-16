@@ -1,15 +1,23 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, Heart, ShoppingBag, User, Bell, MessageSquare, Globe, Sun, Star } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Header = ({ onOpenAISearch }) => {
   const location = useLocation();
-  const { user, wishlist, cartCount } = useAuth();
+  const navigate = useNavigate();
+  const { user, wishlist, cartCount, logout } = useAuth();
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSearchInput, setShowSearchInput] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const handleLogout = async () => {
+    if (logout) {
+      await logout();
+    }
+    navigate('/login');
+  };
 
   const categories = [
     { name: 'Áo Blazer & Suit', path: '/category/blazer' },
@@ -157,7 +165,7 @@ const Header = ({ onOpenAISearch }) => {
                 <Link to="/profile?tab=orders" className="dropdown-item">Lịch sử đơn hàng</Link>
                 <Link to="/profile?tab=wishlist" className="dropdown-item">Danh sách yêu thích</Link>
                 <hr />
-                <button className="dropdown-item text-danger">Đăng xuất</button>
+                <button className="dropdown-item text-danger" onClick={handleLogout}>Đăng xuất</button>
               </div>
             )}
           </div>

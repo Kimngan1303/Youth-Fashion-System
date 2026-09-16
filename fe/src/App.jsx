@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -18,10 +18,13 @@ function ProtectedRoute({ children }) {
 
 function AppContent() {
   const [isAISearchOpen, setIsAISearchOpen] = useState(false);
+  const location = useLocation();
+
+  const hideHeaderFooter = ['/login', '/register'].includes(location.pathname) || location.pathname.startsWith('/manager');
 
   return (
     <div className="app-layout">
-      <Header onOpenAISearch={() => setIsAISearchOpen(true)} />
+      {!hideHeaderFooter && <Header onOpenAISearch={() => setIsAISearchOpen(true)} />}
 
       <main className="app-main">
         <Routes>
@@ -50,13 +53,15 @@ function AppContent() {
         </Routes>
       </main>
 
-      <Footer />
+      {!hideHeaderFooter && <Footer />}
 
       {/* Multimodal AI Search Modal */}
-      <AISearchModal 
-        isOpen={isAISearchOpen} 
-        onClose={() => setIsAISearchOpen(false)} 
-      />
+      {!hideHeaderFooter && (
+        <AISearchModal 
+          isOpen={isAISearchOpen} 
+          onClose={() => setIsAISearchOpen(false)} 
+        />
+      )}
 
       <style>{`
         .app-layout {
