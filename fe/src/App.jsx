@@ -7,6 +7,7 @@ import AISearchModal from './components/AISearchModal';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import ContactPage from './pages/ContactPage';
+import LookbookPage from './pages/LookbookPage';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ManagerDashboard from './pages/manager/ManagerDashboard';
@@ -34,6 +35,7 @@ function AppContent() {
             path="/" 
             element={<HomePage onOpenAISearch={() => setIsAISearchOpen(true)} />} 
           />
+          <Route path="/lookbook" element={<LookbookPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route
