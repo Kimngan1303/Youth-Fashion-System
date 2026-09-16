@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { 
   User, Package, Lock, Heart, LogOut, CheckCircle, 
@@ -31,6 +31,24 @@ const ProfilePage = () => {
 
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
   const [copiedCode, setCopiedCode] = useState('');
+  const fileInputRef = useRef(null);
+
+  const handleAvatarFileChange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const newAvatarUrl = reader.result;
+        setFormData(prev => ({ ...prev, avatar_url: newAvatarUrl }));
+        if (updateUserProfile) {
+          updateUserProfile({ avatar_url: newAvatarUrl });
+        }
+        setSaveSuccessMsg('Đã cập nhật ảnh đại diện mới thành công!');
+        setTimeout(() => setSaveSuccessMsg(''), 4000);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
   
   // Password State
   const [passData, setPassData] = useState({ currentPass: '', newPass: '', confirmPass: '' });
@@ -186,15 +204,28 @@ const ProfilePage = () => {
         {/* 2. Top Luxury Membership Header Banner */}
         <div className="profile-hero-banner">
           <div className="hero-banner-left">
-            <div className="hero-avatar-box">
+            <div className="hero-avatar-box" title="Bấm để thay đổi ảnh đại diện">
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                accept="image/*" 
+                onChange={handleAvatarFileChange} 
+                style={{ display: 'none' }} 
+              />
               <img 
                 src={formData.avatar_url} 
                 alt={user?.full_name || 'Nguyễn Hoàng Thảo My'} 
                 className="hero-avatar-img" 
+                onClick={() => fileInputRef.current?.click()}
               />
-              <div className="hero-avatar-badge" title="Tài khoản VIP đã xác thực">
-                <CheckCircle size={15} className="check-badge-icon" />
-              </div>
+              <button 
+                type="button" 
+                className="avatar-change-btn" 
+                onClick={() => fileInputRef.current?.click()}
+                title="Thay đổi ảnh đại diện"
+              >
+                <Camera size={13} />
+              </button>
             </div>
 
             <div className="hero-info-content">
@@ -211,14 +242,6 @@ const ProfilePage = () => {
 
           <div className="hero-banner-right">
             <div className="stats-box">
-              <div className="stat-col">
-                <span className="stat-label">ĐIỂM TÍCH LŨY</span>
-                <span className="stat-value">{user?.points || '3.450 pts'}</span>
-                <span className="stat-sub">{user?.points_cash || 'Quy đổi 345.000đ'}</span>
-              </div>
-              
-              <div className="stat-divider" />
-              
               <div className="stat-col">
                 <span className="stat-label">TỔNG CHI TIÊU</span>
                 <span className="stat-value">{user?.total_spent || '34.5M'}</span>
@@ -686,6 +709,7 @@ const ProfilePage = () => {
 
         .hero-avatar-box {
           position: relative;
+          cursor: pointer;
         }
 
         .hero-avatar-img {
@@ -695,6 +719,35 @@ const ProfilePage = () => {
           object-fit: cover;
           border: 2px solid rgba(212, 175, 55, 0.5);
           box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          transition: opacity 0.2s;
+        }
+
+        .hero-avatar-box:hover .hero-avatar-img {
+          opacity: 0.85;
+        }
+
+        .avatar-change-btn {
+          position: absolute;
+          bottom: -4px;
+          right: -4px;
+          background-color: #ffffff;
+          color: #111827;
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 2px solid #121316;
+          cursor: pointer;
+          transition: transform 0.2s, background-color 0.2s;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+
+        .avatar-change-btn:hover {
+          background-color: #d4af37;
+          color: #ffffff;
+          transform: scale(1.1);
         }
 
         .hero-avatar-badge {

@@ -112,7 +112,7 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const result = await authService.register(userData);
-      return { success: true, message: result?.message || 'Đăng ký thành công!', data: result?.data };
+      return { success: true, message: result?.message || 'Đăng ký tài khoản thành công!', data: result?.data };
     } catch (error) {
       const serverData = error.response?.data;
       let errorMsg = serverData?.message;
@@ -120,17 +120,8 @@ export function AuthProvider({ children }) {
         errorMsg = `${serverData.message}: ${serverData.errors.join(', ')}`;
       }
 
-      // If backend API is offline or returning network error, fallback gracefully
+      // If backend API is offline or returning network error, fallback gracefully without auto-login
       if (!error.response || error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
-        const newCustomer = {
-          customer_id: Date.now(),
-          email: userData.email,
-          full_name: userData.full_name,
-          phone: userData.phone || '0908 123 456',
-          role: 'CUSTOMER'
-        };
-        setUser(newCustomer);
-        localStorage.setItem('user', JSON.stringify(newCustomer));
         return { success: true, message: 'Đăng ký tài khoản thành công!' };
       }
 

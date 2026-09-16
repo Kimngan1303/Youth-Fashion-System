@@ -94,69 +94,6 @@ const HomePage = ({ onOpenAISearch }) => {
         </div>
       </section>
 
-      {/* 3. VỀ CHÚNG TÔI SECTION (About Box with Workshop Image + Stats) */}
-      <section className="section-about-container container">
-        <div className="about-box">
-          {/* Left: Workshop Image */}
-          <div className="about-img-col">
-            <img 
-              src="https://images.unsplash.com/photo-1558769132-cb1aea458c5e?auto=format&fit=crop&q=80&w=800" 
-              alt="Fashion Atelier Workshop" 
-              className="about-workshop-img"
-            />
-          </div>
-
-          {/* Center: Content */}
-          <div className="about-text-col">
-            <span className="about-sublabel">VỀ CHÚNG TÔI</span>
-            <h2 className="about-heading font-serif">
-              Kiến Tạo Phong Cách.<br />Khẳng Định Bản Sắc.
-            </h2>
-            <p className="about-paragraph">
-              Youth Fashion là thương hiệu thời trang phù hợp với giới trẻ. Từ ý tưởng đến sản phẩm hoàn thiện, chúng tôi mang tới những giải pháp phong cách đương đại cho phái đẹp và quý ông hiện đại.
-            </p>
-            <Link to="/about" className="btn-black about-btn">
-              TÌM HIỂU VỀ CHÚNG TÔI &rarr;
-            </Link>
-          </div>
-
-          {/* Right: Stats list */}
-          <div className="about-stats-col">
-            <div className="stat-item">
-              <div className="stat-icon-wrapper"><Hammer size={18} /></div>
-              <div>
-                <div className="stat-num">10+</div>
-                <div className="stat-lbl">Năm Kinh Nghiệm</div>
-              </div>
-            </div>
-
-            <div className="stat-item">
-              <div className="stat-icon-wrapper"><Users size={18} /></div>
-              <div>
-                <div className="stat-num">250+</div>
-                <div className="stat-lbl">Đối Tác Đồng Hành</div>
-              </div>
-            </div>
-
-            <div className="stat-item">
-              <div className="stat-icon-wrapper"><Menu size={18} /></div>
-              <div>
-                <div className="stat-num">1000+</div>
-                <div className="stat-lbl">Thiết Kế Độc Quyền</div>
-              </div>
-            </div>
-
-            <div className="stat-item">
-              <div className="stat-icon-wrapper"><Heart size={18} /></div>
-              <div>
-                <div className="stat-num">98%</div>
-                <div className="stat-lbl">Khách Hàng Hài Lòng</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* 4. LOOKBOOK XUÂN HÈ 2026 SECTION */}
       <section className="section-lookbook-split container">
         <div className="lookbook-left-card">

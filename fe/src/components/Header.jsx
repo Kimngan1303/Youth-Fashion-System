@@ -63,9 +63,6 @@ const Header = ({ onOpenAISearch }) => {
           <li className={location.pathname === '/' ? 'active' : ''}>
             <Link to="/">TRANG CHỦ</Link>
           </li>
-          <li className={location.pathname === '/about' ? 'active' : ''}>
-            <Link to="/about">VỀ CHÚNG TÔI</Link>
-          </li>
           <li 
             className={`dropdown-trigger ${location.pathname.startsWith('/products') || location.pathname.startsWith('/category') ? 'active' : ''}`}
             onMouseEnter={() => setShowCategoryMenu(true)}
@@ -146,12 +143,8 @@ const Header = ({ onOpenAISearch }) => {
             onMouseEnter={() => setShowUserMenu(true)}
             onMouseLeave={() => setShowUserMenu(false)}
           >
-            <Link to="/profile" className="action-icon user-avatar-btn" title="Tài khoản">
-              {user?.avatar_url ? (
-                <img src={user.avatar_url} alt={user.full_name} className="header-avatar" />
-              ) : (
-                <User size={18} />
-              )}
+            <Link to={user ? "/profile" : "/login"} className="action-icon user-avatar-btn" title="Tài khoản">
+              <User size={18} />
             </Link>
 
             {showUserMenu && user && (
@@ -378,8 +371,13 @@ const Header = ({ onOpenAISearch }) => {
         }
 
         .action-icon:hover {
-          background-color: #f3f4f6;
-          color: #000000;
+          background-color: #000000;
+          color: #ffffff;
+        }
+
+        .action-icon:hover svg {
+          color: #ffffff;
+          stroke: #ffffff;
         }
 
         .badge {
