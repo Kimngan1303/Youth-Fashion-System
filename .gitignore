@@ -8,6 +8,9 @@ node_modules/
 .env.production
 .env.development
 
+# Config files
+.npmrc
+
 # Build & Logs
 dist/
 build/

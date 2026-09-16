@@ -1,12 +1,20 @@
-import React, { useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import React, { useState, useContext } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, AuthContext } from './context/AuthContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AISearchModal from './components/AISearchModal';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import ContactPage from './pages/ContactPage';
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
+import ManagerDashboard from './pages/manager/ManagerDashboard';
+
+function ProtectedRoute({ children }) {
+  const { isAuthenticated } = useContext(AuthContext);
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
+}
 
 function AppContent() {
   const [isAISearchOpen, setIsAISearchOpen] = useState(false);
@@ -17,12 +25,22 @@ function AppContent() {
 
       <main className="app-main">
         <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route 
             path="/" 
             element={<HomePage onOpenAISearch={() => setIsAISearchOpen(true)} />} 
           />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route
+            path="/manager"
+            element={
+              <ProtectedRoute>
+                <ManagerDashboard />
+              </ProtectedRoute>
+            }
+          />
           
           {/* Fallback routes */}
           <Route 
