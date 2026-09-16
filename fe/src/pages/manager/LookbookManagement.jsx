@@ -52,7 +52,8 @@ export default function LookbookManagement() {
     price: '',
     status: 'published',
     image: '',
-    description: ''
+    description: '',
+    products: []
   });
 
   // Calculate statistics
@@ -197,6 +198,29 @@ export default function LookbookManagement() {
     updateLookbooks(updated);
   };
 
+  // Outfit product row helpers
+  const handleAddProductRow = () => {
+    setFormData(prev => ({
+      ...prev,
+      products: [...(prev.products || []), { name: '', price: '' }]
+    }));
+  };
+
+  const handleProductChange = (index, field, value) => {
+    setFormData(prev => {
+      const updated = [...(prev.products || [])];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, products: updated };
+    });
+  };
+
+  const handleRemoveProductRow = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      products: (prev.products || []).filter((_, i) => i !== index)
+    }));
+  };
+
   // Open Create Modal
   const handleOpenCreate = () => {
     setEditingLookbook(null);
@@ -209,11 +233,14 @@ export default function LookbookManagement() {
       season: 'PHONG CÁCH THU ĐÔNG',
       badge: 'MỚI',
       position: String(nextPos),
-      productCount: 1,
+      productCount: 2,
       price: '3.000.000₫',
       status: 'published',
       image: 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&q=80&w=1000',
-      description: ''
+      description: '',
+      products: [
+        { name: '', price: '' }
+      ]
     });
     setIsModalOpen(true);
   };
@@ -221,6 +248,10 @@ export default function LookbookManagement() {
   // Open Edit Modal
   const handleOpenEdit = (lookbook) => {
     setEditingLookbook(lookbook);
+    const initialProducts = lookbook.products && Array.isArray(lookbook.products) 
+      ? lookbook.products.map(p => ({ ...p })) 
+      : [];
+
     setFormData({
       title: lookbook.title,
       code: lookbook.code || '',
@@ -229,11 +260,12 @@ export default function LookbookManagement() {
       season: lookbook.season || '',
       badge: lookbook.badge || '',
       position: lookbook.position === 'banner' ? 'banner' : String(lookbook.position),
-      productCount: lookbook.productCount || 1,
+      productCount: initialProducts.length > 0 ? initialProducts.length : (lookbook.productCount || 1),
       price: lookbook.price || '',
       status: lookbook.status,
       image: lookbook.image,
-      description: lookbook.description || ''
+      description: lookbook.description || '',
+      products: initialProducts
     });
     setIsModalOpen(true);
   };
@@ -247,6 +279,8 @@ export default function LookbookManagement() {
     }
 
     const pos = formData.position === 'banner' ? 'banner' : Number(formData.position);
+    const cleanedProducts = (formData.products || []).filter(p => p.name.trim() || p.price.trim());
+    const count = cleanedProducts.length > 0 ? cleanedProducts.length : (Number(formData.productCount) || 1);
 
     if (editingLookbook) {
       // Update
@@ -256,7 +290,8 @@ export default function LookbookManagement() {
             ...lb,
             ...formData,
             position: pos,
-            productCount: Number(formData.productCount)
+            productCount: count,
+            products: cleanedProducts
           };
         }
         return lb;
@@ -268,9 +303,9 @@ export default function LookbookManagement() {
         id: Date.now(),
         ...formData,
         position: pos,
-        productCount: Number(formData.productCount),
+        productCount: count,
         conversionRate: '0%',
-        products: []
+        products: cleanedProducts
       };
       updateLookbooks([...lookbooks, newLookbook]);
     }
@@ -1506,6 +1541,84 @@ export default function LookbookManagement() {
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                     />
                   </div>
+                </div>
+
+                {/* Outfit Products Section (Danh Sách Sản Phẩm Phối) */}
+                <div className="lb-form-group" style={{ background: '#F9FAFB', padding: '14px', borderRadius: '10px', border: '1px solid #E5E7EB' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <div>
+                      <label className="lb-form-label" style={{ fontWeight: 700, fontSize: '13px', color: '#111827', display: 'block', margin: 0 }}>
+                        Danh Sách Sản Phẩm Phối (Gắn Tag)
+                      </label>
+                      <span style={{ fontSize: '11px', color: '#6B7280' }}>
+                        Các sản phẩm hiển thị tên & giá chi tiết trong khối Lookbook
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddProductRow}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: '#111827',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '6px 12px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#FFFFFF',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Plus size={13} strokeWidth={2.5} /> Thêm sản phẩm
+                    </button>
+                  </div>
+
+                  {formData.products && formData.products.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {formData.products.map((prod, idx) => (
+                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 38px', gap: '8px', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            className="lb-form-input"
+                            placeholder="Tên sản phẩm (VD: Áo Khoác Tweed Ivory Cropped)"
+                            value={prod.name}
+                            onChange={(e) => handleProductChange(idx, 'name', e.target.value)}
+                          />
+                          <input
+                            type="text"
+                            className="lb-form-input"
+                            placeholder="Giá (VD: 2.150.000₫)"
+                            value={prod.price}
+                            onChange={(e) => handleProductChange(idx, 'price', e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveProductRow(idx)}
+                            style={{
+                              background: '#FEF2F2',
+                              border: '1px solid #FEE2E2',
+                              borderRadius: '6px',
+                              height: '38px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#EF4444',
+                              cursor: 'pointer'
+                            }}
+                            title="Xóa sản phẩm này"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '12px', color: '#9CA3AF', fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>
+                      Chưa có sản phẩm nào trong danh sách. Bấm "+ Thêm sản phẩm" để thêm từng món đồ phối.
+                    </div>
+                  )}
                 </div>
 
                 <div className="lb-form-group">

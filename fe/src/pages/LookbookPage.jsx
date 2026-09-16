@@ -883,6 +883,18 @@ export default function LookbookPage() {
                       "{look2.quote || "Thiết kế được lựa chọn trình diễn tại Paris Fashion Week 2025, mang hơi thở quý phái vượt thời gian."}"
                     </div>
 
+                    {look2.products && look2.products.length > 0 && (
+                      <>
+                        <div className="lb-products-subheading">DANH SÁCH SẢN PHẨM PHỐI:</div>
+                        {look2.products.map((p, i) => (
+                          <div key={i} className="lb-product-row">
+                            <span className="lb-product-name">{p.name}</span>
+                            <span className="lb-product-price">{p.price}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '8px' }}>
                       <span style={{ fontSize: '26px', fontWeight: 700, color: '#111', fontFamily: "'Playfair Display', Georgia, serif" }}>
                         {look2.price || '2.950.000₫'}
@@ -1038,6 +1050,16 @@ export default function LookbookPage() {
                         <p className="lb-look-desc" style={{ fontSize: '13px', marginBottom: '16px' }}>
                           {item.description}
                         </p>
+                        {item.products && item.products.length > 0 && (
+                          <div style={{ margin: '10px 0' }}>
+                            {item.products.map((p, i) => (
+                              <div key={i} className="lb-product-row" style={{ fontSize: '12.5px' }}>
+                                <span>{p.name}</span>
+                                <strong>{p.price}</strong>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                         <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>{item.price || ''}</span>
