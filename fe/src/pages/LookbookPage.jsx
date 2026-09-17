@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Share2, 
-  ShoppingBag, 
-  Heart, 
-  Volume2, 
-  VolumeX, 
-  Play, 
-  Check, 
-  Truck, 
-  RotateCcw, 
-  Scissors, 
-  ShieldCheck, 
+import {
+  Share2,
+  ShoppingBag,
+  Heart,
+  Check,
+  Truck,
+  RotateCcw,
+  Scissors,
+  ShieldCheck,
   ChevronRight,
   Sparkles,
   ArrowRight,
@@ -25,16 +22,15 @@ export default function LookbookPage() {
   const [lookbooks, setLookbooks] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
   const [activeHotspot, setActiveHotspot] = useState(null);
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showVideoModal, setShowVideoModal] = useState(false);
 
-  // Load published lookbooks
+  // Load published lookbooks (excluding backstage section)
   useEffect(() => {
     const loadData = () => {
       const all = getStoredLookbooks();
       const published = all
-        .filter(item => item.status === 'published')
+        .filter(item => item.status === 'published' && item.type !== 'backstage' && String(item.position) !== '5' && item.lookCode !== 'MỤC 05')
         .sort((a, b) => getLookbookPositionValue(a.position) - getLookbookPositionValue(b.position));
       setLookbooks(published);
     };
@@ -53,14 +49,15 @@ export default function LookbookPage() {
   const look2 = lookbooks.find(l => String(l.position) === '2' || l.lookCode === 'LOOK 02');
   const look3 = lookbooks.find(l => String(l.position) === '3' || l.lookCode === 'LOOK 03');
   const look4 = lookbooks.find(l => String(l.position) === '4' || l.lookCode === 'LOOK 04');
-  const backstageItem = lookbooks.find(l => String(l.position) === '5' || l.type === 'backstage' || l.lookCode === 'MỤC 05');
-  const extraLooks = lookbooks.filter(l => 
-    l.id !== heroItem?.id && 
-    l.id !== look1?.id && 
-    l.id !== look2?.id && 
-    l.id !== look3?.id && 
-    l.id !== look4?.id && 
-    l.id !== backstageItem?.id
+  const extraLooks = lookbooks.filter(l =>
+    l.id !== heroItem?.id &&
+    l.id !== look1?.id &&
+    l.id !== look2?.id &&
+    l.id !== look3?.id &&
+    l.id !== look4?.id &&
+    String(l.position) !== '5' &&
+    l.type !== 'backstage' &&
+    l.lookCode !== 'MỤC 05'
   );
 
   const showToast = (msg) => {
@@ -708,33 +705,9 @@ export default function LookbookPage() {
                 <span className="lb-hero-campaign-tag">
                   {heroItem.season ? `${heroItem.season.toUpperCase()} • CHIẾN DỊCH CHÍNH THỨC` : "BỘ SƯU TẬP MÙA THU ĐÔNG 2025 • CHIẾN DỊCH CHÍNH THỨC"}
                 </span>
-                <h1 className="lb-hero-main-heading">
-                  {heroItem.title.replace('Ảnh Bìa Hero Banner: ', '')}
-                </h1>
                 <p className="lb-hero-desc">
                   {heroItem.description || "Khúc xạ của thu vĩnh cửu giữa đại lộ Paris — Nơi phong cách hòa cùng nghệ thuật may đo thủ công Pháp."}
                 </p>
-
-                {/* Audio / Soundtrack glass pill */}
-                <div 
-                  className="lb-audio-glass-card" 
-                  onClick={() => {
-                    setIsPlayingAudio(!isPlayingAudio);
-                    showToast(isPlayingAudio ? 'Đã tắt âm thanh nền' : 'Đang phát âm thanh Paris Autumn Symphony');
-                  }}
-                >
-                  <div className="lb-audio-icon-btn">
-                    {isPlayingAudio ? <Volume2 size={15} /> : <Play size={14} fill="#111" />}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                      BẢN GHI PHONG CÁCH
-                    </div>
-                    <div style={{ fontSize: '12.5px', color: '#ECEAE4' }}>
-                      {heroItem.campaignAudio || "Paris Autumn Symphony • 3:42 mins"}
-                    </div>
-                  </div>
-                </div>
               </div>
             </section>
           )}
@@ -797,9 +770,9 @@ export default function LookbookPage() {
                     className="lb-editorial-img"
                   />
                   {look1.hotspots?.map((hs, idx) => (
-                    <div 
+                    <div
                       key={idx}
-                      className="lb-hotspot" 
+                      className="lb-hotspot"
                       style={{ top: hs.top, left: hs.left }}
                       onClick={() => setActiveHotspot(activeHotspot === idx ? null : idx)}
                     >
@@ -844,8 +817,8 @@ export default function LookbookPage() {
                   </div>
 
                   <div className="lb-cta-container">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className="btn-buy-combo"
                       onClick={() => showToast(`Đã thêm trọn bộ ${look1.lookCode || 'Look 01'} vào giỏ hàng!`)}
                     >
@@ -906,8 +879,8 @@ export default function LookbookPage() {
                   </div>
 
                   <div className="lb-cta-container">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className="btn-buy-combo"
                       onClick={() => showToast(`Đã thêm ${look2.title} vào giỏ hàng!`)}
                     >
@@ -923,8 +896,8 @@ export default function LookbookPage() {
                     alt={look2.title}
                     className="lb-editorial-img"
                   />
-                  <span 
-                    className="lb-badge-pill" 
+                  <span
+                    className="lb-badge-pill"
                     style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(0,0,0,0.65)', color: '#FFFFFF', borderColor: 'transparent' }}
                   >
                     HAUTE COUTURE EDITION
@@ -967,9 +940,9 @@ export default function LookbookPage() {
                       </div>
                       <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                         <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>{look3.price || '3.040.000₫'}</span>
-                        <button 
-                          type="button" 
-                          className="btn-buy-combo" 
+                        <button
+                          type="button"
+                          className="btn-buy-combo"
                           style={{ width: 'auto', padding: '10px 18px' }}
                           onClick={() => showToast(`Đã thêm ${look3.title} vào giỏ hàng!`)}
                         >
@@ -1011,9 +984,9 @@ export default function LookbookPage() {
                       </div>
                       <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                         <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>{look4.price || '2.700.000₫'}</span>
-                        <button 
-                          type="button" 
-                          className="btn-buy-combo" 
+                        <button
+                          type="button"
+                          className="btn-buy-combo"
                           style={{ width: 'auto', padding: '10px 18px' }}
                           onClick={() => showToast(`Đã thêm ${look4.title} vào giỏ hàng!`)}
                         >
@@ -1063,9 +1036,9 @@ export default function LookbookPage() {
                       </div>
                       <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                         <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>{item.price || ''}</span>
-                        <button 
-                          type="button" 
-                          className="btn-buy-combo" 
+                        <button
+                          type="button"
+                          className="btn-buy-combo"
                           style={{ width: 'auto', padding: '10px 18px' }}
                           onClick={() => showToast(`Đã thêm ${item.title} vào giỏ hàng!`)}
                         >
@@ -1075,68 +1048,6 @@ export default function LookbookPage() {
                     </div>
                   </div>
                 ))}
-              </section>
-            )}
-
-            {/* SECTION 4 (MỤC 05): CRAFTSMANSHIP & BACKSTAGE ("Hậu Trường & Kỷ Họa Ý Tưởng") */}
-            {backstageItem && (
-              <section className="lb-craftsmanship-card">
-                <div className="lb-craft-img-box">
-                  <img
-                    src={backstageItem.image || "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?auto=format&fit=crop&q=80&w=1000"}
-                    alt={backstageItem.title}
-                    className="lb-editorial-img"
-                  />
-                  <span 
-                    className="lb-badge-pill" 
-                    style={{ position: 'absolute', bottom: '16px', left: '16px', background: 'rgba(0,0,0,0.7)', color: '#FFFFFF', borderColor: 'transparent' }}
-                  >
-                    XƯỞNG MAY THỦ CÔNG PARIS • ATELIER NO. 12
-                  </span>
-                </div>
-
-                <div className="lb-craft-content">
-                  <span className="lb-look-category">{backstageItem.season || 'NGHỆ THUẬT MAY ĐO BESPOKE'}</span>
-                  <h2 className="lb-look-title" style={{ fontSize: '28px', margin: '8px 0 14px 0' }}>
-                    {backstageItem.title}
-                  </h2>
-                  <p className="lb-look-desc" style={{ margin: 0 }}>
-                    {backstageItem.description}
-                  </p>
-
-                  <div className="lb-stats-3-col">
-                    {backstageItem.metrics ? backstageItem.metrics.map((m, idx) => (
-                      <div key={idx}>
-                        <div className="lb-stat-big-num">{m.num}</div>
-                        <div className="lb-stat-desc">{m.desc}</div>
-                      </div>
-                    )) : (
-                      <>
-                        <div>
-                          <div className="lb-stat-big-num">180h</div>
-                          <div className="lb-stat-desc">Thời gian may đo & thêu tay chuẩn Haute Couture</div>
-                        </div>
-                        <div>
-                          <div className="lb-stat-big-num">100%</div>
-                          <div className="lb-stat-desc">Sợi tự nhiên len cừu Merino & Cashmere Ý</div>
-                        </div>
-                        <div>
-                          <div className="lb-stat-big-num">12+</div>
-                          <div className="lb-stat-desc">Nghệ nhân may đo kinh nghiệm 20 năm tại xưởng</div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  <button 
-                    type="button" 
-                    className="btn-share-editorial"
-                    style={{ fontSize: '13px', marginTop: '4px', textDecoration: 'underline' }}
-                    onClick={() => showToast('Đang tải phim tài liệu hậu trường Youth Fashion 2025...')}
-                  >
-                    Xem Phim Ngắn Hậu Trường Chiến Dịch →
-                  </button>
-                </div>
               </section>
             )}
 

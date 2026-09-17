@@ -119,29 +119,24 @@ export const INITIAL_LOOKBOOK_ITEMS = [
       { name: "Áo Blazer Kẻ Sọc Pinstripe", price: "1.950.000₫" },
       { name: "Sơ Mi Poplin Cotton Trắng", price: "750.000₫" }
     ]
-  },
-  {
-    id: 5,
-    type: "backstage",
-    lookCode: "MỤC 05",
-    sectionRole: "Khối Mục 05 (Hậu Trường Xưởng May Atelier No. 12)",
-    title: "Hậu Trường & Kỷ Họa Ý Tưởng (Atelier No. 12)",
-    code: "LB - ATELIER05",
-    season: "NGHỆ THUẬT MAY ĐO BESPOKE",
-    badge: "ATELIER",
-    position: 5,
-    productCount: 3,
-    status: "published",
-    image: "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?auto=format&fit=crop&q=80&w=1000",
-    description: "Mỗi tác phẩm trong tuyển tập Fall/Winter 2025 là kết tinh của hơn 180 giờ chế tác thủ công, tuyển chọn từ những thước vải tự nhiên thượng hạng nhất từ Ý và Pháp.",
-    metrics: [
-      { num: "180h", desc: "Thời gian may đo & thêu tay chuẩn Haute Couture" },
-      { num: "100%", desc: "Sợi tự nhiên len cừu Merino & Cashmere Ý" },
-      { num: "12+", desc: "Nghệ nhân may đo kinh nghiệm 20 năm tại xưởng" }
-    ],
-    conversionRate: "19%"
   }
 ];
+
+export const normalizeLookbookPositions = (items) => {
+  if (!Array.isArray(items)) return items;
+  const used = new Set();
+  let nextPos = 1;
+  return items.map(item => {
+    if (item.position === 'banner') return item;
+    let pos = Number(item.position);
+    if (isNaN(pos) || pos < 1 || used.has(pos)) {
+      while (used.has(nextPos)) nextPos++;
+      pos = nextPos;
+    }
+    used.add(pos);
+    return { ...item, position: pos };
+  });
+};
 
 export const getStoredLookbooks = () => {
   try {
@@ -149,13 +144,24 @@ export const getStoredLookbooks = () => {
     if (data) {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0 && parsed.some(item => item.position === 'banner')) {
-        return parsed;
+        // Tự động dọn dẹp mục 05 cố định cũ nếu còn lưu trong localStorage trình duyệt
+        const cleaned = parsed.filter(item => 
+          item.id !== 5 && 
+          item.type !== 'backstage' && 
+          item.lookCode !== 'MỤC 05' && 
+          String(item.position) !== '5'
+        );
+        const normalized = normalizeLookbookPositions(cleaned);
+        if (cleaned.length !== parsed.length || JSON.stringify(normalized) !== JSON.stringify(parsed)) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+        }
+        return normalized;
       }
     }
   } catch (e) {
     console.error('Failed to load lookbooks from storage', e);
   }
-  // Initialize with the 6 structured items (Banner + 1,2,3,4,5)
+  // Initialize with the structured items (Banner + 1,2,3,4)
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_LOOKBOOK_ITEMS));
   } catch (e) {}

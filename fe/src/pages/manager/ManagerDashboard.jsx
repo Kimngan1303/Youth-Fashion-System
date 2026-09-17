@@ -2,19 +2,19 @@ import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import LookbookManagement from './LookbookManagement';
-import { 
-  LayoutGrid, 
-  Package, 
-  Folder, 
-  BookOpen, 
-  ShoppingBag, 
-  MessageSquare, 
-  Tag, 
-  BarChart2, 
-  Home, 
-  LogOut, 
-  Search, 
-  User 
+import {
+  LayoutGrid,
+  Package,
+  Folder,
+  BookOpen,
+  ShoppingBag,
+  MessageSquare,
+  Tag,
+  BarChart2,
+  Home,
+  LogOut,
+  Search,
+  User
 } from 'lucide-react';
 
 /**

@@ -25,10 +25,22 @@ const HomePage = ({ onOpenAISearch }) => {
     };
   }, []);
 
-  // Featured lookbook on homepage: prioritize position 1, or first non-banner published item
-  const featuredLookbook = publishedLookbooks.find(l => String(l.position) === '1')
-    || publishedLookbooks.find(l => l.position !== 'banner')
-    || publishedLookbooks[0]
+  // Lookbook items for homepage display (Lấy các lookbook đã published và loại trừ banner/backstage)
+  const contentLookbooks = publishedLookbooks
+    .filter(l => l.position !== 'banner' && l.type !== 'hero' && l.type !== 'backstage')
+    .sort((a, b) => Number(a.position) - Number(b.position));
+
+  // Vị trí 1: Lookbook nổi bật hiển thị ở thẻ bên trái và ảnh đầu tiên
+  const featuredLookbook = contentLookbooks.find(l => Number(l.position) === 1) || contentLookbooks[0] || null;
+
+  // Vị trí 2: Ảnh thứ 2
+  const secondLookbook = contentLookbooks.find(l => Number(l.position) === 2) 
+    || contentLookbooks.filter(l => l.id !== featuredLookbook?.id)[0] 
+    || null;
+
+  // Vị trí 3: Ảnh thứ 3
+  const thirdLookbook = contentLookbooks.find(l => Number(l.position) === 3) 
+    || contentLookbooks.filter(l => l.id !== featuredLookbook?.id && l.id !== secondLookbook?.id)[0] 
     || null;
 
   const newProducts = [
@@ -126,7 +138,7 @@ const HomePage = ({ onOpenAISearch }) => {
         <section className="section-lookbook-split container">
           <div className="lookbook-left-card">
             <span className="lookbook-sub">
-              {featuredLookbook.season ? `BỘ SƯU TẬP • ${featuredLookbook.season.toUpperCase()}` : 'BỘ SƯU TẬP NỔI BẬT'} (VỊ TRÍ #{featuredLookbook.position})
+              {featuredLookbook.season ? `BỘ SƯU TẬP • ${featuredLookbook.season.toUpperCase()}` : 'BỘ SƯU TẬP NỔI BẬT'}
             </span>
             <h2 className="lookbook-title font-serif">
               {featuredLookbook.title}
@@ -147,20 +159,24 @@ const HomePage = ({ onOpenAISearch }) => {
                 className="lb-img"
               />
             </div>
-            <div className="lb-photo-col">
-              <img 
-                src={publishedLookbooks[1]?.image || featuredLookbook.outfits?.[0]?.image || "https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=600"} 
-                alt={publishedLookbooks[1]?.title || "Lookbook Highlight 2"} 
-                className="lb-img"
-              />
-            </div>
-            <div className="lb-photo-col">
-              <img 
-                src={publishedLookbooks[2]?.image || featuredLookbook.outfits?.[1]?.image || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600"} 
-                alt={publishedLookbooks[2]?.title || "Lookbook Highlight 3"} 
-                className="lb-img"
-              />
-            </div>
+            {secondLookbook && (
+              <div className="lb-photo-col">
+                <img 
+                  src={secondLookbook.image || "https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=600"} 
+                  alt={secondLookbook.title || "Lookbook Highlight 2"} 
+                  className="lb-img"
+                />
+              </div>
+            )}
+            {thirdLookbook && (
+              <div className="lb-photo-col">
+                <img 
+                  src={thirdLookbook.image || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600"} 
+                  alt={thirdLookbook.title || "Lookbook Highlight 3"} 
+                  className="lb-img"
+                />
+              </div>
+            )}
           </div>
         </section>
       )}

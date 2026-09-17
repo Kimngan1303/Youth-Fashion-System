@@ -167,7 +167,8 @@ export default function LookbookManagement() {
   const handleUpdatePosition = (id, newPos) => {
     const target = newPos === 'banner' ? 'banner' : Number(newPos);
     const currentItem = lookbooks.find(lb => lb.id === id);
-    const oldPos = currentItem ? currentItem.position : 1;
+    if (!currentItem || String(currentItem.position) === String(target)) return;
+    const oldPos = currentItem.position;
 
     // If another item already holds this target position, swap their positions!
     const existingWithTarget = lookbooks.find(lb => lb.id !== id && String(lb.position) === String(target));
@@ -279,8 +280,11 @@ export default function LookbookManagement() {
     }
 
     const pos = formData.position === 'banner' ? 'banner' : Number(formData.position);
-    const cleanedProducts = (formData.products || []).filter(p => p.name.trim() || p.price.trim());
+    const cleanedProducts = pos === 'banner'
+      ? []
+      : (formData.products || []).filter(p => p.name.trim() || p.price.trim());
     const count = cleanedProducts.length > 0 ? cleanedProducts.length : (Number(formData.productCount) || 1);
+    const autoLookCode = pos === 'banner' ? 'BANNER' : (formData.lookCode && formData.lookCode !== 'BANNER' ? formData.lookCode : `LOOK 0${pos}`);
 
     if (editingLookbook) {
       // Update
@@ -289,6 +293,7 @@ export default function LookbookManagement() {
           return {
             ...lb,
             ...formData,
+            lookCode: autoLookCode,
             position: pos,
             productCount: count,
             products: cleanedProducts
@@ -302,6 +307,7 @@ export default function LookbookManagement() {
       const newLookbook = {
         id: Date.now(),
         ...formData,
+        lookCode: autoLookCode,
         position: pos,
         productCount: count,
         conversionRate: '0%',
@@ -1164,10 +1170,10 @@ export default function LookbookManagement() {
                 color: '#374151',
                 cursor: 'pointer'
               }}
-              title="Khôi phục thứ tự chuẩn 1, 2, 3, 4, 5, 6 theo các ảnh giao diện ban đầu"
+              title="Khôi phục các bộ sưu tập mặc định ban đầu"
             >
               <RotateCcw size={12} />
-              <span>Khôi phục chuẩn (1-6)</span>
+              <span>Khôi phục mặc định</span>
             </button>
             <span style={{ color: '#E7E5E4' }}>|</span>
             <span className="lb-selected-count">
@@ -1260,7 +1266,7 @@ export default function LookbookManagement() {
 
                       {/* Position Selector Column */}
                       <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center' }}>
                           <select
                             className={`lb-position-badge ${lb.position === 'banner' ? 'banner-rank' : isTopRank ? 'top-rank' : 'normal-rank'}`}
                             value={lb.position}
@@ -1272,9 +1278,9 @@ export default function LookbookManagement() {
                               background: lb.position === 'banner' ? '#111827' : undefined,
                               color: lb.position === 'banner' ? '#FBBF24' : undefined,
                               textAlign: 'center',
-                              padding: '3px 8px',
+                              padding: '4px 10px',
                               fontWeight: 700,
-                              fontSize: '12px',
+                              fontSize: '13px',
                               borderRadius: '6px',
                               width: 'auto',
                               height: 'auto'
@@ -1290,16 +1296,6 @@ export default function LookbookManagement() {
                               </option>
                             ))}
                           </select>
-                          <span style={{ 
-                            fontSize: '10.5px', 
-                            color: lb.position === 'banner' ? '#D97706' : '#6B7280', 
-                            fontWeight: 700,
-                            background: lb.position === 'banner' ? '#FEF3C7' : 'transparent',
-                            padding: lb.position === 'banner' ? '1px 6px' : '0',
-                            borderRadius: '4px'
-                          }}>
-                            {lb.position === 'banner' ? 'BANNER' : (lb.lookCode || `MỤC 0${lb.position}`)}
-                          </span>
                         </div>
                       </td>
 
@@ -1489,17 +1485,6 @@ export default function LookbookManagement() {
 
                 <div className="lb-form-row-2">
                   <div className="lb-form-group">
-                    <label className="lb-form-label">Mã Hiển Thị (VD: LOOK 01, MỤC 05...)</label>
-                    <input
-                      type="text"
-                      className="lb-form-input"
-                      placeholder="VD: LOOK 01"
-                      value={formData.lookCode}
-                      onChange={(e) => setFormData({ ...formData, lookCode: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="lb-form-group">
                     <label className="lb-form-label">Phong Cách / Mùa</label>
                     <input
                       type="text"
@@ -1509,15 +1494,20 @@ export default function LookbookManagement() {
                       onChange={(e) => setFormData({ ...formData, season: e.target.value })}
                     />
                   </div>
-                </div>
 
-                <div className="lb-form-row-2">
                   <div className="lb-form-group">
-                    <label className="lb-form-label">Thứ Tự Vị Trí (Banner, 1, 2, 3, 4, 5...)</label>
+                    <label className="lb-form-label">Thứ Tự Vị Trí (Banner, 1, 2, 3, 4...)</label>
                     <select
                       className="lb-form-select"
                       value={formData.position}
-                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                      onChange={(e) => {
+                        const newPos = e.target.value;
+                        setFormData({ 
+                          ...formData, 
+                          position: newPos,
+                          lookCode: newPos === 'banner' ? 'BANNER' : (formData.lookCode === 'BANNER' ? `LOOK 0${newPos}` : formData.lookCode)
+                        });
+                      }}
                       style={{ fontWeight: 600 }}
                     >
                       <option value="banner" style={{ fontWeight: 700, color: '#D97706' }}>
@@ -1525,12 +1515,14 @@ export default function LookbookManagement() {
                       </option>
                       {Array.from({ length: 12 }, (_, i) => i + 1).map(num => (
                         <option key={num} value={num}>
-                          Vị trí #{num} {num === 1 ? '(Look 01 & Nổi bật Trang Chủ)' : num === 2 ? '(Look 02)' : num === 3 ? '(Look 03)' : num === 4 ? '(Look 04)' : num === 5 ? '(Mục 05)' : ''}
+                          Vị trí #{num} {num === 1 ? '(Look 01 & Nổi bật Trang Chủ)' : num === 2 ? '(Look 02)' : num === 3 ? '(Look 03)' : num === 4 ? '(Look 04)' : ''}
                         </option>
                       ))}
                     </select>
                   </div>
+                </div>
 
+                {formData.position !== 'banner' && (
                   <div className="lb-form-group">
                     <label className="lb-form-label">Giá Hiển Thị / Combo</label>
                     <input
@@ -1541,85 +1533,87 @@ export default function LookbookManagement() {
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                     />
                   </div>
-                </div>
+                )}
 
-                {/* Outfit Products Section (Danh Sách Sản Phẩm Phối) */}
-                <div className="lb-form-group" style={{ background: '#F9FAFB', padding: '14px', borderRadius: '10px', border: '1px solid #E5E7EB' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <div>
-                      <label className="lb-form-label" style={{ fontWeight: 700, fontSize: '13px', color: '#111827', display: 'block', margin: 0 }}>
-                        Danh Sách Sản Phẩm Phối (Gắn Tag)
-                      </label>
-                      <span style={{ fontSize: '11px', color: '#6B7280' }}>
-                        Các sản phẩm hiển thị tên & giá chi tiết trong khối Lookbook
-                      </span>
+                {/* Outfit Products Section (Danh Sách Sản Phẩm Phối) - Ẩn khi vị trí là Banner */}
+                {formData.position !== 'banner' && (
+                  <div className="lb-form-group" style={{ background: '#F9FAFB', padding: '14px', borderRadius: '10px', border: '1px solid #E5E7EB' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                      <div>
+                        <label className="lb-form-label" style={{ fontWeight: 700, fontSize: '13px', color: '#111827', display: 'block', margin: 0 }}>
+                          Danh Sách Sản Phẩm Phối (Gắn Tag)
+                        </label>
+                        <span style={{ fontSize: '11px', color: '#6B7280' }}>
+                          Các sản phẩm hiển thị tên & giá chi tiết trong khối Lookbook
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddProductRow}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: '#111827',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '6px 12px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#FFFFFF',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Plus size={13} strokeWidth={2.5} /> Thêm sản phẩm
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleAddProductRow}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        background: '#111827',
-                        border: 'none',
-                        borderRadius: '6px',
-                        padding: '6px 12px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: '#FFFFFF',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <Plus size={13} strokeWidth={2.5} /> Thêm sản phẩm
-                    </button>
+
+                    {formData.products && formData.products.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {formData.products.map((prod, idx) => (
+                          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 38px', gap: '8px', alignItems: 'center' }}>
+                            <input
+                              type="text"
+                              className="lb-form-input"
+                              placeholder="Tên sản phẩm (VD: Áo Khoác Tweed Ivory Cropped)"
+                              value={prod.name}
+                              onChange={(e) => handleProductChange(idx, 'name', e.target.value)}
+                            />
+                            <input
+                              type="text"
+                              className="lb-form-input"
+                              placeholder="Giá (VD: 2.150.000₫)"
+                              value={prod.price}
+                              onChange={(e) => handleProductChange(idx, 'price', e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveProductRow(idx)}
+                              style={{
+                                background: '#FEF2F2',
+                                border: '1px solid #FEE2E2',
+                                borderRadius: '6px',
+                                height: '38px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#EF4444',
+                                cursor: 'pointer'
+                              }}
+                              title="Xóa sản phẩm này"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '12px', color: '#9CA3AF', fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>
+                        Chưa có sản phẩm nào trong danh sách. Bấm "+ Thêm sản phẩm" để thêm từng món đồ phối.
+                      </div>
+                    )}
                   </div>
-
-                  {formData.products && formData.products.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {formData.products.map((prod, idx) => (
-                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 38px', gap: '8px', alignItems: 'center' }}>
-                          <input
-                            type="text"
-                            className="lb-form-input"
-                            placeholder="Tên sản phẩm (VD: Áo Khoác Tweed Ivory Cropped)"
-                            value={prod.name}
-                            onChange={(e) => handleProductChange(idx, 'name', e.target.value)}
-                          />
-                          <input
-                            type="text"
-                            className="lb-form-input"
-                            placeholder="Giá (VD: 2.150.000₫)"
-                            value={prod.price}
-                            onChange={(e) => handleProductChange(idx, 'price', e.target.value)}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveProductRow(idx)}
-                            style={{
-                              background: '#FEF2F2',
-                              border: '1px solid #FEE2E2',
-                              borderRadius: '6px',
-                              height: '38px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#EF4444',
-                              cursor: 'pointer'
-                            }}
-                            title="Xóa sản phẩm này"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '12px', color: '#9CA3AF', fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>
-                      Chưa có sản phẩm nào trong danh sách. Bấm "+ Thêm sản phẩm" để thêm từng món đồ phối.
-                    </div>
-                  )}
-                </div>
+                )}
 
                 <div className="lb-form-group">
                   <label className="lb-form-label">Trạng Thái Hiển Thị</label>
