@@ -1,4 +1,4 @@
-import { registerService, loginService, logoutService, refreshAccessTokenService } from '../services/auth.service.js';
+import { registerService, loginService, logoutService, refreshAccessTokenService, updateProfileService } from '../services/auth.service.js';
 import { BaseResponse } from '../utils/baseResponse.js';
 
 /**
@@ -88,3 +88,24 @@ export const refreshController = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Endpoint Cập nhật hồ sơ cá nhân (PUT /api/auth/profile)
+ */
+export const updateProfileController = async (req, res, next) => {
+  try {
+    const customer_id = req.user?.id || req.body.customer_id || req.body.id;
+    const { full_name, phone, avatar_url, gender, dob } = req.body;
+
+    if (!customer_id) {
+      return BaseResponse.error(res, 'Không tìm thấy ID người dùng', [], 400);
+    }
+
+    const result = await updateProfileService({ customer_id, full_name, phone, avatar_url, gender, dob });
+
+    return BaseResponse.success(res, 'Cập nhật thông tin hồ sơ thành công', result, 200);
+  } catch (error) {
+    next(error);
+  }
+};
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, Heart, ShoppingBag, User, Bell, MessageSquare, Globe, Sun, Star } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +11,32 @@ const Header = ({ onOpenAISearch }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSearchInput, setShowSearchInput] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const categoryTimeoutRef = useRef(null);
+  const userTimeoutRef = useRef(null);
+
+  const handleCategoryMouseEnter = () => {
+    if (categoryTimeoutRef.current) clearTimeout(categoryTimeoutRef.current);
+    setShowCategoryMenu(true);
+  };
+
+  const handleCategoryMouseLeave = () => {
+    categoryTimeoutRef.current = setTimeout(() => {
+      setShowCategoryMenu(false);
+    }, 200);
+  };
+
+  const handleUserMouseEnter = () => {
+    if (userTimeoutRef.current) clearTimeout(userTimeoutRef.current);
+    setShowUserMenu(true);
+  };
+
+  const handleUserMouseLeave = () => {
+    userTimeoutRef.current = setTimeout(() => {
+      setShowUserMenu(false);
+    }, 200);
+  };
+
 
   const handleLogout = async () => {
     if (logout) {
@@ -66,8 +92,8 @@ const Header = ({ onOpenAISearch }) => {
           </li>
           <li 
             className={`dropdown-trigger ${location.pathname.startsWith('/products') || location.pathname.startsWith('/category') ? 'active' : ''}`}
-            onMouseEnter={() => setShowCategoryMenu(true)}
-            onMouseLeave={() => setShowCategoryMenu(false)}
+            onMouseEnter={handleCategoryMouseEnter}
+            onMouseLeave={handleCategoryMouseLeave}
           >
             <Link to="/products" className="nav-link">
               DANH MỤC
@@ -133,16 +159,16 @@ const Header = ({ onOpenAISearch }) => {
           </Link>
 
           {/* Wishlist Icon */}
-          <Link to="/profile?tab=wishlist" className="action-icon" title="Yêu thích">
+          <Link to={user ? "/profile?tab=wishlist" : "/login"} className="action-icon" title="Yêu thích">
             <Heart size={18} />
-            <span className="badge">{wishlist.length || 2}</span>
+            <span className="badge">{user ? (wishlist ? wishlist.length : 0) : 0}</span>
           </Link>
 
           {/* User Account */}
           <div 
             className="user-menu-wrapper"
-            onMouseEnter={() => setShowUserMenu(true)}
-            onMouseLeave={() => setShowUserMenu(false)}
+            onMouseEnter={handleUserMouseEnter}
+            onMouseLeave={handleUserMouseLeave}
           >
             <Link to={user ? "/profile" : "/login"} className="action-icon user-avatar-btn" title="Tài khoản">
               <User size={18} />
@@ -430,7 +456,18 @@ const Header = ({ onOpenAISearch }) => {
           box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
           border-radius: 10px;
           padding: 8px 0;
-          margin-top: 6px;
+          margin-top: 4px;
+        }
+
+        /* Bridge hover gap so menu never disappears when moving mouse */
+        .user-dropdown::before,
+        .dropdown-menu::before {
+          content: '';
+          position: absolute;
+          top: -14px;
+          left: 0;
+          right: 0;
+          height: 14px;
         }
 
         .user-info-header {

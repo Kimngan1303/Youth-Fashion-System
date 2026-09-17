@@ -41,4 +41,13 @@ export const authService = {
     const response = await axiosClient.post('/auth/refresh');
     return response.data;
   },
+
+  /**
+   * Update customer profile in database
+   */
+  updateProfile: async (profileData) => {
+    const response = await axiosClient.put('/auth/profile', profileData);
+    return response.data;
+  },
 };
+

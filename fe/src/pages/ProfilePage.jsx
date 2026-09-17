@@ -13,12 +13,10 @@ const ProfilePage = () => {
   const [searchParams] = useSearchParams();
 
   const handleLogout = async () => {
-    if (window.confirm('Bạn có chắc chắn muốn đăng xuất tài khoản?')) {
-      if (logout) {
-        await logout();
-      }
-      navigate('/');
+    if (logout) {
+      await logout();
     }
+    navigate('/');
   };
   const initialTab = searchParams.get('tab') || 'info';
 
@@ -91,9 +89,9 @@ const ProfilePage = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    updateUserProfile({
+    const res = await updateUserProfile({
       full_name: formData.full_name,
       phone: formData.phone,
       gender: formData.gender,
@@ -106,9 +104,10 @@ const ProfilePage = () => {
       }
     });
 
-    setSaveSuccessMsg('Đã cập nhật thông tin hồ sơ cá nhân thành công!');
+    setSaveSuccessMsg(res?.message || 'Đã cập nhật thông tin hồ sơ cá nhân thành công!');
     setTimeout(() => setSaveSuccessMsg(''), 4000);
   };
+
 
   const handlePassChange = (e) => {
     e.preventDefault();

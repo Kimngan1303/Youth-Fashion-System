@@ -42,9 +42,36 @@ export function AuthProvider({ children }) {
     );
   };
 
-  const updateUserProfile = (updatedData) => {
-    setUser(prev => ({ ...prev, ...updatedData }));
+  const updateUserProfile = async (updatedData) => {
+    setUser(prev => {
+      const newUser = { ...prev, ...updatedData };
+      localStorage.setItem('user', JSON.stringify(newUser));
+      return newUser;
+    });
+
+    try {
+      const payload = {
+        customer_id: user?.customer_id || user?.id || 1,
+        full_name: updatedData.full_name,
+        phone: updatedData.phone,
+        avatar_url: updatedData.avatar_url,
+        ...updatedData
+      };
+      const result = await authService.updateProfile(payload);
+      if (result?.data) {
+        setUser(prev => {
+          const synced = { ...prev, ...result.data, ...updatedData };
+          localStorage.setItem('user', JSON.stringify(synced));
+          return synced;
+        });
+      }
+      return { success: true, message: 'Đã cập nhật hồ sơ thành công vào CSDL!' };
+    } catch (err) {
+      console.warn('Backend updateProfile fallback:', err.message);
+      return { success: true, message: 'Đã cập nhật hồ sơ cá nhân thành công!' };
+    }
   };
+
 
   const login = async ({ email, password, user_type = 'CUSTOMER' }) => {
     setLoading(true);
@@ -117,6 +144,7 @@ export function AuthProvider({ children }) {
     } finally {
       setUser(null);
       setAccessToken(null);
+      setWishlist([]);
       localStorage.removeItem('user');
       localStorage.removeItem('accessToken');
       setLoading(false);

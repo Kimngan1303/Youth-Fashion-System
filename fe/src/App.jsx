@@ -38,7 +38,14 @@ function AppContent() {
             element={<HomePage onOpenAISearch={() => setIsAISearchOpen(true)} />} 
           />
           <Route path="/lookbook" element={<LookbookPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            } 
+          />
           <Route path="/contact" element={<ContactPage />} />
           <Route
             path="/manager"

@@ -8,6 +8,7 @@ import {
   saveRefreshToken,
   deleteRefreshTokenByHash,
   findRefreshTokenByHash,
+  updateCustomerProfile,
 } from '../repositories/auth.repository.js';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../helpers/jwt.helper.js';
 
@@ -122,9 +123,14 @@ export const loginService = async ({ email, password, user_type }) => {
     accessToken,
     refreshToken,
     user: {
+      customer_id: user_type === 'CUSTOMER' ? user.customer_id.toString() : undefined,
       id: userId.toString(),
       email: user.email,
       full_name: user.full_name,
+      phone: user.phone || null,
+      avatar_url: user.avatar_url || null,
+      gender: user.gender || null,
+      dob: user.dob || null,
       role,
       user_type,
     },
@@ -174,3 +180,28 @@ export const refreshAccessTokenService = async (refreshToken) => {
 
   return { accessToken: newAccessToken };
 };
+
+/**
+ * Xử lý cập nhật hồ sơ cá nhân của Khách hàng vào CSDL
+ */
+export const updateProfileService = async ({ customer_id, full_name, phone, avatar_url, gender, dob }) => {
+  if (phone) {
+    const existingPhone = await findCustomerByPhone(phone);
+    if (existingPhone && existingPhone.customer_id.toString() !== customer_id.toString()) {
+      throw { statusCode: 400, message: 'Số điện thoại này đã được sử dụng bởi tài khoản khác' };
+    }
+  }
+
+  const updatedCustomer = await updateCustomerProfile(customer_id, { full_name, phone, avatar_url, gender, dob });
+
+  return {
+    customer_id: updatedCustomer.customer_id.toString(),
+    email: updatedCustomer.email,
+    full_name: updatedCustomer.full_name,
+    phone: updatedCustomer.phone,
+    avatar_url: updatedCustomer.avatar_url,
+    gender: updatedCustomer.gender,
+    dob: updatedCustomer.dob,
+  };
+};
+

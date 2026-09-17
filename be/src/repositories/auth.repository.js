@@ -89,3 +89,32 @@ export const deleteRefreshTokenByHash = async (token_hash) => {
     where: { token_hash },
   });
 };
+
+/**
+ * Cập nhật thông tin Hồ sơ Khách hàng (Customer Profile) vào CSDL MySQL
+ */
+export const updateCustomerProfile = async (customer_id, { full_name, phone, avatar_url, gender, dob }) => {
+  const data = {};
+  if (full_name !== undefined) data.full_name = full_name;
+  if (phone !== undefined) data.phone = phone;
+  if (avatar_url !== undefined) data.avatar_url = avatar_url;
+  if (gender !== undefined) data.gender = gender;
+  if (dob !== undefined) data.dob = dob;
+
+  return await prisma.customer.update({
+    where: { customer_id: BigInt(customer_id) },
+    data,
+    select: {
+      customer_id: true,
+      email: true,
+      full_name: true,
+      phone: true,
+      avatar_url: true,
+      gender: true,
+      dob: true,
+      status: true,
+      updated_at: true,
+    },
+  });
+};
+
