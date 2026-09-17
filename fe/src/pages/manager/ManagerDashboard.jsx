@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import LookbookManagement from './LookbookManagement';
 import { 
   LayoutGrid, 
@@ -501,11 +501,14 @@ const dashboardStyles = `
 export default function ManagerDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeMenu, setActiveMenu] = useState('lookbooks');
+  const location = useLocation();
+
+  const isLookbooksRoute = location.pathname.endsWith('/lookbooks');
+  const activeMenu = isLookbooksRoute ? 'lookbooks' : 'overview';
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate('/');
   };
 
   return (
@@ -518,10 +521,7 @@ export default function ManagerDashboard() {
 
           {/* Logo Brand */}
           <div className="brand-logo-section">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h8M12 8v8" />
-            </svg>
+            <img src="/logo.png" alt="Youth Fashion Logo" style={{ width: '34px', height: '34px', objectFit: 'contain' }} />
             <span className="brand-logo-text">YOUTH FASHION</span>
           </div>
 
@@ -533,7 +533,7 @@ export default function ManagerDashboard() {
             {/* 1. Tổng Quan */}
             <button
               className={`nav-menu-link ${activeMenu === 'overview' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('overview')}
+              onClick={() => navigate('/manager')}
             >
               <div className="nav-item-inner">
                 <LayoutGrid size={16} />
@@ -543,8 +543,8 @@ export default function ManagerDashboard() {
 
             {/* 2. Quản Lý Sản Phẩm */}
             <button
-              className={`nav-menu-link ${activeMenu === 'products' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('products')}
+              className="nav-menu-link"
+              onClick={() => navigate('/manager/products')}
             >
               <div className="nav-item-inner">
                 <Package size={16} />
@@ -554,8 +554,8 @@ export default function ManagerDashboard() {
 
             {/* 3. Quản Lý Danh Mục */}
             <button
-              className={`nav-menu-link ${activeMenu === 'categories' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('categories')}
+              className="nav-menu-link"
+              onClick={() => navigate('/manager/categories')}
             >
               <div className="nav-item-inner">
                 <Folder size={16} />
@@ -563,10 +563,10 @@ export default function ManagerDashboard() {
               </div>
             </button>
 
-            {/* 4. Quản Lý Lookbook (Active in screenshot) */}
+            {/* 4. Quản Lý Lookbook */}
             <button
               className={`nav-menu-link ${activeMenu === 'lookbooks' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('lookbooks')}
+              onClick={() => navigate('/manager/lookbooks')}
             >
               <div className="nav-item-inner">
                 <BookOpen size={16} />
@@ -576,8 +576,8 @@ export default function ManagerDashboard() {
 
             {/* 5. Quản Lý Đơn Hàng (Badge 18) */}
             <button
-              className={`nav-menu-link ${activeMenu === 'orders' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('orders')}
+              className="nav-menu-link"
+              onClick={() => navigate('/manager')}
             >
               <div className="nav-item-inner">
                 <ShoppingBag size={16} />
@@ -590,8 +590,8 @@ export default function ManagerDashboard() {
 
             {/* 6. Tư Vấn & CSKH */}
             <button
-              className={`nav-menu-link ${activeMenu === 'customer_service' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('customer_service')}
+              className="nav-menu-link"
+              onClick={() => navigate('/manager')}
             >
               <div className="nav-item-inner">
                 <MessageSquare size={16} />
@@ -601,8 +601,8 @@ export default function ManagerDashboard() {
 
             {/* 7. Voucher & Khuyến Mãi */}
             <button
-              className={`nav-menu-link ${activeMenu === 'vouchers' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('vouchers')}
+              className="nav-menu-link"
+              onClick={() => navigate('/manager')}
             >
               <div className="nav-item-inner">
                 <Tag size={16} />
@@ -612,8 +612,8 @@ export default function ManagerDashboard() {
 
             {/* 8. Báo Cáo & Doanh Thu */}
             <button
-              className={`nav-menu-link ${activeMenu === 'reports' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('reports')}
+              className="nav-menu-link"
+              onClick={() => navigate('/manager')}
             >
               <div className="nav-item-inner">
                 <BarChart2 size={16} />

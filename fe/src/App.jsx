@@ -11,6 +11,8 @@ import LookbookPage from './pages/LookbookPage';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ManagerDashboard from './pages/manager/ManagerDashboard';
+import ProductManager from './pages/manager/ProductManager';
+import CategoryManager from './pages/manager/CategoryManager';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useContext(AuthContext);
@@ -40,6 +42,31 @@ function AppContent() {
           <Route path="/contact" element={<ContactPage />} />
           <Route
             path="/manager"
+            element={
+              <ProtectedRoute>
+                <ManagerDashboard />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/manager/products"
+            element={
+              <ProtectedRoute>
+                <ProductManager />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/manager/categories"
+            element={
+              <ProtectedRoute>
+                <CategoryManager />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/manager/lookbooks"
             element={
               <ProtectedRoute>
                 <ManagerDashboard />

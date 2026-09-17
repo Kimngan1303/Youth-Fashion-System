@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   User, Package, Lock, Heart, LogOut, CheckCircle, 
   Camera, MapPin, Calendar, Clock, CreditCard, ChevronRight, AlertCircle, Tag, Copy
@@ -8,8 +8,18 @@ import { useAuth } from '../context/AuthContext';
 import ProductCard from '../components/ProductCard';
 
 const ProfilePage = () => {
-  const { user, updateUserProfile, orders, wishlist } = useAuth();
+  const { user, updateUserProfile, orders, wishlist, logout } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  const handleLogout = async () => {
+    if (window.confirm('Bạn có chắc chắn muốn đăng xuất tài khoản?')) {
+      if (logout) {
+        await logout();
+      }
+      navigate('/');
+    }
+  };
   const initialTab = searchParams.get('tab') || 'info';
 
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -311,11 +321,7 @@ const ProfilePage = () => {
               {/* Menu Item 5: Đăng Xuất */}
               <button 
                 className="nav-item-btn logout-item-btn"
-                onClick={() => {
-                  if (window.confirm('Bạn có chắc chắn muốn đăng xuất tài khoản?')) {
-                    alert('Đã đăng xuất tài khoản!');
-                  }
-                }}
+                onClick={handleLogout}
               >
                 <div className="nav-item-left text-danger">
                   <LogOut size={18} />

@@ -555,17 +555,14 @@ export default function Login() {
           <div className="concentric-circle-2" />
 
           <div className="header-mini-logo">
-            <div className="mini-logo-dot" />
+            <img src="/logo.png" alt="Youth Fashion Logo" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
             <span className="mini-logo-text">YOUTH FASHION</span>
           </div>
 
           <div className="central-hero-statement">
             <div className="floating-emblem-wrapper">
               <div className="floating-emblem">
-                <svg className="emblem-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
-                </svg>
+                <img src="/logo.png" alt="Youth Fashion Emblem" style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
               </div>
             </div>
 
@@ -606,155 +603,128 @@ export default function Login() {
               </div>
             )}
 
-            {/* Nếu ĐÃ ĐĂNG NHẬP: Hiển thị Thẻ thông tin User & Nút Logout */}
-            {isAuthenticated ? (
-              <div className="user-welcome-card">
-                <div style={{ fontWeight: 600, fontSize: '15px', color: '#1C1917' }}>
-                  Xin chào, {user?.full_name}!
-                </div>
-                <div style={{ fontSize: '13px', color: '#57534E' }}>
-                  <strong>Email:</strong> {user?.email}
-                </div>
-                <div style={{ fontSize: '13px', color: '#57534E' }}>
-                  <strong>Loại tài khoản:</strong> {user?.role || 'Khách hàng'}
-                </div>
+            {/* Form Đăng Nhập */}
+            <form className="auth-form" onSubmit={handleSubmit}>
+
+              {/* Switcher Khách hàng / Nhân viên */}
+              <div className="role-switcher">
                 <button
                   type="button"
-                  className="btn-submit-cta"
-                  style={{ marginTop: '10px', background: '#DC2626' }}
-                  onClick={logout}
+                  className={`role-btn ${loginType === 'CUSTOMER' ? 'active' : ''}`}
+                  onClick={() => setLoginType('CUSTOMER')}
                 >
-                  ĐĂNG XUẤT
+                  Khách Hàng
+                </button>
+                <button
+                  type="button"
+                  className={`role-btn ${loginType === 'EMPLOYEE' ? 'active' : ''}`}
+                  onClick={() => setLoginType('EMPLOYEE')}
+                >
+                  Nhân Viên / Admin
                 </button>
               </div>
-            ) : (
-              /* Nếu CHƯA ĐĂNG NHẬP: Hiển thị Form */
-              <form className="auth-form" onSubmit={handleSubmit}>
 
-                {/* Switcher Khách hàng / Nhân viên */}
-                <div className="role-switcher">
+              {/* Email */}
+              <div className="input-field-group">
+                <label className="input-label">ĐỊA CHỈ EMAIL</label>
+                <div className="input-relative-box">
+                  <svg className="input-left-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <input
+                    type="email"
+                    className="custom-input"
+                    placeholder={loginType === 'CUSTOMER' ? 'quykhach@domain.com' : 'nhanvien@youthfashion.com'}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="input-field-group">
+                <label className="input-label">MẬT KHẨU</label>
+                <div className="input-relative-box">
+                  <svg className="input-left-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    className="custom-input"
+                    placeholder="••••••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
                   <button
                     type="button"
-                    className={`role-btn ${loginType === 'CUSTOMER' ? 'active' : ''}`}
-                    onClick={() => setLoginType('CUSTOMER')}
+                    className="input-right-btn"
+                    onClick={() => setShowPassword(!showPassword)}
                   >
-                    Khách Hàng
+                    {showPassword ? (
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22" />
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
                   </button>
-                  <button
-                    type="button"
-                    className={`role-btn ${loginType === 'EMPLOYEE' ? 'active' : ''}`}
-                    onClick={() => setLoginType('EMPLOYEE')}
-                  >
-                    Nhân Viên / Admin
-                  </button>
                 </div>
+              </div>
 
-                {/* Email */}
-                <div className="input-field-group">
-                  <label className="input-label">ĐỊA CHỈ EMAIL</label>
-                  <div className="input-relative-box">
-                    <svg className="input-left-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <input
-                      type="email"
-                      className="custom-input"
-                      placeholder={loginType === 'CUSTOMER' ? 'quykhach@domain.com' : 'nhanvien@youthfashion.com'}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
+              {/* Auxiliary Row */}
+              <div className="auxiliary-row">
+                <label className="remember-me-label">
+                  <input
+                    type="checkbox"
+                    className="remember-checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  Ghi nhớ đăng nhập
+                </label>
+                <a href="#forgot" className="forgot-password-link">
+                  Quên mật khẩu?
+                </a>
+              </div>
 
-                {/* Password */}
-                <div className="input-field-group">
-                  <label className="input-label">MẬT KHẨU</label>
-                  <div className="input-relative-box">
-                    <svg className="input-left-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      className="custom-input"
-                      placeholder="••••••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="input-right-btn"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? (
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22" />
-                        </svg>
-                      ) : (
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
+              {/* Submit CTA */}
+              <button type="submit" className="btn-submit-cta" disabled={loading}>
+                {loading ? 'ĐANG ĐĂNG NHẬP...' : 'ĐĂNG NHẬP'}
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </button>
+            </form>
 
-                {/* Auxiliary Row */}
-                <div className="auxiliary-row">
-                  <label className="remember-me-label">
-                    <input
-                      type="checkbox"
-                      className="remember-checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                    />
-                    Ghi nhớ đăng nhập
-                  </label>
-                  <a href="#forgot" className="forgot-password-link">
-                    Quên mật khẩu?
-                  </a>
-                </div>
+            {/* Divider */}
+            <div className="or-divider-container">
+              <div className="or-divider-line" />
+              <span className="or-divider-text">HOẶC TIẾP TỤC VỚI</span>
+            </div>
 
-                {/* Submit CTA */}
-                <button type="submit" className="btn-submit-cta" disabled={loading}>
-                  {loading ? 'ĐANG ĐĂNG NHẬP...' : 'ĐĂNG NHẬP'}
-                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                </button>
-              </form>
-            )}
+            {/* Google Button */}
+            <button type="button" className="btn-google-login">
+              <svg width="16" height="16" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+              </svg>
+              Google
+            </button>
 
-            {!isAuthenticated && (
-              <>
-                {/* Divider */}
-                <div className="or-divider-container">
-                  <div className="or-divider-line" />
-                  <span className="or-divider-text">HOẶC TIẾP TỤC VỚI</span>
-                </div>
-
-                {/* Google Button */}
-                <button type="button" className="btn-google-login">
-                  <svg width="16" height="16" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                  </svg>
-                  Google
-                </button>
-
-                {/* Footer Link */}
-                <div className="registration-note-footer">
-                  <span>Chưa có tài khoản?</span>
-                  <Link to="/register" className="register-now-link">
-                    Đăng ký tài khoản ngay
-                  </Link>
-                </div>
-              </>
-            )}
+            {/* Footer Link */}
+            <div className="registration-note-footer">
+              <span>Chưa có tài khoản?</span>
+              <Link to="/register" className="register-now-link">
+                Đăng ký tài khoản ngay
+              </Link>
+            </div>
 
           </div>
         </div>

@@ -16,7 +16,8 @@ const Header = ({ onOpenAISearch }) => {
     if (logout) {
       await logout();
     }
-    navigate('/login');
+    setShowUserMenu(false);
+    navigate('/');
   };
 
   const categories = [
@@ -159,6 +160,18 @@ const Header = ({ onOpenAISearch }) => {
                 <Link to="/profile?tab=wishlist" className="dropdown-item">Danh sách yêu thích</Link>
                 <hr />
                 <button className="dropdown-item text-danger" onClick={handleLogout}>Đăng xuất</button>
+              </div>
+            )}
+
+            {showUserMenu && !user && (
+              <div className="user-dropdown animate-fade-in">
+                <div className="user-info-header">
+                  <span className="user-name">Tài khoản</span>
+                  <span className="user-email">Vui lòng đăng nhập để trải nghiệm</span>
+                </div>
+                <hr />
+                <Link to="/login" className="dropdown-item" style={{ fontWeight: 600, color: '#111' }}>Đăng Nhập</Link>
+                <Link to="/register" className="dropdown-item">Đăng Ký Tài Khoản</Link>
               </div>
             )}
           </div>
