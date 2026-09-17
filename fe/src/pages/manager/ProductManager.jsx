@@ -1,6 +1,20 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { 
+  LayoutGrid, 
+  Package, 
+  Folder, 
+  BookOpen, 
+  ShoppingBag, 
+  MessageSquare, 
+  Tag, 
+  BarChart2, 
+  Home, 
+  LogOut, 
+  Search, 
+  User 
+} from 'lucide-react';
 
 /**
  * Product Manager Component (Single-file JSX + Embedded CSS Method 1)
@@ -925,57 +939,93 @@ export default function ProductManager() {
 
           {/* Navigation Menu */}
           <nav className="nav-menu-items">
-            <button className="nav-menu-link" onClick={() => navigate('/manager')}>
+            {/* 1. Tổng Quan */}
+            <button
+              className="nav-menu-link"
+              onClick={() => navigate('/manager')}
+            >
               <div className="nav-item-inner">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
+                <LayoutGrid size={16} />
                 <span>Tổng Quan</span>
               </div>
             </button>
 
-            <button className="nav-menu-link active" onClick={() => navigate('/manager/products')}>
+            {/* 2. Quản Lý Sản Phẩm (Active) */}
+            <button
+              className="nav-menu-link active"
+              onClick={() => navigate('/manager/products')}
+            >
               <div className="nav-item-inner">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
+                <Package size={16} />
                 <span>Quản Lý Sản Phẩm</span>
               </div>
             </button>
 
-            <button className="nav-menu-link" onClick={() => navigate('/manager/categories')}>
+            {/* 3. Quản Lý Danh Mục */}
+            <button
+              className="nav-menu-link"
+              onClick={() => navigate('/manager/categories')}
+            >
               <div className="nav-item-inner">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 11h.01M7 15h.01M11 7h8M11 11h8M11 15h8" />
-                </svg>
+                <Folder size={16} />
                 <span>Quản Lý Danh Mục</span>
               </div>
             </button>
 
-            <button className="nav-menu-link" onClick={() => navigate('/manager')}>
+            {/* 4. Quản Lý Lookbook */}
+            <button
+              className="nav-menu-link"
+              onClick={() => navigate('/manager/lookbooks')}
+            >
               <div className="nav-item-inner">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
+                <BookOpen size={16} />
+                <span>Quản Lý Lookbook</span>
+              </div>
+            </button>
+
+            {/* 5. Quản Lý Đơn Hàng (Badge 18) */}
+            <button
+              className="nav-menu-link"
+              onClick={() => navigate('/manager')}
+            >
+              <div className="nav-item-inner">
+                <ShoppingBag size={16} />
                 <span>Quản Lý Đơn Hàng</span>
               </div>
-              <span className="order-count-badge">12</span>
+              <span className="order-count-badge" style={{ background: '#FACC15', color: '#713F12', fontWeight: 700, padding: '2px 7px', borderRadius: '999px', fontSize: '11px' }}>
+                18
+              </span>
             </button>
 
-            <button className="nav-menu-link" onClick={() => navigate('/manager')}>
+            {/* 6. Tư Vấn & CSKH */}
+            <button
+              className="nav-menu-link"
+              onClick={() => navigate('/manager')}
+            >
               <div className="nav-item-inner">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                </svg>
-                <span>Tư Vấn Size & CSKH</span>
+                <MessageSquare size={16} />
+                <span>Tư Vấn & CSKH</span>
               </div>
             </button>
 
-            <button className="nav-menu-link" onClick={() => navigate('/manager')}>
+            {/* 7. Voucher & Khuyến Mãi */}
+            <button
+              className="nav-menu-link"
+              onClick={() => navigate('/manager')}
+            >
               <div className="nav-item-inner">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
+                <Tag size={16} />
+                <span>Voucher & Khuyến Mãi</span>
+              </div>
+            </button>
+
+            {/* 8. Báo Cáo & Doanh Thu */}
+            <button
+              className="nav-menu-link"
+              onClick={() => navigate('/manager')}
+            >
+              <div className="nav-item-inner">
+                <BarChart2 size={16} />
                 <span>Báo Cáo & Doanh Thu</span>
               </div>
             </button>
@@ -986,15 +1036,11 @@ export default function ProductManager() {
         {/* Sidebar Bottom Part */}
         <div className="sidebar-bottom-part">
           <button type="button" className="btn-store-status" onClick={() => navigate('/')}>
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            Về Trang Chủ
+            <Home size={15} />
+            VỀ TRANG CHỦ
           </button>
           <button type="button" className="btn-sidebar-logout" onClick={handleLogout}>
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
+            <LogOut size={15} />
             ĐĂNG XUẤT
           </button>
         </div>

@@ -65,6 +65,14 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/manager/lookbooks"
+            element={
+              <ProtectedRoute>
+                <ManagerDashboard />
+              </ProtectedRoute>
+            }
+          />
           
           {/* Fallback routes */}
           <Route 
