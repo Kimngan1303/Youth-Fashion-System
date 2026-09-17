@@ -1,6 +1,21 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import LookbookManagement from './LookbookManagement';
+import { 
+  LayoutGrid, 
+  Package, 
+  Folder, 
+  BookOpen, 
+  ShoppingBag, 
+  MessageSquare, 
+  Tag, 
+  BarChart2, 
+  Home, 
+  LogOut, 
+  Search, 
+  User 
+} from 'lucide-react';
 
 /**
  * Manager Dashboard Component (Single-file JSX + Embedded CSS Method 1)
@@ -486,7 +501,7 @@ const dashboardStyles = `
 export default function ManagerDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeMenu, setActiveMenu] = useState('overview');
+  const [activeMenu, setActiveMenu] = useState('lookbooks');
 
   const handleLogout = async () => {
     await logout();
@@ -512,75 +527,93 @@ export default function ManagerDashboard() {
 
           {/* Menu Items */}
           <nav className="nav-menu-items">
+            {/* 1. Tổng Quan */}
             <button
               className={`nav-menu-link ${activeMenu === 'overview' ? 'active' : ''}`}
               onClick={() => navigate('/manager')}
             >
               <div className="nav-item-inner">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
+                <LayoutGrid size={16} />
                 <span>Tổng Quan</span>
               </div>
             </button>
 
+            {/* 2. Quản Lý Sản Phẩm */}
             <button
               className="nav-menu-link"
               onClick={() => navigate('/manager/products')}
             >
               <div className="nav-item-inner">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
+                <Package size={16} />
                 <span>Quản Lý Sản Phẩm</span>
               </div>
             </button>
 
+            {/* 3. Quản Lý Danh Mục */}
             <button
               className="nav-menu-link"
               onClick={() => navigate('/manager/categories')}
             >
               <div className="nav-item-inner">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 11h.01M7 15h.01M11 7h8M11 11h8M11 15h8" />
-                </svg>
+                <Folder size={16} />
                 <span>Quản Lý Danh Mục</span>
               </div>
             </button>
 
+            {/* 4. Quản Lý Lookbook (Active in screenshot) */}
+            <button
+              className={`nav-menu-link ${activeMenu === 'lookbooks' ? 'active' : ''}`}
+              onClick={() => setActiveMenu('lookbooks')}
+            >
+              <div className="nav-item-inner">
+                <BookOpen size={16} />
+                <span>Quản Lý Lookbook</span>
+              </div>
+            </button>
+
+            {/* 5. Quản Lý Đơn Hàng (Badge 18) */}
             <button
               className={`nav-menu-link ${activeMenu === 'orders' ? 'active' : ''}`}
               onClick={() => setActiveMenu('orders')}
             >
               <div className="nav-item-inner">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
+                <ShoppingBag size={16} />
                 <span>Quản Lý Đơn Hàng</span>
               </div>
-              <span className="order-count-badge">12</span>
+              <span className="order-count-badge" style={{ background: '#FACC15', color: '#713F12', fontWeight: 700, padding: '2px 7px', borderRadius: '999px', fontSize: '11px' }}>
+                18
+              </span>
             </button>
 
+            {/* 6. Tư Vấn & CSKH */}
             <button
               className={`nav-menu-link ${activeMenu === 'customer_service' ? 'active' : ''}`}
               onClick={() => setActiveMenu('customer_service')}
             >
               <div className="nav-item-inner">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                </svg>
-                <span>Tư Vấn Size & CSKH</span>
+                <MessageSquare size={16} />
+                <span>Tư Vấn & CSKH</span>
               </div>
             </button>
 
+            {/* 7. Voucher & Khuyến Mãi */}
+            <button
+              className={`nav-menu-link ${activeMenu === 'vouchers' ? 'active' : ''}`}
+              onClick={() => setActiveMenu('vouchers')}
+            >
+              <div className="nav-item-inner">
+                <Tag size={16} />
+                <span>Voucher & Khuyến Mãi</span>
+              </div>
+            </button>
+
+            {/* 8. Báo Cáo & Doanh Thu */}
             <button
               className={`nav-menu-link ${activeMenu === 'reports' ? 'active' : ''}`}
               onClick={() => setActiveMenu('reports')}
             >
               <div className="nav-item-inner">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
+                <BarChart2 size={16} />
                 <span>Báo Cáo & Doanh Thu</span>
               </div>
             </button>
@@ -591,15 +624,11 @@ export default function ManagerDashboard() {
         {/* Sidebar Bottom Part */}
         <div className="sidebar-bottom-part">
           <button type="button" className="btn-store-status" onClick={() => navigate('/')}>
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            Về Trang Chủ
+            <Home size={15} />
+            VỀ TRANG CHỦ
           </button>
           <button type="button" className="btn-sidebar-logout" onClick={handleLogout}>
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
+            <LogOut size={15} />
             ĐĂNG XUẤT
           </button>
         </div>
@@ -611,126 +640,131 @@ export default function ManagerDashboard() {
         {/* Top Header Bar */}
         <header className="top-header-bar">
           <div className="header-search-box">
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#A8A29E">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input className="header-search-input" placeholder="Tìm kiếm đơn hàng, sản phẩm..." />
+            <Search size={16} color="#A8A29E" />
+            <input className="header-search-input" placeholder="Tìm kiếm đơn hàng, sản phẩm, lookbook..." />
           </div>
 
           <div className="header-user-profile">
-            <div className="user-avatar-circle">
-              {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'M'}
+            <div className="user-avatar-circle" style={{ background: '#111111', color: '#FFFFFF' }}>
+              <User size={18} />
             </div>
             <div className="user-info-text">
-              <span className="user-name">{user?.full_name || 'Quản lý Youth Fashion'}</span>
-              <span className="user-role-label">{user?.role || 'Quản trị viên (Manager)'}</span>
+              <span className="user-name" style={{ fontWeight: 700, fontSize: '13px', color: '#111' }}>
+                {user?.full_name || 'Hoàng Kim Anh'}
+              </span>
+              <span className="user-role-label" style={{ fontSize: '11px', color: '#78716C' }}>
+                {user?.role || 'Quản Lý Cửa Hàng & Bán Hàng'}
+              </span>
             </div>
           </div>
         </header>
 
-        {/* Scrollable Dashboard Body */}
-        <div className="dashboard-scroll-body">
+        {/* MAIN BODY BASED ON ACTIVE MENU */}
+        {activeMenu === 'lookbooks' ? (
+          <LookbookManagement />
+        ) : (
+          /* Scrollable Dashboard Body (Overview) */
+          <div className="dashboard-scroll-body">
 
-          {/* Header Row */}
-          <div className="dashboard-header-row">
-            <div>
-              <p className="dashboard-header-sub">KHU VỰC TỔNG QUAN</p>
-              <h1 className="dashboard-header-title">Bảng Điều Khiển Quản Trị</h1>
-            </div>
-
-            <button type="button" className="btn-export-data">
-              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Xuất Dữ Liệu
-            </button>
-          </div>
-
-          {/* KPI Cards Grid */}
-          <div className="kpi-cards-grid">
-
-            {/* KPI Card 1 */}
-            <div className="kpi-card">
-              <div className="kpi-card-header">
-                <span className="kpi-title">Doanh Thu Tháng</span>
-                <div className="kpi-icon-badge">
-                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-              </div>
-              <div className="kpi-value">1.845.000.000₫</div>
-              <div className="kpi-growth-row">
-                <span className="growth-badge-green">▲ 12.5%</span>
-                <span className="growth-subtext">so với tháng trước</span>
-              </div>
-              <div className="kpi-progress-bg">
-                <div className="kpi-progress-bar" style={{ width: '68%' }} />
-              </div>
-            </div>
-
-            {/* KPI Card 2 */}
-            <div className="kpi-card">
-              <div className="kpi-card-header">
-                <span className="kpi-title">Tổng Đơn Bán Lẻ</span>
-                <div className="kpi-icon-badge">
-                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                  </svg>
-                </div>
-              </div>
-              <div className="kpi-value">1.248 <span style={{ fontSize: '15px', fontWeight: 400, color: '#57534E' }}>đơn</span></div>
-              <div className="kpi-growth-row">
-                <span className="growth-badge-green">▲ 8.2%</span>
-                <span className="growth-subtext">tăng trưởng tuần</span>
-              </div>
-              <div className="kpi-progress-bg">
-                <div className="kpi-progress-bar" style={{ width: '75%', background: '#C5A059' }} />
-              </div>
-            </div>
-
-            {/* KPI Card 3 */}
-            <div className="kpi-card">
-              <div className="kpi-card-header">
-                <span className="kpi-title">Giá Trị Trung Bình / Đơn</span>
-                <div className="kpi-icon-badge">
-                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                </div>
-              </div>
-              <div className="kpi-value">1.290.000₫</div>
-              <div className="kpi-growth-row">
-                <span className="growth-badge-green">▲ 4.1%</span>
-                <span className="growth-subtext">AOV trung bình</span>
-              </div>
-              <div className="kpi-progress-bg">
-                <div className="kpi-progress-bar" style={{ width: '60%', background: '#EAB308' }} />
-              </div>
-            </div>
-
-          </div>
-
-          {/* Charts Section */}
-          <div className="charts-section-card">
-            <div className="chart-header">
+            {/* Header Row */}
+            <div className="dashboard-header-row">
               <div>
-                <span className="chart-title-tag">XU HƯỚNG TĂNG TRƯỞNG</span>
-                <h3 className="chart-heading">Doanh Thu 4 Tuần Gần Nhất</h3>
+                <p className="dashboard-header-sub">KHU VỰC TỔNG QUAN</p>
+                <h1 className="dashboard-header-title">Bảng Điều Khiển Quản Trị</h1>
               </div>
-              <div className="chart-pills">
-                <button type="button" className="chart-pill-btn">7 Ngày</button>
-                <button type="button" className="chart-pill-btn active">4 Tuần</button>
-                <button type="button" className="chart-pill-btn">12 Tháng</button>
+
+              <button type="button" className="btn-export-data">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Xuất Dữ Liệu
+              </button>
+            </div>
+
+            {/* KPI Cards Grid */}
+            <div className="kpi-cards-grid">
+              {/* KPI Card 1 */}
+              <div className="kpi-card">
+                <div className="kpi-card-header">
+                  <span className="kpi-title">Doanh Thu Tháng</span>
+                  <div className="kpi-icon-badge">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="kpi-value">1.845.000.000₫</div>
+                <div className="kpi-growth-row">
+                  <span className="growth-badge-green">▲ 12.5%</span>
+                  <span className="growth-subtext">so với tháng trước</span>
+                </div>
+                <div className="kpi-progress-bg">
+                  <div className="kpi-progress-bar" style={{ width: '68%' }} />
+                </div>
+              </div>
+
+              {/* KPI Card 2 */}
+              <div className="kpi-card">
+                <div className="kpi-card-header">
+                  <span className="kpi-title">Tổng Đơn Bán Lẻ</span>
+                  <div className="kpi-icon-badge">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="kpi-value">1.248 <span style={{ fontSize: '15px', fontWeight: 400, color: '#57534E' }}>đơn</span></div>
+                <div className="kpi-growth-row">
+                  <span className="growth-badge-green">▲ 8.2%</span>
+                  <span className="growth-subtext">tăng trưởng tuần</span>
+                </div>
+                <div className="kpi-progress-bg">
+                  <div className="kpi-progress-bar" style={{ width: '75%', background: '#C5A059' }} />
+                </div>
+              </div>
+
+              {/* KPI Card 3 */}
+              <div className="kpi-card">
+                <div className="kpi-card-header">
+                  <span className="kpi-title">Giá Trị Trung Bình / Đơn</span>
+                  <div className="kpi-icon-badge">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="kpi-value">1.290.000₫</div>
+                <div className="kpi-growth-row">
+                  <span className="growth-badge-green">▲ 4.1%</span>
+                  <span className="growth-subtext">AOV trung bình</span>
+                </div>
+                <div className="kpi-progress-bg">
+                  <div className="kpi-progress-bar" style={{ width: '60%', background: '#EAB308' }} />
+                </div>
               </div>
             </div>
 
-            <div style={{ padding: '40px 0', textAlign: 'center', color: '#78716C' }}>
-              📊 [Biểu đồ đường xu hướng doanh thu tích hợp Recharts / Chart.js]
+            {/* Charts Section */}
+            <div className="charts-section-card">
+              <div className="chart-header">
+                <div>
+                  <span className="chart-title-tag">XU HƯỚNG TĂNG TRƯỞNG</span>
+                  <h3 className="chart-heading">Doanh Thu 4 Tuần Gần Nhất</h3>
+                </div>
+                <div className="chart-pills">
+                  <button type="button" className="chart-pill-btn">7 Ngày</button>
+                  <button type="button" className="chart-pill-btn active">4 Tuần</button>
+                  <button type="button" className="chart-pill-btn">12 Tháng</button>
+                </div>
+              </div>
+
+              <div style={{ padding: '40px 0', textAlign: 'center', color: '#78716C' }}>
+                📊 [Biểu đồ đường xu hướng doanh thu tích hợp Recharts / Chart.js]
+              </div>
             </div>
+
           </div>
-
-        </div>
+        )}
 
       </main>
     </div>
