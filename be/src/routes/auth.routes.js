@@ -6,7 +6,7 @@ import {
   refreshController,
   updateProfileController,
 } from '../controllers/auth.controller.js';
-import { registerSchema, loginSchema, validateBody } from '../validations/auth.validation.js';
+import { registerSchema, loginSchema, updateProfileSchema, validateBody } from '../validations/auth.validation.js';
 import { verifyAccessToken } from '../helpers/jwt.helper.js';
 
 const router = Router();
@@ -38,6 +38,6 @@ router.post('/logout', logoutController);
 router.post('/refresh', refreshController);
 
 // PUT /api/auth/profile - Cập nhật thông tin Hồ sơ cá nhân
-router.put('/profile', optionalAuthToken, updateProfileController);
+router.put('/profile', optionalAuthToken, validateBody(updateProfileSchema), updateProfileController);
 
 export default router;

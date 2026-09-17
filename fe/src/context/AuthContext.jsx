@@ -43,31 +43,39 @@ export function AuthProvider({ children }) {
   };
 
   const updateUserProfile = async (updatedData) => {
-    setUser(prev => {
-      const newUser = { ...prev, ...updatedData };
-      localStorage.setItem('user', JSON.stringify(newUser));
-      return newUser;
-    });
-
     try {
       const payload = {
         customer_id: user?.customer_id || user?.id || 1,
         full_name: updatedData.full_name,
         phone: updatedData.phone,
         avatar_url: updatedData.avatar_url,
+        gender: updatedData.gender,
+        dob: updatedData.dob,
         ...updatedData
       };
       const result = await authService.updateProfile(payload);
-      if (result?.data) {
-        setUser(prev => {
-          const synced = { ...prev, ...result.data, ...updatedData };
-          localStorage.setItem('user', JSON.stringify(synced));
-          return synced;
-        });
-      }
+      setUser(prev => {
+        const synced = { ...prev, ...(result?.data || {}), ...updatedData };
+        localStorage.setItem('user', JSON.stringify(synced));
+        return synced;
+      });
       return { success: true, message: 'Đã cập nhật hồ sơ thành công vào CSDL!' };
     } catch (err) {
+      const serverData = err.response?.data;
+      if (serverData) {
+        let errorMsg = serverData.message || 'Cập nhật hồ sơ thất bại!';
+        if (serverData.errors && Array.isArray(serverData.errors) && serverData.errors.length > 0) {
+          errorMsg = `${serverData.message}: ${serverData.errors.join(', ')}`;
+        }
+        return { success: false, message: errorMsg };
+      }
+
       console.warn('Backend updateProfile fallback:', err.message);
+      setUser(prev => {
+        const newUser = { ...prev, ...updatedData };
+        localStorage.setItem('user', JSON.stringify(newUser));
+        return newUser;
+      });
       return { success: true, message: 'Đã cập nhật hồ sơ cá nhân thành công!' };
     }
   };

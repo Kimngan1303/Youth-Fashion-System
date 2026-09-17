@@ -7,6 +7,80 @@ import {
 import { useAuth } from '../context/AuthContext';
 import ProductCard from '../components/ProductCard';
 
+// Chuẩn hóa ngày hiển thị sang dạng DD/MM/YYYY
+const normalizeDobToVn = (dob) => {
+  if (!dob) return '18/10/1994';
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dob)) return dob;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+    const [y, m, d] = dob.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  const parts = dob.split(/[\/\-.]/);
+  if (parts.length === 3 && parts[2].length === 4) {
+    let d = parts[0].padStart(2, '0');
+    let m = parts[1].padStart(2, '0');
+    let y = parts[2];
+    if (parseInt(d, 10) <= 12 && parseInt(m, 10) > 12) {
+      [d, m] = [m, d];
+    }
+    return `${d}/${m}/${y}`;
+  }
+  return dob;
+};
+
+// Chuyển đổi DD/MM/YYYY sang YYYY-MM-DD cho input date picker
+const convertVnDateToIso = (vnStr) => {
+  if (!vnStr) return '';
+  const parts = vnStr.split('/');
+  if (parts.length === 3 && parts[2].length === 4) {
+    const [d, m, y] = parts;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return '';
+};
+
+// Tự động chèn dấu / khi người dùng chỉ cần gõ số ngày sinh (VD: 18101994 -> 18/10/1994)
+const formatDobInput = (val) => {
+  const digits = val.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
+// Kiểm tra tính hợp lệ của ngày sinh (ngày tồn tại, tháng 1-12, không vượt quá hôm nay)
+const validateDob = (dobStr) => {
+  if (!dobStr || !dobStr.trim()) return '';
+  const parts = dobStr.split('/');
+  if (parts.length !== 3 || dobStr.length !== 10) {
+    return 'Vui lòng nhập đủ 8 số ngày sinh (VD: 18101994)';
+  }
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  const year = parseInt(parts[2], 10);
+  if (isNaN(day) || isNaN(month) || isNaN(year)) {
+    return 'Ngày sinh chỉ được chứa số';
+  }
+  if (month < 1 || month > 12) {
+    return 'Tháng sinh không hợp lệ (từ 01 đến 12)';
+  }
+  if (day < 1 || day > 31) {
+    return 'Ngày sinh không hợp lệ (từ 01 đến 31)';
+  }
+  const dateObj = new Date(year, month - 1, day);
+  if (dateObj.getFullYear() !== year || dateObj.getMonth() !== month - 1 || dateObj.getDate() !== day) {
+    return `Ngày ${dobStr} không tồn tại trong lịch`;
+  }
+  if (year < 1900) {
+    return 'Năm sinh không được nhỏ hơn 1900';
+  }
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  if (dateObj > today) {
+    return 'Ngày sinh không được lớn hơn ngày hiện tại';
+  }
+  return '';
+};
+
 const ProfilePage = () => {
   const { user, updateUserProfile, orders, wishlist, logout } = useAuth();
   const navigate = useNavigate();
@@ -30,16 +104,34 @@ const ProfilePage = () => {
     email: user?.email || 'thaomy.nguyen@atelier-youth.vn',
     avatar_url: user?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
     gender: user?.gender || 'Nữ',
-    dob: user?.dob || '10/18/1994',
+    dob: normalizeDobToVn(user?.dob || '18/10/1994'),
     province: user?.address?.province || 'Thành phố Hồ Chí Minh',
     district: user?.address?.district || 'Quận 1',
     ward: user?.address?.ward || 'Phường Bến Nghé',
     detailAddress: user?.address?.detail || 'Số 154, Đường Đồng Khởi'
   });
 
-  const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+  const [profileAlert, setProfileAlert] = useState({ type: '', message: '' });
+  const [phoneError, setPhoneError] = useState('');
+  const [dobError, setDobError] = useState('');
   const [copiedCode, setCopiedCode] = useState('');
   const fileInputRef = useRef(null);
+  const hiddenDateRef = useRef(null);
+
+  // Hàm kiểm tra định dạng số điện thoại di động Việt Nam chuẩn
+  const validatePhone = (phoneNumber) => {
+    if (!phoneNumber || !phoneNumber.toString().trim()) {
+      return 'Số điện thoại không được để trống';
+    }
+    const cleaned = phoneNumber.toString().replace(/[\s.\-()]/g, '');
+    // Chuẩn đầu số các nhà mạng di động Việt Nam (Viettel, Mobi, Vina, Vietnamobile, Wintel, Gmobile)
+    // 032-039, 052/055/056/058/059, 070/076-079, 081-089, 090-099
+    const vnPhoneRegex = /^(?:(?:\+84|84|0))(3[2-9]|5[25689]|7[06-9]|8[1-9]|9[0-9])\d{7}$/;
+    if (!vnPhoneRegex.test(cleaned)) {
+      return 'Số điện thoại không hợp lệ (gồm 10 số thuộc các đầu mạng di động VN: 032-039, 05x, 07x, 08x, 09x)';
+    }
+    return '';
+  };
 
   const handleAvatarFileChange = (e) => {
     const file = e.target.files && e.target.files[0];
@@ -51,8 +143,8 @@ const ProfilePage = () => {
         if (updateUserProfile) {
           updateUserProfile({ avatar_url: newAvatarUrl });
         }
-        setSaveSuccessMsg('Đã cập nhật ảnh đại diện mới thành công!');
-        setTimeout(() => setSaveSuccessMsg(''), 4000);
+        setProfileAlert({ type: 'success', message: 'Đã cập nhật ảnh đại diện mới thành công!' });
+        setTimeout(() => setProfileAlert({ type: '', message: '' }), 4000);
       };
       reader.readAsDataURL(file);
     }
@@ -79,7 +171,7 @@ const ProfilePage = () => {
         email: user.email || prev.email,
         avatar_url: user.avatar_url || prev.avatar_url,
         gender: user.gender || prev.gender,
-        dob: user.dob || prev.dob
+        dob: user.dob ? normalizeDobToVn(user.dob) : prev.dob
       }));
     }
   }, [user]);
@@ -87,13 +179,64 @@ const ProfilePage = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === 'phone' && phoneError) {
+      setPhoneError(validatePhone(value));
+    }
+  };
+
+  const handlePhoneBlur = () => {
+    setPhoneError(validatePhone(formData.phone));
+  };
+
+  // Xử lý khi người dùng nhập số ngày sinh (tự chèn dấu /, chỉ cho nhập số)
+  const handleDobChange = (e) => {
+    const formatted = formatDobInput(e.target.value);
+    setFormData(prev => ({ ...prev, dob: formatted }));
+    if (dobError) {
+      setDobError(validateDob(formatted));
+    }
+  };
+
+  const handleDobBlur = () => {
+    if (formData.dob) {
+      setDobError(validateDob(formData.dob));
+    }
+  };
+
+  // Xử lý khi người dùng chọn ngày từ bảng lịch
+  const handleCalendarDateChange = (e) => {
+    const isoVal = e.target.value;
+    if (isoVal) {
+      const [y, m, d] = isoVal.split('-');
+      const vnDate = `${d}/${m}/${y}`;
+      setFormData(prev => ({ ...prev, dob: vnDate }));
+      setDobError('');
+    }
   };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
+    const phoneErr = validatePhone(formData.phone);
+    if (phoneErr) {
+      setPhoneError(phoneErr);
+      setProfileAlert({ type: 'danger', message: phoneErr });
+      setTimeout(() => setProfileAlert({ type: '', message: '' }), 4000);
+      return;
+    }
+    setPhoneError('');
+
+    const dobErr = validateDob(formData.dob);
+    if (dobErr) {
+      setDobError(dobErr);
+      setProfileAlert({ type: 'danger', message: dobErr });
+      setTimeout(() => setProfileAlert({ type: '', message: '' }), 4000);
+      return;
+    }
+    setDobError('');
+
     const res = await updateUserProfile({
       full_name: formData.full_name,
-      phone: formData.phone,
+      phone: formData.phone.trim(),
       gender: formData.gender,
       dob: formData.dob,
       address: {
@@ -104,8 +247,12 @@ const ProfilePage = () => {
       }
     });
 
-    setSaveSuccessMsg(res?.message || 'Đã cập nhật thông tin hồ sơ cá nhân thành công!');
-    setTimeout(() => setSaveSuccessMsg(''), 4000);
+    if (res?.success) {
+      setProfileAlert({ type: 'success', message: res?.message || 'Đã cập nhật thông tin hồ sơ cá nhân thành công!' });
+    } else {
+      setProfileAlert({ type: 'danger', message: res?.message || 'Cập nhật thất bại. Vui lòng kiểm tra lại!' });
+    }
+    setTimeout(() => setProfileAlert({ type: '', message: '' }), 4000);
   };
 
 
@@ -340,9 +487,10 @@ const ProfilePage = () => {
                   <p className="content-sub-heading">Cập nhật hồ sơ định danh và thông tin liên hệ bảo mật</p>
                 </div>
 
-                {saveSuccessMsg && (
-                  <div className="profile-alert alert-success">
-                    <CheckCircle size={16} /> {saveSuccessMsg}
+                {profileAlert.message && (
+                  <div className={`profile-alert alert-${profileAlert.type}`}>
+                    {profileAlert.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                    <span>{profileAlert.message}</span>
                   </div>
                 )}
 
@@ -376,28 +524,67 @@ const ProfilePage = () => {
 
                     {/* Số Điện Thoại Di Động */}
                     <div className="field-group">
-                      <label className="field-label">SỐ ĐIỆN THOẠI DI ĐỘNG</label>
+                      <label className="field-label">
+                        SỐ ĐIỆN THOẠI DI ĐỘNG <span className="field-required">*</span>
+                      </label>
                       <input 
                         type="tel" 
                         name="phone"
-                        className="custom-input"
+                        className={`custom-input ${phoneError ? 'input-error' : ''}`}
                         value={formData.phone}
                         onChange={handleInputChange}
+                        onBlur={handlePhoneBlur}
+                        placeholder="VD: 0908 123 456"
                         required
                       />
+                      {phoneError && (
+                        <div className="field-error-msg">
+                          <AlertCircle size={14} />
+                          <span>{phoneError}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Ngày Sinh Nhật */}
                     <div className="field-group">
-                      <label className="field-label">NGÀY SINH NHẬT (ĐẶC QUYỀN QUÀ VIP)</label>
-                      <input 
-                        type="text" 
-                        name="dob"
-                        className="custom-input"
-                        value={formData.dob}
-                        onChange={handleInputChange}
-                        placeholder="MM/DD/YYYY"
-                      />
+                      <label className="field-label">NGÀY SINH NHẬT</label>
+                      <div className="dob-picker-group">
+                        <input 
+                          type="text" 
+                          name="dob"
+                          className={`custom-input dob-text-input ${dobError ? 'input-error' : ''}`}
+                          value={formData.dob}
+                          onChange={handleDobChange}
+                          onBlur={handleDobBlur}
+                          placeholder="DD/MM/YYYY"
+                          maxLength={10}
+                          inputMode="numeric"
+                        />
+                        <button 
+                          type="button" 
+                          className="dob-calendar-btn"
+                          onClick={() => hiddenDateRef.current?.showPicker ? hiddenDateRef.current.showPicker() : hiddenDateRef.current?.click()}
+                          title="Mở lịch chọn ngày"
+                        >
+                          <Calendar size={18} />
+                        </button>
+                        <input 
+                          ref={hiddenDateRef}
+                          type="date"
+                          tabIndex={-1}
+                          aria-hidden="true"
+                          className="dob-hidden-native-input"
+                          value={convertVnDateToIso(formData.dob)}
+                          onChange={handleCalendarDateChange}
+                          max={new Date().toISOString().split('T')[0]}
+                        />
+                      </div>
+                      {dobError && (
+                        <div className="field-error-msg">
+                          <AlertCircle size={14} />
+                          <span>{dobError}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1082,11 +1269,86 @@ const ProfilePage = () => {
           box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.05);
         }
 
+        .field-required {
+          color: #ef4444;
+          font-weight: 700;
+          margin-left: 2px;
+        }
+
+        .custom-input.input-error {
+          border-color: #ef4444 !important;
+          background-color: #fef2f2 !important;
+        }
+
+        .custom-input.input-error:focus {
+          border-color: #dc2626 !important;
+          box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+        }
+
+        .field-error-msg {
+          font-size: 12px;
+          color: #dc2626;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: 4px;
+          line-height: 1.4;
+          font-weight: 500;
+        }
+
         .input-disabled {
           background-color: #f3f4f6;
           color: #6b7280;
           cursor: not-allowed;
           border-color: #e5e7eb;
+        }
+
+        .dob-picker-group {
+          position: relative;
+          display: flex;
+          align-items: center;
+          width: 100%;
+        }
+
+        .dob-text-input {
+          padding-right: 44px;
+          letter-spacing: 0.5px;
+        }
+
+        .dob-calendar-btn {
+          position: absolute;
+          right: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: transparent;
+          border: none;
+          padding: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #6b7280;
+          cursor: pointer;
+          border-radius: 6px;
+          transition: color 0.2s, background-color 0.2s, transform 0.15s;
+        }
+
+        .dob-calendar-btn:hover {
+          color: #111827;
+          background-color: #f3f4f6;
+          transform: translateY(-50%) scale(1.08);
+        }
+
+        .dob-hidden-native-input {
+          position: absolute;
+          bottom: 0;
+          right: 12px;
+          width: 0;
+          height: 0;
+          opacity: 0;
+          pointer-events: none;
+          border: none;
+          padding: 0;
+          margin: 0;
         }
 
         .gender-radio-options {

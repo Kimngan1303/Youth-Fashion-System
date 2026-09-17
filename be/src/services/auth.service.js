@@ -33,8 +33,9 @@ export const registerService = async ({ email, password, full_name, phone }) => 
   }
 
   // 2. Kiểm tra số điện thoại (nếu có)
-  if (phone) {
-    const existingPhone = await findCustomerByPhone(phone);
+  let cleanPhone = phone ? phone.toString().replace(/[\s.\-()]/g, '') : null;
+  if (cleanPhone) {
+    const existingPhone = await findCustomerByPhone(cleanPhone);
     if (existingPhone) {
       throw { statusCode: 400, message: 'Số điện thoại này đã được sử dụng' };
     }
@@ -48,7 +49,7 @@ export const registerService = async ({ email, password, full_name, phone }) => 
     email,
     password_hash,
     full_name,
-    phone,
+    phone: cleanPhone,
   });
 
   return {
@@ -185,14 +186,20 @@ export const refreshAccessTokenService = async (refreshToken) => {
  * Xử lý cập nhật hồ sơ cá nhân của Khách hàng vào CSDL
  */
 export const updateProfileService = async ({ customer_id, full_name, phone, avatar_url, gender, dob }) => {
-  if (phone) {
-    const existingPhone = await findCustomerByPhone(phone);
+  let cleanPhone = phone !== undefined ? (phone ? phone.toString().replace(/[\s.\-()]/g, '') : null) : undefined;
+  if (cleanPhone) {
+    const existingPhone = await findCustomerByPhone(cleanPhone);
     if (existingPhone && existingPhone.customer_id.toString() !== customer_id.toString()) {
       throw { statusCode: 400, message: 'Số điện thoại này đã được sử dụng bởi tài khoản khác' };
     }
   }
 
-  const updatedCustomer = await updateCustomerProfile(customer_id, { full_name, phone, avatar_url, gender, dob });
+  const updateData = { full_name, avatar_url, gender, dob };
+  if (cleanPhone !== undefined) {
+    updateData.phone = cleanPhone;
+  }
+
+  const updatedCustomer = await updateCustomerProfile(customer_id, updateData);
 
   return {
     customer_id: updatedCustomer.customer_id.toString(),

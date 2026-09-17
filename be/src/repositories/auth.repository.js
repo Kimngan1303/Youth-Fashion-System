@@ -101,9 +101,19 @@ export const updateCustomerProfile = async (customer_id, { full_name, phone, ava
   if (gender !== undefined) data.gender = gender;
   if (dob !== undefined) data.dob = dob;
 
-  return await prisma.customer.update({
+  return await prisma.customer.upsert({
     where: { customer_id: BigInt(customer_id) },
-    data,
+    update: data,
+    create: {
+      customer_id: BigInt(customer_id),
+      email: 'customer@youthfashion.vn',
+      password_hash: 'default_placeholder_hash',
+      full_name: full_name || 'Khách hàng Youth Fashion',
+      phone: phone || null,
+      avatar_url: avatar_url || null,
+      gender: gender || 'Nữ',
+      dob: dob || null,
+    },
     select: {
       customer_id: true,
       email: true,
