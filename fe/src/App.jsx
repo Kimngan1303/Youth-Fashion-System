@@ -5,6 +5,8 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import HomePage from './pages/customer/HomePage';
 import ManagerDashboard from './pages/manager/ManagerDashboard';
+import ProductManager from './pages/manager/ProductManager';
+import CategoryManager from './pages/manager/CategoryManager';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = React.useContext(AuthContext);
@@ -29,6 +31,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ManagerDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/manager/products"
+        element={
+          <ProtectedRoute>
+            <ProductManager />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/manager/categories"
+        element={
+          <ProtectedRoute>
+            <CategoryManager />
           </ProtectedRoute>
         }
       />

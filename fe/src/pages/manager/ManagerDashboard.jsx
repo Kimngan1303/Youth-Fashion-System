@@ -503,10 +503,7 @@ export default function ManagerDashboard() {
 
           {/* Logo Brand */}
           <div className="brand-logo-section">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
-            </svg>
+            <img src="/logo.png" alt="Youth Fashion Logo" style={{ width: '34px', height: '34px', objectFit: 'contain' }} />
             <span className="brand-logo-text">YOUTH FASHION</span>
           </div>
 
@@ -517,7 +514,7 @@ export default function ManagerDashboard() {
           <nav className="nav-menu-items">
             <button
               className={`nav-menu-link ${activeMenu === 'overview' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('overview')}
+              onClick={() => navigate('/manager')}
             >
               <div className="nav-item-inner">
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -528,8 +525,8 @@ export default function ManagerDashboard() {
             </button>
 
             <button
-              className={`nav-menu-link ${activeMenu === 'products' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('products')}
+              className="nav-menu-link"
+              onClick={() => navigate('/manager/products')}
             >
               <div className="nav-item-inner">
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -540,14 +537,14 @@ export default function ManagerDashboard() {
             </button>
 
             <button
-              className={`nav-menu-link ${activeMenu === 'categories' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('categories')}
+              className="nav-menu-link"
+              onClick={() => navigate('/manager/categories')}
             >
               <div className="nav-item-inner">
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 11h.01M7 15h.01M11 7h8M11 11h8M11 15h8" />
                 </svg>
-                <span>Quản Lý Danh Mục Mùa</span>
+                <span>Quản Lý Danh Mục</span>
               </div>
             </button>
 
