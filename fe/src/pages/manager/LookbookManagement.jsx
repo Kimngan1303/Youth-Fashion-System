@@ -318,22 +318,22 @@ export default function LookbookManagement() {
       {/* Inline styles specifically tailored for Lookbook Management */}
       <style>{`
         .lookbook-page-container {
-          padding: 24px 36px;
+          padding: 28px;
           width: 100%;
           box-sizing: border-box;
-          background: #FAF9F6;
-          min-height: calc(100vh - 57px);
+          background: #F7F6F3;
+          min-height: calc(100vh - 60px);
           font-family: 'Inter', sans-serif;
         }
 
         /* Top Breadcrumb & Title */
         .lb-breadcrumb {
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 1px;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.8px;
           color: #8C857B;
           text-transform: uppercase;
-          margin-bottom: 8px;
+          margin-bottom: 4px;
         }
 
         .lb-header-row {
@@ -345,7 +345,7 @@ export default function LookbookManagement() {
 
         .lb-main-title {
           font-family: 'Playfair Display', Georgia, serif;
-          font-size: 28px;
+          font-size: 26px;
           font-weight: 700;
           color: #111111;
           margin: 0;

@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 import dotenv from 'dotenv';
+
 dotenv.config();
 
 cloudinary.config({
@@ -9,7 +10,7 @@ cloudinary.config({
 });
 
 /**
- * Helper function to upload image buffer to Cloudinary
+ * Helper function to upload image buffer directly to Cloudinary
  * @param {Buffer} fileBuffer - Image buffer from Multer
  * @param {String} folderName - Target folder on Cloudinary
  * @returns {Promise<Object>} Upload result containing secure_url and public_id
