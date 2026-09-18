@@ -5,18 +5,31 @@ import {
   Camera, MapPin, Calendar, Clock, CreditCard, ChevronRight, AlertCircle, Tag, Copy
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirmModal } from '../context/ConfirmModalContext';
 import ProductCard from '../components/ProductCard';
 
 const ProfilePage = () => {
   const { user, updateUserProfile, orders, wishlist, logout } = useAuth();
+  const { showSuccess } = useToast();
+  const { confirmModal } = useConfirmModal();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const handleLogout = async () => {
-    if (window.confirm('Bạn có chắc chắn muốn đăng xuất tài khoản?')) {
+    const confirmed = await confirmModal({
+      title: 'Đăng xuất tài khoản',
+      message: 'Bạn có chắc chắn muốn đăng xuất tài khoản khỏi Youth Fashion không?',
+      confirmText: 'Đăng xuất',
+      cancelText: 'Hủy bỏ',
+      variant: 'logout'
+    });
+
+    if (confirmed) {
       if (logout) {
         await logout();
       }
+      showSuccess('Đã đăng xuất tài khoản thành công!');
       navigate('/');
     }
   };

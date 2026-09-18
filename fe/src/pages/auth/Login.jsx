@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../context/ToastContext';
 
 /**
  * Single-file Login Component with Full Backend Integration
@@ -510,6 +511,7 @@ const loginStyles = `
 
 export default function Login() {
   const { login, logout, user, isAuthenticated, loading } = useAuth();
+  const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
@@ -529,7 +531,9 @@ export default function Login() {
     const res = await login({ email, password, user_type: loginType });
 
     if (res.success) {
-      setSuccessMessage(`Đăng nhập thành công! Chào mừng ${res.data.user.full_name}`);
+      const msg = `Đăng nhập thành công! Chào mừng ${res.data.user.full_name}`;
+      setSuccessMessage(msg);
+      showSuccess(msg);
       setTimeout(() => {
         const role = res.data.user.role || res.data.user.user_type;
         if (loginType === 'EMPLOYEE' || role === 'EMPLOYEE' || role === 'ADMIN' || role === 'MANAGER') {
@@ -539,7 +543,9 @@ export default function Login() {
         }
       }, 500);
     } else {
-      setErrorMessage(res.message);
+      const msg = res.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin!';
+      setErrorMessage(msg);
+      showError(msg);
     }
   };
 

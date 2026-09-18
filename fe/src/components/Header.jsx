@@ -2,22 +2,37 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, Heart, ShoppingBag, User, Bell, MessageSquare, Globe, Sun, Star } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirmModal } from '../context/ConfirmModalContext';
 
 const Header = ({ onOpenAISearch }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, wishlist, cartCount, logout } = useAuth();
+  const { showSuccess } = useToast();
+  const { confirmModal } = useConfirmModal();
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSearchInput, setShowSearchInput] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleLogout = async () => {
-    if (logout) {
-      await logout();
-    }
     setShowUserMenu(false);
-    navigate('/');
+    const confirmed = await confirmModal({
+      title: 'Đăng xuất tài khoản',
+      message: 'Bạn có chắc chắn muốn đăng xuất tài khoản khỏi Youth Fashion không?',
+      confirmText: 'Đăng xuất',
+      cancelText: 'Hủy bỏ',
+      variant: 'logout'
+    });
+
+    if (confirmed) {
+      if (logout) {
+        await logout();
+      }
+      showSuccess('Đã đăng xuất tài khoản thành công!');
+      navigate('/');
+    }
   };
 
   const categories = [
