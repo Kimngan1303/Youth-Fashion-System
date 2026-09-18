@@ -2,6 +2,7 @@ import React, { useState, useContext } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { ConfirmModalProvider } from './context/ConfirmModalContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AISearchModal from './components/AISearchModal';
@@ -121,7 +122,9 @@ export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <AppContent />
+        <ConfirmModalProvider>
+          <AppContent />
+        </ConfirmModalProvider>
       </ToastProvider>
     </AuthProvider>
   );

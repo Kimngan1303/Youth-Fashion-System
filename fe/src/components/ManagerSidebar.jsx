@@ -1,6 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../context/ToastContext';
+import { useConfirmModal } from '../context/ConfirmModalContext';
 import { 
   LayoutGrid, 
   Package, 
@@ -191,10 +193,25 @@ const sidebarStyles = `
 export default function ManagerSidebar({ activeMenu = 'products' }) {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { showSuccess } = useToast();
+  const { confirmModal } = useConfirmModal();
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/login');
+    const confirmed = await confirmModal({
+      title: 'Đăng xuất tài khoản',
+      message: 'Bạn có chắc chắn muốn đăng xuất tài khoản quản trị không?',
+      confirmText: 'Đăng xuất',
+      cancelText: 'Hủy bỏ',
+      variant: 'logout'
+    });
+
+    if (confirmed) {
+      if (logout) {
+        await logout();
+      }
+      showSuccess('Đã đăng xuất tài khoản quản trị thành công!');
+      navigate('/login');
+    }
   };
 
   return (

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../context/ToastContext';
 
 /**
  * Register Component
@@ -478,6 +479,7 @@ const registerStyles = `
 
 export default function Register() {
   const { register, loading } = useAuth();
+  const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState('');
@@ -497,17 +499,23 @@ export default function Register() {
 
     // Client-side validations
     if (!agreeTerms) {
-      setErrorMessage('Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.');
+      const msg = 'Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.';
+      setErrorMessage(msg);
+      showError(msg);
       return;
     }
 
     if (password.length < 6) {
-      setErrorMessage('Mật khẩu phải có tối thiểu 6 ký tự.');
+      const msg = 'Mật khẩu phải có tối thiểu 6 ký tự.';
+      setErrorMessage(msg);
+      showError(msg);
       return;
     }
 
     if (password !== confirmPassword) {
-      setErrorMessage('Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại!');
+      const msg = 'Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại!';
+      setErrorMessage(msg);
+      showError(msg);
       return;
     }
 
@@ -518,12 +526,16 @@ export default function Register() {
     });
 
     if (res.success) {
-      setSuccessMessage('Đăng ký thành công! Đang chuyển hướng sang trang đăng nhập...');
+      const msg = 'Đăng ký tài khoản thành công! Đang chuyển hướng sang trang đăng nhập...';
+      setSuccessMessage(msg);
+      showSuccess(msg);
       setTimeout(() => {
         navigate('/login');
       }, 1500);
     } else {
-      setErrorMessage(res.message);
+      const msg = res.message || 'Đăng ký thất bại. Vui lòng thử lại!';
+      setErrorMessage(msg);
+      showError(msg);
     }
   };
 

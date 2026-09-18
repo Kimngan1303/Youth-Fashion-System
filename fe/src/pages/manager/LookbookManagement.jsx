@@ -19,8 +19,12 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { getStoredLookbooks, saveStoredLookbooks, resetToDefaultLookbooks, getLookbookPositionValue } from '../../services/lookbookData';
+import { useToast } from '../../context/ToastContext';
+import { useConfirmModal } from '../../context/ConfirmModalContext';
 
 export default function LookbookManagement() {
+  const { showSuccess, showWarning } = useToast();
+  const { confirmModal } = useConfirmModal();
   const [lookbooks, setLookbooks] = useState(() => getStoredLookbooks());
 
   const updateLookbooks = (newItems) => {
@@ -128,24 +132,42 @@ export default function LookbookManagement() {
   };
 
   // Bulk Delete
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
-    if (window.confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.length} lookbook đã chọn không?`)) {
+    const confirmed = await confirmModal({
+      title: 'Xóa danh sách Lookbook',
+      message: `Bạn có chắc chắn muốn xóa ${selectedIds.length} lookbook đã chọn không? Hành động này không thể hoàn tác.`,
+      confirmText: 'Xác nhận xóa',
+      cancelText: 'Hủy bỏ',
+      variant: 'danger'
+    });
+
+    if (confirmed) {
       const updated = lookbooks.filter(lb => !selectedIds.includes(lb.id));
       updateLookbooks(updated);
       setSelectedIds([]);
       if (currentPage > 1 && currentItems.length === selectedIds.length) {
         setCurrentPage(currentPage - 1);
       }
+      showSuccess(`Đã xóa ${selectedIds.length} lookbook thành công!`);
     }
   };
 
   // Single Delete
-  const handleDeleteOne = (id) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa lookbook này không?')) {
+  const handleDeleteOne = async (id) => {
+    const confirmed = await confirmModal({
+      title: 'Xóa Lookbook',
+      message: 'Bạn có chắc chắn muốn xóa lookbook này không? Hành động này không thể hoàn tác.',
+      confirmText: 'Xóa lookbook',
+      cancelText: 'Hủy bỏ',
+      variant: 'danger'
+    });
+
+    if (confirmed) {
       const updated = lookbooks.filter(lb => lb.id !== id);
       updateLookbooks(updated);
       setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
+      showSuccess('Đã xóa lookbook thành công!');
     }
   };
 
@@ -274,7 +296,7 @@ export default function LookbookManagement() {
   const handleSaveForm = (e) => {
     e.preventDefault();
     if (!formData.title.trim()) {
-      alert('Vui lòng nhập tên tuyển tập Lookbook!');
+      showWarning('Vui lòng nhập tên tuyển tập Lookbook!');
       return;
     }
 
@@ -297,6 +319,7 @@ export default function LookbookManagement() {
         return lb;
       });
       updateLookbooks(updated);
+      showSuccess('Đã cập nhật bộ sưu tập Lookbook thành công!');
     } else {
       // Create new
       const newLookbook = {
@@ -308,6 +331,7 @@ export default function LookbookManagement() {
         products: cleanedProducts
       };
       updateLookbooks([...lookbooks, newLookbook]);
+      showSuccess('Đã tạo bộ sưu tập Lookbook mới thành công!');
     }
 
     setIsModalOpen(false);
@@ -1144,11 +1168,19 @@ export default function LookbookManagement() {
             <button
               type="button"
               className="btn-reset-defaults"
-              onClick={() => {
-                if (window.confirm('Khôi phục danh sách lookbook về cấu hình chuẩn ban đầu (Mục 1 đến 6 theo thiết kế)?')) {
+              onClick={async () => {
+                const confirmed = await confirmModal({
+                  title: 'Khôi phục cấu hình chuẩn',
+                  message: 'Khôi phục danh sách lookbook về cấu hình chuẩn ban đầu (Mục 1 đến 6 theo thiết kế)?',
+                  confirmText: 'Khôi phục',
+                  cancelText: 'Hủy bỏ',
+                  variant: 'warning'
+                });
+                if (confirmed) {
                   const reset = resetToDefaultLookbooks();
                   setLookbooks(reset);
                   setSelectedIds([]);
+                  showSuccess('Đã khôi phục danh sách lookbook về cấu hình chuẩn ban đầu!');
                 }
               }}
               style={{
