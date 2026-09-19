@@ -11,7 +11,10 @@ export const registerSchema = z.object({
     .email({ message: 'Địa chỉ email không đúng định dạng' }),
   password: z
     .string({ required_error: 'Mật khẩu là bắt buộc' })
-    .min(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' }),
+    .min(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9])/, {
+      message: 'Mật khẩu phải chứa ít nhất 6 ký tự, bao gồm chữ hoa (A-Z), chữ thường (a-z), chữ số (0-9) và ký tự đặc biệt (VD: Manh123@)',
+    }),
   full_name: z
     .string({ required_error: 'Họ và tên là bắt buộc' })
     .min(1, { message: 'Họ và tên không được để trống' }),
@@ -48,6 +51,30 @@ export const updateProfileSchema = z.object({
   dob: z.string().optional().nullable(),
   address: z.any().optional(),
 });
+
+// Schema kiểm tra dữ liệu đầu vào khi Đổi mật khẩu
+export const changePasswordSchema = z
+  .object({
+    customer_id: z.union([z.string(), z.number()]).optional(),
+    id: z.union([z.string(), z.number()]).optional(),
+    email: z.string().optional(),
+    current_password: z
+      .string({ required_error: 'Mật khẩu hiện tại là bắt buộc' })
+      .min(1, { message: 'Mật khẩu hiện tại không được để trống' }),
+    new_password: z
+      .string({ required_error: 'Mật khẩu mới là bắt buộc' })
+      .min(6, { message: 'Mật khẩu mới phải có ít nhất 6 ký tự' })
+      .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9])/, {
+        message: 'Mật khẩu mới phải bao gồm chữ hoa (A-Z), chữ thường (a-z), chữ số (0-9) và ký tự đặc biệt (VD: Manh123@)',
+      }),
+    confirm_password: z
+      .string({ required_error: 'Xác nhận mật khẩu mới là bắt buộc' })
+      .min(1, { message: 'Xác nhận mật khẩu mới không được để trống' }),
+  })
+  .refine((data) => data.new_password === data.confirm_password, {
+    message: 'Mật khẩu mới xác nhận không khớp. Vui lòng kiểm tra lại!',
+    path: ['confirm_password'],
+  });
 
 // Schema kiểm tra dữ liệu đầu vào khi Đăng nhập
 export const loginSchema = z.object({

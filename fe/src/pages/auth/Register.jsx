@@ -506,6 +506,11 @@ export default function Register() {
       return;
     }
 
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9])/.test(password)) {
+      setErrorMessage('Mật khẩu phải chứa ít nhất 6 ký tự, gồm chữ hoa (A-Z), chữ thường (a-z), chữ số (0-9) và ký tự đặc biệt (VD: Manh123@).');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setErrorMessage('Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại!');
       return;

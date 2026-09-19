@@ -3,12 +3,14 @@ import crypto from 'crypto';
 import {
   findCustomerByEmail,
   findCustomerByPhone,
+  findCustomerById,
   findEmployeeByEmail,
   createCustomer,
   saveRefreshToken,
   deleteRefreshTokenByHash,
   findRefreshTokenByHash,
   updateCustomerProfile,
+  updateCustomerPassword,
 } from '../repositories/auth.repository.js';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../helpers/jwt.helper.js';
 
@@ -210,5 +212,41 @@ export const updateProfileService = async ({ customer_id, full_name, phone, avat
     gender: updatedCustomer.gender,
     dob: updatedCustomer.dob,
   };
+};
+
+/**
+ * Xử lý nghiệp vụ Đổi mật khẩu Khách hàng và mã hóa vào CSDL MySQL
+ */
+export const changePasswordService = async ({ customer_id, email, current_password, new_password }) => {
+  let customer = null;
+  if (customer_id) {
+    customer = await findCustomerById(customer_id);
+  }
+  if (!customer && email) {
+    customer = await findCustomerByEmail(email);
+  }
+  if (!customer) {
+    throw { statusCode: 404, message: 'Không tìm thấy thông tin tài khoản người dùng' };
+  }
+
+  // 1. Kiểm tra mật khẩu hiện tại bằng Bcrypt
+  const isCurrentPasswordValid = await bcrypt.compare(current_password, customer.password_hash);
+  if (!isCurrentPasswordValid) {
+    throw { statusCode: 400, message: 'Mật khẩu hiện tại không chính xác' };
+  }
+
+  // 2. Mật khẩu mới không được trùng với mật khẩu hiện tại
+  if (current_password === new_password) {
+    throw { statusCode: 400, message: 'Mật khẩu mới không được trùng với mật khẩu hiện tại' };
+  }
+
+  // 3. Mã hóa mật khẩu mới bằng Bcrypt
+  const salt = await bcrypt.genSalt(10);
+  const newPasswordHash = await bcrypt.hash(new_password, salt);
+
+  // 4. Lưu password_hash mới vào CSDL MySQL
+  await updateCustomerPassword(customer.customer_id, newPasswordHash);
+
+  return { message: 'Đổi mật khẩu thành công!' };
 };
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   User, Package, Lock, Heart, LogOut, CheckCircle, 
-  Camera, MapPin, Calendar, Clock, CreditCard, ChevronRight, AlertCircle, Tag, Copy
+  Camera, MapPin, Calendar, Clock, CreditCard, ChevronRight, AlertCircle, Tag, Copy, Eye, EyeOff
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ProductCard from '../components/ProductCard';
@@ -82,7 +82,7 @@ const validateDob = (dobStr) => {
 };
 
 const ProfilePage = () => {
-  const { user, updateUserProfile, orders, wishlist, logout } = useAuth();
+  const { user, updateUserProfile, changePassword, orders, wishlist, logout } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -97,12 +97,71 @@ const ProfilePage = () => {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
   
+  const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400';
+
+  // Nén ảnh tải lên về chuẩn JPEG (max 400x400) để tối ưu lưu trữ CSDL & LocalStorage
+  const compressAvatarImage = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxSize = 400;
+
+          if (width > height) {
+            if (width > maxSize) {
+              height = Math.round((height * maxSize) / width);
+              width = maxSize;
+            }
+          } else {
+            if (height > maxSize) {
+              width = Math.round((width * maxSize) / height);
+              height = maxSize;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          resolve(compressedDataUrl);
+        };
+        img.onerror = () => resolve(e.target.result);
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const isValidAvatarUrl = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    if (url.startsWith('http://') || url.startsWith('https://')) return true;
+    if (url.startsWith('data:image/')) return url.length > 50 && url.includes(';base64,');
+    return false;
+  };
+
   // Form State initialized from user context
+  const getSavedAvatar = () => {
+    if (isValidAvatarUrl(user?.avatar_url)) return user.avatar_url;
+    if (user?.email) {
+      const byEmail = localStorage.getItem(`avatar_url_${user.email}`);
+      if (isValidAvatarUrl(byEmail)) return byEmail;
+    }
+    const globalAvatar = localStorage.getItem('user_avatar_url');
+    if (isValidAvatarUrl(globalAvatar)) return globalAvatar;
+    return DEFAULT_AVATAR;
+  };
+
   const [formData, setFormData] = useState({
     full_name: user?.full_name || 'Nguyễn Hoàng Thảo My',
     phone: user?.phone || '0908 123 456',
     email: user?.email || 'thaomy.nguyen@atelier-youth.vn',
-    avatar_url: user?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
+    avatar_url: getSavedAvatar(),
     gender: user?.gender || 'Nữ',
     dob: normalizeDobToVn(user?.dob || '18/10/1994'),
     province: user?.address?.province || 'Thành phố Hồ Chí Minh',
@@ -124,8 +183,6 @@ const ProfilePage = () => {
       return 'Số điện thoại không được để trống';
     }
     const cleaned = phoneNumber.toString().replace(/[\s.\-()]/g, '');
-    // Chuẩn đầu số các nhà mạng di động Việt Nam (Viettel, Mobi, Vina, Vietnamobile, Wintel, Gmobile)
-    // 032-039, 052/055/056/058/059, 070/076-079, 081-089, 090-099
     const vnPhoneRegex = /^(?:(?:\+84|84|0))(3[2-9]|5[25689]|7[06-9]|8[1-9]|9[0-9])\d{7}$/;
     if (!vnPhoneRegex.test(cleaned)) {
       return 'Số điện thoại không hợp lệ (gồm 10 số thuộc các đầu mạng di động VN: 032-039, 05x, 07x, 08x, 09x)';
@@ -133,43 +190,106 @@ const ProfilePage = () => {
     return '';
   };
 
-  const handleAvatarFileChange = (e) => {
+  const handleAvatarFileChange = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const newAvatarUrl = reader.result;
-        setFormData(prev => ({ ...prev, avatar_url: newAvatarUrl }));
-        if (updateUserProfile) {
-          updateUserProfile({ avatar_url: newAvatarUrl });
+      try {
+        const compressedAvatarUrl = await compressAvatarImage(file);
+        if (compressedAvatarUrl) {
+          setFormData(prev => ({ ...prev, avatar_url: compressedAvatarUrl }));
+          try {
+            localStorage.setItem('user_avatar_url', compressedAvatarUrl);
+            if (user?.email) {
+              localStorage.setItem(`avatar_url_${user.email}`, compressedAvatarUrl);
+            }
+          } catch (err) {
+            console.warn('LocalStorage quota warning:', err);
+          }
+          if (updateUserProfile) {
+            await updateUserProfile({ avatar_url: compressedAvatarUrl });
+          }
+          setProfileAlert({ type: 'success', message: 'Đã cập nhật ảnh đại diện mới thành công!' });
+          setTimeout(() => setProfileAlert({ type: '', message: '' }), 4000);
         }
-        setProfileAlert({ type: 'success', message: 'Đã cập nhật ảnh đại diện mới thành công!' });
-        setTimeout(() => setProfileAlert({ type: '', message: '' }), 4000);
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('Lỗi cập nhật ảnh đại diện:', err);
+      }
     }
   };
   
   // Password State
   const [passData, setPassData] = useState({ currentPass: '', newPass: '', confirmPass: '' });
+  const [showCurrentPass, setShowCurrentPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [passMsg, setPassMsg] = useState('');
+  const [passAlertType, setPassAlertType] = useState('danger');
+  const [newPassError, setNewPassError] = useState('');
+  const [confirmPassError, setConfirmPassError] = useState('');
+
+  // Validations matching Registration
+  const validateNewPassword = (pwd) => {
+    if (!pwd || !pwd.trim()) {
+      return 'Mật khẩu mới không được để trống';
+    }
+    if (pwd.length < 6) {
+      return 'Mật khẩu mới phải có tối thiểu 6 ký tự';
+    }
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9])/.test(pwd)) {
+      return 'Mật khẩu phải bao gồm chữ hoa (A-Z), chữ thường (a-z), chữ số (0-9) và ký tự đặc biệt (VD: Manh123@)';
+    }
+    return '';
+  };
+
+  const validateConfirmPassword = (confirmPwd, newPwd) => {
+    if (!confirmPwd || !confirmPwd.trim()) {
+      return 'Xác nhận mật khẩu mới không được để trống';
+    }
+    if (confirmPwd !== newPwd) {
+      return 'Mật khẩu mới xác nhận không khớp. Vui lòng kiểm tra lại!';
+    }
+    return '';
+  };
+
+  const handleNewPassChange = (e) => {
+    const val = e.target.value;
+    setPassData(p => ({ ...p, newPass: val }));
+    if (newPassError) {
+      setNewPassError(validateNewPassword(val));
+    }
+    if (confirmPassError && passData.confirmPass) {
+      setConfirmPassError(validateConfirmPassword(passData.confirmPass, val));
+    }
+  };
+
+  const handleConfirmPassChange = (e) => {
+    const val = e.target.value;
+    setPassData(p => ({ ...p, confirmPass: val }));
+    if (confirmPassError) {
+      setConfirmPassError(validateConfirmPassword(val, passData.newPass));
+    }
+  };
 
   // Synchronize when tab query param changes
   useEffect(() => {
-    if (searchParams.get('tab')) {
-      setActiveTab(searchParams.get('tab'));
-    }
+    const currentTab = searchParams.get('tab') || 'info';
+    setActiveTab(currentTab);
   }, [searchParams]);
 
   // Keep form data synced if user context updates
   useEffect(() => {
     if (user) {
+      const savedByEmail = user.email && localStorage.getItem(`avatar_url_${user.email}`);
+      const globalAvatar = localStorage.getItem('user_avatar_url');
+      const candidate = [user.avatar_url, savedByEmail, globalAvatar].find(isValidAvatarUrl);
+      const activeAvatar = candidate || DEFAULT_AVATAR;
+
       setFormData(prev => ({
         ...prev,
         full_name: user.full_name || prev.full_name,
         phone: user.phone || prev.phone,
         email: user.email || prev.email,
-        avatar_url: user.avatar_url || prev.avatar_url,
+        avatar_url: activeAvatar,
         gender: user.gender || prev.gender,
         dob: user.dob ? normalizeDobToVn(user.dob) : prev.dob
       }));
@@ -237,6 +357,7 @@ const ProfilePage = () => {
     const res = await updateUserProfile({
       full_name: formData.full_name,
       phone: formData.phone.trim(),
+      avatar_url: formData.avatar_url,
       gender: formData.gender,
       dob: formData.dob,
       address: {
@@ -256,15 +377,63 @@ const ProfilePage = () => {
   };
 
 
-  const handlePassChange = (e) => {
+  const handlePassChange = async (e) => {
     e.preventDefault();
-    if (passData.newPass !== passData.confirmPass) {
-      setPassMsg('Mật khẩu mới xác nhận không khớp!');
+    setPassMsg('');
+    setPassAlertType('danger');
+
+    // 1. Validate Mật khẩu hiện tại không trống
+    if (!passData.currentPass || !passData.currentPass.trim()) {
+      setPassMsg('Vui lòng nhập mật khẩu hiện tại.');
       return;
     }
-    setPassMsg('Đã đổi mật khẩu thành công!');
-    setPassData({ currentPass: '', newPass: '', confirmPass: '' });
-    setTimeout(() => setPassMsg(''), 4000);
+
+    // 2. Validate Mật khẩu mới >= 6 ký tự (giống hệt khi đăng ký)
+    const nErr = validateNewPassword(passData.newPass);
+    if (nErr) {
+      setNewPassError(nErr);
+      setPassMsg(nErr);
+      return;
+    }
+    setNewPassError('');
+
+    // 3. Validate Mật khẩu mới xác nhận trùng khớp
+    const cErr = validateConfirmPassword(passData.confirmPass, passData.newPass);
+    if (cErr) {
+      setConfirmPassError(cErr);
+      setPassMsg(cErr);
+      return;
+    }
+    setConfirmPassError('');
+
+    // 4. Validate Mật khẩu mới khác Mật khẩu hiện tại
+    if (passData.currentPass === passData.newPass) {
+      setPassMsg('Mật khẩu mới không được trùng với mật khẩu hiện tại.');
+      return;
+    }
+
+    if (changePassword) {
+      const res = await changePassword({
+        current_password: passData.currentPass,
+        new_password: passData.newPass,
+        confirm_password: passData.confirmPass,
+      });
+
+      if (res?.success) {
+        setPassAlertType('success');
+        setPassMsg(res?.message || 'Đã đổi mật khẩu thành công và lưu vào CSDL!');
+        setPassData({ currentPass: '', newPass: '', confirmPass: '' });
+      } else {
+        setPassAlertType('danger');
+        setPassMsg(res?.message || 'Đổi mật khẩu thất bại. Vui lòng kiểm tra lại mật khẩu hiện tại!');
+      }
+    } else {
+      setPassAlertType('success');
+      setPassMsg('Đã đổi mật khẩu thành công!');
+      setPassData({ currentPass: '', newPass: '', confirmPass: '' });
+    }
+
+    setTimeout(() => setPassMsg(''), 5000);
   };
 
   const handleCopyVoucher = (code) => {
@@ -369,10 +538,14 @@ const ProfilePage = () => {
                 style={{ display: 'none' }} 
               />
               <img 
-                src={formData.avatar_url} 
-                alt={user?.full_name || 'Nguyễn Hoàng Thảo My'} 
+                src={formData.avatar_url || DEFAULT_AVATAR} 
+                alt={user?.full_name || 'Khách hàng Youth Fashion'} 
                 className="hero-avatar-img" 
                 onClick={() => fileInputRef.current?.click()}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = DEFAULT_AVATAR;
+                }}
               />
               <button 
                 type="button" 
@@ -780,46 +953,97 @@ const ProfilePage = () => {
                 </div>
 
                 {passMsg && (
-                  <div className={`profile-alert ${passMsg.includes('thành công') ? 'alert-success' : 'alert-danger'}`}>
-                    <AlertCircle size={16} /> {passMsg}
+                  <div className={`profile-alert alert-${passAlertType}`}>
+                    {passAlertType === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                    <span>{passMsg}</span>
                   </div>
                 )}
 
                 <form onSubmit={handlePassChange} className="password-form">
+                  {/* MẬT KHẨU HIỆN TẠI */}
                   <div className="field-group">
-                    <label className="field-label">MẬT KHẨU HIỆN TẠI *</label>
-                    <input 
-                      type="password" 
-                      className="custom-input"
-                      value={passData.currentPass}
-                      onChange={(e) => setPassData(p => ({ ...p, currentPass: e.target.value }))}
-                      required
-                    />
+                    <label className="field-label">MẬT KHẨU HIỆN TẠI <span className="field-required">*</span></label>
+                    <div className="password-input-relative">
+                      <input 
+                        type={showCurrentPass ? 'text' : 'password'} 
+                        className="custom-input"
+                        value={passData.currentPass}
+                        onChange={(e) => setPassData(p => ({ ...p, currentPass: e.target.value }))}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="pass-eye-toggle-btn"
+                        onClick={() => setShowCurrentPass(!showCurrentPass)}
+                        title={showCurrentPass ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                        aria-label="Toggle password visibility"
+                      >
+                        {showCurrentPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
 
+                  {/* MẬT KHẨU MỚI */}
                   <div className="field-group">
-                    <label className="field-label">MẬT KHẨU MỚI *</label>
-                    <input 
-                      type="password" 
-                      className="custom-input"
-                      value={passData.newPass}
-                      onChange={(e) => setPassData(p => ({ ...p, newPass: e.target.value }))}
-                      required
-                    />
+                    <label className="field-label">MẬT KHẨU MỚI <span className="field-required">*</span></label>
+                    <div className="password-input-relative">
+                      <input 
+                        type={showNewPass ? 'text' : 'password'} 
+                        className={`custom-input ${newPassError ? 'input-error' : ''}`}
+                        value={passData.newPass}
+                        onChange={handleNewPassChange}
+                        onBlur={() => setNewPassError(validateNewPassword(passData.newPass))}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="pass-eye-toggle-btn"
+                        onClick={() => setShowNewPass(!showNewPass)}
+                        title={showNewPass ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                        aria-label="Toggle password visibility"
+                      >
+                        {showNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {newPassError && (
+                      <div className="field-error-msg">
+                        <AlertCircle size={14} />
+                        <span>{newPassError}</span>
+                      </div>
+                    )}
                   </div>
 
+                  {/* XÁC NHẬN MẬT KHẨU MỚI */}
                   <div className="field-group">
-                    <label className="field-label">XÁC NHẬN MẬT KHẨU MỚI *</label>
-                    <input 
-                      type="password" 
-                      className="custom-input"
-                      value={passData.confirmPass}
-                      onChange={(e) => setPassData(p => ({ ...p, confirmPass: e.target.value }))}
-                      required
-                    />
+                    <label className="field-label">XÁC NHẬN MẬT KHẨU MỚI <span className="field-required">*</span></label>
+                    <div className="password-input-relative">
+                      <input 
+                        type={showConfirmPass ? 'text' : 'password'} 
+                        className={`custom-input ${confirmPassError ? 'input-error' : ''}`}
+                        value={passData.confirmPass}
+                        onChange={handleConfirmPassChange}
+                        onBlur={() => setConfirmPassError(validateConfirmPassword(passData.confirmPass, passData.newPass))}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="pass-eye-toggle-btn"
+                        onClick={() => setShowConfirmPass(!showConfirmPass)}
+                        title={showConfirmPass ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                        aria-label="Toggle password visibility"
+                      >
+                        {showConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {confirmPassError && (
+                      <div className="field-error-msg">
+                        <AlertCircle size={14} />
+                        <span>{confirmPassError}</span>
+                      </div>
+                    )}
                   </div>
 
-                  <button type="submit" className="save-profile-btn" style={{ marginTop: '12px' }}>
+                  <button type="submit" className="save-profile-btn" style={{ marginTop: '16px' }}>
                     CẬP NHẬT MẬT KHẨU
                   </button>
                 </form>
@@ -1267,6 +1491,37 @@ const ProfilePage = () => {
         .custom-input:focus {
           border-color: #111827;
           box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.05);
+        }
+
+        .password-input-relative {
+          position: relative;
+          width: 100%;
+          display: flex;
+          align-items: center;
+        }
+
+        .password-input-relative .custom-input {
+          padding-right: 42px;
+        }
+
+        .pass-eye-toggle-btn {
+          position: absolute;
+          right: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: transparent;
+          border: none;
+          color: #6b7280;
+          cursor: pointer;
+          padding: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: color 0.15s ease;
+        }
+
+        .pass-eye-toggle-btn:hover {
+          color: #111827;
         }
 
         .field-required {

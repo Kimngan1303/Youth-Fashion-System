@@ -49,5 +49,13 @@ export const authService = {
     const response = await axiosClient.put('/auth/profile', profileData);
     return response.data;
   },
+
+  /**
+   * Change customer password in database
+   */
+  changePassword: async (passwordData) => {
+    const response = await axiosClient.put('/auth/change-password', passwordData);
+    return response.data;
+  },
 };
 

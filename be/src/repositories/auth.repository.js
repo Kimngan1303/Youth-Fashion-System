@@ -128,3 +128,30 @@ export const updateCustomerProfile = async (customer_id, { full_name, phone, ava
   });
 };
 
+/**
+ * Tìm Khách hàng theo customer_id
+ */
+export const findCustomerById = async (customer_id) => {
+  if (!customer_id) return null;
+  return await prisma.customer.findUnique({
+    where: { customer_id: BigInt(customer_id) },
+  });
+};
+
+/**
+ * Cập nhật Mật khẩu mới của Khách hàng vào CSDL MySQL
+ */
+export const updateCustomerPassword = async (customer_id, new_password_hash) => {
+  return await prisma.customer.update({
+    where: { customer_id: BigInt(customer_id) },
+    data: {
+      password_hash: new_password_hash,
+    },
+    select: {
+      customer_id: true,
+      email: true,
+      updated_at: true,
+    },
+  });
+};
+

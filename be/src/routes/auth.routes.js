@@ -5,8 +5,9 @@ import {
   logoutController,
   refreshController,
   updateProfileController,
+  changePasswordController,
 } from '../controllers/auth.controller.js';
-import { registerSchema, loginSchema, updateProfileSchema, validateBody } from '../validations/auth.validation.js';
+import { registerSchema, loginSchema, updateProfileSchema, changePasswordSchema, validateBody } from '../validations/auth.validation.js';
 import { verifyAccessToken } from '../helpers/jwt.helper.js';
 
 const router = Router();
@@ -39,5 +40,8 @@ router.post('/refresh', refreshController);
 
 // PUT /api/auth/profile - Cập nhật thông tin Hồ sơ cá nhân
 router.put('/profile', optionalAuthToken, validateBody(updateProfileSchema), updateProfileController);
+
+// PUT /api/auth/change-password - Đổi mật khẩu tài khoản
+router.put('/change-password', optionalAuthToken, validateBody(changePasswordSchema), changePasswordController);
 
 export default router;

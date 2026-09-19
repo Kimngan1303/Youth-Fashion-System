@@ -2,11 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
-import { categoryService } from '../../services/categoryService';
+import { brandService } from '../../services/brandService';
 import ManagerSidebar from '../../components/ManagerSidebar';
 import ManagerHeader from '../../components/ManagerHeader';
 import {
-  Folder,
+  Award,
   Plus,
   Edit,
   Eye,
@@ -15,7 +15,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-const categoryManagerStyles = `
+const brandManagerStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,400&display=swap');
 
   .manager-layout {
@@ -76,7 +76,7 @@ const categoryManagerStyles = `
     margin: 4px 0 0 0;
   }
 
-  .btn-add-category {
+  .btn-add-brand {
     display: flex;
     align-items: center;
     padding: 10px 18px;
@@ -92,7 +92,7 @@ const categoryManagerStyles = `
     transition: background 0.2s;
   }
 
-  .btn-add-category:hover {
+  .btn-add-brand:hover {
     background: #2A2725;
   }
 
@@ -244,26 +244,15 @@ const categoryManagerStyles = `
     color: #1C1917;
   }
 
-  .filter-select {
-    padding: 8px 12px;
-    border: 1px solid #E2DFD7;
-    border-radius: 8px;
-    font-size: 12.5px;
-    color: #404040;
-    background: #FFFFFF;
-    outline: none;
-    cursor: pointer;
-  }
-
   /* Data Table */
-  .category-data-table {
+  .brand-data-table {
     width: 100%;
     border-collapse: collapse;
     text-align: left;
     font-size: 13.5px;
   }
 
-  .category-data-table th {
+  .brand-data-table th {
     background: #FAF9F6;
     padding: 14px 18px;
     font-weight: 700;
@@ -274,20 +263,20 @@ const categoryManagerStyles = `
     border-bottom: 1px solid #EAE7DF;
   }
 
-  .category-data-table td {
+  .brand-data-table td {
     padding: 16px 18px;
     border-bottom: 1px solid #F2EEE8;
     color: #1C1917;
     vertical-align: middle;
   }
 
-  .category-title-cell {
+  .brand-title-cell {
     display: flex;
     align-items: center;
     gap: 12px;
   }
 
-  .category-icon-box {
+  .brand-icon-box {
     width: 40px;
     height: 40px;
     border-radius: 8px;
@@ -299,12 +288,12 @@ const categoryManagerStyles = `
     color: #111111;
   }
 
-  .cat-name {
+  .brand-name {
     font-weight: 600;
     color: #111111;
   }
 
-  .cat-id-sub {
+  .brand-id-sub {
     font-size: 11px;
     color: #78716C;
   }
@@ -566,61 +555,61 @@ const categoryManagerStyles = `
   }
 `;
 
-export default function CategoryManager() {
+export default function BrandManager() {
   const { showSuccess, showError } = useToast();
 
-  const [categories, setCategories] = useState([]);
+  const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
 
   const [activeTab, setActiveTab] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Drawer state: null, or { mode: 'create' | 'edit' | 'view', category?: item }
+  // Drawer state: null, or { mode: 'create' | 'edit' | 'view', brand?: item }
   const [drawerMode, setDrawerMode] = useState(null);
-  const [currentCategory, setCurrentCategory] = useState(null);
+  const [currentBrand, setCurrentBrand] = useState(null);
 
   const [formData, setFormData] = useState({
-    category_name: '',
+    brand_name: '',
     description: '',
     status: 'ACTIVE',
   });
   const [submitting, setSubmitting] = useState(false);
 
   // Confirm delete modal state
-  const [deleteCategoryItem, setDeleteCategoryItem] = useState(null);
+  const [deleteBrandItem, setDeleteBrandItem] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Fetch Categories từ CSDL MySQL thật 100%
-  const fetchCategories = useCallback(async () => {
+  // Fetch Brands từ CSDL MySQL thật 100%
+  const fetchBrands = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const res = await categoryService.getCategories({
+      const res = await brandService.getBrands({
         search: searchTerm,
         status: activeTab,
       });
 
       if (res.status && res.data) {
-        setCategories(res.data || []);
+        setBrands(res.data || []);
       }
     } catch (err) {
-      console.error('Lỗi khi lấy danh mục:', err);
-      setErrorMsg(err.response?.data?.message || 'Không thể tải danh sách danh mục từ MySQL');
+      console.error('Lỗi khi lấy danh sách thương hiệu:', err);
+      setErrorMsg(err.response?.data?.message || 'Không thể tải danh sách thương hiệu từ CSDL MySQL');
     } finally {
       setLoading(false);
     }
   }, [searchTerm, activeTab]);
 
   useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+    fetchBrands();
+  }, [fetchBrands]);
 
   // Open Drawer Create
   const handleOpenCreateDrawer = () => {
-    setCurrentCategory(null);
+    setCurrentBrand(null);
     setFormData({
-      category_name: '',
+      brand_name: '',
       description: '',
       status: 'ACTIVE',
     });
@@ -628,72 +617,72 @@ export default function CategoryManager() {
   };
 
   // Open Drawer Edit / View
-  const handleOpenEditDrawer = (cat, mode = 'edit') => {
-    setCurrentCategory(cat);
+  const handleOpenEditDrawer = (brand, mode = 'edit') => {
+    setCurrentBrand(brand);
     setFormData({
-      category_name: cat.category_name,
-      description: cat.description || '',
-      status: cat.status,
+      brand_name: brand.brand_name,
+      description: brand.description || '',
+      status: brand.status,
     });
     setDrawerMode(mode);
   };
 
-  // Submit Create / Edit Category Form
-  const handleSubmitCategoryForm = async (e) => {
+  // Submit Create / Edit Brand Form
+  const handleSubmitBrandForm = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
       const isCreate = drawerMode === 'create';
       if (isCreate) {
-        await categoryService.createCategory(formData);
-      } else if (drawerMode === 'edit' && currentCategory) {
-        await categoryService.updateCategory(currentCategory.category_id, formData);
+        await brandService.createBrand(formData);
+      } else if (drawerMode === 'edit' && currentBrand) {
+        await brandService.updateBrand(currentBrand.brand_id, formData);
       }
 
       setDrawerMode(null);
-      fetchCategories();
-      showSuccess(isCreate ? 'Tạo mới danh mục thành công' : 'Đã lưu thay đổi danh mục thành công');
+      fetchBrands();
+      showSuccess(isCreate ? 'Tạo mới thương hiệu thành công' : 'Đã lưu thay đổi thương hiệu thành công');
     } catch (err) {
-      console.error('Lỗi khi lưu danh mục:', err);
+      console.error('Lỗi khi lưu thương hiệu:', err);
       const detailedErrors = err.response?.data?.errors?.join(', ');
       const msg = detailedErrors
         ? `${err.response.data.message}: ${detailedErrors}`
-        : (err.response?.data?.message || 'Có lỗi xảy ra khi lưu danh mục');
+        : (err.response?.data?.message || 'Có lỗi xảy ra khi lưu thương hiệu');
       showError(msg);
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Confirm Delete Category
+  // Confirm Delete Brand
   const handleConfirmDelete = async () => {
-    if (!deleteCategoryItem) return;
+    if (!deleteBrandItem) return;
     setDeleting(true);
     try {
-      await categoryService.deleteCategory(deleteCategoryItem.category_id);
-      setDeleteCategoryItem(null);
-      fetchCategories();
-      showSuccess('Đã xóa danh mục thành công');
+      await brandService.deleteBrand(deleteBrandItem.brand_id);
+      setDeleteBrandItem(null);
+      fetchBrands();
+      showSuccess('Đã xóa thương hiệu thành công');
     } catch (err) {
-      showError(err.response?.data?.message || 'Không thể xóa danh mục này');
+      showError(err.response?.data?.message || 'Không thể xóa thương hiệu này');
     } finally {
       setDeleting(false);
     }
   };
 
   // KPI Computations
-  const totalCatCount = categories.length;
-  const activeCount = categories.filter((c) => c.status === 'ACTIVE').length;
-  const inactiveCount = categories.filter((c) => c.status === 'INACTIVE').length;
-  const totalProductsInCat = categories.reduce((sum, c) => sum + (c.product_count || 0), 0);
-  const topCategory = categories.reduce((max, c) => ((c.product_count || 0) > (max?.product_count || 0) ? c : max), categories[0]);
+  const totalBrandCount = brands.length;
+  const activeCount = brands.filter((b) => b.status === 'ACTIVE').length;
+  const inactiveCount = brands.filter((b) => b.status === 'INACTIVE').length;
+  const totalProductsInBrand = brands.reduce((sum, b) => sum + (b.product_count || 0), 0);
+  const topBrand = brands.reduce((max, b) => ((b.product_count || 0) > (max?.product_count || 0) ? b : max), brands[0]);
 
   return (
     <div className="manager-layout">
-      <style>{categoryManagerStyles}</style>
+      <style>{brandManagerStyles}</style>
 
       {/* LEFT SIDEBAR */}
-      <ManagerSidebar activeMenu="categories" />
+      <ManagerSidebar activeMenu="brands" />
 
       {/* MAIN CONTENT AREA */}
       <main className="main-content-area">
@@ -702,7 +691,7 @@ export default function CategoryManager() {
         <ManagerHeader
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
-          searchPlaceholder="Tìm theo tên danh mục trong CSDL MySQL..."
+          searchPlaceholder="Tìm theo tên thương hiệu trong CSDL MySQL..."
         />
 
         {/* Scroll Body */}
@@ -712,12 +701,12 @@ export default function CategoryManager() {
           <div className="dashboard-header-row">
             <div>
               <p className="dashboard-header-sub">QUẢN LÝ DỮ LIỆU MYSQL THẬT 100%</p>
-              <h1 className="dashboard-header-title">Quản Lý Danh Mục</h1>
+              <h1 className="dashboard-header-title">Quản Lý Thương Hiệu</h1>
             </div>
 
-            <button type="button" className="btn-add-category" onClick={handleOpenCreateDrawer}>
+            <button type="button" className="btn-add-brand" onClick={handleOpenCreateDrawer}>
               <Plus size={16} />
-              Thêm Danh Mục Mới
+              Thêm Thương Hiệu Mới
             </button>
           </div>
 
@@ -726,20 +715,20 @@ export default function CategoryManager() {
 
             <div className="kpi-card">
               <div className="kpi-card-header">
-                <span className="kpi-title">TỔNG DANH MỤC DB</span>
-                <div className="kpi-icon-badge">📁</div>
+                <span className="kpi-title">TỔNG THƯƠNG HIỆU DB</span>
+                <div className="kpi-icon-badge">🏷️</div>
               </div>
-              <div className="kpi-value">{totalCatCount} <span style={{ fontSize: '14px', fontWeight: 400, color: '#57534E' }}>Danh mục</span></div>
+              <div className="kpi-value">{totalBrandCount} <span style={{ fontSize: '14px', fontWeight: 400, color: '#57534E' }}>Thương hiệu</span></div>
               <div className="kpi-subtext">{activeCount} đang hiển thị • {inactiveCount} đã ẩn</div>
             </div>
 
             <div className="kpi-card">
               <div className="kpi-card-header">
-                <span className="kpi-title">DANH MỤC NHIỀU SP NHẤT</span>
+                <span className="kpi-title">THƯƠNG HIỆU NHIỀU SP NHẤT</span>
                 <div className="kpi-icon-badge">👑</div>
               </div>
-              <div className="kpi-value" style={{ fontSize: '18px' }}>{topCategory?.category_name || 'N/A'}</div>
-              <div className="kpi-subtext">Chứa {topCategory?.product_count || 0} sản phẩm liên kết</div>
+              <div className="kpi-value" style={{ fontSize: '18px' }}>{topBrand?.brand_name || 'N/A'}</div>
+              <div className="kpi-subtext">Chứa {topBrand?.product_count || 0} sản phẩm liên kết</div>
             </div>
 
             <div className="kpi-card">
@@ -747,8 +736,8 @@ export default function CategoryManager() {
                 <span className="kpi-title">TỔNG SẢN PHẨM PHÂN BỔ</span>
                 <div className="kpi-icon-badge">📦</div>
               </div>
-              <div className="kpi-value">{totalProductsInCat} <span style={{ fontSize: '14px', fontWeight: 400, color: '#57534E' }}>Sản phẩm</span></div>
-              <div className="kpi-subtext">Trung bình ~{totalCatCount > 0 ? Math.round(totalProductsInCat / totalCatCount) : 0} SP / danh mục</div>
+              <div className="kpi-value">{totalProductsInBrand} <span style={{ fontSize: '14px', fontWeight: 400, color: '#57534E' }}>Sản phẩm</span></div>
+              <div className="kpi-subtext">Trung bình ~{totalBrandCount > 0 ? Math.round(totalProductsInBrand / totalBrandCount) : 0} SP / thương hiệu</div>
             </div>
 
           </div>
@@ -764,7 +753,7 @@ export default function CategoryManager() {
                     className={`status-tab-btn ${activeTab === 'ALL' ? 'active' : ''}`}
                     onClick={() => setActiveTab('ALL')}
                   >
-                    Tất Cả <span className="tab-count-badge" style={{ background: activeTab === 'ALL' ? '#333' : '#E7E5E4' }}>{totalCatCount}</span>
+                    Tất Cả <span className="tab-count-badge" style={{ background: activeTab === 'ALL' ? '#333' : '#E7E5E4' }}>{totalBrandCount}</span>
                   </button>
                   <button
                     className={`status-tab-btn ${activeTab === 'ACTIVE' ? 'active' : ''}`}
@@ -787,7 +776,7 @@ export default function CategoryManager() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                   <input
-                    placeholder="Lọc theo tên danh mục..."
+                    placeholder="Lọc theo tên thương hiệu..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -798,83 +787,86 @@ export default function CategoryManager() {
             {/* Loading / Error / Data Table */}
             {loading ? (
               <div style={{ padding: '40px', textAlign: 'center', color: '#78716C' }}>
-                <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
-                <p style={{ marginTop: '8px', fontSize: '13px' }}>Đang tải danh mục từ MySQL CSDL...</p>
+                <Loader2 className="animate-spin" size={24} style={{ margin: '0 auto 8px' }} />
+                <span>Đang tải dữ liệu thương hiệu từ MySQL...</span>
               </div>
             ) : errorMsg ? (
-              <div style={{ padding: '30px', textAlign: 'center', color: '#DC2626' }}>
-                <AlertCircle size={24} />
-                <p style={{ marginTop: '8px', fontSize: '13px' }}>{errorMsg}</p>
+              <div style={{ padding: '40px', textAlign: 'center', color: '#DC2626' }}>
+                <AlertCircle size={28} style={{ margin: '0 auto 8px' }} />
+                <p>{errorMsg}</p>
+                <button type="button" className="btn-secondary" onClick={fetchBrands} style={{ marginTop: '12px' }}>
+                  Thử lại
+                </button>
               </div>
-            ) : categories.length === 0 ? (
+            ) : brands.length === 0 ? (
               <div style={{ padding: '40px', textAlign: 'center', color: '#78716C' }}>
-                <p>Không tìm thấy danh mục nào trong CSDL MySQL.</p>
+                Không tìm thấy thương hiệu nào phù hợp.
               </div>
             ) : (
-              <table className="category-data-table">
+              <table className="brand-data-table">
                 <thead>
                   <tr>
-                    <th>TÊN DANH MỤC & ID</th>
-                    <th>MÔ TẢ DANH MỤC</th>
-                    <th>SỐ SẢN PHẨM LIÊN KẾT</th>
-                    <th style={{ textAlign: 'center' }}>TRẠNG THÁI</th>
-                    <th style={{ textAlign: 'right', paddingRight: '24px' }}>THAO TÁC</th>
+                    <th>TÊN THƯƠNG HIỆU</th>
+                    <th>MÔ TẢ</th>
+                    <th>SẢN PHẨM LIÊN KẾT</th>
+                    <th>TRẠNG THÁI</th>
+                    <th>NGÀY TẠO</th>
+                    <th style={{ textAlign: 'right' }}>THAO TÁC</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {categories.map((c) => (
-                    <tr key={c.category_id}>
+                  {brands.map((b) => (
+                    <tr key={b.brand_id}>
                       <td>
-                        <div className="category-title-cell">
-                          <div className="category-icon-box">
-                            <Folder size={20} />
+                        <div className="brand-title-cell">
+                          <div className="brand-icon-box">
+                            <Award size={18} />
                           </div>
                           <div>
-                            <div className="cat-name">{c.category_name}</div>
-                            <div className="cat-id-sub">#{c.category_id}</div>
+                            <div className="brand-name">{b.brand_name}</div>
+                            <div className="brand-id-sub">ID: #{b.brand_id}</div>
                           </div>
                         </div>
                       </td>
-                      <td>
-                        <div style={{ color: '#57534E', fontSize: '13px', maxWidth: '320px' }}>
-                          {c.description || 'Chưa có mô tả'}
-                        </div>
+                      <td style={{ color: '#57534E', maxWidth: '300px' }}>
+                        {b.description || <span style={{ color: '#A8A29E', italic: 'true' }}>Chưa có mô tả</span>}
                       </td>
                       <td>
-                        <strong>{c.product_count}</strong> sản phẩm
+                        <span style={{ fontWeight: 600, color: '#111111' }}>{b.product_count || 0}</span> sản phẩm
                       </td>
-                      <td style={{ textAlign: 'center' }}>
-                        {c.status === 'ACTIVE' ? (
-                          <span className="status-pill-active">● Đang Hiện</span>
+                      <td>
+                        {b.status === 'ACTIVE' ? (
+                          <span className="status-pill-active">● Hoạt động</span>
                         ) : (
-                          <span className="status-pill-hidden">● Đã Ẩn</span>
+                          <span className="status-pill-hidden">● Đã ẩn</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                      <td style={{ color: '#78716C', fontSize: '12.5px' }}>
+                        {new Date(b.created_at).toLocaleDateString('vi-VN')}
+                      </td>
+                      <td>
                         <div className="action-buttons-cell">
-                          <button
-                            type="button"
-                            className="action-btn-item edit"
-                            title="Chỉnh sửa danh mục"
-                            onClick={() => handleOpenEditDrawer(c, 'edit')}
-                          >
-                            <Edit size={16} />
-                          </button>
-
                           <button
                             type="button"
                             className="action-btn-item view"
                             title="Xem chi tiết"
-                            onClick={() => handleOpenEditDrawer(c, 'view')}
+                            onClick={() => handleOpenEditDrawer(b, 'view')}
                           >
                             <Eye size={16} />
                           </button>
-
+                          <button
+                            type="button"
+                            className="action-btn-item edit"
+                            title="Chỉnh sửa"
+                            onClick={() => handleOpenEditDrawer(b, 'edit')}
+                          >
+                            <Edit size={16} />
+                          </button>
                           <button
                             type="button"
                             className="action-btn-item delete"
-                            title="Xóa danh mục"
-                            onClick={() => setDeleteCategoryItem(c)}
+                            title="Xóa thương hiệu"
+                            onClick={() => setDeleteBrandItem(b)}
                           >
                             <Trash2 size={16} />
                           </button>
@@ -889,69 +881,80 @@ export default function CategoryManager() {
           </div>
 
         </div>
-
       </main>
 
-      {/* DRAWER COMPONENT (Create / Edit / View Details) */}
+      {/* DRAWER FORM (CREATE / EDIT / VIEW) */}
       {drawerMode && (
         <div className="drawer-overlay" onClick={() => setDrawerMode(null)}>
           <div className="drawer-container" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-header">
-              <h3 className="drawer-title">
-                {drawerMode === 'create'
-                  ? 'Thêm Danh Mục Mới'
-                  : drawerMode === 'edit'
-                    ? 'Chỉnh Sửa Danh Mục'
-                    : 'Chi Tiết Danh Mục'}
-              </h3>
-              <button className="drawer-close-btn" onClick={() => setDrawerMode(null)}>✕</button>
+              <h2 className="drawer-title">
+                {drawerMode === 'create' && 'Thêm Thương Hiệu Mới'}
+                {drawerMode === 'edit' && `Chỉnh Sửa Thương Hiệu #${currentBrand?.brand_id}`}
+                {drawerMode === 'view' && `Chi Tiết Thương Hiệu #${currentBrand?.brand_id}`}
+              </h2>
+              <button type="button" className="drawer-close-btn" onClick={() => setDrawerMode(null)}>✕</button>
             </div>
 
-            <form onSubmit={handleSubmitCategoryForm} className="drawer-body">
-              <div className="form-group">
-                <label className="form-label">Tên danh mục *</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  required
-                  disabled={drawerMode === 'view'}
-                  value={formData.category_name}
-                  onChange={(e) => setFormData({ ...formData, category_name: e.target.value })}
-                />
-              </div>
+            <form onSubmit={handleSubmitBrandForm} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <div className="drawer-body">
+                <div className="form-group">
+                  <label className="form-label">Tên Thương Hiệu *</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Nhập tên thương hiệu (VD: YouthFashion Studio, Nike...)"
+                    value={formData.brand_name}
+                    onChange={(e) => setFormData({ ...formData, brand_name: e.target.value })}
+                    disabled={drawerMode === 'view'}
+                    required
+                  />
+                </div>
 
-              <div className="form-group">
-                <label className="form-label">Mô tả danh mục</label>
-                <textarea
-                  rows="4"
-                  className="form-textarea"
-                  disabled={drawerMode === 'view'}
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                />
-              </div>
+                <div className="form-group">
+                  <label className="form-label">Mô Tả Thương Hiệu</label>
+                  <textarea
+                    className="form-textarea"
+                    rows={4}
+                    placeholder="Nhập mô tả tổng quan về thương hiệu..."
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    disabled={drawerMode === 'view'}
+                  />
+                </div>
 
-              <div className="form-group">
-                <label className="form-label">Trạng thái hiển thị *</label>
-                <select
-                  className="form-select"
-                  disabled={drawerMode === 'view'}
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                >
-                  <option value="ACTIVE">Đang Hiện (Hoạt động)</option>
-                  <option value="INACTIVE">Đã Ẩn (Tạm ngưng)</option>
-                </select>
+                <div className="form-group">
+                  <label className="form-label">Trạng Thái Hiển Thị</label>
+                  <select
+                    className="form-select"
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    disabled={drawerMode === 'view'}
+                  >
+                    <option value="ACTIVE">Hoạt động (Hiển thị công khai)</option>
+                    <option value="INACTIVE">Tạm ẩn (Ẩn khỏi giao diện bán hàng)</option>
+                  </select>
+                </div>
+
+                {drawerMode === 'view' && currentBrand && (
+                  <div style={{ background: '#F9F8F6', padding: '16px', borderRadius: '8px', marginTop: '12px' }}>
+                    <p style={{ margin: '0 0 6px', fontSize: '12px', fontWeight: 600, color: '#78716C' }}>THÔNG TIN THỐNG KÊ</p>
+                    <p style={{ margin: '4px 0', fontSize: '13px', color: '#111' }}>• Số sản phẩm thuộc thương hiệu: <strong>{currentBrand.product_count || 0}</strong></p>
+                    <p style={{ margin: '4px 0', fontSize: '13px', color: '#111' }}>• Ngày khởi tạo: {new Date(currentBrand.created_at).toLocaleString('vi-VN')}</p>
+                    <p style={{ margin: '4px 0', fontSize: '13px', color: '#111' }}>• Cập nhật lần cuối: {new Date(currentBrand.updated_at).toLocaleString('vi-VN')}</p>
+                  </div>
+                )}
               </div>
 
               <div className="drawer-footer">
                 <button type="button" className="btn-secondary" onClick={() => setDrawerMode(null)}>
-                  {drawerMode === 'view' ? 'Đóng' : 'Hủy'}
+                  {drawerMode === 'view' ? 'Đóng' : 'Hủy bỏ'}
                 </button>
+
                 {drawerMode !== 'view' && (
                   <button type="submit" className="btn-primary-black" disabled={submitting}>
-                    {submitting && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-                    {drawerMode === 'create' ? 'Tạo Danh Mục Mới' : 'Lưu Thay Đổi'}
+                    {submitting && <Loader2 className="animate-spin" size={14} />}
+                    {drawerMode === 'create' ? 'Tạo Thương Hiệu' : 'Lưu Thay Đổi'}
                   </button>
                 )}
               </div>
@@ -961,33 +964,38 @@ export default function CategoryManager() {
       )}
 
       {/* CONFIRM DELETE MODAL */}
-      {deleteCategoryItem && (
-        <div className="modal-overlay" onClick={() => !deleting && setDeleteCategoryItem(null)}>
+      {deleteBrandItem && (
+        <div className="modal-overlay" onClick={() => setDeleteBrandItem(null)}>
           <div className="confirm-modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-warning-icon">
-              <Trash2 size={24} />
+              <AlertCircle size={26} />
             </div>
-            <div className="modal-title">Xác nhận xóa danh mục khỏi MySQL?</div>
-            <div className="modal-subtext">
-              Bạn có chắc chắn muốn xóa danh mục <strong>"{deleteCategoryItem.category_name}"</strong> khỏi CSDL MySQL không? Hành động này không thể hoàn tác.
-            </div>
+            <h3 className="modal-title">Xác nhận xóa thương hiệu?</h3>
+            <p className="modal-subtext">
+              Bạn có chắc chắn muốn xóa thương hiệu <strong>"{deleteBrandItem.brand_name}"</strong>?
+              {deleteBrandItem.product_count > 0 && (
+                <span style={{ display: 'block', color: '#DC2626', marginTop: '6px', fontWeight: 600 }}>
+                  ⚠️ Thương hiệu này đang chứa {deleteBrandItem.product_count} sản phẩm liên kết!
+                </span>
+              )}
+            </p>
             <div className="modal-actions-row">
               <button
                 type="button"
                 className="btn-secondary"
+                onClick={() => setDeleteBrandItem(null)}
                 disabled={deleting}
-                onClick={() => setDeleteCategoryItem(null)}
               >
                 Hủy bỏ
               </button>
               <button
                 type="button"
                 className="btn-danger-confirm"
-                disabled={deleting}
                 onClick={handleConfirmDelete}
+                disabled={deleting}
               >
-                {deleting && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-                {deleting ? 'Đang xóa...' : 'Xác nhận xóa'}
+                {deleting && <Loader2 className="animate-spin" size={14} />}
+                Xóa Thương Hiệu
               </button>
             </div>
           </div>

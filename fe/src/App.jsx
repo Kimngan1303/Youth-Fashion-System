@@ -1,6 +1,8 @@
 import React, { useState, useContext } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
+import { ConfirmModalProvider } from './context/ConfirmModalContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AISearchModal from './components/AISearchModal';
@@ -13,6 +15,7 @@ import Register from './pages/auth/Register';
 import ManagerDashboard from './pages/manager/ManagerDashboard';
 import ProductManager from './pages/manager/ProductManager';
 import CategoryManager from './pages/manager/CategoryManager';
+import BrandManager from './pages/manager/BrandManager';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useContext(AuthContext);
@@ -73,6 +76,14 @@ function AppContent() {
             }
           />
           <Route
+            path="/manager/brands"
+            element={
+              <ProtectedRoute>
+                <BrandManager />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/manager/lookbooks"
             element={
               <ProtectedRoute>
@@ -117,7 +128,11 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <ToastProvider>
+        <ConfirmModalProvider>
+          <AppContent />
+        </ConfirmModalProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }
