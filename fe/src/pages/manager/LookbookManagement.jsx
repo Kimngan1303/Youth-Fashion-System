@@ -22,66 +22,92 @@ import { getStoredLookbooks, saveStoredLookbooks, resetToDefaultLookbooks, getLo
 import { useToast } from '../../context/ToastContext';
 import { useConfirmModal } from '../../context/ConfirmModalContext';
 
+// ============================================================================
+// [PHẦN 1] KHỞI TẠO COMPONENT QUẢN LÝ LOOKBOOK (LOOKBOOK MANAGEMENT)
+// - Mục đích: Trang quản trị nội dung Lookbook cho phép Quản lý (Manager):
+//   1. Xem danh sách toàn bộ các tuyển tập Lookbook
+//   2. Đổi thứ tự vị trí hiển thị (Banner, 1, 2, 3, 4...) tự động đồng bộ sang Trang chủ và Trang Lookbook
+//   3. Tạo mới, chỉnh sửa thông tin, giá bán, gắn danh sách sản phẩm phối đồ (tag)
+//   4. Ẩn/hiện (Phát hành/Tạm ẩn), xóa hoặc khôi phục mặc định ban đầu
+// ============================================================================
 export default function LookbookManagement() {
   const { showSuccess, showWarning } = useToast();
   const { confirmModal } = useConfirmModal();
+
+  // [STATE] Danh sách lookbook đọc trực tiếp từ LocalStorage qua dịch vụ lookbookData.js
   const [lookbooks, setLookbooks] = useState(() => getStoredLookbooks());
 
+  // [HÀM ĐỒNG BỘ] Cập nhật danh sách lookbook vào state đồng thời lưu LocalStorage và báo tin cho toàn app
   const updateLookbooks = (newItems) => {
     setLookbooks(newItems);
     saveStoredLookbooks(newItems);
   };
-  const [currentTab, setCurrentTab] = useState('all'); // 'all', 'published', 'hidden'
+
+  // [STATE] Tab lọc trạng thái: 'all' (tất cả), 'published' (đã phát hành), 'hidden' (tạm ẩn)
+  const [currentTab, setCurrentTab] = useState('all');
+
+  // [STATE] Từ khóa tìm kiếm (tìm theo tiêu đề, mã code, mùa chiến dịch)
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('position'); // Defaults to sequential position: Banner, 1, 2, 3, 4, 5...
+
+  // [STATE] Tiêu chí sắp xếp: 'position' (theo thứ tự điều khiển), 'newest' (mới nhất), 'productCount' (số SP), 'oldest' (cũ nhất)
+  const [sortBy, setSortBy] = useState('position');
+
+  // [STATE] Danh sách ID các lookbook đang được tích chọn (để xóa hàng loạt)
   const [selectedIds, setSelectedIds] = useState([]);
+
+  // [STATE] Phân trang (Trang hiện tại và số phần tử mỗi trang)
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Modal states
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingLookbook, setEditingLookbook] = useState(null);
-  const [previewLookbook, setPreviewLookbook] = useState(null);
+  // [STATE] Quản lý trạng thái đóng/mở các Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);       // Modal Thêm mới / Sửa
+  const [editingLookbook, setEditingLookbook] = useState(null); // Dữ liệu lookbook đang chỉnh sửa (null nếu tạo mới)
+  const [previewLookbook, setPreviewLookbook] = useState(null); // Dữ liệu lookbook đang xem trước (Preview)
 
-  // Form states for Create/Edit
+  // [STATE] Dữ liệu form nhập liệu trong Modal Tạo / Sửa
   const [formData, setFormData] = useState({
-    title: '',
-    code: '',
-    lookCode: '',
-    sectionRole: '',
-    season: '',
-    badge: '',
-    position: '1',
-    productCount: 1,
-    price: '',
-    status: 'published',
-    image: '',
-    description: '',
-    products: []
+    title: '',         // Tên tuyển tập / trang phục
+    code: '',          // Mã lookbook (LB - LOOK01...)
+    lookCode: '',      // Nhãn Look (LOOK 01 hoặc BANNER)
+    sectionRole: '',   // Vị trí khối điều khiển trên giao diện
+    season: '',        // Phong cách / Mùa chiến dịch
+    badge: '',         // Nhãn phụ (MỚI, ICONIC...)
+    position: '1',     // Thứ tự hiển thị: 'banner', 1, 2, 3...
+    productCount: 1,   // Số lượng sản phẩm
+    price: '',         // Giá hiển thị combo
+    status: 'published', // Trạng thái: 'published' (phát hành) | 'hidden' (tạm ẩn)
+    image: '',         // Link ảnh URL
+    description: '',   // Mô tả cảm hứng / chất liệu
+    products: []       // Danh sách từng sản phẩm phối đồ gắn kèm
   });
 
-  // Calculate statistics
+  // ==========================================================================
+  // [PHẦN 2] TÍNH TOÁN CÁC CHỈ SỐ THỐNG KÊ (METRICS / STATS)
+  // ==========================================================================
   const totalCount = lookbooks.length;
   const publishedCount = lookbooks.filter(lb => lb.status === 'published').length;
   const hiddenCount = lookbooks.filter(lb => lb.status === 'hidden').length;
   
-  // Prominent lookbook (featured)
+  // ==========================================================================
+  // [PHẦN 3] TÌM LOOKBOOK NỔI BẬT NHẤT & BỘ LỌC DỮ LIỆU
+  // ==========================================================================
+  // Tìm lookbook nổi bật đại diện (ưu tiên vị trí số 1, hoặc mục đầu tiên không phải banner)
   const prominentLookbook = useMemo(() => {
     return lookbooks.find(lb => String(lb.position) === '1') || lookbooks.find(lb => lb.position !== 'banner') || lookbooks[0];
   }, [lookbooks]);
 
-  // Filtered & Sorted Lookbooks
+  // Bộ lọc danh sách Lookbook dựa trên Tab trạng thái, từ khóa tìm kiếm và tùy chọn sắp xếp
   const filteredLookbooks = useMemo(() => {
     let result = [...lookbooks];
 
-    // Filter by Tab
+    // [BƯỚC 1] Lọc theo Tab trạng thái ('published' = Phát hành | 'hidden' = Tạm ẩn)
     if (currentTab === 'published') {
       result = result.filter(lb => lb.status === 'published');
     } else if (currentTab === 'hidden') {
       result = result.filter(lb => lb.status === 'hidden');
     }
 
-    // Filter by Search Query
+    // [BƯỚC 2] Lọc theo từ khóa tìm kiếm (tìm kiếm không phân biệt hoa thường)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(lb => 
@@ -91,30 +117,35 @@ export default function LookbookManagement() {
       );
     }
 
-    // Sorting
+    // [BƯỚC 3] Sắp xếp danh sách
     if (sortBy === 'newest') {
-      result.sort((a, b) => b.id - a.id);
+      result.sort((a, b) => b.id - a.id); // ID lớn hơn tạo sau -> mới nhất
     } else if (sortBy === 'oldest') {
-      result.sort((a, b) => a.id - b.id);
+      result.sort((a, b) => a.id - b.id); // ID nhỏ hơn -> cũ nhất
     } else if (sortBy === 'position') {
+      // Sắp xếp theo chuẩn thứ tự vị trí: Banner lên đầu tiên, sau đó đến 1, 2, 3, 4, 5...
       result.sort((a, b) => getLookbookPositionValue(a.position) - getLookbookPositionValue(b.position));
     } else if (sortBy === 'productCount') {
-      result.sort((a, b) => b.productCount - a.productCount);
+      result.sort((a, b) => b.productCount - a.productCount); // Nhiều sản phẩm phối nhất lên đầu
     }
 
     return result;
   }, [lookbooks, currentTab, searchQuery, sortBy]);
 
-  // Pagination calculations
+  // [PHÂN TRANG] Tính toán tổng số trang và cắt danh sách cho trang hiện tại
   const totalPages = Math.ceil(filteredLookbooks.length / itemsPerPage) || 1;
   const currentItems = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredLookbooks.slice(start, start + itemsPerPage);
   }, [filteredLookbooks, currentPage, itemsPerPage]);
 
-  // Checkbox selection handlers
+  // ==========================================================================
+  // [PHẦN 4] XỬ LÝ CHỌN CHECKBOX VÀ XÓA LOOKBOOK
+  // ==========================================================================
+  // Kiểm tra xem tất cả các mục trên trang hiện tại đã được chọn hay chưa
   const isAllSelected = currentItems.length > 0 && currentItems.every(item => selectedIds.includes(item.id));
 
+  // Chọn hoặc bỏ chọn tất cả các mục trên trang hiện tại
   const handleSelectAll = (e) => {
     if (e.target.checked) {
       const pageIds = currentItems.map(item => item.id);
@@ -125,13 +156,14 @@ export default function LookbookManagement() {
     }
   };
 
+  // Chọn hoặc bỏ chọn một lookbook đơn lẻ
   const handleSelectOne = (id) => {
     setSelectedIds(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
 
-  // Bulk Delete
+  // [HÀM XÓA NHIỀU MỤC] Xóa hàng loạt các lookbook đang được tích chọn
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
     const confirmed = await confirmModal({
@@ -153,7 +185,7 @@ export default function LookbookManagement() {
     }
   };
 
-  // Single Delete
+  // [HÀM XÓA 1 MỤC] Xóa đơn lẻ một lookbook theo ID
   const handleDeleteOne = async (id) => {
     const confirmed = await confirmModal({
       title: 'Xóa Lookbook',
@@ -171,7 +203,10 @@ export default function LookbookManagement() {
     }
   };
 
-  // Toggle Publish/Hidden
+  // ==========================================================================
+  // [PHẦN 5] BẬT/TẮT TRẠNG THÁI & ĐỔI THỨ TỰ VỊ TRÍ (HOÁN ĐỔI TỰ ĐỘNG)
+  // ==========================================================================
+  // Chuyển đổi trạng thái Phát hành <-> Tạm ẩn cho một lookbook
   const handleToggleStatus = (id) => {
     const updated = lookbooks.map(lb => {
       if (lb.id === id) {
@@ -185,17 +220,19 @@ export default function LookbookManagement() {
     updateLookbooks(updated);
   };
 
-  // Quick update position (controls banner or lookbook order with automatic swap)
+  // [LOGIC ĐỔI VỊ TRÍ ĐẶC BIỆT] Tự động hoán đổi vị trí khi người dùng chọn vị trí mới
+  // Ví dụ: Look A đang ở vị trí #1, nếu chọn sang #2 thì Look B đang ở #2 sẽ tự động chuyển về #1
   const handleUpdatePosition = (id, newPos) => {
     const target = newPos === 'banner' ? 'banner' : Number(newPos);
     const currentItem = lookbooks.find(lb => lb.id === id);
     if (!currentItem || String(currentItem.position) === String(target)) return;
     const oldPos = currentItem.position;
 
-    // If another item already holds this target position, swap their positions!
+    // Tìm xem đã có lookbook nào đang giữ vị trí đích 'target' hay chưa
     const existingWithTarget = lookbooks.find(lb => lb.id !== id && String(lb.position) === String(target));
 
     const updated = lookbooks.map(lb => {
+      // 1. Cập nhật vị trí mới cho item hiện tại
       if (lb.id === id) {
         return { 
           ...lb, 
@@ -206,6 +243,7 @@ export default function LookbookManagement() {
             : (lb.sectionRole && lb.sectionRole.includes('Banner') ? `Khối Look 0${target} trên trang` : lb.sectionRole)
         };
       }
+      // 2. Nếu có item đang giữ vị trí đó, hoán đổi nó về vị trí cũ 'oldPos' của item hiện tại
       if (existingWithTarget && lb.id === existingWithTarget.id) {
         return { 
           ...lb, 
@@ -221,7 +259,11 @@ export default function LookbookManagement() {
     updateLookbooks(updated);
   };
 
-  // Outfit product row helpers
+  // ==========================================================================
+  // [PHẦN 6] QUẢN LÝ DANH SÁCH SẢN PHẨM PHỐI ĐỒ (GẮN TAGS)
+  // - Cho phép thêm dòng mới, sửa tên/giá và xóa dòng sản phẩm phối
+  // ==========================================================================
+  // Thêm một dòng sản phẩm rỗng vào form
   const handleAddProductRow = () => {
     setFormData(prev => ({
       ...prev,
@@ -229,6 +271,7 @@ export default function LookbookManagement() {
     }));
   };
 
+  // Cập nhật tên hoặc giá của từng sản phẩm phối theo index
   const handleProductChange = (index, field, value) => {
     setFormData(prev => {
       const updated = [...(prev.products || [])];
@@ -237,6 +280,7 @@ export default function LookbookManagement() {
     });
   };
 
+  // Xóa một dòng sản phẩm phối theo index
   const handleRemoveProductRow = (index) => {
     setFormData(prev => ({
       ...prev,
@@ -244,7 +288,10 @@ export default function LookbookManagement() {
     }));
   };
 
-  // Open Create Modal
+  // ==========================================================================
+  // [PHẦN 7] MỞ MODAL VÀ LƯU DỮ LIỆU FORM (TẠO MỚI / CHỈNH SỬA)
+  // ==========================================================================
+  // Mở Modal Tạo mới với giá trị khởi tạo tự động
   const handleOpenCreate = () => {
     setEditingLookbook(null);
     const nextPos = lookbooks.length + 1;
@@ -268,7 +315,7 @@ export default function LookbookManagement() {
     setIsModalOpen(true);
   };
 
-  // Open Edit Modal
+  // Mở Modal Chỉnh sửa với dữ liệu sẵn có của Lookbook được chọn
   const handleOpenEdit = (lookbook) => {
     setEditingLookbook(lookbook);
     const initialProducts = lookbook.products && Array.isArray(lookbook.products) 
@@ -293,7 +340,7 @@ export default function LookbookManagement() {
     setIsModalOpen(true);
   };
 
-  // Save Form (Create or Edit)
+  // [HÀM LƯU FORM] Xử lý khi nhấn nút "Lưu Thay Đổi" hoặc "Tạo Lookbook"
   const handleSaveForm = (e) => {
     e.preventDefault();
     if (!formData.title.trim()) {
@@ -302,6 +349,8 @@ export default function LookbookManagement() {
     }
 
     const pos = formData.position === 'banner' ? 'banner' : Number(formData.position);
+    
+    // Nếu là Banner thì danh sách sản phẩm phối là rỗng (vì Banner là ảnh bìa lớn)
     const cleanedProducts = pos === 'banner'
       ? []
       : (formData.products || []).filter(p => p.name.trim() || p.price.trim());
@@ -309,7 +358,7 @@ export default function LookbookManagement() {
     const autoLookCode = pos === 'banner' ? 'BANNER' : (formData.lookCode && formData.lookCode !== 'BANNER' ? formData.lookCode : `LOOK 0${pos}`);
 
     if (editingLookbook) {
-      // Update
+      // Trường hợp Chỉnh sửa: Cập nhật lookbook có id tương ứng
       const updated = lookbooks.map(lb => {
         if (lb.id === editingLookbook.id) {
           return {
@@ -326,7 +375,7 @@ export default function LookbookManagement() {
       updateLookbooks(updated);
       showSuccess('Đã cập nhật bộ sưu tập Lookbook thành công!');
     } else {
-      // Create new
+      // Trường hợp Tạo mới: Thêm bản ghi mới với ID sinh theo timestamp
       const newLookbook = {
         id: Date.now(),
         ...formData,
@@ -1049,12 +1098,13 @@ export default function LookbookManagement() {
         }
       `}</style>
 
-      {/* Breadcrumb */}
+      {/* ==================================================================== */}
+      {/* [PHẦN 8] BREADCRUMB & TIÊU ĐỀ TRANG QUẢN LÝ LOOKBOOK                 */}
+      {/* ==================================================================== */}
       <div className="lb-breadcrumb">
         YOUTHFASHION • QUẢN LÝ NỘI DUNG & LOOKBOOK
       </div>
 
-      {/* Main Page Title & Top Action */}
       <div className="lb-header-row">
         <h1 className="lb-main-title">Quản Lý Tuyển Tập Lookbook</h1>
         <button 
@@ -1067,9 +1117,14 @@ export default function LookbookManagement() {
         </button>
       </div>
 
-      {/* 3 Metric Summary Cards */}
+      {/* ==================================================================== */}
+      {/* [PHẦN 9] 3 THẺ THỐNG KÊ TỔNG QUAN (METRIC SUMMARY CARDS)              */}
+      {/* 1. Tổng tuyển tập (Bao gồm số phát hành và số tạm ẩn)               */}
+      {/* 2. Lookbook nổi bật nhất (Mục đang chiếm vị trí số 1)                */}
+      {/* 3. Tổng số phối đồ (Outfit) & sản phẩm được gắn tag                  */}
+      {/* ==================================================================== */}
       <div className="lb-stats-grid">
-        {/* Card 1: Tổng Tuyển Tập */}
+        {/* THẺ 1: Tổng số lượng tuyển tập */}
         <div className="lb-stat-card">
           <div className="lb-stat-top">
             <span className="lb-stat-label">TỔNG TUYỂN TẬP</span>
@@ -1094,7 +1149,7 @@ export default function LookbookManagement() {
           </div>
         </div>
 
-        {/* Card 2: Lookbook Nổi Bật Nhất */}
+        {/* THẺ 2: Tuyển tập Lookbook nổi bật nhất (Vị trí số 1) */}
         <div className="lb-stat-card">
           <div className="lb-stat-top">
             <span className="lb-stat-label">LOOKBOOK NỔI BẬT NHẤT</span>
@@ -1119,7 +1174,7 @@ export default function LookbookManagement() {
           </div>
         </div>
 
-        {/* Card 3: Tổng Outfit & Sản Phẩm Gắn Tag */}
+        {/* THẺ 3: Tổng số Outfit & sản phẩm phối được gắn tag */}
         <div className="lb-stat-card">
           <div className="lb-stat-top">
             <span className="lb-stat-label">TỔNG OUTFIT & SẢN PHẨM GẮN TAG</span>
@@ -1142,9 +1197,11 @@ export default function LookbookManagement() {
         </div>
       </div>
 
-      {/* Main Table Card */}
+      {/* ==================================================================== */}
+      {/* [PHẦN 10] BẢNG DỮ LIỆU LOOKBOOK & BỘ LỌC TÌM KIẾM                     */}
+      {/* ==================================================================== */}
       <div className="lb-table-card">
-        {/* Toolbar Top: Tabs & Bulk Actions */}
+        {/* THANH CÔNG CỤ TRÊN: Tab trạng thái & Nút thao tác hàng loạt */}
         <div className="lb-toolbar-top">
           <div className="lb-filter-tabs">
             <button
@@ -1171,6 +1228,7 @@ export default function LookbookManagement() {
           </div>
 
           <div className="lb-bulk-actions">
+            {/* Nút khôi phục dữ liệu lookbook gốc */}
             <button
               type="button"
               className="btn-reset-defaults"
@@ -1212,6 +1270,7 @@ export default function LookbookManagement() {
               Đã chọn: <strong>{selectedIds.length} mục</strong>
             </span>
             <span style={{ color: '#E7E5E4' }}>|</span>
+            {/* Nút xóa nhiều mục đã tích chọn */}
             <button
               type="button"
               className="btn-bulk-delete"
@@ -1224,7 +1283,9 @@ export default function LookbookManagement() {
           </div>
         </div>
 
-        {/* Search & Sort Row */}
+        {/* ================================================================== */}
+        {/* [PHẦN 10.1] THANH TÌM KIẾM VÀ TÙY CHỌN SẮP XẾP                   */}
+        {/* ================================================================== */}
         <div className="lb-toolbar-search-row">
           <div className="lb-search-input-wrapper">
             <Search className="lb-search-icon" size={16} />
@@ -1252,7 +1313,9 @@ export default function LookbookManagement() {
           </div>
         </div>
 
-        {/* Lookbooks Data Table */}
+        {/* ================================================================== */}
+        {/* [PHẦN 10.2] BẢNG HIỂN THỊ DANH SÁCH TUYỂN TẬP LOOKBOOK             */}
+        {/* ================================================================== */}
         <div style={{ overflowX: 'auto' }}>
           <table className="lb-table">
             <thead>
@@ -1286,7 +1349,7 @@ export default function LookbookManagement() {
 
                   return (
                     <tr key={lb.id}>
-                      {/* Checkbox */}
+                      {/* Cột 1: Hộp chọn Checkbox */}
                       <td>
                         <input
                           type="checkbox"
@@ -1296,7 +1359,7 @@ export default function LookbookManagement() {
                         />
                       </td>
 
-                      {/* Position Selector Column */}
+                      {/* Cột 2: Lựa chọn vị trí tức thì (Banner hoặc 1, 2, 3... - Tự hoán đổi vị trí) */}
                       <td style={{ textAlign: 'center' }}>
                         <div style={{ display: 'flex', justifyContent: 'center' }}>
                           <select
@@ -1331,7 +1394,7 @@ export default function LookbookManagement() {
                         </div>
                       </td>
 
-                      {/* Title & Section Role Description */}
+                      {/* Cột 3: Tên tuyển tập, nhãn Look và khối điều khiển trên giao diện */}
                       <td>
                         <div className="lb-item-cell">
                           <img
@@ -1368,7 +1431,7 @@ export default function LookbookManagement() {
                         </div>
                       </td>
 
-                      {/* Price & Product count */}
+                      {/* Cột 4: Giá bán hiển thị & Số lượng sản phẩm phối */}
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <span style={{ fontWeight: 700, fontSize: '13px', color: '#111111' }}>
@@ -1380,7 +1443,7 @@ export default function LookbookManagement() {
                         </div>
                       </td>
 
-                      {/* Status */}
+                      {/* Cột 5: Nút chuyển đổi trạng thái Phát hành / Tạm ẩn */}
                       <td style={{ textAlign: 'center' }}>
                         <button
                           type="button"
@@ -1392,10 +1455,10 @@ export default function LookbookManagement() {
                         </button>
                       </td>
 
-                      {/* Actions */}
+                      {/* Cột 6: Các nút hành động (Xem trước, Sửa, Xóa) */}
                       <td>
                         <div className="lb-actions-group" style={{ justifyContent: 'center' }}>
-                          {/* View Preview */}
+                          {/* Nút Xem chi tiết Lookbook */}
                           <button
                             type="button"
                             className="lb-action-btn"
@@ -1405,7 +1468,7 @@ export default function LookbookManagement() {
                             <Eye size={15} />
                           </button>
 
-                          {/* Edit */}
+                          {/* Nút Mở Modal Chỉnh sửa */}
                           <button
                             type="button"
                             className="lb-action-btn"
@@ -1415,7 +1478,7 @@ export default function LookbookManagement() {
                             <Edit3 size={15} />
                           </button>
 
-                          {/* Delete */}
+                          {/* Nút Xóa Lookbook */}
                           <button
                             type="button"
                             className="lb-action-btn delete"
@@ -1434,7 +1497,9 @@ export default function LookbookManagement() {
           </table>
         </div>
 
-        {/* Table Footer & Pagination */}
+        {/* ================================================================== */}
+        {/* [PHẦN 10.3] PHÂN TRANG (PAGINATION)                                */}
+        {/* ================================================================== */}
         <div className="lb-pagination-row">
           <div>
             Hiển thị <strong>{filteredLookbooks.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} - {Math.min(currentPage * itemsPerPage, filteredLookbooks.length)}</strong> trong tổng số <strong>{filteredLookbooks.length}</strong> tuyển tập lookbook
@@ -1473,7 +1538,11 @@ export default function LookbookManagement() {
         </div>
       </div>
 
-      {/* CREATE / EDIT MODAL */}
+      {/* ==================================================================== */}
+      {/* [PHẦN 11] MODAL THÊM MỚI / CHỈNH SỬA TUYỂN TẬP LOOKBOOK              */}
+      {/* - Cho phép nhập tên, mục điều khiển, mùa, vị trí, giá, link ảnh      */}
+      {/* - Tự động ẩn danh sách sản phẩm phối khi vị trí là Banner            */}
+      {/* ==================================================================== */}
       {isModalOpen && (
         <div className="lb-modal-backdrop" onClick={() => setIsModalOpen(false)}>
           <div className="lb-modal-box" onClick={(e) => e.stopPropagation()}>
@@ -1492,6 +1561,7 @@ export default function LookbookManagement() {
 
             <form onSubmit={handleSaveForm}>
               <div className="lb-modal-form">
+                {/* [MỤC 1] Tên tuyển tập / tên bộ sưu tập */}
                 <div className="lb-form-group">
                   <label className="lb-form-label">Tên Mục / Tuyển Tập Lookbook *</label>
                   <input
@@ -1504,6 +1574,7 @@ export default function LookbookManagement() {
                   />
                 </div>
 
+                {/* [MỤC 2] Ghi chú vai trò điều khiển hiển thị trên giao diện */}
                 <div className="lb-form-group">
                   <label className="lb-form-label">Mục điều khiển trên giao diện (Vị trí & Khối)</label>
                   <input
@@ -1515,6 +1586,7 @@ export default function LookbookManagement() {
                   />
                 </div>
 
+                {/* [MỤC 3] Mùa chiến dịch & Thứ tự vị trí (Banner hoặc số 1, 2, 3...) */}
                 <div className="lb-form-row-2">
                   <div className="lb-form-group">
                     <label className="lb-form-label">Phong Cách / Mùa</label>
@@ -1554,6 +1626,7 @@ export default function LookbookManagement() {
                   </div>
                 </div>
 
+                {/* [MỤC 4] Giá hiển thị tổng thể (Ẩn khi vị trí là Banner) */}
                 {formData.position !== 'banner' && (
                   <div className="lb-form-group">
                     <label className="lb-form-label">Giá Hiển Thị / Combo</label>
@@ -1567,7 +1640,7 @@ export default function LookbookManagement() {
                   </div>
                 )}
 
-                {/* Outfit Products Section (Danh Sách Sản Phẩm Phối) - Ẩn khi vị trí là Banner */}
+                {/* [MỤC 5] Danh sách sản phẩm phối gắn tag (TỰ ĐỘNG ẨN khi vị trí là Banner) */}
                 {formData.position !== 'banner' && (
                   <div className="lb-form-group" style={{ background: '#F9FAFB', padding: '14px', borderRadius: '10px', border: '1px solid #E5E7EB' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -1647,6 +1720,7 @@ export default function LookbookManagement() {
                   </div>
                 )}
 
+                {/* [MỤC 6] Trạng thái hiển thị (Phát hành hoặc Tạm ẩn) */}
                 <div className="lb-form-group">
                   <label className="lb-form-label">Trạng Thái Hiển Thị</label>
                   <select
@@ -1659,6 +1733,7 @@ export default function LookbookManagement() {
                   </select>
                 </div>
 
+                {/* [MỤC 7] Đường link ảnh URL & Khung xem trước ảnh */}
                 <div className="lb-form-group">
                   <label className="lb-form-label">Link Ảnh Bìa Tuyển Tập (URL)</label>
                   <input
@@ -1675,6 +1750,7 @@ export default function LookbookManagement() {
                   )}
                 </div>
 
+                {/* [MỤC 8] Mô tả chi tiết cảm hứng & chất liệu */}
                 <div className="lb-form-group">
                   <label className="lb-form-label">Mô Tả Bộ Sưu Tập</label>
                   <textarea
@@ -1687,6 +1763,7 @@ export default function LookbookManagement() {
                 </div>
               </div>
 
+              {/* Nút hành động Modal (Hủy bỏ / Lưu thay đổi) */}
               <div className="lb-modal-footer">
                 <button
                   type="button"
@@ -1704,7 +1781,9 @@ export default function LookbookManagement() {
         </div>
       )}
 
-      {/* PREVIEW DETAIL MODAL */}
+      {/* ==================================================================== */}
+      {/* [PHẦN 12] MODAL XEM TRƯỚC CHI TIẾT LOOKBOOK (PREVIEW DETAIL)          */}
+      {/* ==================================================================== */}
       {previewLookbook && (
         <div className="lb-modal-backdrop" onClick={() => setPreviewLookbook(null)}>
           <div className="lb-modal-box" onClick={(e) => e.stopPropagation()}>

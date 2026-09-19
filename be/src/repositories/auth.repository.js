@@ -89,3 +89,96 @@ export const deleteRefreshTokenByHash = async (token_hash) => {
     where: { token_hash },
   });
 };
+
+/**
+ * ==============================================================================
+ * REPOSITORY DÀNH RIÊNG CHO XÁC THỰC EMAIL BẰNG OTP (EMAIL VERIFICATION TOKENS)
+ * ==============================================================================
+ */
+
+/**
+ * Lưu mã OTP băm (token_hash) vào CSDL
+ */
+export const createEmailVerificationToken = async ({ customer_id, token_hash, expires_at }) => {
+  return await prisma.emailVerificationToken.create({
+    data: {
+      customer_id: BigInt(customer_id),
+      token_hash,
+      expires_at,
+      attempts: 0,
+    },
+  });
+};
+
+/**
+ * Lấy token xác thực mới nhất chưa hoàn tất của khách hàng
+ */
+export const findLatestActiveVerificationToken = async (customer_id) => {
+  return await prisma.emailVerificationToken.findFirst({
+    where: {
+      customer_id: BigInt(customer_id),
+      verified_at: null,
+    },
+    orderBy: {
+      created_at: 'desc',
+    },
+  });
+};
+
+/**
+ * Tăng số lần nhập sai OTP (attempts)
+ */
+export const incrementTokenAttempts = async (email_verification_token_id) => {
+  return await prisma.emailVerificationToken.update({
+    where: {
+      email_verification_token_id: BigInt(email_verification_token_id),
+    },
+    data: {
+      attempts: { increment: 1 },
+    },
+  });
+};
+
+/**
+ * Đánh dấu token đã xác thực thành công
+ */
+export const markTokenVerified = async (email_verification_token_id) => {
+  return await prisma.emailVerificationToken.update({
+    where: {
+      email_verification_token_id: BigInt(email_verification_token_id),
+    },
+    data: {
+      verified_at: new Date(),
+    },
+  });
+};
+
+/**
+ * Cập nhật email_verified_at cho khách hàng
+ */
+export const markCustomerEmailVerified = async (customer_id) => {
+  return await prisma.customer.update({
+    where: {
+      customer_id: BigInt(customer_id),
+    },
+    data: {
+      email_verified_at: new Date(),
+    },
+  });
+};
+
+/**
+ * Vô hiệu hóa (hết hạn) toàn bộ mã OTP chưa xác thực của khách hàng (khi gửi lại mã mới)
+ */
+export const invalidateCustomerTokens = async (customer_id) => {
+  return await prisma.emailVerificationToken.updateMany({
+    where: {
+      customer_id: BigInt(customer_id),
+      verified_at: null,
+    },
+    data: {
+      expires_at: new Date(Date.now() - 1000), // Cho hết hạn ngay lập tức
+    },
+  });
+};
+

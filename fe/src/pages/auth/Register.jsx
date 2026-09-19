@@ -526,12 +526,13 @@ export default function Register() {
     });
 
     if (res.success) {
-      const msg = 'Đăng ký tài khoản thành công! Đang chuyển hướng sang trang đăng nhập...';
+      const normalizedEmail = email.trim().toLowerCase();
+      const msg = res.message || 'Mã xác thực OTP đã được gửi đến email của bạn!';
       setSuccessMessage(msg);
       showSuccess(msg);
       setTimeout(() => {
-        navigate('/login');
-      }, 1500);
+        navigate('/verify-email', { state: { email: normalizedEmail } });
+      }, 1000);
     } else {
       const msg = res.message || 'Đăng ký thất bại. Vui lòng thử lại!';
       setErrorMessage(msg);

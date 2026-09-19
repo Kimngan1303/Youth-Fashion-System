@@ -25,22 +25,27 @@ const HomePage = ({ onOpenAISearch }) => {
     };
   }, []);
 
-  // Lookbook items for homepage display (Lấy các lookbook đã published và loại trừ banner/backstage)
+  // ----------------------------------------------------------------------------
+  // [LOOKBOOK HOMEPAGE QUERY] ĐỒNG BỘ DỮ LIỆU LOOKBOOK VỚI TRANG QUẢN TRỊ:
+  // - Lọc ra các lookbook đang kích hoạt (status: 'published').
+  // - Bỏ qua ảnh bìa lớn (banner) và hậu trường (backstage) để lấy các trang phục thực tế.
+  // - Sắp xếp tăng dần theo số thứ tự vị trí (1, 2, 3...).
+  // ----------------------------------------------------------------------------
   const contentLookbooks = publishedLookbooks
     .filter(l => l.position !== 'banner' && l.type !== 'hero' && l.type !== 'backstage')
     .sort((a, b) => Number(a.position) - Number(b.position));
 
-  // Vị trí 1: Lookbook nổi bật hiển thị ở thẻ bên trái và ảnh đầu tiên
+  // Vị trí #1: Lookbook Nổi Bật (hiển thị tiêu đề, mô tả bên trái & ảnh số 1 khung lưới)
   const featuredLookbook = contentLookbooks.find(l => Number(l.position) === 1) || contentLookbooks[0] || null;
 
-  // Vị trí 2: Ảnh thứ 2
-  const secondLookbook = contentLookbooks.find(l => Number(l.position) === 2) 
-    || contentLookbooks.filter(l => l.id !== featuredLookbook?.id)[0] 
+  // Vị trí #2: Hiển thị tại ảnh số 2 trong khung lưới ảnh bên phải
+  const secondLookbook = contentLookbooks.find(l => Number(l.position) === 2)
+    || contentLookbooks.filter(l => l.id !== featuredLookbook?.id)[0]
     || null;
 
-  // Vị trí 3: Ảnh thứ 3
-  const thirdLookbook = contentLookbooks.find(l => Number(l.position) === 3) 
-    || contentLookbooks.filter(l => l.id !== featuredLookbook?.id && l.id !== secondLookbook?.id)[0] 
+  // Vị trí #3: Hiển thị tại ảnh số 3 trong khung lưới ảnh bên phải
+  const thirdLookbook = contentLookbooks.find(l => Number(l.position) === 3)
+    || contentLookbooks.filter(l => l.id !== featuredLookbook?.id && l.id !== secondLookbook?.id)[0]
     || null;
 
   const newProducts = [
@@ -108,9 +113,9 @@ const HomePage = ({ onOpenAISearch }) => {
           </div>
 
           <div className="hero-right">
-            <img 
-              src="https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=1200" 
-              alt="Youth Fashion Hero Model" 
+            <img
+              src="https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=1200"
+              alt="Youth Fashion Hero Model"
               className="hero-img"
             />
           </div>
@@ -133,9 +138,15 @@ const HomePage = ({ onOpenAISearch }) => {
         </div>
       </section>
 
-      {/* 4. LOOKBOOK SECTION - ĐƯỢC ĐIỀU KHIỂN THEO VỊ TRÍ TỪ BẢNG QUẢN LÝ */}
+      {/* ----------------------------------------------------------------------
+          KHỐI 4: BỘ SƯU TẬP LOOKBOOK TRANG CHỦ (LOOKBOOK SPLIT SECTION)
+          - Được điều khiển thời gian thực theo số thứ tự vị trí từ Bảng Quản Trị.
+          - Cột trái: Thông tin Lookbook Vị trí #1 (Mùa, Tiêu đề, Mô tả, Nút xem thêm).
+          - Cột phải: Khung lưới 3 ảnh tương ứng với Vị trí #1, Vị trí #2 và Vị trí #3.
+          ---------------------------------------------------------------------- */}
       {featuredLookbook && (
         <section className="section-lookbook-split container">
+          {/* Thẻ mô tả Lookbook chính (Vị trí 1) */}
           <div className="lookbook-left-card">
             <span className="lookbook-sub">
               {featuredLookbook.season ? `BỘ SƯU TẬP • ${featuredLookbook.season.toUpperCase()}` : 'BỘ SƯU TẬP NỔI BẬT'}
@@ -151,28 +162,34 @@ const HomePage = ({ onOpenAISearch }) => {
             </Link>
           </div>
 
+          {/* Lưới 3 ảnh Lookbook tương ứng với các vị trí 1, 2, 3 */}
           <div className="lookbook-photos-grid">
+            {/* Ảnh Lookbook Vị trí #1 */}
             <div className="lb-photo-col">
-              <img 
-                src={featuredLookbook.image || "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=600"} 
-                alt={featuredLookbook.title} 
+              <img
+                src={featuredLookbook.image || "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=600"}
+                alt={featuredLookbook.title}
                 className="lb-img"
               />
             </div>
+
+            {/* Ảnh Lookbook Vị trí #2 */}
             {secondLookbook && (
               <div className="lb-photo-col">
-                <img 
-                  src={secondLookbook.image || "https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=600"} 
-                  alt={secondLookbook.title || "Lookbook Highlight 2"} 
+                <img
+                  src={secondLookbook.image || "https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=600"}
+                  alt={secondLookbook.title || "Lookbook Highlight 2"}
                   className="lb-img"
                 />
               </div>
             )}
+
+            {/* Ảnh Lookbook Vị trí #3 */}
             {thirdLookbook && (
               <div className="lb-photo-col">
-                <img 
-                  src={thirdLookbook.image || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600"} 
-                  alt={thirdLookbook.title || "Lookbook Highlight 3"} 
+                <img
+                  src={thirdLookbook.image || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600"}
+                  alt={thirdLookbook.title || "Lookbook Highlight 3"}
                   className="lb-img"
                 />
               </div>
