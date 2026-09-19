@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { prisma } from '../repositories/prisma.js';
 import {
   findCustomerByEmail,
   findCustomerByPhone,
@@ -66,7 +67,7 @@ export const registerService = async ({ email, password, full_name, phone }) => 
  */
 export const loginService = async ({ email, password, user_type }) => {
   let user = null;
-  let role = 'CUSTOMER';
+  let role;
 
   // 1. Kiểm tra tài khoản dựa trên loại người dùng (CUSTOMER hoặc EMPLOYEE)
   if (user_type === 'CUSTOMER') {
@@ -166,9 +167,35 @@ export const refreshAccessTokenService = async (refreshToken) => {
     throw { statusCode: 401, message: 'Refresh token đã bị thu hồi hoặc hết hạn' };
   }
 
-  // 3. Sinh Access Token mới
+  // 3. Truy vấn lại thông tin user để lấy role và email mới nhất
+  let role;
+  let email;
+
+  if (decoded.user_type === 'EMPLOYEE') {
+    const employee = await prisma.employee.findUnique({
+      where: { employee_id: BigInt(decoded.id) },
+    });
+    if (!employee || employee.status !== 'ACTIVE') {
+      throw { statusCode: 403, message: 'Tài khoản nhân viên ngưng hoạt động' };
+    }
+    role = employee.employee_role; // MANAGER hoặc ADMIN
+    email = employee.email;
+  } else {
+    const customer = await prisma.customer.findUnique({
+      where: { customer_id: BigInt(decoded.id) },
+    });
+    if (!customer || customer.status !== 'ACTIVE') {
+      throw { statusCode: 403, message: 'Tài khoản khách hàng ngưng hoạt động' };
+    }
+    role = 'CUSTOMER';
+    email = customer.email;
+  }
+
+  // 4. Sinh Access Token mới có đầy đủ role và email
   const newAccessToken = generateAccessToken({
     id: decoded.id,
+    email,
+    role,
     user_type: decoded.user_type,
   });
 
