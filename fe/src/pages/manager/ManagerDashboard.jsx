@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import LookbookManagement from './LookbookManagement';
+import ManagerSidebar from '../../components/ManagerSidebar';
+import ManagerHeader from '../../components/ManagerHeader';
 import { 
   LayoutGrid, 
   Package, 
@@ -310,10 +312,10 @@ const dashboardStyles = `
   }
 
   .dashboard-header-sub {
-    font-weight: 600;
-    font-size: 10.5px;
+    font-weight: 700;
+    font-size: 11.5px;
     line-height: 16px;
-    letter-spacing: 0.525px;
+    letter-spacing: 0.8px;
     text-transform: uppercase;
     color: #8C857B;
     margin: 0;
@@ -321,7 +323,7 @@ const dashboardStyles = `
 
   .dashboard-header-title {
     font-family: 'Playfair Display', serif;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 26px;
     line-height: 32px;
     color: #111111;
@@ -332,14 +334,14 @@ const dashboardStyles = `
     box-sizing: border-box;
     display: flex;
     align-items: center;
-    padding: 8px 14px;
+    padding: 10px 18px;
     gap: 8px;
     background: #FFFFFF;
     border: 1px solid #E2DFD7;
     box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05);
     border-radius: 8px;
     font-weight: 600;
-    font-size: 12px;
+    font-size: 13px;
     color: #292524;
     cursor: pointer;
   }
@@ -347,7 +349,7 @@ const dashboardStyles = `
   /* KPI Cards Grid */
   .kpi-cards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 20px;
     width: 100%;
   }
@@ -357,7 +359,7 @@ const dashboardStyles = `
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 20px;
+    padding: 20px 22px;
     background: #FFFFFF;
     border: 1px solid #EAE7DF;
     box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05);
@@ -373,9 +375,9 @@ const dashboardStyles = `
 
   .kpi-title {
     font-weight: 700;
-    font-size: 10.5px;
+    font-size: 11.5px;
     line-height: 16px;
-    letter-spacing: 0.525px;
+    letter-spacing: 0.6px;
     text-transform: uppercase;
     color: #8C857B;
   }
@@ -384,18 +386,17 @@ const dashboardStyles = `
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 24px;
-    height: 24px;
+    width: 30px;
+    height: 30px;
     background: #FBF9F4;
-    border-radius: 4px;
+    border-radius: 6px;
     color: #A88A4B;
   }
 
   .kpi-value {
     font-weight: 700;
-    font-size: 23px;
-    line-height: 29px;
-    letter-spacing: -0.575px;
+    font-size: 24px;
+    line-height: 30px;
     color: #111111;
     margin: 4px 0;
   }
@@ -404,7 +405,7 @@ const dashboardStyles = `
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
+    font-size: 12.5px;
     margin-top: 4px;
   }
 
@@ -501,11 +502,14 @@ const dashboardStyles = `
 export default function ManagerDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeMenu, setActiveMenu] = useState('lookbooks');
+  const location = useLocation();
+
+  const isLookbooksRoute = location.pathname.endsWith('/lookbooks');
+  const activeMenu = isLookbooksRoute ? 'lookbooks' : 'overview';
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate('/');
   };
 
   return (
@@ -513,154 +517,13 @@ export default function ManagerDashboard() {
       <style>{dashboardStyles}</style>
 
       {/* LEFT SIDEBAR */}
-      <aside className="left-sidebar">
-        <div className="sidebar-top-part">
-
-          {/* Logo Brand */}
-          <div className="brand-logo-section">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h8M12 8v8" />
-            </svg>
-            <span className="brand-logo-text">YOUTH FASHION</span>
-          </div>
-
-          {/* Navigation Label */}
-          <div className="nav-section-label">KHU VỰC QUẢN TRỊ</div>
-
-          {/* Menu Items */}
-          <nav className="nav-menu-items">
-            {/* 1. Tổng Quan */}
-            <button
-              className={`nav-menu-link ${activeMenu === 'overview' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('overview')}
-            >
-              <div className="nav-item-inner">
-                <LayoutGrid size={16} />
-                <span>Tổng Quan</span>
-              </div>
-            </button>
-
-            {/* 2. Quản Lý Sản Phẩm */}
-            <button
-              className={`nav-menu-link ${activeMenu === 'products' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('products')}
-            >
-              <div className="nav-item-inner">
-                <Package size={16} />
-                <span>Quản Lý Sản Phẩm</span>
-              </div>
-            </button>
-
-            {/* 3. Quản Lý Danh Mục */}
-            <button
-              className={`nav-menu-link ${activeMenu === 'categories' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('categories')}
-            >
-              <div className="nav-item-inner">
-                <Folder size={16} />
-                <span>Quản Lý Danh Mục</span>
-              </div>
-            </button>
-
-            {/* 4. Quản Lý Lookbook (Active in screenshot) */}
-            <button
-              className={`nav-menu-link ${activeMenu === 'lookbooks' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('lookbooks')}
-            >
-              <div className="nav-item-inner">
-                <BookOpen size={16} />
-                <span>Quản Lý Lookbook</span>
-              </div>
-            </button>
-
-            {/* 5. Quản Lý Đơn Hàng (Badge 18) */}
-            <button
-              className={`nav-menu-link ${activeMenu === 'orders' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('orders')}
-            >
-              <div className="nav-item-inner">
-                <ShoppingBag size={16} />
-                <span>Quản Lý Đơn Hàng</span>
-              </div>
-              <span className="order-count-badge" style={{ background: '#FACC15', color: '#713F12', fontWeight: 700, padding: '2px 7px', borderRadius: '999px', fontSize: '11px' }}>
-                18
-              </span>
-            </button>
-
-            {/* 6. Tư Vấn & CSKH */}
-            <button
-              className={`nav-menu-link ${activeMenu === 'customer_service' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('customer_service')}
-            >
-              <div className="nav-item-inner">
-                <MessageSquare size={16} />
-                <span>Tư Vấn & CSKH</span>
-              </div>
-            </button>
-
-            {/* 7. Voucher & Khuyến Mãi */}
-            <button
-              className={`nav-menu-link ${activeMenu === 'vouchers' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('vouchers')}
-            >
-              <div className="nav-item-inner">
-                <Tag size={16} />
-                <span>Voucher & Khuyến Mãi</span>
-              </div>
-            </button>
-
-            {/* 8. Báo Cáo & Doanh Thu */}
-            <button
-              className={`nav-menu-link ${activeMenu === 'reports' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('reports')}
-            >
-              <div className="nav-item-inner">
-                <BarChart2 size={16} />
-                <span>Báo Cáo & Doanh Thu</span>
-              </div>
-            </button>
-          </nav>
-
-        </div>
-
-        {/* Sidebar Bottom Part */}
-        <div className="sidebar-bottom-part">
-          <button type="button" className="btn-store-status" onClick={() => navigate('/')}>
-            <Home size={15} />
-            VỀ TRANG CHỦ
-          </button>
-          <button type="button" className="btn-sidebar-logout" onClick={handleLogout}>
-            <LogOut size={15} />
-            ĐĂNG XUẤT
-          </button>
-        </div>
-      </aside>
+      <ManagerSidebar activeMenu={activeMenu} />
 
       {/* MAIN CONTENT AREA */}
       <main className="main-content-area">
 
         {/* Top Header Bar */}
-        <header className="top-header-bar">
-          <div className="header-search-box">
-            <Search size={16} color="#A8A29E" />
-            <input className="header-search-input" placeholder="Tìm kiếm đơn hàng, sản phẩm, lookbook..." />
-          </div>
-
-          <div className="header-user-profile">
-            <div className="user-avatar-circle" style={{ background: '#111111', color: '#FFFFFF' }}>
-              <User size={18} />
-            </div>
-            <div className="user-info-text">
-              <span className="user-name" style={{ fontWeight: 700, fontSize: '13px', color: '#111' }}>
-                {user?.full_name || 'Hoàng Kim Anh'}
-              </span>
-              <span className="user-role-label" style={{ fontSize: '11px', color: '#78716C' }}>
-                {user?.role || 'Quản Lý Cửa Hàng & Bán Hàng'}
-              </span>
-            </div>
-          </div>
-        </header>
+        <ManagerHeader searchPlaceholder="Tìm kiếm đơn hàng, sản phẩm, lookbook..." />
 
         {/* MAIN BODY BASED ON ACTIVE MENU */}
         {activeMenu === 'lookbooks' ? (

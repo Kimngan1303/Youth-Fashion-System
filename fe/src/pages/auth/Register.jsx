@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../context/ToastContext';
 
 /**
  * Register Component
@@ -145,15 +146,17 @@ const registerStyles = `
 
   .floating-emblem-badge {
     position: relative;
-    width: 78px;
-    height: 78px;
-    margin-bottom: 22px;
+    width: 80px;
+    height: 80px;
+    margin-bottom: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #FAF8F4;
+    background: rgba(248, 246, 240, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(4px);
     border-radius: 9999px;
-    box-shadow: 0px 8px 20px -4px rgba(120, 110, 95, 0.16);
+    box-shadow: 0px 10px 25px -5px rgba(120, 110, 95, 0.12);
   }
 
   .hero-headline {
@@ -476,6 +479,7 @@ const registerStyles = `
 
 export default function Register() {
   const { register, loading } = useAuth();
+  const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState('');
@@ -495,17 +499,23 @@ export default function Register() {
 
     // Client-side validations
     if (!agreeTerms) {
-      setErrorMessage('Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.');
+      const msg = 'Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.';
+      setErrorMessage(msg);
+      showError(msg);
       return;
     }
 
     if (password.length < 6) {
-      setErrorMessage('Mật khẩu phải có tối thiểu 6 ký tự.');
+      const msg = 'Mật khẩu phải có tối thiểu 6 ký tự.';
+      setErrorMessage(msg);
+      showError(msg);
       return;
     }
 
     if (password !== confirmPassword) {
-      setErrorMessage('Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại!');
+      const msg = 'Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại!';
+      setErrorMessage(msg);
+      showError(msg);
       return;
     }
 
@@ -516,12 +526,16 @@ export default function Register() {
     });
 
     if (res.success) {
-      setSuccessMessage('Đăng ký thành công! Đang chuyển hướng sang trang đăng nhập...');
+      const msg = 'Đăng ký tài khoản thành công! Đang chuyển hướng sang trang đăng nhập...';
+      setSuccessMessage(msg);
+      showSuccess(msg);
       setTimeout(() => {
         navigate('/login');
       }, 1500);
     } else {
-      setErrorMessage(res.message);
+      const msg = res.message || 'Đăng ký thất bại. Vui lòng thử lại!';
+      setErrorMessage(msg);
+      showError(msg);
     }
   };
 
@@ -551,30 +565,14 @@ export default function Register() {
 
             {/* Header mini logo */}
             <div className="header-mini-logo">
-              <div className="mini-logo-dot" />
+              <img src="/logo.png" alt="Youth Fashion Logo" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
               <span className="mini-logo-text">YOUTH FASHION</span>
             </div>
 
             {/* Central hero statement */}
             <div className="central-hero-statement">
               <div className="floating-emblem-badge">
-                <svg viewBox="0 0 80 80" width="76" height="76">
-                  <circle cx="40" cy="40" r="37" fill="#F8F6F0" stroke="#DDD7CC" strokeWidth="1.2" />
-                  <circle cx="40" cy="40" r="31" fill="none" stroke="#22201E" strokeWidth="1.4" />
-                  <circle cx="40" cy="40" r="27.5" fill="none" stroke="#22201E" strokeWidth="0.8" />
-                  <text
-                    x="40"
-                    y="48"
-                    textAnchor="middle"
-                    fontFamily="'Playfair Display', serif"
-                    fontSize="23"
-                    fontWeight="600"
-                    fill="#1C1917"
-                    letterSpacing="-0.5"
-                  >
-                    YF
-                  </text>
-                </svg>
+                <img src="/logo.png" alt="Youth Fashion Emblem" style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
               </div>
 
               <h1 className="hero-headline">Đăng ký</h1>
@@ -666,7 +664,7 @@ export default function Register() {
                       <input
                         type={showPassword ? 'text' : 'password'}
                         className="custom-input"
-                        placeholder="Tối thiểu 8 ký tự"
+                        placeholder="Tối thiểu 6 ký tự"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required

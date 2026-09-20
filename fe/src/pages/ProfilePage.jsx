@@ -1,15 +1,38 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   User, Package, Lock, Heart, LogOut, CheckCircle, 
   Camera, MapPin, Calendar, Clock, CreditCard, ChevronRight, AlertCircle, Tag, Copy
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirmModal } from '../context/ConfirmModalContext';
 import ProductCard from '../components/ProductCard';
 
 const ProfilePage = () => {
-  const { user, updateUserProfile, orders, wishlist } = useAuth();
+  const { user, updateUserProfile, orders, wishlist, logout } = useAuth();
+  const { showSuccess } = useToast();
+  const { confirmModal } = useConfirmModal();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  const handleLogout = async () => {
+    const confirmed = await confirmModal({
+      title: 'Đăng xuất tài khoản',
+      message: 'Bạn có chắc chắn muốn đăng xuất tài khoản khỏi Youth Fashion không?',
+      confirmText: 'Đăng xuất',
+      cancelText: 'Hủy bỏ',
+      variant: 'logout'
+    });
+
+    if (confirmed) {
+      if (logout) {
+        await logout();
+      }
+      showSuccess('Đã đăng xuất tài khoản thành công!');
+      navigate('/');
+    }
+  };
   const initialTab = searchParams.get('tab') || 'info';
 
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -311,11 +334,7 @@ const ProfilePage = () => {
               {/* Menu Item 5: Đăng Xuất */}
               <button 
                 className="nav-item-btn logout-item-btn"
-                onClick={() => {
-                  if (window.confirm('Bạn có chắc chắn muốn đăng xuất tài khoản?')) {
-                    alert('Đã đăng xuất tài khoản!');
-                  }
-                }}
+                onClick={handleLogout}
               >
                 <div className="nav-item-left text-danger">
                   <LogOut size={18} />
