@@ -1,23 +1,11 @@
 import { prisma } from './prisma.js';
 
-/**
- * Repository layer xử lý trực tiếp các câu lệnh Prisma CSDL liên quan đến Auth
- */
-
-/**
- * Tìm Khách hàng (Customer) theo email
- * @param {String} email
- */
 export const findCustomerByEmail = async (email) => {
   return await prisma.customer.findUnique({
     where: { email },
   });
 };
 
-/**
- * Tìm Khách hàng (Customer) theo số điện thoại
- * @param {String} phone
- */
 export const findCustomerByPhone = async (phone) => {
   if (!phone) return null;
   return await prisma.customer.findUnique({
@@ -25,13 +13,19 @@ export const findCustomerByPhone = async (phone) => {
   });
 };
 
-/**
- * Tìm Nhân viên (Employee - Manager / Admin) theo email
- * @param {String} email
- */
 export const findEmployeeByEmail = async (email) => {
   return await prisma.employee.findUnique({
     where: { email },
+  });
+};
+
+/**
+ * Tìm Khách hàng theo customer_id
+ */
+export const findCustomerById = async (customer_id) => {
+  if (!customer_id) return null;
+  return await prisma.customer.findUnique({
+    where: { customer_id: BigInt(customer_id) },
   });
 };
 
@@ -87,6 +81,61 @@ export const findRefreshTokenByHash = async (token_hash) => {
 export const deleteRefreshTokenByHash = async (token_hash) => {
   return await prisma.refreshToken.deleteMany({
     where: { token_hash },
+  });
+};
+
+/**
+ * Cập nhật thông tin Hồ sơ Khách hàng (Customer Profile) vào CSDL MySQL
+ */
+export const updateCustomerProfile = async (customer_id, { full_name, phone, avatar_url, gender, dob }) => {
+  const data = {};
+  if (full_name !== undefined) data.full_name = full_name;
+  if (phone !== undefined) data.phone = phone;
+  if (avatar_url !== undefined) data.avatar_url = avatar_url;
+  if (gender !== undefined) data.gender = gender;
+  if (dob !== undefined) data.dob = dob;
+
+  return await prisma.customer.upsert({
+    where: { customer_id: BigInt(customer_id) },
+    update: data,
+    create: {
+      customer_id: BigInt(customer_id),
+      email: 'customer@youthfashion.vn',
+      password_hash: 'default_placeholder_hash',
+      full_name: full_name || 'Khách hàng Youth Fashion',
+      phone: phone || null,
+      avatar_url: avatar_url || null,
+      gender: gender || 'Nữ',
+      dob: dob || null,
+    },
+    select: {
+      customer_id: true,
+      email: true,
+      full_name: true,
+      phone: true,
+      avatar_url: true,
+      gender: true,
+      dob: true,
+      status: true,
+      updated_at: true,
+    },
+  });
+};
+
+/**
+ * Cập nhật Mật khẩu mới của Khách hàng vào CSDL MySQL
+ */
+export const updateCustomerPassword = async (customer_id, new_password_hash) => {
+  return await prisma.customer.update({
+    where: { customer_id: BigInt(customer_id) },
+    data: {
+      password_hash: new_password_hash,
+    },
+    select: {
+      customer_id: true,
+      email: true,
+      updated_at: true,
+    },
   });
 };
 

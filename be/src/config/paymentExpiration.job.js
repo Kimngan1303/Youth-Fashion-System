@@ -1,13 +1,10 @@
 import { prisma } from '../repositories/prisma.js';
 
-/**
- * Background job to check and auto-cancel orders whose payment_deadline has expired (5-minute rule)
- */
 export function autoCancelExpiredOrders() {
   setInterval(async () => {
     try {
       const now = new Date();
-      
+
       // Update expired pending orders to CANCELLED
       const updatedOrders = await prisma.order.updateMany({
         where: {

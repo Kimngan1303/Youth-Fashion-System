@@ -5,6 +5,8 @@ import {
   refreshAccessTokenService,
   verifyEmailService,
   resendVerificationOtpService,
+  updateProfileService,
+  changePasswordService,
 } from '../services/auth.service.js';
 import { BaseResponse } from '../utils/baseResponse.js';
 
@@ -81,23 +83,15 @@ export const loginController = async (req, res, next) => {
 
     const result = await loginService({ email, password, user_type });
 
-    // Thiết lập HTTP-Only Cookie cho Refresh Token
+    // Lưu Refresh Token vào Cookie HTTP-Only bảo mật
     res.cookie('refreshToken', result.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
     });
 
-    return BaseResponse.success(
-      res,
-      'Đăng nhập thành công',
-      {
-        accessToken: result.accessToken,
-        user: result.user,
-      },
-      200
-    );
+    return BaseResponse.success(res, 'Đăng nhập thành công', result, 200);
   } catch (error) {
     next(error);
   }
@@ -109,13 +103,11 @@ export const loginController = async (req, res, next) => {
 export const logoutController = async (req, res, next) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
-
     await logoutService(refreshToken);
 
-    // Xóa cookie refreshToken phía Client
     res.clearCookie('refreshToken');
 
-    return BaseResponse.success(res, 'Đăng xuất thành công', {}, 200);
+    return BaseResponse.success(res, 'Đăng xuất thành công', null, 200);
   } catch (error) {
     next(error);
   }
@@ -131,6 +123,48 @@ export const refreshController = async (req, res, next) => {
     const result = await refreshAccessTokenService(refreshToken);
 
     return BaseResponse.success(res, 'Cấp lại Access Token thành công', result, 200);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Endpoint Cập nhật hồ sơ cá nhân (PUT /api/auth/profile)
+ */
+export const updateProfileController = async (req, res, next) => {
+  try {
+    const customer_id = req.user?.id || req.body.customer_id || req.body.id;
+    const { full_name, phone, avatar_url, gender, dob } = req.body;
+
+    if (!customer_id) {
+      return BaseResponse.error(res, 'Không tìm thấy ID người dùng', [], 400);
+    }
+
+    const result = await updateProfileService({ customer_id, full_name, phone, avatar_url, gender, dob });
+
+    return BaseResponse.success(res, 'Cập nhật thông tin hồ sơ thành công', result, 200);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Endpoint Đổi mật khẩu (PUT /api/auth/change-password)
+ */
+export const changePasswordController = async (req, res, next) => {
+  try {
+    const customer_id = req.user?.id || req.body.customer_id || req.body.id;
+    const email = req.user?.email || req.body.email;
+    const { current_password, new_password } = req.body;
+
+    const result = await changePasswordService({
+      customer_id,
+      email,
+      current_password,
+      new_password,
+    });
+
+    return BaseResponse.success(res, 'Đổi mật khẩu thành công', result, 200);
   } catch (error) {
     next(error);
   }

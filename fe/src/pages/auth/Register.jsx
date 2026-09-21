@@ -1,12 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { useToast } from '../../context/ToastContext';
-
-/**
- * Register Component
- * Match UI pixel-perfect according to luxury editorial design for Youth Fashion
- */
 
 const registerStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Montserrat:wght@500;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
@@ -479,7 +473,6 @@ const registerStyles = `
 
 export default function Register() {
   const { register, loading } = useAuth();
-  const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState('');
@@ -499,23 +492,22 @@ export default function Register() {
 
     // Client-side validations
     if (!agreeTerms) {
-      const msg = 'Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.';
-      setErrorMessage(msg);
-      showError(msg);
+      setErrorMessage('Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.');
       return;
     }
 
     if (password.length < 6) {
-      const msg = 'Mật khẩu phải có tối thiểu 6 ký tự.';
-      setErrorMessage(msg);
-      showError(msg);
+      setErrorMessage('Mật khẩu phải có tối thiểu 6 ký tự.');
+      return;
+    }
+
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9])/.test(password)) {
+      setErrorMessage('Mật khẩu phải chứa ít nhất 6 ký tự, gồm chữ hoa (A-Z), chữ thường (a-z), chữ số (0-9) và ký tự đặc biệt (VD: Manh123@).');
       return;
     }
 
     if (password !== confirmPassword) {
-      const msg = 'Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại!';
-      setErrorMessage(msg);
-      showError(msg);
+      setErrorMessage('Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại!');
       return;
     }
 
@@ -529,14 +521,11 @@ export default function Register() {
       const normalizedEmail = email.trim().toLowerCase();
       const msg = res.message || 'Mã xác thực OTP đã được gửi đến email của bạn!';
       setSuccessMessage(msg);
-      showSuccess(msg);
       setTimeout(() => {
         navigate('/verify-email', { state: { email: normalizedEmail } });
       }, 1000);
     } else {
-      const msg = res.message || 'Đăng ký thất bại. Vui lòng thử lại!';
-      setErrorMessage(msg);
-      showError(msg);
+      setErrorMessage(res.message);
     }
   };
 

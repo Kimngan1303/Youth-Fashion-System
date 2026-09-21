@@ -42,6 +42,32 @@ const Header = ({ onOpenAISearch }) => {
     };
   }, [showUserMenu]);
 
+  const categoryTimeoutRef = useRef(null);
+  const userTimeoutRef = useRef(null);
+
+  const handleCategoryMouseEnter = () => {
+    if (categoryTimeoutRef.current) clearTimeout(categoryTimeoutRef.current);
+    setShowCategoryMenu(true);
+  };
+
+  const handleCategoryMouseLeave = () => {
+    categoryTimeoutRef.current = setTimeout(() => {
+      setShowCategoryMenu(false);
+    }, 200);
+  };
+
+  const handleUserMouseEnter = () => {
+    if (userTimeoutRef.current) clearTimeout(userTimeoutRef.current);
+    setShowUserMenu(true);
+  };
+
+  const handleUserMouseLeave = () => {
+    userTimeoutRef.current = setTimeout(() => {
+      setShowUserMenu(false);
+    }, 200);
+  };
+
+
   const handleLogout = async () => {
     setShowUserMenu(false);
     const confirmed = await confirmModal({
@@ -97,7 +123,11 @@ const Header = ({ onOpenAISearch }) => {
           <li className={location.pathname === '/' ? 'active' : ''}>
             <Link to="/">TRANG CHỦ</Link>
           </li>
-          <li className={location.pathname.startsWith('/products') ? 'active' : ''}>
+          <li 
+            className={`dropdown-trigger ${location.pathname.startsWith('/products') || location.pathname.startsWith('/category') ? 'active' : ''}`}
+            onMouseEnter={handleCategoryMouseEnter}
+            onMouseLeave={handleCategoryMouseLeave}
+          >
             <Link to="/products" className="nav-link">
               DANH MỤC
             </Link>
@@ -153,15 +183,17 @@ const Header = ({ onOpenAISearch }) => {
           </Link>
 
           {/* Wishlist Icon */}
-          <Link to="/profile?tab=wishlist" className="action-icon" title="Yêu thích">
+          <Link to={user ? "/profile?tab=wishlist" : "/login"} className="action-icon" title="Yêu thích">
             <Heart size={18} />
-            <span className="badge">{wishlist.length || 2}</span>
+            <span className="badge">{user ? (wishlist ? wishlist.length : 0) : 0}</span>
           </Link>
 
           {/* User Account */}
           <div
             ref={userMenuRef}
             className="user-menu-wrapper"
+            onMouseEnter={handleUserMouseEnter}
+            onMouseLeave={handleUserMouseLeave}
           >
             <button
               type="button"
@@ -487,7 +519,18 @@ const Header = ({ onOpenAISearch }) => {
           box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
           border-radius: 10px;
           padding: 8px 0;
-          margin-top: 6px;
+          margin-top: 4px;
+        }
+
+        /* Bridge hover gap so menu never disappears when moving mouse */
+        .user-dropdown::before,
+        .dropdown-menu::before {
+          content: '';
+          position: absolute;
+          top: -14px;
+          left: 0;
+          right: 0;
+          height: 14px;
         }
 
         .user-info-header {

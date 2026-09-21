@@ -4,6 +4,7 @@ import { prisma } from '../repositories/prisma.js';
 import {
   findCustomerByEmail,
   findCustomerByPhone,
+  findCustomerById,
   findEmployeeByEmail,
   createCustomer,
   saveRefreshToken,
@@ -15,12 +16,14 @@ import {
   markTokenVerified,
   markCustomerEmailVerified,
   invalidateCustomerTokens,
+  updateCustomerProfile,
+  updateCustomerPassword,
 } from '../repositories/auth.repository.js';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../helpers/jwt.helper.js';
 import { sendVerificationOTP } from './email.service.js';
 
 /**
- * Service layer chứa toàn bộ Business Logic cho tính năng Đăng ký, Đăng nhập, Đăng xuất, Refresh Token, OTP
+ * Service layer chứa toàn bộ Business Logic cho tính năng Đăng ký, Đăng nhập, Đăng xuất, Refresh Token, OTP, Profile
  */
 
 /**
@@ -39,8 +42,9 @@ export const registerService = async ({ email, password, full_name, phone }) => 
   }
 
   // 2. Kiểm tra số điện thoại (nếu có)
-  if (phone) {
-    const existingPhone = await findCustomerByPhone(phone);
+  let cleanPhone = phone ? phone.toString().replace(/[\s.\-()]/g, '') : null;
+  if (cleanPhone) {
+    const existingPhone = await findCustomerByPhone(cleanPhone);
     if (existingPhone && (!existingCustomer || existingPhone.customer_id !== existingCustomer.customer_id)) {
       throw { statusCode: 400, message: 'Số điện thoại này đã được sử dụng' };
     }
@@ -63,7 +67,7 @@ export const registerService = async ({ email, password, full_name, phone }) => 
       data: {
         full_name,
         password_hash,
-        phone: phone || null,
+        phone: cleanPhone,
         status: 'ACTIVE',
       },
     });
@@ -74,7 +78,7 @@ export const registerService = async ({ email, password, full_name, phone }) => 
         email: normalizedEmail,
         password_hash,
         full_name,
-        phone: phone || null,
+        phone: cleanPhone,
         status: 'ACTIVE',
         email_verified_at: null,
       },
@@ -98,7 +102,7 @@ export const registerService = async ({ email, password, full_name, phone }) => 
     expires_at,
   });
 
-  // 9. Gửi email chứa OTP qua Resend
+  // 9. Gửi email chứa OTP qua Resend / SMTP
   await sendVerificationOTP(normalizedEmail, otp);
 
   return {
@@ -235,7 +239,7 @@ export const resendVerificationOtpService = async ({ email }) => {
  */
 export const loginService = async ({ email, password, user_type }) => {
   let user = null;
-  let role;
+  let role = 'CUSTOMER';
 
   // 1. Kiểm tra tài khoản dựa trên loại người dùng (CUSTOMER hoặc EMPLOYEE)
   if (user_type === 'CUSTOMER') {
@@ -299,9 +303,14 @@ export const loginService = async ({ email, password, user_type }) => {
     accessToken,
     refreshToken,
     user: {
+      customer_id: user_type === 'CUSTOMER' ? user.customer_id.toString() : undefined,
       id: userId.toString(),
       email: user.email,
       full_name: user.full_name,
+      phone: user.phone || null,
+      avatar_url: user.avatar_url || null,
+      gender: user.gender || null,
+      dob: user.dob || null,
       role,
       user_type,
     },
@@ -343,37 +352,78 @@ export const refreshAccessTokenService = async (refreshToken) => {
     throw { statusCode: 401, message: 'Refresh token đã bị thu hồi hoặc hết hạn' };
   }
 
-  // 3. Truy vấn lại thông tin user để lấy role và email mới nhất
-  let role;
-  let email;
-
-  if (decoded.user_type === 'EMPLOYEE') {
-    const employee = await prisma.employee.findUnique({
-      where: { employee_id: BigInt(decoded.id) },
-    });
-    if (!employee || employee.status !== 'ACTIVE') {
-      throw { statusCode: 403, message: 'Tài khoản nhân viên ngưng hoạt động' };
-    }
-    role = employee.employee_role; // MANAGER hoặc ADMIN
-    email = employee.email;
-  } else {
-    const customer = await prisma.customer.findUnique({
-      where: { customer_id: BigInt(decoded.id) },
-    });
-    if (!customer || customer.status !== 'ACTIVE') {
-      throw { statusCode: 403, message: 'Tài khoản khách hàng ngưng hoạt động' };
-    }
-    role = 'CUSTOMER';
-    email = customer.email;
-  }
-
-  // 4. Sinh Access Token mới có đầy đủ role và email
+  // 3. Sinh Access Token mới
   const newAccessToken = generateAccessToken({
     id: decoded.id,
-    email,
-    role,
     user_type: decoded.user_type,
   });
 
   return { accessToken: newAccessToken };
 };
+
+/**
+ * Xử lý cập nhật hồ sơ cá nhân của Khách hàng vào CSDL
+ */
+export const updateProfileService = async ({ customer_id, full_name, phone, avatar_url, gender, dob }) => {
+  let cleanPhone = phone !== undefined ? (phone ? phone.toString().replace(/[\s.\-()]/g, '') : null) : undefined;
+  if (cleanPhone) {
+    const existingPhone = await findCustomerByPhone(cleanPhone);
+    if (existingPhone && existingPhone.customer_id.toString() !== customer_id.toString()) {
+      throw { statusCode: 400, message: 'Số điện thoại này đã được sử dụng bởi tài khoản khác' };
+    }
+  }
+
+  const updateData = { full_name, avatar_url, gender, dob };
+  if (cleanPhone !== undefined) {
+    updateData.phone = cleanPhone;
+  }
+
+  const updatedCustomer = await updateCustomerProfile(customer_id, updateData);
+
+  return {
+    customer_id: updatedCustomer.customer_id.toString(),
+    email: updatedCustomer.email,
+    full_name: updatedCustomer.full_name,
+    phone: updatedCustomer.phone,
+    avatar_url: updatedCustomer.avatar_url,
+    gender: updatedCustomer.gender,
+    dob: updatedCustomer.dob,
+  };
+};
+
+/**
+ * Xử lý nghiệp vụ Đổi mật khẩu Khách hàng và mã hóa vào CSDL MySQL
+ */
+export const changePasswordService = async ({ customer_id, email, current_password, new_password }) => {
+  let customer = null;
+  if (customer_id) {
+    customer = await findCustomerById(customer_id);
+  }
+  if (!customer && email) {
+    customer = await findCustomerByEmail(email);
+  }
+  if (!customer) {
+    throw { statusCode: 404, message: 'Không tìm thấy thông tin tài khoản người dùng' };
+  }
+
+  // 1. Kiểm tra mật khẩu hiện tại bằng Bcrypt
+  const isCurrentPasswordValid = await bcrypt.compare(current_password, customer.password_hash);
+  if (!isCurrentPasswordValid) {
+    throw { statusCode: 400, message: 'Mật khẩu hiện tại không chính xác' };
+  }
+
+  // 2. Mật khẩu mới không được trùng với mật khẩu hiện tại
+  if (current_password === new_password) {
+    throw { statusCode: 400, message: 'Mật khẩu mới không được trùng với mật khẩu hiện tại' };
+  }
+
+  // 3. Mã hóa mật khẩu mới bằng Bcrypt
+  const salt = await bcrypt.genSalt(10);
+  const newPasswordHash = await bcrypt.hash(new_password, salt);
+
+  // 4. Lưu password_hash mới vào CSDL MySQL
+  await updateCustomerPassword(customer.customer_id, newPasswordHash);
+
+  return { message: 'Đổi mật khẩu thành công!' };
+};
+
