@@ -11,7 +11,6 @@ const Header = ({ onOpenAISearch }) => {
   const { user, wishlist, cartCount, logout } = useAuth();
   const { showSuccess } = useToast();
   const { confirmModal } = useConfirmModal();
-  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSearchInput, setShowSearchInput] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,14 +33,6 @@ const Header = ({ onOpenAISearch }) => {
       navigate('/');
     }
   };
-
-  const categories = [
-    { name: 'Áo Blazer & Suit', path: '/category/blazer' },
-    { name: 'Áo Khoác Dạ & Tweed', path: '/category/jacket' },
-    { name: 'Áo Sơ Mi & T-Shirt', path: '/category/shirt' },
-    { name: 'Đầm & Váy Dạ Tiệc', path: '/category/dress' },
-    { name: 'Quần Tây & Denim', path: '/category/pants' }
-  ];
 
   const announcementText = [
     { icon: <Globe size={13} />, text: 'MIỄN PHÍ VẬN CHUYỂN TOÀN QUỐC CHO ĐƠN HÀNG TỪ 1.500.000Đ' },
@@ -79,23 +70,10 @@ const Header = ({ onOpenAISearch }) => {
           <li className={location.pathname === '/' ? 'active' : ''}>
             <Link to="/">TRANG CHỦ</Link>
           </li>
-          <li 
-            className={`dropdown-trigger ${location.pathname.startsWith('/products') || location.pathname.startsWith('/category') ? 'active' : ''}`}
-            onMouseEnter={() => setShowCategoryMenu(true)}
-            onMouseLeave={() => setShowCategoryMenu(false)}
-          >
+          <li className={location.pathname.startsWith('/products') ? 'active' : ''}>
             <Link to="/products" className="nav-link">
               DANH MỤC
             </Link>
-            {showCategoryMenu && (
-              <div className="dropdown-menu animate-fade-in">
-                {categories.map((cat, idx) => (
-                  <Link key={idx} to={cat.path} className="dropdown-item">
-                    {cat.name}
-                  </Link>
-                ))}
-              </div>
-            )}
           </li>
           <li className={location.pathname === '/lookbook' ? 'active' : ''}>
             <Link to="/lookbook">LOOKBOOK</Link>
