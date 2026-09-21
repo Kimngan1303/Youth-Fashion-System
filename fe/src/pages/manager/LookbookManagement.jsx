@@ -3,8 +3,6 @@ import {
   Plus, 
   Search, 
   Trash2, 
-  Eye, 
-  EyeOff, 
   Edit3, 
   ChevronLeft, 
   ChevronRight, 
@@ -1458,16 +1456,6 @@ export default function LookbookManagement() {
                       {/* Cột 6: Các nút hành động (Xem trước, Sửa, Xóa) */}
                       <td>
                         <div className="lb-actions-group" style={{ justifyContent: 'center' }}>
-                          {/* Nút Xem chi tiết Lookbook */}
-                          <button
-                            type="button"
-                            className="lb-action-btn"
-                            title="Xem chi tiết tuyển tập"
-                            onClick={() => setPreviewLookbook(lb)}
-                          >
-                            <Eye size={15} />
-                          </button>
-
                           {/* Nút Mở Modal Chỉnh sửa */}
                           <button
                             type="button"
