@@ -21,6 +21,8 @@ import {
 import { getStoredLookbooks, saveStoredLookbooks, resetToDefaultLookbooks, getLookbookPositionValue } from '../../services/lookbookData';
 import { useToast } from '../../context/ToastContext';
 import { useConfirmModal } from '../../context/ConfirmModalContext';
+import ManagerSidebar from '../../components/ManagerSidebar';
+import ManagerHeader from '../../components/ManagerHeader';
 
 export default function LookbookManagement() {
   const { showSuccess, showWarning } = useToast();
@@ -338,9 +340,39 @@ export default function LookbookManagement() {
   };
 
   return (
-    <div className="lookbook-page-container">
+    <div className="manager-layout">
       {/* Inline styles specifically tailored for Lookbook Management */}
       <style>{`
+        .manager-layout {
+          display: flex;
+          flex-direction: row;
+          align-items: flex-start;
+          padding: 0px;
+          width: 100%;
+          min-height: 100vh;
+          background: #F7F6F3;
+          font-family: 'Inter', sans-serif;
+          box-sizing: border-box;
+        }
+
+        .main-content-area {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          flex: 1;
+          min-height: 100vh;
+          box-sizing: border-box;
+        }
+
+        .dashboard-scroll-body {
+          display: flex;
+          flex-direction: column;
+          padding: 0px;
+          gap: 24px;
+          width: 100%;
+          box-sizing: border-box;
+        }
+
         .lookbook-page-container {
           padding: 28px;
           width: 100%;
@@ -1042,6 +1074,17 @@ export default function LookbookManagement() {
           background: #27272A;
         }
       `}</style>
+
+      {/* LEFT SIDEBAR */}
+      <ManagerSidebar activeMenu="lookbooks" />
+
+      {/* MAIN CONTENT AREA */}
+      <main className="main-content-area">
+        {/* Header Bar */}
+        <ManagerHeader searchPlaceholder="Tìm kiếm tuyển tập lookbook..." />
+
+        <div className="dashboard-scroll-body">
+          <div className="lookbook-page-container">
 
       {/* Breadcrumb */}
       <div className="lb-breadcrumb">
@@ -1823,6 +1866,9 @@ export default function LookbookManagement() {
           </div>
         </div>
       )}
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
