@@ -1,4 +1,3 @@
-import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 
@@ -136,11 +135,13 @@ YouthFashion Team`;
 
   // 2. Gửi qua Resend nếu có cấu hình
   const apiKey = process.env.RESEND_API_KEY;
-  const resend = apiKey ? new Resend(apiKey) : null;
-  const fromEmail = process.env.EMAIL_FROM || 'YouthFashion <onboarding@resend.dev>';
 
-  if (resend) {
+  if (apiKey) {
     try {
+      const { Resend } = await import('resend');
+      const resend = new Resend(apiKey);
+      const fromEmail = process.env.EMAIL_FROM || 'YouthFashion <onboarding@resend.dev>';
+
       const response = await resend.emails.send({
         from: fromEmail,
         to: [email],
