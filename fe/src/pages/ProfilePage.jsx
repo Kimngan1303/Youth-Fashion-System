@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   User, Package, Lock, Heart, LogOut, CheckCircle, 
-  Camera, MapPin, Calendar, Clock, CreditCard, ChevronRight, AlertCircle, Tag, Copy
+  Camera, MapPin, Calendar, Clock, CreditCard, ChevronRight, AlertCircle, Tag, Copy, LayoutDashboard
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -11,6 +11,16 @@ import ProductCard from '../components/ProductCard';
 
 const ProfilePage = () => {
   const { user, updateUserProfile, orders, wishlist, logout } = useAuth();
+  const isManagerOrAdmin = Boolean(
+    user && (
+      user.role === 'MANAGER' ||
+      user.role === 'ADMIN' ||
+      user.role === 'EMPLOYEE' ||
+      user.user_type === 'EMPLOYEE' ||
+      user.employee_role === 'MANAGER' ||
+      user.employee_role === 'ADMIN'
+    )
+  );
   const { showSuccess } = useToast();
   const { confirmModal } = useConfirmModal();
   const navigate = useNavigate();
@@ -330,6 +340,21 @@ const ProfilePage = () => {
                 </div>
                 {activeTab === 'password' && <ChevronRight size={16} className="active-arrow" />}
               </button>
+
+              {/* Menu Item: Bảng Quản Lý (Đối với tài khoản manager hoặc admin) */}
+              {isManagerOrAdmin && (
+                <button 
+                  className="nav-item-btn"
+                  onClick={() => navigate('/manager')}
+                  style={{ color: '#0284c7', borderLeft: '3px solid #0284c7' }}
+                >
+                  <div className="nav-item-left">
+                    <LayoutDashboard size={18} />
+                    <span style={{ fontWeight: 600 }}>BẢNG QUẢN LÝ</span>
+                  </div>
+                  <ChevronRight size={16} />
+                </button>
+              )}
 
               {/* Menu Item 5: Đăng Xuất */}
               <button 
