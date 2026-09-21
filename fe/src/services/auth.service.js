@@ -18,11 +18,29 @@ export const authService = {
   },
 
   /**
-   * Register new customer
-   * @param {Object} userData - { full_name, email, password, phone_number, gender, address }
+   * Register new customer (sends verification OTP)
+   * @param {Object} userData - { full_name, email, password, phone }
    */
   register: async (userData) => {
     const response = await axiosClient.post('/auth/register', userData);
+    return response.data;
+  },
+
+  /**
+   * Verify email using 6-digit OTP
+   * @param {Object} data - { email, otp }
+   */
+  verifyEmail: async ({ email, otp }) => {
+    const response = await axiosClient.post('/auth/verify-email', { email, otp });
+    return response.data;
+  },
+
+  /**
+   * Resend verification OTP
+   * @param {Object} data - { email }
+   */
+  resendVerificationOTP: async ({ email }) => {
+    const response = await axiosClient.post('/auth/resend-verification-otp', { email });
     return response.data;
   },
 

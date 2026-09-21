@@ -13,6 +13,7 @@ import ContactPage from './pages/ContactPage';
 import LookbookPage from './pages/LookbookPage';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import VerifyEmail from './pages/auth/VerifyEmail';
 import ManagerDashboard from './pages/manager/ManagerDashboard';
 import ProductManager from './pages/manager/ProductManager';
 import CategoryManager from './pages/manager/CategoryManager';
@@ -28,7 +29,7 @@ function AppContent() {
   const [isAISearchOpen, setIsAISearchOpen] = useState(false);
   const location = useLocation();
 
-  const hideHeaderFooter = ['/login', '/register'].includes(location.pathname) || location.pathname.startsWith('/manager');
+  const hideHeaderFooter = ['/login', '/register', '/verify-email'].includes(location.pathname) || location.pathname.startsWith('/manager');
 
   return (
     <div className="app-layout">
@@ -38,6 +39,7 @@ function AppContent() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route 
             path="/" 
             element={<HomePage onOpenAISearch={() => setIsAISearchOpen(true)} />} 

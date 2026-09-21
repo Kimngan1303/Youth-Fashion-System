@@ -1,4 +1,11 @@
-import { registerService, loginService, logoutService, refreshAccessTokenService } from '../services/auth.service.js';
+import {
+  registerService,
+  loginService,
+  logoutService,
+  refreshAccessTokenService,
+  verifyEmailService,
+  resendVerificationOtpService,
+} from '../services/auth.service.js';
 import { BaseResponse } from '../utils/baseResponse.js';
 
 /**
@@ -16,9 +23,49 @@ export const registerController = async (req, res, next) => {
 
     return BaseResponse.success(
       res,
-      'Đăng ký tài khoản thành công. Vui lòng đăng nhập.',
+      'Đăng ký tài khoản thành công. Mã xác thực 6 chữ số đã được gửi đến email của bạn.',
       result,
       201
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Endpoint Xác thực Email bằng mã OTP (POST /api/auth/verify-email)
+ */
+export const verifyEmailController = async (req, res, next) => {
+  try {
+    const { email, otp } = req.body;
+
+    const result = await verifyEmailService({ email, otp });
+
+    return BaseResponse.success(
+      res,
+      result.message || 'Xác thực email thành công!',
+      result,
+      200
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Endpoint Gửi lại mã OTP (POST /api/auth/resend-verification-otp)
+ */
+export const resendVerificationOtpController = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const result = await resendVerificationOtpService({ email });
+
+    return BaseResponse.success(
+      res,
+      result.message || 'Mã OTP mới đã được gửi về email của bạn.',
+      result,
+      200
     );
   } catch (error) {
     next(error);
