@@ -1,23 +1,11 @@
 import { prisma } from './prisma.js';
 
-/**
- * Repository layer xử lý trực tiếp các câu lệnh Prisma CSDL liên quan đến Auth
- */
-
-/**
- * Tìm Khách hàng (Customer) theo email
- * @param {String} email
- */
 export const findCustomerByEmail = async (email) => {
   return await prisma.customer.findUnique({
     where: { email },
   });
 };
 
-/**
- * Tìm Khách hàng (Customer) theo số điện thoại
- * @param {String} phone
- */
 export const findCustomerByPhone = async (phone) => {
   if (!phone) return null;
   return await prisma.customer.findUnique({
@@ -25,10 +13,6 @@ export const findCustomerByPhone = async (phone) => {
   });
 };
 
-/**
- * Tìm Nhân viên (Employee - Manager / Admin) theo email
- * @param {String} email
- */
 export const findEmployeeByEmail = async (email) => {
   return await prisma.employee.findUnique({
     where: { email },

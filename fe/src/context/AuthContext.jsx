@@ -1,8 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/auth.service';
 
+// Khởi tạo AuthContext
 export const AuthContext = createContext(null);
 
+/**
+ * Hàm kiểm tra tính hợp lệ của đường dẫn ảnh đại diện
+ */
 const isValidAvatarUrl = (url) => {
   if (!url || typeof url !== 'string') return false;
   if (url.startsWith('http://') || url.startsWith('https://')) return true;
@@ -11,11 +15,13 @@ const isValidAvatarUrl = (url) => {
 };
 
 export function AuthProvider({ children }) {
+  // 1. Khôi phục thông tin người dùng từ localStorage khi tải trang
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
       try {
         const parsed = JSON.parse(savedUser);
+        // Kiểm tra và khôi phục avatar đã lưu trong cache nếu có
         if (!isValidAvatarUrl(parsed.avatar_url)) {
           const savedAvatar = (parsed.email && localStorage.getItem(`avatar_url_${parsed.email}`)) || localStorage.getItem('user_avatar_url');
           if (isValidAvatarUrl(savedAvatar)) parsed.avatar_url = savedAvatar;
@@ -27,9 +33,12 @@ export function AuthProvider({ children }) {
     }
     return null;
   });
+
+  // 2. Khôi phục Access Token từ localStorage
   const [accessToken, setAccessToken] = useState(() => localStorage.getItem('accessToken') || null);
   const [loading, setLoading] = useState(false);
 
+  // 3. Trạng thái danh sách yêu thích (Wishlist), số lượng giỏ hàng (Cart) và đơn hàng (Orders)
   const [wishlist, setWishlist] = useState([1, 3]);
   const [cartCount, setCartCount] = useState(2);
   const [orders, setOrders] = useState([]);
@@ -47,8 +56,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const toggleWishlist = (productId) => {
-    setWishlist(prev => 
-      prev.includes(productId) 
+    setWishlist(prev =>
+      prev.includes(productId)
         ? prev.filter(id => id !== productId)
         : [...prev, productId]
     );
@@ -102,7 +111,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-
   const login = async ({ email, password, user_type = 'CUSTOMER' }) => {
     setLoading(true);
     try {
@@ -127,7 +135,7 @@ export function AuthProvider({ children }) {
         errorMsg = `${serverData.message}: ${serverData.errors.join(', ')}`;
       }
 
-      // If backend API is offline or returning network error, fallback gracefully
+      // Trường hợp server backend gián đoạn mạng, kích hoạt fallback dự phòng
       if (!error.response || error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
         const savedAvatar = (email && localStorage.getItem(`avatar_url_${email}`)) || localStorage.getItem('user_avatar_url');
         const mockUser = {
@@ -161,7 +169,6 @@ export function AuthProvider({ children }) {
         errorMsg = `${serverData.message}: ${serverData.errors.join(', ')}`;
       }
 
-      // If backend API is offline or returning network error, fallback gracefully without auto-login
       if (!error.response || error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
         return { success: true, message: 'Đăng ký tài khoản thành công!' };
       }

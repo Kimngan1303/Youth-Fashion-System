@@ -1,13 +1,6 @@
 import * as productRepo from '../repositories/product.repository.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
 
-/**
- * Service layer xử lý nghiệp vụ cho Sản phẩm
- */
-
-/**
- * Helper định dạng dữ liệu sản phẩm trước khi trả về Client
- */
 const formatProduct = (product) => {
   if (!product) return null;
   return {
@@ -17,18 +10,18 @@ const formatProduct = (product) => {
     brand_id: product.brand_id ? String(product.brand_id) : product.brand_id,
     variants: product.variants
       ? product.variants.map((v) => ({
-          ...v,
-          variant_id: String(v.variant_id),
-          product_id: String(v.product_id),
-          price: Number(v.price),
-        }))
+        ...v,
+        variant_id: String(v.variant_id),
+        product_id: String(v.product_id),
+        price: Number(v.price),
+      }))
       : [],
     images: product.images
       ? product.images.map((img) => ({
-          ...img,
-          image_id: String(img.image_id),
-          product_id: String(img.product_id),
-        }))
+        ...img,
+        image_id: String(img.image_id),
+        product_id: String(img.product_id),
+      }))
       : [],
   };
 };
