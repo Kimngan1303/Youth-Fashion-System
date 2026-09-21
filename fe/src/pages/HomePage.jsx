@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Hammer, Users, Menu, Heart, Star, Edit3, RotateCcw, UserCheck } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
+import { productService } from '../services/productService';
 import { getStoredLookbooks, getLookbookPositionValue } from '../services/lookbookData';
 
 const HomePage = ({ onOpenAISearch }) => {
@@ -31,43 +32,36 @@ const HomePage = ({ onOpenAISearch }) => {
     || publishedLookbooks[0]
     || null;
 
-  const newProducts = [
-    {
-      id: 1,
-      name: 'Áo Blazer Oversized',
-      price: '1.850.000đ',
-      tag: 'MỚI',
-      image: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=600'
-    },
-    {
-      id: 2,
-      name: 'Áo Sơ Mi Linen',
-      price: '950.000đ',
-      tag: 'MỚI',
-      image: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&q=80&w=600'
-    },
-    {
-      id: 3,
-      name: 'Đầm Lụa Xếp Ly',
-      price: '2.450.000đ',
-      tag: 'MỚI',
-      image: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=600'
-    },
-    {
-      id: 4,
-      name: 'Áo Măng Tô Dạ Tuyết',
-      price: '3.200.000đ',
-      tag: 'MỚI',
-      image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600'
-    },
-    {
-      id: 5,
-      name: 'Áo Polo Dệt Kim',
-      price: '850.000đ',
-      tag: 'MỚI',
-      image: 'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?auto=format&fit=crop&q=80&w=600'
-    }
-  ];
+  const [newProducts, setNewProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const res = await productService.getProducts({ page: 1, limit: 10 });
+        const items = res?.data?.products || res?.products || [];
+        if (items.length > 0) {
+          const mapped = items.map(p => {
+            const primaryImg = p.images?.find(i => i.is_primary)?.image_url || p.images?.[0]?.image_url || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800';
+            const priceVal = p.variants?.[0]?.price ? Number(p.variants[0].price) : 0;
+            return {
+              id: p.product_id,
+              name: p.product_name,
+              price: priceVal > 0 ? priceVal.toLocaleString('vi-VN') + 'đ' : 'Liên hệ',
+              tag: 'MỚI',
+              image: primaryImg,
+            };
+          });
+          setNewProducts(mapped);
+        }
+      } catch (err) {
+        console.error('Error fetching homepage products:', err);
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+    fetchProducts();
+  }, []);
 
   return (
     <div className="home-page">

@@ -7,6 +7,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import AISearchModal from './components/AISearchModal';
 import HomePage from './pages/HomePage';
+import ProductListPage from './pages/customer/ProductListPage';
 import ProfilePage from './pages/ProfilePage';
 import ContactPage from './pages/ContactPage';
 import LookbookPage from './pages/LookbookPage';
@@ -16,6 +17,7 @@ import ManagerDashboard from './pages/manager/ManagerDashboard';
 import ProductManager from './pages/manager/ProductManager';
 import CategoryManager from './pages/manager/CategoryManager';
 import BrandManager from './pages/manager/BrandManager';
+import LookbookManagement from './pages/manager/LookbookManagement';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useContext(AuthContext);
@@ -40,8 +42,19 @@ function AppContent() {
             path="/" 
             element={<HomePage onOpenAISearch={() => setIsAISearchOpen(true)} />} 
           />
+          <Route 
+            path="/products" 
+            element={<ProductListPage onOpenAISearch={() => setIsAISearchOpen(true)} />} 
+          />
           <Route path="/lookbook" element={<LookbookPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            } 
+          />
           <Route path="/contact" element={<ContactPage />} />
           <Route
             path="/manager"
@@ -80,7 +93,7 @@ function AppContent() {
             path="/manager/lookbooks"
             element={
               <ProtectedRoute>
-                <ManagerDashboard />
+                <LookbookManagement />
               </ProtectedRoute>
             }
           />
