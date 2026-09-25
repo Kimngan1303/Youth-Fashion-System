@@ -1,9 +1,5 @@
 import { z } from 'zod';
 
-/**
- * Validation Schemas cho Module Product sử dụng Zod
- */
-
 export const createProductSchema = z.object({
   product_name: z
     .string({ required_error: 'Tên sản phẩm là bắt buộc' })

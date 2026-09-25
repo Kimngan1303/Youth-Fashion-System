@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, Heart, ShoppingBag, User, Bell, MessageSquare, Globe, Sun, Star } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -11,9 +11,62 @@ const Header = ({ onOpenAISearch }) => {
   const { user, wishlist, cartCount, logout } = useAuth();
   const { showSuccess } = useToast();
   const { confirmModal } = useConfirmModal();
+  const isManagerOrAdmin = Boolean(
+    user && (
+      user.role === 'MANAGER' ||
+      user.role === 'ADMIN' ||
+      user.role === 'EMPLOYEE' ||
+      user.user_type === 'EMPLOYEE' ||
+      user.employee_role === 'MANAGER' ||
+      user.employee_role === 'ADMIN'
+    )
+  );
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSearchInput, setShowSearchInput] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const userMenuRef = useRef(null);
+
+  // Đóng dropdown khi click ra ngoài vùng menu tài khoản
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserMenu]);
+
+  const categoryTimeoutRef = useRef(null);
+  const userTimeoutRef = useRef(null);
+
+  const handleCategoryMouseEnter = () => {
+    if (categoryTimeoutRef.current) clearTimeout(categoryTimeoutRef.current);
+    setShowCategoryMenu(true);
+  };
+
+  const handleCategoryMouseLeave = () => {
+    categoryTimeoutRef.current = setTimeout(() => {
+      setShowCategoryMenu(false);
+    }, 200);
+  };
+
+  const handleUserMouseEnter = () => {
+    if (userTimeoutRef.current) clearTimeout(userTimeoutRef.current);
+    setShowUserMenu(true);
+  };
+
+  const handleUserMouseLeave = () => {
+    userTimeoutRef.current = setTimeout(() => {
+      setShowUserMenu(false);
+    }, 200);
+  };
+
 
   const handleLogout = async () => {
     setShowUserMenu(false);
@@ -70,7 +123,11 @@ const Header = ({ onOpenAISearch }) => {
           <li className={location.pathname === '/' ? 'active' : ''}>
             <Link to="/">TRANG CHỦ</Link>
           </li>
-          <li className={location.pathname.startsWith('/products') ? 'active' : ''}>
+          <li 
+            className={`dropdown-trigger ${location.pathname.startsWith('/products') || location.pathname.startsWith('/category') ? 'active' : ''}`}
+            onMouseEnter={handleCategoryMouseEnter}
+            onMouseLeave={handleCategoryMouseLeave}
+          >
             <Link to="/products" className="nav-link">
               DANH MỤC
             </Link>
@@ -89,9 +146,9 @@ const Header = ({ onOpenAISearch }) => {
           <div className="search-wrapper">
             {showSearchInput ? (
               <div className="inline-search-input animate-fade-in">
-                <input 
-                  type="text" 
-                  placeholder="Tìm sản phẩm..." 
+                <input
+                  type="text"
+                  placeholder="Tìm sản phẩm..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   autoFocus
@@ -126,20 +183,26 @@ const Header = ({ onOpenAISearch }) => {
           </Link>
 
           {/* Wishlist Icon */}
-          <Link to="/profile?tab=wishlist" className="action-icon" title="Yêu thích">
+          <Link to={user ? "/profile?tab=wishlist" : "/login"} className="action-icon" title="Yêu thích">
             <Heart size={18} />
-            <span className="badge">{wishlist.length || 2}</span>
+            <span className="badge">{user ? (wishlist ? wishlist.length : 0) : 0}</span>
           </Link>
 
           {/* User Account */}
-          <div 
+          <div
+            ref={userMenuRef}
             className="user-menu-wrapper"
-            onMouseEnter={() => setShowUserMenu(true)}
-            onMouseLeave={() => setShowUserMenu(false)}
+            onMouseEnter={handleUserMouseEnter}
+            onMouseLeave={handleUserMouseLeave}
           >
-            <Link to={user ? "/profile" : "/login"} className="action-icon user-avatar-btn" title="Tài khoản">
+            <button
+              type="button"
+              className={`action-icon user-avatar-btn ${showUserMenu ? 'active' : ''}`}
+              title="Tài khoản"
+              onClick={() => setShowUserMenu(prev => !prev)}
+            >
               <User size={18} />
-            </Link>
+            </button>
 
             {showUserMenu && user && (
               <div className="user-dropdown animate-fade-in">
@@ -148,11 +211,26 @@ const Header = ({ onOpenAISearch }) => {
                   <span className="user-email">{user.email}</span>
                 </div>
                 <hr />
-                <Link to="/profile" className="dropdown-item">Thông tin tài khoản</Link>
-                <Link to="/profile?tab=orders" className="dropdown-item">Lịch sử đơn hàng</Link>
-                <Link to="/profile?tab=wishlist" className="dropdown-item">Danh sách yêu thích</Link>
+                <Link
+                  to="/profile"
+                  className="dropdown-item"
+                  onClick={() => setShowUserMenu(false)}
+                >
+                  Thông tin tài khoản
+                </Link>
+                {isManagerOrAdmin && (
+                  <Link
+                    to="/manager"
+                    className="dropdown-item"
+                    onClick={() => setShowUserMenu(false)}
+                  >
+                    Bảng quản lý
+                  </Link>
+                )}
                 <hr />
-                <button className="dropdown-item text-danger" onClick={handleLogout}>Đăng xuất</button>
+                <button className="dropdown-item text-danger" onClick={handleLogout}>
+                  Đăng xuất
+                </button>
               </div>
             )}
 
@@ -163,8 +241,21 @@ const Header = ({ onOpenAISearch }) => {
                   <span className="user-email">Vui lòng đăng nhập để trải nghiệm</span>
                 </div>
                 <hr />
-                <Link to="/login" className="dropdown-item" style={{ fontWeight: 600, color: '#111' }}>Đăng Nhập</Link>
-                <Link to="/register" className="dropdown-item">Đăng Ký Tài Khoản</Link>
+                <Link
+                  to="/login"
+                  className="dropdown-item"
+                  style={{ fontWeight: 600, color: '#111' }}
+                  onClick={() => setShowUserMenu(false)}
+                >
+                  Đăng Nhập
+                </Link>
+                <Link
+                  to="/register"
+                  className="dropdown-item"
+                  onClick={() => setShowUserMenu(false)}
+                >
+                  Đăng Ký Tài Khoản
+                </Link>
               </div>
             )}
           </div>
@@ -373,15 +464,20 @@ const Header = ({ onOpenAISearch }) => {
           width: 34px;
           height: 34px;
           border-radius: 50%;
+          border: none;
+          background: transparent;
+          cursor: pointer;
           transition: background-color 0.2s, color 0.2s;
         }
 
-        .action-icon:hover {
+        .action-icon:hover,
+        .action-icon.active {
           background-color: #000000;
           color: #ffffff;
         }
 
-        .action-icon:hover svg {
+        .action-icon:hover svg,
+        .action-icon.active svg {
           color: #ffffff;
           stroke: #ffffff;
         }
@@ -423,7 +519,18 @@ const Header = ({ onOpenAISearch }) => {
           box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
           border-radius: 10px;
           padding: 8px 0;
-          margin-top: 6px;
+          margin-top: 4px;
+        }
+
+        /* Bridge hover gap so menu never disappears when moving mouse */
+        .user-dropdown::before,
+        .dropdown-menu::before {
+          content: '';
+          position: absolute;
+          top: -14px;
+          left: 0;
+          right: 0;
+          height: 14px;
         }
 
         .user-info-header {

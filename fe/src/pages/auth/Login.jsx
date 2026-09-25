@@ -1,12 +1,7 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
-
-/**
- * Single-file Login Component with Full Backend Integration
- * Connected to /api/auth/login via AuthContext & Axios Client.
- */
 
 const loginStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Montserrat:wght@500;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
@@ -513,8 +508,10 @@ export default function Login() {
   const { login, logout, user, isAuthenticated, loading } = useAuth();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [email, setEmail] = useState('');
+  const prefillEmail = location.state?.registeredEmail || '';
+  const [email, setEmail] = useState(prefillEmail);
   const [password, setPassword] = useState('');
   const [loginType, setLoginType] = useState('CUSTOMER'); // 'CUSTOMER' or 'EMPLOYEE'
   const [showPassword, setShowPassword] = useState(false);
@@ -601,6 +598,16 @@ export default function Login() {
             {errorMessage && (
               <div className="alert-box alert-error">
                 <span>⚠️ {errorMessage}</span>
+                {(errorMessage.toLowerCase().includes('xác thực') || errorMessage.toLowerCase().includes('verify')) && (
+                  <div style={{ marginTop: '6px' }}>
+                    <Link
+                      to={`/verify-email?email=${encodeURIComponent(email)}`}
+                      style={{ color: '#991B1B', fontWeight: 600, textDecoration: 'underline' }}
+                    >
+                      Bấm vào đây để nhập mã xác thực OTP &rarr;
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
             {successMessage && (
