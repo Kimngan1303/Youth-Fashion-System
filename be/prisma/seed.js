@@ -642,8 +642,136 @@ async function main() {
     }
   }
 
+  // 5. Seed Lookbooks (5 Tuyển tập Lookbook mẫu)
+  console.log('\n📖 --- Tạo Danh sách Lookbook mẫu (5 bộ sưu tập) ---');
+  const lookbooksData = [
+    {
+      type: 'hero',
+      look_code: 'BANNER',
+      section_role: "Banner (Ảnh trên cùng - Hero Cover đầu trang)",
+      title: "Ảnh Bìa Hero Banner: L'Automne Éternel",
+      code: 'LB - HERO00',
+      season: 'CHIẾN DỊCH CHÍNH THỨC',
+      badge: 'HERO COVER',
+      position: 'banner',
+      product_count: 1,
+      status: 'PUBLISHED',
+      image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1600',
+      description: 'Khúc xạ của thu vĩnh cửu giữa đại lộ Paris — Nơi phong cách hòa cùng nghệ thuật may đo thủ công Pháp.',
+      campaign_audio: 'Paris Autumn Symphony • 3:42 mins',
+      conversion_rate: '42%',
+    },
+    {
+      type: 'look',
+      look_code: 'LOOK 01',
+      section_role: 'Khối Look 01 (Áo Măng Tô Belted & Nổi Bật Trang Chủ)',
+      title: 'Áo Măng Tô Belted Dạ Camel Cashmere Quý Phái Thời Đại',
+      code: 'LB - LOOK01',
+      season: 'PHONG CÁCH THU ĐÔNG',
+      badge: 'SIGNATURE',
+      position: '1',
+      product_count: 3,
+      status: 'PUBLISHED',
+      image: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=1000',
+      description: 'Cắt may thủ công từ 100% len lông cừu Merino pha Cashmere tự nhiên, cổ bẻ kinh điển cùng thắt lưng tôn dáng sang trọng.',
+      price: '5.445.000₫',
+      original_price: '6.050.000₫',
+      cta_text: 'Mua Trọn Bộ Phối Đồ (Tiết Kiệm 10%) • 5.445.000₫',
+      conversion_rate: '36%',
+      products: [
+        { name: 'Áo Măng Tô Dạ Camel Cashmere', price: '3.850.000₫' },
+        { name: 'Áo Len Cổ Lọ Cream Knitwear', price: '950.000₫' },
+        { name: 'Quần Âu Ống Suông Wool Tencel', price: '1.250.000₫' },
+      ],
+      hotspots: [
+        { top: '38%', left: '46%', label: 'Áo Măng Tô Dạ Camel — 3.850.000₫' },
+        { top: '82%', left: '54%', label: 'Bốt Da Nappa Cổ Điển — 2.100.000₫' },
+      ],
+    },
+    {
+      type: 'look',
+      look_code: 'LOOK 02',
+      section_role: 'Khối Look 02 (Đầm Dạ Tiệc & Haute Couture)',
+      title: 'Đầm Xếp Ly Emerald Lộng Lẫy Tơ Tằm Cao Cấp',
+      code: 'LB - LOOK02',
+      season: 'DẠ TIỆC & HAUTE COUTURE',
+      badge: 'PHIÊN BẢN GIỚI HẠN',
+      position: '2',
+      product_count: 1,
+      status: 'PUBLISHED',
+      image: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=1000',
+      description: 'Chất tơ tằm dệt ánh ngọc lục bảo rực rỡ, đường xếp ly accordion tỉ mỉ tạo độ xòe bồng bềnh tựa dải sóng khi chuyển động.',
+      quote: 'Thiết kế được lựa chọn trình diễn tại Paris Fashion Week 2025, mang hơi thở quý phái vượt thời gian.',
+      price: '2.950.000₫',
+      stock_info: 'Chỉ còn 5 chiếc size S, M',
+      cta_text: 'ĐẶT MUA NGAY',
+      conversion_rate: '28%',
+      products: [
+        { name: 'Đầm Lụa Emerald Pleated Gown', price: '2.950.000₫' },
+      ],
+    },
+    {
+      type: 'look',
+      look_code: 'LOOK 03',
+      section_role: 'Khối Look 03 (Cột 1 Lưới: Set Parisian Chic)',
+      title: 'Set Áo Tweed Ivory & Quần Âu Cắt May Cổ Điển',
+      code: 'LB - LOOK03',
+      season: 'PARISIAN CHIC',
+      badge: 'BÁN CHẠY',
+      position: '3',
+      product_count: 2,
+      status: 'PUBLISHED',
+      image: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&q=80&w=800',
+      description: 'Sự tương phản kinh điển giữa trắng kem ngà và đen tuyền, nút kim loại mạ vàng chạm khắc thủ công.',
+      price: '3.040.000₫',
+      cta_text: 'Mua Ngay',
+      conversion_rate: '24%',
+      products: [
+        { name: 'Áo Khoác Tweed Ivory Cropped', price: '2.150.000₫' },
+        { name: 'Quần Tây Slim Fit Black', price: '890.000₫' },
+      ],
+    },
+    {
+      type: 'look',
+      look_code: 'LOOK 04',
+      section_role: 'Khối Look 04 (Cột 2 Lưới: Modern Tailoring)',
+      title: 'Oversized Charcoal Blazer & Minimalist Shirt',
+      code: 'LB - LOOK04',
+      season: 'MODERN TAILORING',
+      badge: 'TRENDING',
+      position: '4',
+      product_count: 2,
+      status: 'PUBLISHED',
+      image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=800',
+      description: 'Phong thái nữ quyền độc lập và tự do, phom dáng rộng thoải mái cùng đường may vai sắc nét chuẩn quý cô Paris.',
+      price: '2.700.000₫',
+      cta_text: 'Mua Ngay',
+      conversion_rate: '21%',
+      products: [
+        { name: 'Áo Blazer Kẻ Sọc Pinstripe', price: '1.950.000₫' },
+        { name: 'Sơ Mi Poplin Cotton Trắng', price: '750.000₫' },
+      ],
+    },
+  ];
+
+  for (const lb of lookbooksData) {
+    const existing = await prisma.lookbook.findFirst({
+      where: { code: lb.code },
+    });
+    if (!existing) {
+      await prisma.lookbook.create({
+        data: lb,
+      });
+      console.log(`  ➕ Đã thêm Lookbook: ${lb.title}`);
+    } else {
+      console.log(`  ℹ️ Lookbook đã tồn tại: ${existing.title}`);
+    }
+  }
+  console.log(`✅ Đã tạo ${lookbooksData.length} lookbook.`);
+
   console.log('\n🎉 --- Hoàn thành Khởi tạo Dữ liệu Mẫu thành công! ---');
 }
+
 
 main()
   .catch((e) => {
