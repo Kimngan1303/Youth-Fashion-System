@@ -32,41 +32,52 @@ import {
   ArrowRight,
   Info
 } from 'lucide-react';
-import { getStoredLookbooks, getLookbookPositionValue } from '../services/lookbookData';
+import { lookbookService, getLookbookPositionValue } from '../services/lookbookService';
 import { useAuth } from '../context/AuthContext';
 
 export default function LookbookPage() {
   const { user } = useAuth();
   // ----------------------------------------------------------------------------
-  // PHẦN 1: QUẢN LÝ TRẠNG THÁI (STATE) VÀ ĐỒNG BỘ DỮ LIỆU
+  // PHẦN 1: QUẢN LÝ TRẠNG THÁI (STATE) VÀ ĐỒNG BỘ DỮ LIỆU TỪ MYSQL
   // ----------------------------------------------------------------------------
-  const [lookbooks, setLookbooks] = useState([]); // Danh sách các lookbook đang được kích hoạt (published)
+  const [lookbooks, setLookbooks] = useState([]); // Danh sách các lookbook từ MySQL
+  const [isLoading, setIsLoading] = useState(true);
   const [activeHotspot, setActiveHotspot] = useState(null); // Điểm chạm tương tác (+) trên ảnh look 01
   const [toastMessage, setToastMessage] = useState(''); // Thông báo nổi góc màn hình khi người dùng thao tác
   const [showVideoModal, setShowVideoModal] = useState(false);
 
-  // [HOOK] Tải dữ liệu lookbook từ storage và lắng nghe sự kiện đồng bộ từ trang quản trị
+  // [HOOK] Tải dữ liệu lookbook từ MySQL Database và lắng nghe sự kiện đồng bộ
   useEffect(() => {
-    const loadData = () => {
-      // 1. Lấy tất cả dữ liệu từ Service lookbookData
-      const all = getStoredLookbooks();
-      
-      // 2. Chỉ lấy các bài đăng có trạng thái 'published' và sắp xếp thứ tự tăng dần (Banner -> 1 -> 2 -> 3...)
-      const published = all
-        .filter(item => item.status === 'published' && item.type !== 'backstage' && String(item.position) !== '5' && item.lookCode !== 'MỤC 05')
-        .sort((a, b) => getLookbookPositionValue(a.position) - getLookbookPositionValue(b.position));
-      
-      setLookbooks(published);
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        const res = await lookbookService.getLookbooks({ status: 'published' });
+        const items = res?.data || [];
+        const published = items
+          .filter(item => item.status === 'published' && item.type !== 'backstage' && String(item.position) !== '5' && item.lookCode !== 'MỤC 05')
+          .sort((a, b) => getLookbookPositionValue(a.position) - getLookbookPositionValue(b.position));
+        setLookbooks(published);
+      } catch (err) {
+        console.error('Lỗi khi tải dữ liệu Lookbook từ MySQL:', err);
+        setLookbooks([]);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     loadData();
-    
+
     // Đăng ký nhận thông báo real-time khi Quản lý thêm/sửa/đổi vị trí lookbook
+    const handleStorage = (e) => {
+      if (e.key === 'lookbook_updated_at') {
+        loadData();
+      }
+    };
     window.addEventListener('lookbook-updated', loadData);
-    window.addEventListener('storage', loadData);
+    window.addEventListener('storage', handleStorage);
     return () => {
       window.removeEventListener('lookbook-updated', loadData);
-      window.removeEventListener('storage', loadData);
+      window.removeEventListener('storage', handleStorage);
     };
   }, []);
 
@@ -712,21 +723,29 @@ export default function LookbookPage() {
           - Hiển thị tên chiến dịch toàn cầu và nút sao chép liên kết chia sẻ
           ---------------------------------------------------------------------- */}
       <div className="lb-sub-bar">
-        <span>BỘ SƯU TẬP THU ĐÔNG 2025 • FALL / WINTER EDITORIAL</span>
+        <span>BỘ SƯU TẬP MỚI NHẤT 2026</span>
         <button type="button" className="btn-share-editorial" onClick={handleShare}>
           <Share2 size={13} />
           <span>CHIA SẺ BỘ SƯU TẬP</span>
         </button>
       </div>
 
-      {lookbooks.length === 0 ? (
-        /* Giao diện hiển thị khi Quản lý ẩn toàn bộ bộ sưu tập */
+      {isLoading ? (
+        <div style={{ textAlign: 'center', padding: '140px 20px', minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '40px', height: '40px', border: '3px solid #E5E7EB', borderTopColor: '#111827', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: '16px' }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <p style={{ fontSize: '14px', color: '#78716C', letterSpacing: '1px', textTransform: 'uppercase' }}>
+            Đang tải bộ sưu tập thời trang...
+          </p>
+        </div>
+      ) : lookbooks.length === 0 ? (
+        /* Giao diện hiển thị khi chưa có bộ sưu tập nào được phát hành */
         <div style={{ textAlign: 'center', padding: '120px 20px', minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '28px', color: '#111', marginBottom: '12px' }}>
             Chưa có Tuyển Tập Lookbook nào được phát hành
           </h2>
           <p style={{ fontSize: '14px', color: '#78716C', maxWidth: '480px', margin: '0 auto 24px auto', lineHeight: '1.6' }}>
-            Các bộ sưu tập đã được gỡ bỏ khỏi hệ thống quản lý. Quý khách vui lòng quay lại sau!
+            Hiện chưa có bộ sưu tập Lookbook nào trong cơ sở dữ liệu. Quý khách vui lòng quay lại sau!
           </p>
           <Link to="/" style={{ padding: '12px 28px', background: '#111', color: '#FFF', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}>
             VỀ TRANG CHỦ
@@ -749,10 +768,14 @@ export default function LookbookPage() {
 
               <div className="lb-hero-content">
                 <span className="lb-hero-campaign-tag">
-                  {heroItem.season ? `${heroItem.season.toUpperCase()} • CHIẾN DỊCH CHÍNH THỨC` : "BỘ SƯU TẬP MÙA THU ĐÔNG 2025 • CHIẾN DỊCH CHÍNH THỨC"}
+                  {heroItem.season ? (
+                    heroItem.season.includes('•')
+                      ? heroItem.season.toUpperCase()
+                      : `${heroItem.season.toUpperCase()}`
+                  ) : "BỘ SƯU TẬP MÙA THU ĐÔNG 2025"}
                 </span>
                 <p className="lb-hero-desc">
-                  {heroItem.description || "Khúc xạ của thu vĩnh cửu giữa đại lộ Paris — Nơi phong cách hòa cùng nghệ thuật may đo thủ công Pháp."}
+                  {heroItem.description || ""}
                 </p>
               </div>
             </section>
@@ -854,12 +877,12 @@ export default function LookbookPage() {
                       {look2.title}
                     </h2>
 
-                    <p className="lb-look-desc">
-                      {look2.description}
-                    </p>
-
                     <div className="lb-quote-card">
-                      "{look2.quote || "Thiết kế được lựa chọn trình diễn tại Paris Fashion Week 2025, mang hơi thở quý phái vượt thời gian."}"
+                      {(() => {
+                        const text = look2.description || look2.quote || "Thiết kế được lựa chọn trình diễn tại Paris Fashion Week 2025, mang hơi thở quý phái vượt thời gian.";
+                        const trimmed = text.trim();
+                        return trimmed.startsWith('"') && trimmed.endsWith('"') ? trimmed : `"${trimmed}"`;
+                      })()}
                     </div>
 
                     {look2.products && look2.products.length > 0 && (
@@ -879,7 +902,7 @@ export default function LookbookPage() {
                         {look2.price || '2.950.000₫'}
                       </span>
                       <span style={{ fontSize: '12px', color: '#B45309', fontWeight: 600 }}>
-                        {look2.stockInfo || '• Chỉ còn 5 chiếc size S, M'}
+                        {look2.stockInfo}
                       </span>
                     </div>
                   </div>

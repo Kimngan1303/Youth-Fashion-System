@@ -17,6 +17,7 @@ import ManagerDashboard from './pages/manager/ManagerDashboard';
 import ProductManager from './pages/manager/ProductManager';
 import CategoryManager from './pages/manager/CategoryManager';
 import BrandManager from './pages/manager/BrandManager';
+import LookbookManagement from './pages/manager/LookbookManagement';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useContext(AuthContext);
@@ -82,7 +83,7 @@ function AppContent() {
             path="/manager/lookbooks"
             element={
               <ProtectedRoute>
-                <ManagerDashboard />
+                <LookbookManagement />
               </ProtectedRoute>
             }
           />

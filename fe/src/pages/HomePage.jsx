@@ -2,26 +2,38 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Hammer, Users, Menu, Heart, Star, Edit3, RotateCcw, UserCheck } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
-import { getStoredLookbooks, getLookbookPositionValue } from '../services/lookbookData';
+import { productService } from '../services/productService';
+import { lookbookService, getLookbookPositionValue } from '../services/lookbookService';
 
 const HomePage = ({ onOpenAISearch }) => {
   const [publishedLookbooks, setPublishedLookbooks] = useState([]);
 
   useEffect(() => {
-    const loadLookbooks = () => {
-      const all = getStoredLookbooks();
-      const published = all
-        .filter(item => item.status === 'published')
-        .sort((a, b) => getLookbookPositionValue(a.position) - getLookbookPositionValue(b.position));
-      setPublishedLookbooks(published);
+    const loadLookbooks = async () => {
+      try {
+        const res = await lookbookService.getLookbooks({ status: 'published' });
+        const items = res?.data || [];
+        const published = items
+          .filter(item => item.status === 'published')
+          .sort((a, b) => getLookbookPositionValue(a.position) - getLookbookPositionValue(b.position));
+        setPublishedLookbooks(published);
+      } catch (err) {
+        console.error('Lỗi khi tải Lookbook cho trang chủ từ MySQL:', err);
+        setPublishedLookbooks([]);
+      }
     };
 
     loadLookbooks();
+    const handleStorage = (e) => {
+      if (e.key === 'lookbook_updated_at') {
+        loadLookbooks();
+      }
+    };
     window.addEventListener('lookbook-updated', loadLookbooks);
-    window.addEventListener('storage', loadLookbooks);
+    window.addEventListener('storage', handleStorage);
     return () => {
       window.removeEventListener('lookbook-updated', loadLookbooks);
-      window.removeEventListener('storage', loadLookbooks);
+      window.removeEventListener('storage', handleStorage);
     };
   }, []);
 
