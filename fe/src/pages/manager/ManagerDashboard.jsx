@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
-import LookbookManagement from './LookbookManagement';
 import ManagerSidebar from '../../components/ManagerSidebar';
 import ManagerHeader from '../../components/ManagerHeader';
 import { 
@@ -504,8 +503,7 @@ export default function ManagerDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isLookbooksRoute = location.pathname.endsWith('/lookbooks');
-  const activeMenu = isLookbooksRoute ? 'lookbooks' : 'overview';
+  const activeMenu = 'overview';
 
   const handleLogout = async () => {
     await logout();
@@ -525,12 +523,8 @@ export default function ManagerDashboard() {
         {/* Top Header Bar */}
         <ManagerHeader searchPlaceholder="Tìm kiếm đơn hàng, sản phẩm, lookbook..." />
 
-        {/* MAIN BODY BASED ON ACTIVE MENU */}
-        {activeMenu === 'lookbooks' ? (
-          <LookbookManagement />
-        ) : (
-          /* Scrollable Dashboard Body (Overview) */
-          <div className="dashboard-scroll-body">
+        {/* Scrollable Dashboard Body (Overview) */}
+        <div className="dashboard-scroll-body">
 
             {/* Header Row */}
             <div className="dashboard-header-row">
@@ -627,10 +621,8 @@ export default function ManagerDashboard() {
               <div style={{ padding: '40px 0', textAlign: 'center', color: '#78716C' }}>
                 📊 [Biểu đồ đường xu hướng doanh thu tích hợp Recharts / Chart.js]
               </div>
-            </div>
-
           </div>
-        )}
+        </div>
 
       </main>
     </div>

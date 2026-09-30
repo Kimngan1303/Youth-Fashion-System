@@ -481,31 +481,33 @@ enum SearchType {
 }
 
 model Lookbook {
-  lookbook_id     BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
-  type            String         @default("look") @db.VarChar(50)
-  look_code       String         @db.VarChar(50)
-  section_role    String?        @db.VarChar(255)
-  title           String         @db.VarChar(255)
-  code            String         @db.VarChar(100)
-  season          String?        @db.VarChar(100)
-  badge           String?        @db.VarChar(50)
-  position        String         @db.VarChar(50)
-  product_count   Int            @default(1) @db.UnsignedInt
-  status          LookbookStatus @default(PUBLISHED)
-  image           String         @db.VarChar(500)
-  description     String?        @db.Text
-  price           String?        @db.VarChar(100)
-  original_price  String?        @db.VarChar(100)
-  cta_text        String?        @db.VarChar(255)
-  quote           String?        @db.Text
-  stock_info      String?        @db.VarChar(255)
-  campaign_audio  String?        @db.VarChar(255)
-  conversion_rate String?        @default("0%") @db.VarChar(50)
+  lookbook_id     BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
+  type            String?         @default("look") @db.VarChar(50)
+  look_code       String?         @db.VarChar(50)
+  section_role    String?         @db.VarChar(255)
+  title           String          @db.VarChar(255)
+  code            String?         @db.VarChar(100)
+  season          String?         @db.VarChar(100)
+  badge           String?         @db.VarChar(50)
+  position        String          @default("1") @db.VarChar(50)
+  product_count   Int             @default(0) @db.UnsignedInt
+  status          LookbookStatus  @default(PUBLISHED)
+  image           String          @db.VarChar(1000)
+  description     String?         @db.Text
+  price           String?         @db.VarChar(100)
+  original_price  String?         @db.VarChar(100)
+  cta_text        String?         @db.VarChar(255)
+  quote           String?         @db.Text
+  stock_info      String?         @db.VarChar(255)
+  campaign_audio  String?         @db.VarChar(255)
+  conversion_rate String?         @default("0%") @db.VarChar(50)
   products        Json?
   hotspots        Json?
-  created_at      DateTime       @default(now()) @db.DateTime(0)
-  updated_at      DateTime       @default(now()) @updatedAt @db.DateTime(0)
+  created_at      DateTime        @default(now()) @db.DateTime(0)
+  updated_at      DateTime        @default(now()) @updatedAt @db.DateTime(0)
 
+  @@index([status], map: "lookbooks_status_idx")
+  @@index([position], map: "lookbooks_position_idx")
   @@map("lookbooks")
 }
 
@@ -513,5 +515,4 @@ enum LookbookStatus {
   PUBLISHED
   HIDDEN
 }
-
 
