@@ -14,9 +14,10 @@ import {
   Sparkles,
   ExternalLink,
   ChevronDown,
-  RotateCcw
+  RotateCcw,
+  Loader2
 } from 'lucide-react';
-import { getStoredLookbooks, saveStoredLookbooks, resetToDefaultLookbooks, getLookbookPositionValue } from '../../services/lookbookData';
+import { lookbookService, getLookbookPositionValue, notifyLookbookUpdated } from '../../services/lookbookService';
 import { useToast } from '../../context/ToastContext';
 import { useConfirmModal } from '../../context/ConfirmModalContext';
 import ManagerSidebar from '../../components/ManagerSidebar';
@@ -24,24 +25,34 @@ import ManagerHeader from '../../components/ManagerHeader';
 
 // ============================================================================
 // [PHẦN 1] KHỞI TẠO COMPONENT QUẢN LÝ LOOKBOOK (LOOKBOOK MANAGEMENT)
-// - Mục đích: Trang quản trị nội dung Lookbook cho phép Quản lý (Manager):
-//   1. Xem danh sách toàn bộ các tuyển tập Lookbook
-//   2. Đổi thứ tự vị trí hiển thị (Banner, 1, 2, 3, 4...) tự động đồng bộ sang Trang chủ và Trang Lookbook
-//   3. Tạo mới, chỉnh sửa thông tin, giá bán, gắn danh sách sản phẩm phối đồ (tag)
-//   4. Ẩn/hiện (Phát hành/Tạm ẩn), xóa hoặc khôi phục mặc định ban đầu
+// - Dữ liệu Lookbook được đọc và lưu trữ trực tiếp từ Cơ sở dữ liệu MySQL
 // ============================================================================
 export default function LookbookManagement() {
   const { showSuccess, showWarning } = useToast();
   const { confirmModal } = useConfirmModal();
 
-  // [STATE] Danh sách lookbook đọc trực tiếp từ LocalStorage qua dịch vụ lookbookData.js
-  const [lookbooks, setLookbooks] = useState(() => getStoredLookbooks());
+  // [STATE] Danh sách lookbook từ MySQL database qua lookbookService
+  const [lookbooks, setLookbooks] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // [HÀM ĐỒNG BỘ] Cập nhật danh sách lookbook vào state đồng thời lưu LocalStorage và báo tin cho toàn app
-  const updateLookbooks = (newItems) => {
-    setLookbooks(newItems);
-    saveStoredLookbooks(newItems);
+  // [HÀM TẢI DỮ LIỆU TỪ MYSQL]
+  const fetchLookbooks = async () => {
+    try {
+      setIsLoading(true);
+      const res = await lookbookService.getLookbooks();
+      const items = res?.data || [];
+      setLookbooks(items);
+    } catch (err) {
+      console.error('Lỗi khi tải danh sách lookbook từ database:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  useEffect(() => {
+    fetchLookbooks();
+  }, []);
 
   // [STATE] Tab lọc trạng thái: 'all' (tất cả), 'published' (đã phát hành), 'hidden' (tạm ẩn)
   const [currentTab, setCurrentTab] = useState('all');
@@ -163,100 +174,81 @@ export default function LookbookManagement() {
     );
   };
 
-  // [HÀM XÓA NHIỀU MỤC] Xóa hàng loạt các lookbook đang được tích chọn
+  // [HÀM XÓA NHIỀU MỤC] Xóa hàng loạt các lookbook đang được tích chọn khỏi MySQL
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
     const confirmed = await confirmModal({
       title: 'Xóa danh sách Lookbook',
-      message: `Bạn có chắc chắn muốn xóa ${selectedIds.length} lookbook đã chọn không? Hành động này không thể hoàn tác.`,
+      message: `Bạn có chắc chắn muốn xóa ${selectedIds.length} lookbook đã chọn khỏi cơ sở dữ liệu MySQL không? Hành động này không thể hoàn tác.`,
       confirmText: 'Xác nhận xóa',
       cancelText: 'Hủy bỏ',
       variant: 'danger'
     });
 
     if (confirmed) {
-      const updated = lookbooks.filter(lb => !selectedIds.includes(lb.id));
-      updateLookbooks(updated);
-      setSelectedIds([]);
-      if (currentPage > 1 && currentItems.length === selectedIds.length) {
-        setCurrentPage(currentPage - 1);
+      try {
+        await lookbookService.bulkDeleteLookbooks(selectedIds);
+        setSelectedIds([]);
+        if (currentPage > 1 && currentItems.length === selectedIds.length) {
+          setCurrentPage(currentPage - 1);
+        }
+        showSuccess(`Đã xóa ${selectedIds.length} lookbook khỏi MySQL thành công!`);
+        notifyLookbookUpdated();
+        await fetchLookbooks();
+      } catch (err) {
+        showWarning(err.response?.data?.message || 'Có lỗi xảy ra khi xóa danh sách Lookbook!');
       }
-      showSuccess(`Đã xóa ${selectedIds.length} lookbook thành công!`);
     }
   };
 
-  // [HÀM XÓA 1 MỤC] Xóa đơn lẻ một lookbook theo ID
+  // [HÀM XÓA 1 MỤC] Xóa đơn lẻ một lookbook theo ID khỏi MySQL
   const handleDeleteOne = async (id) => {
     const confirmed = await confirmModal({
       title: 'Xóa Lookbook',
-      message: 'Bạn có chắc chắn muốn xóa lookbook này không? Hành động này không thể hoàn tác.',
+      message: 'Bạn có chắc chắn muốn xóa lookbook này khỏi cơ sở dữ liệu MySQL không? Hành động này không thể hoàn tác.',
       confirmText: 'Xóa lookbook',
       cancelText: 'Hủy bỏ',
       variant: 'danger'
     });
 
     if (confirmed) {
-      const updated = lookbooks.filter(lb => lb.id !== id);
-      updateLookbooks(updated);
-      setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
-      showSuccess('Đã xóa lookbook thành công!');
+      try {
+        await lookbookService.deleteLookbook(id);
+        setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
+        showSuccess('Đã xóa lookbook thành công!');
+        notifyLookbookUpdated();
+        await fetchLookbooks();
+      } catch (err) {
+        showWarning(err.response?.data?.message || 'Có lỗi xảy ra khi xóa Lookbook!');
+      }
     }
   };
 
   // ==========================================================================
-  // [PHẦN 5] BẬT/TẮT TRẠNG THÁI & ĐỔI THỨ TỰ VỊ TRÍ (HOÁN ĐỔI TỰ ĐỘNG)
+  // [PHẦN 5] BẬT/TẮT TRẠNG THÁI & ĐỔI THỨ TỰ VỊ TRÍ TRONG MYSQL
   // ==========================================================================
   // Chuyển đổi trạng thái Phát hành <-> Tạm ẩn cho một lookbook
-  const handleToggleStatus = (id) => {
-    const updated = lookbooks.map(lb => {
-      if (lb.id === id) {
-        return {
-          ...lb,
-          status: lb.status === 'published' ? 'hidden' : 'published'
-        };
-      }
-      return lb;
-    });
-    updateLookbooks(updated);
+  const handleToggleStatus = async (id) => {
+    try {
+      await lookbookService.toggleStatus(id);
+      showSuccess('Đã cập nhật trạng thái hiển thị Lookbook!');
+      notifyLookbookUpdated();
+      await fetchLookbooks();
+    } catch (err) {
+      showWarning(err.response?.data?.message || 'Có lỗi xảy ra khi đổi trạng thái!');
+    }
   };
 
-  // [LOGIC ĐỔI VỊ TRÍ ĐẶC BIỆT] Tự động hoán đổi vị trí khi người dùng chọn vị trí mới
-  // Ví dụ: Look A đang ở vị trí #1, nếu chọn sang #2 thì Look B đang ở #2 sẽ tự động chuyển về #1
-  const handleUpdatePosition = (id, newPos) => {
-    const target = newPos === 'banner' ? 'banner' : Number(newPos);
-    const currentItem = lookbooks.find(lb => lb.id === id);
-    if (!currentItem || String(currentItem.position) === String(target)) return;
-    const oldPos = currentItem.position;
-
-    // Tìm xem đã có lookbook nào đang giữ vị trí đích 'target' hay chưa
-    const existingWithTarget = lookbooks.find(lb => lb.id !== id && String(lb.position) === String(target));
-
-    const updated = lookbooks.map(lb => {
-      // 1. Cập nhật vị trí mới cho item hiện tại
-      if (lb.id === id) {
-        return {
-          ...lb,
-          position: target,
-          lookCode: target === 'banner' ? 'BANNER' : (lb.lookCode === 'BANNER' ? `LOOK 0${target}` : lb.lookCode),
-          sectionRole: target === 'banner'
-            ? 'Banner (Ảnh trên cùng - Hero Cover đầu trang)'
-            : (lb.sectionRole && lb.sectionRole.includes('Banner') ? `Khối Look 0${target} trên trang` : lb.sectionRole)
-        };
-      }
-      // 2. Nếu có item đang giữ vị trí đó, hoán đổi nó về vị trí cũ 'oldPos' của item hiện tại
-      if (existingWithTarget && lb.id === existingWithTarget.id) {
-        return {
-          ...lb,
-          position: oldPos,
-          lookCode: oldPos === 'banner' ? 'BANNER' : (lb.lookCode === 'BANNER' ? `LOOK 0${oldPos}` : lb.lookCode),
-          sectionRole: oldPos === 'banner'
-            ? 'Banner (Ảnh trên cùng - Hero Cover đầu trang)'
-            : (lb.sectionRole && lb.sectionRole.includes('Banner') ? `Khối Look 0${oldPos} trên trang` : lb.sectionRole)
-        };
-      }
-      return lb;
-    });
-    updateLookbooks(updated);
+  // Ví dụ: Look A đang ở vị trí #1, nếu chọn sang #2 thì vị trí sẽ được cập nhật trong MySQL và tự động tải lại
+  const handleUpdatePosition = async (id, newPos) => {
+    try {
+      await lookbookService.updatePosition(id, newPos);
+      showSuccess('Đã cập nhật và hoán đổi vị trí hiển thị Lookbook!');
+      notifyLookbookUpdated();
+      await fetchLookbooks();
+    } catch (err) {
+      showWarning(err.response?.data?.message || 'Có lỗi xảy ra khi hoán đổi vị trí!');
+    }
   };
 
   // ==========================================================================
@@ -289,7 +281,7 @@ export default function LookbookManagement() {
   };
 
   // ==========================================================================
-  // [PHẦN 7] MỞ MODAL VÀ LƯU DỮ LIỆU FORM (TẠO MỚI / CHỈNH SỬA)
+  // [PHẦN 7] MỞ MODAL VÀ LƯU DỮ LIỆU FORM (TẠO MỚI / CHỈNH SỬA VÀO MYSQL)
   // ==========================================================================
   // Mở Modal Tạo mới với giá trị khởi tạo tự động
   const handleOpenCreate = () => {
@@ -306,7 +298,7 @@ export default function LookbookManagement() {
       productCount: 2,
       price: '3.000.000₫',
       status: 'published',
-      image: 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&q=80&w=1000',
+      image: '',
       description: '',
       products: [
         { name: '', price: '' }
@@ -341,10 +333,14 @@ export default function LookbookManagement() {
   };
 
   // [HÀM LƯU FORM] Xử lý khi nhấn nút "Lưu Thay Đổi" hoặc "Tạo Lookbook"
-  const handleSaveForm = (e) => {
+  const handleSaveForm = async (e) => {
     e.preventDefault();
     if (!formData.title.trim()) {
       showWarning('Vui lòng nhập tên tuyển tập Lookbook!');
+      return;
+    }
+    if (!formData.image.trim()) {
+      showWarning('Vui lòng nhập đường dẫn hình ảnh Lookbook!');
       return;
     }
 
@@ -357,39 +353,32 @@ export default function LookbookManagement() {
     const count = cleanedProducts.length > 0 ? cleanedProducts.length : (Number(formData.productCount) || 1);
     const autoLookCode = pos === 'banner' ? 'BANNER' : (formData.lookCode && formData.lookCode !== 'BANNER' ? formData.lookCode : `LOOK 0${pos}`);
 
-    if (editingLookbook) {
-      // Trường hợp Chỉnh sửa: Cập nhật lookbook có id tương ứng
-      const updated = lookbooks.map(lb => {
-        if (lb.id === editingLookbook.id) {
-          return {
-            ...lb,
-            ...formData,
-            lookCode: autoLookCode,
-            position: pos,
-            productCount: count,
-            products: cleanedProducts
-          };
-        }
-        return lb;
-      });
-      updateLookbooks(updated);
-      showSuccess('Đã cập nhật bộ sưu tập Lookbook thành công!');
-    } else {
-      // Trường hợp Tạo mới: Thêm bản ghi mới với ID sinh theo timestamp
-      const newLookbook = {
-        id: Date.now(),
-        ...formData,
-        lookCode: autoLookCode,
-        position: pos,
-        productCount: count,
-        conversionRate: '0%',
-        products: cleanedProducts
-      };
-      updateLookbooks([...lookbooks, newLookbook]);
-      showSuccess('Đã tạo bộ sưu tập Lookbook mới thành công!');
-    }
+    const payload = {
+      ...formData,
+      lookCode: autoLookCode,
+      position: pos,
+      productCount: count,
+      products: cleanedProducts
+    };
 
-    setIsModalOpen(false);
+    try {
+      setIsSubmitting(true);
+      if (editingLookbook) {
+        await lookbookService.updateLookbook(editingLookbook.id, payload);
+        showSuccess('Đã cập nhật tuyển tập Lookbook trong MySQL thành công!');
+      } else {
+        await lookbookService.createLookbook(payload);
+        showSuccess('Đã tạo tuyển tập Lookbook mới trong MySQL thành công!');
+      }
+
+      setIsModalOpen(false);
+      notifyLookbookUpdated();
+      await fetchLookbooks();
+    } catch (err) {
+      showWarning(err.response?.data?.message || 'Có lỗi xảy ra khi lưu Lookbook vào MySQL!');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -1307,6 +1296,30 @@ export default function LookbookManagement() {
                     <RotateCcw size={12} />
                     <span>Khôi phục mặc định</span>
                   </button>
+                  {/* Nút làm mới dữ liệu từ MySQL */}
+                  <button
+                    type="button"
+                    className="btn-refresh-data"
+                    onClick={fetchLookbooks}
+                    disabled={isLoading}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      background: '#FFFFFF',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#374151',
+                      cursor: isLoading ? 'not-allowed' : 'pointer'
+                    }}
+                    title="Tải lại danh sách từ cơ sở dữ liệu MySQL"
+                  >
+                    <RotateCcw size={12} className={isLoading ? 'animate-spin' : ''} />
+                    <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
+                  </button>
                   <span style={{ color: '#E7E5E4' }}>|</span>
                   <span className="lb-selected-count">
                     Đã chọn: <strong>{selectedIds.length} mục</strong>
@@ -1378,10 +1391,33 @@ export default function LookbookManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {currentItems.length === 0 ? (
+                    {isLoading ? (
                       <tr>
-                        <td colSpan="6" style={{ textAlign: 'center', padding: '48px', color: '#8C857B' }}>
-                          Không tìm thấy tuyển tập Lookbook phù hợp với điều kiện tìm kiếm.
+                        <td colSpan="6" style={{ textAlign: 'center', padding: '60px', color: '#8C857B' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                            <Loader2 size={28} className="animate-spin" style={{ color: '#111827' }} />
+                            <span>Đang tải dữ liệu Lookbook từ cơ sở dữ liệu MySQL...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : currentItems.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" style={{ textAlign: 'center', padding: '60px', color: '#8C857B' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                            <ImageIcon size={36} style={{ color: '#D1D5DB' }} />
+                            {searchQuery ? (
+                              <span>Không tìm thấy tuyển tập Lookbook phù hợp với điều kiện tìm kiếm.</span>
+                            ) : (
+                              <>
+                                <span style={{ fontWeight: 600, color: '#374151' }}>
+                                  Chưa có tuyển tập Lookbook nào trong cơ sở dữ liệu MySQL.
+                                </span>
+                                <span style={{ fontSize: '13px' }}>
+                                  Nhấn nút "Tạo Lookbook Mới" bên trên để bắt đầu thêm bài viết thời trang mới.
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ) : (
@@ -1788,7 +1824,7 @@ export default function LookbookManagement() {
                         <textarea
                           rows="3"
                           className="lb-form-textarea"
-                          placeholder="Mô tả phong cách, cảm hứng thiết kế hoặc thông điệp..."
+                          placeholder="Mô tả phong cách, cảm hứng thiết kế (VD: Thiết kế được lựa chọn trình diễn tại Paris Fashion Week 2025...)"
                           value={formData.description}
                           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         />
