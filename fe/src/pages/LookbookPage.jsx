@@ -54,7 +54,7 @@ export default function LookbookPage() {
         const res = await lookbookService.getLookbooks({ status: 'published' });
         const items = res?.data || [];
         const published = items
-          .filter(item => item.status === 'published' && item.type !== 'backstage' && String(item.position) !== '5' && item.lookCode !== 'MỤC 05')
+          .filter(item => item.status === 'published')
           .sort((a, b) => getLookbookPositionValue(a.position) - getLookbookPositionValue(b.position));
         setLookbooks(published);
       } catch (err) {
@@ -99,10 +99,7 @@ export default function LookbookPage() {
     l.id !== look1?.id &&
     l.id !== look2?.id &&
     l.id !== look3?.id &&
-    l.id !== look4?.id &&
-    String(l.position) !== '5' &&
-    l.type !== 'backstage' &&
-    l.lookCode !== 'MỤC 05'
+    l.id !== look4?.id
   );
 
   // ----------------------------------------------------------------------------

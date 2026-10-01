@@ -98,6 +98,8 @@ export default function LookbookManagement() {
   const totalCount = lookbooks.length;
   const publishedCount = lookbooks.filter(lb => lb.status === 'published').length;
   const hiddenCount = lookbooks.filter(lb => lb.status === 'hidden').length;
+  const totalTaggedProducts = lookbooks.reduce((sum, lb) => sum + (lb.products?.length || Number(lb.productCount) || 0), 0);
+  const avgTagged = totalCount > 0 ? (totalTaggedProducts / totalCount).toFixed(1) : 0;
 
   // ==========================================================================
   // [PHẦN 3] TÌM LOOKBOOK NỔI BẬT NHẤT & BỘ LỌC DỮ LIỆU
@@ -1190,16 +1192,16 @@ export default function LookbookManagement() {
                 </div>
                 <div>
                   <div className="lb-stat-value serif" title={prominentLookbook?.title}>
-                    {prominentLookbook?.title || "Fall/Winter 2025: L'Automne Éternel"}
+                    {prominentLookbook?.title || "Chưa có Lookbook"}
                   </div>
                   <div className="lb-stat-subtext">
                     <span style={{ color: '#D97706', fontSize: '15px' }}>•</span>
-                    <span>Đóng góp <strong>{prominentLookbook?.conversionRate || "36%"}</strong> chuyển đổi mua sắm</span>
+                    <span>{prominentLookbook ? `Vị trí #${prominentLookbook.position} • ${prominentLookbook.season || 'Bộ sưu tập'}` : 'Chưa thiết lập'}</span>
                   </div>
                   <div className="lb-stat-progress-bg">
                     <div
                       className="lb-stat-progress-fill"
-                      style={{ width: '42%', background: '#D97706' }}
+                      style={{ width: prominentLookbook ? '100%' : '0%', background: '#D97706' }}
                     />
                   </div>
                 </div>
@@ -1208,20 +1210,20 @@ export default function LookbookManagement() {
               {/* THẺ 3: Tổng số Outfit & sản phẩm phối được gắn tag */}
               <div className="lb-stat-card">
                 <div className="lb-stat-top">
-                  <span className="lb-stat-label">TỔNG OUTFIT & SẢN PHẨM GẮN TAG</span>
+                  <span className="lb-stat-label">TỔNG SẢN PHẨM GẮN TAG</span>
                   <div className="lb-stat-icon-badge">
                     <Tag size={16} />
                   </div>
                 </div>
                 <div>
-                  <div className="lb-stat-value">8 Phối Đồ (Outfits)</div>
+                  <div className="lb-stat-value">{totalTaggedProducts} Sản Phẩm Phối</div>
                   <div className="lb-stat-subtext">
-                    Trung bình <strong>~3 sản phẩm tag</strong> / mỗi Lookbook
+                    Trung bình <strong>~{avgTagged} sản phẩm</strong> / mỗi Lookbook
                   </div>
                   <div className="lb-stat-progress-bg">
                     <div
                       className="lb-stat-progress-fill"
-                      style={{ width: '68%', background: '#334155' }}
+                      style={{ width: totalTaggedProducts > 0 ? '100%' : '0%', background: '#334155' }}
                     />
                   </div>
                 </div>
