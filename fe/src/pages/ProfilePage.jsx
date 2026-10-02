@@ -9,7 +9,7 @@ import ProductCard from '../components/ProductCard';
 
 // Chuẩn hóa ngày hiển thị sang dạng DD/MM/YYYY
 const normalizeDobToVn = (dob) => {
-  if (!dob) return '18/10/1994';
+  if (!dob) return '';
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(dob)) return dob;
   if (/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
     const [y, m, d] = dob.split('-');
@@ -49,7 +49,7 @@ const formatDobInput = (val) => {
 
 // Kiểm tra tính hợp lệ của ngày sinh (ngày tồn tại, tháng 1-12, không vượt quá hôm nay)
 const validateDob = (dobStr) => {
-  if (!dobStr || !dobStr.trim()) return '';
+  if (!dobStr || !dobStr.trim()) return 'Ngày sinh nhật không được để trống';
   const parts = dobStr.split('/');
   if (parts.length !== 3 || dobStr.length !== 10) {
     return 'Vui lòng nhập đủ 8 số ngày sinh (VD: 18101994)';
@@ -168,24 +168,55 @@ const ProfilePage = () => {
   };
 
   const [formData, setFormData] = useState({
-    full_name: user?.full_name || 'Nguyễn Hoàng Thảo My',
-    phone: user?.phone || '0908 123 456',
-    email: user?.email || 'thaomy.nguyen@atelier-youth.vn',
+    full_name: user?.full_name || '',
+    phone: user?.phone || '',
+    email: user?.email || '',
     avatar_url: getSavedAvatar(),
     gender: user?.gender || 'Nữ',
-    dob: normalizeDobToVn(user?.dob || '18/10/1994'),
-    province: user?.address?.province || 'Thành phố Hồ Chí Minh',
-    district: user?.address?.district || 'Quận 1',
-    ward: user?.address?.ward || 'Phường Bến Nghé',
-    detailAddress: user?.address?.detail || 'Số 154, Đường Đồng Khởi'
+    dob: normalizeDobToVn(user?.dob),
+    province: user?.address?.province || '',
+    district: user?.address?.district || '',
+    ward: user?.address?.ward || '',
+    detailAddress: user?.address?.detail || ''
   });
 
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        full_name: user.full_name || prev.full_name || '',
+        phone: user.phone || '',
+        email: user.email || prev.email || '',
+        avatar_url: getSavedAvatar(),
+        gender: user.gender || prev.gender || 'Nữ',
+        dob: normalizeDobToVn(user.dob),
+        province: user.address?.province || prev.province || '',
+        district: user.address?.district || prev.district || '',
+        ward: user.address?.ward || prev.ward || '',
+        detailAddress: user.address?.detail || prev.detailAddress || ''
+      }));
+    }
+  }, [user]);
+
   const [profileAlert, setProfileAlert] = useState({ type: '', message: '' });
+  const [fullNameError, setFullNameError] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [dobError, setDobError] = useState('');
+  const [genderError, setGenderError] = useState('');
   const [copiedCode, setCopiedCode] = useState('');
   const fileInputRef = useRef(null);
   const hiddenDateRef = useRef(null);
+
+  // Hàm kiểm tra họ và tên
+  const validateFullName = (name) => {
+    if (!name || !name.trim()) {
+      return 'Họ và tên không được để trống';
+    }
+    if (name.trim().length < 2) {
+      return 'Họ và tên phải có tối thiểu 2 ký tự';
+    }
+    return '';
+  };
 
   // Hàm kiểm tra định dạng số điện thoại di động Việt Nam chuẩn
   const validatePhone = (phoneNumber) => {
@@ -286,32 +317,22 @@ const ProfilePage = () => {
     setActiveTab(currentTab);
   }, [searchParams]);
 
-  // Keep form data synced if user context updates
-  useEffect(() => {
-    if (user) {
-      const savedByEmail = user.email && localStorage.getItem(`avatar_url_${user.email}`);
-      const globalAvatar = localStorage.getItem('user_avatar_url');
-      const candidate = [user.avatar_url, savedByEmail, globalAvatar].find(isValidAvatarUrl);
-      const activeAvatar = candidate || DEFAULT_AVATAR;
-
-      setFormData(prev => ({
-        ...prev,
-        full_name: user.full_name || prev.full_name,
-        phone: user.phone || prev.phone,
-        email: user.email || prev.email,
-        avatar_url: activeAvatar,
-        gender: user.gender || prev.gender,
-        dob: user.dob ? normalizeDobToVn(user.dob) : prev.dob
-      }));
-    }
-  }, [user]);
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === 'full_name' && fullNameError) {
+      setFullNameError(validateFullName(value));
+    }
     if (name === 'phone' && phoneError) {
       setPhoneError(validatePhone(value));
     }
+    if (name === 'gender' && genderError) {
+      setGenderError('');
+    }
+  };
+
+  const handleFullNameBlur = () => {
+    setFullNameError(validateFullName(formData.full_name));
   };
 
   const handlePhoneBlur = () => {
@@ -328,9 +349,7 @@ const ProfilePage = () => {
   };
 
   const handleDobBlur = () => {
-    if (formData.dob) {
-      setDobError(validateDob(formData.dob));
-    }
+    setDobError(validateDob(formData.dob));
   };
 
   // Xử lý khi người dùng chọn ngày từ bảng lịch
@@ -346,6 +365,18 @@ const ProfilePage = () => {
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
+
+    // 1. Kiểm tra Họ và tên
+    const nameErr = validateFullName(formData.full_name);
+    if (nameErr) {
+      setFullNameError(nameErr);
+      setProfileAlert({ type: 'danger', message: nameErr });
+      setTimeout(() => setProfileAlert({ type: '', message: '' }), 4000);
+      return;
+    }
+    setFullNameError('');
+
+    // 2. Kiểm tra Số điện thoại
     const phoneErr = validatePhone(formData.phone);
     if (phoneErr) {
       setPhoneError(phoneErr);
@@ -355,6 +386,7 @@ const ProfilePage = () => {
     }
     setPhoneError('');
 
+    // 3. Kiểm tra Ngày sinh nhật
     const dobErr = validateDob(formData.dob);
     if (dobErr) {
       setDobError(dobErr);
@@ -364,12 +396,21 @@ const ProfilePage = () => {
     }
     setDobError('');
 
+    // 4. Kiểm tra Giới tính
+    if (!formData.gender) {
+      setGenderError('Vui lòng chọn giới tính');
+      setProfileAlert({ type: 'danger', message: 'Vui lòng chọn giới tính' });
+      setTimeout(() => setProfileAlert({ type: '', message: '' }), 4000);
+      return;
+    }
+    setGenderError('');
+
     const res = await updateUserProfile({
-      full_name: formData.full_name,
+      full_name: formData.full_name.trim(),
       phone: formData.phone.trim(),
       avatar_url: formData.avatar_url,
       gender: formData.gender,
-      dob: formData.dob,
+      dob: formData.dob.trim(),
       address: {
         province: formData.province,
         district: formData.district,
@@ -571,7 +612,7 @@ const ProfilePage = () => {
               <div className="hero-subtitle">
                 <span className="gold-text-hero">THÀNH VIÊN ĐẶC QUYỀN</span> <span className="dot">•</span> {user?.member_since || 'Từ Tháng 03/2023'}
               </div>
-              <h1 className="hero-user-name font-serif">{user?.full_name || 'Nguyễn Hoàng Thảo My'}</h1>
+              <h1 className="hero-user-name font-serif">{user?.full_name || 'Khách hàng Youth Fashion'}</h1>
               <div className="hero-tier-pill">
                 <span className="tier-medal">🏅</span>
                 <span>{user?.tier || 'VIP GOLD ATELIER MEMBER'}</span>
@@ -696,20 +737,32 @@ const ProfilePage = () => {
                   <div className="form-fields-2col">
                     {/* Họ Và Tên */}
                     <div className="field-group">
-                      <label className="field-label">HỌ VÀ TÊN</label>
+                      <label className="field-label">
+                        HỌ VÀ TÊN <span className="field-required">*</span>
+                      </label>
                       <input 
                         type="text" 
                         name="full_name"
-                        className="custom-input"
+                        className={`custom-input ${fullNameError ? 'input-error' : ''}`}
                         value={formData.full_name}
                         onChange={handleInputChange}
+                        onBlur={handleFullNameBlur}
+                        placeholder="Nhập họ và tên của bạn"
                         required
                       />
+                      {fullNameError && (
+                        <div className="field-error-msg">
+                          <AlertCircle size={14} />
+                          <span>{fullNameError}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Địa Chỉ Email */}
                     <div className="field-group">
-                      <label className="field-label">ĐỊA CHỈ EMAIL</label>
+                      <label className="field-label">
+                        ĐỊA CHỈ EMAIL <span className="field-required">*</span>
+                      </label>
                       <input 
                         type="email" 
                         name="email"
@@ -745,7 +798,9 @@ const ProfilePage = () => {
 
                     {/* Ngày Sinh Nhật */}
                     <div className="field-group">
-                      <label className="field-label">NGÀY SINH NHẬT</label>
+                      <label className="field-label">
+                        NGÀY SINH NHẬT <span className="field-required">*</span>
+                      </label>
                       <div className="dob-picker-group">
                         <input 
                           type="text" 
@@ -757,6 +812,7 @@ const ProfilePage = () => {
                           placeholder="DD/MM/YYYY"
                           maxLength={10}
                           inputMode="numeric"
+                          required
                         />
                         <button 
                           type="button" 
@@ -788,7 +844,9 @@ const ProfilePage = () => {
 
                   {/* Giới Tính */}
                   <div className="field-group full-width-group">
-                    <label className="field-label">GIỚI TÍNH</label>
+                    <label className="field-label">
+                      GIỚI TÍNH <span className="field-required">*</span>
+                    </label>
                     <div className="gender-radio-options">
                       {['Nữ', 'Nam', 'Khác / Không tiết lộ'].map((g) => (
                         <label key={g} className="custom-radio-label">
@@ -804,6 +862,12 @@ const ProfilePage = () => {
                         </label>
                       ))}
                     </div>
+                    {genderError && (
+                      <div className="field-error-msg">
+                        <AlertCircle size={14} />
+                        <span>{genderError}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Save Button */}
