@@ -30,7 +30,8 @@ export const getLookbookById = async (req, res, next) => {
 
 export const createLookbook = async (req, res, next) => {
   try {
-    const data = await lookbookService.createLookbookService(req.body);
+    const file = req.file;
+    const data = await lookbookService.createLookbookService(req.body, file);
     return res.status(201).json({
       status: true,
       message: 'Tạo mới lookbook thành công',
@@ -44,7 +45,8 @@ export const createLookbook = async (req, res, next) => {
 export const updateLookbook = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const data = await lookbookService.updateLookbookService(id, req.body);
+    const file = req.file;
+    const data = await lookbookService.updateLookbookService(id, req.body, file);
     return res.status(200).json({
       status: true,
       message: 'Cập nhật lookbook thành công',
@@ -62,6 +64,20 @@ export const deleteLookbook = async (req, res, next) => {
     return res.status(200).json({
       status: true,
       message: 'Xóa lookbook thành công',
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const swapPositions = async (req, res, next) => {
+  try {
+    const { id1, id2 } = req.body;
+    const data = await lookbookService.swapLookbookPositionsService(id1, id2);
+    return res.status(200).json({
+      status: true,
+      message: 'Đổi vị trí lookbook thành công',
       data,
     });
   } catch (error) {
