@@ -754,20 +754,24 @@ async function main() {
     },
   ];
 
-  for (const lb of lookbooksData) {
-    const existing = await prisma.lookbook.findFirst({
-      where: { code: lb.code },
-    });
-    if (!existing) {
-      await prisma.lookbook.create({
-        data: lb,
+  try {
+    for (const lb of lookbooksData) {
+      const existing = await prisma.lookbook.findFirst({
+        where: { code: lb.code },
       });
-      console.log(`  ➕ Đã thêm Lookbook: ${lb.title}`);
-    } else {
-      console.log(`  ℹ️ Lookbook đã tồn tại: ${existing.title}`);
+      if (!existing) {
+        await prisma.lookbook.create({
+          data: lb,
+        });
+        console.log(`  ➕ Đã thêm Lookbook: ${lb.title}`);
+      } else {
+        console.log(`  ℹ️ Lookbook đã tồn tại: ${existing.title}`);
+      }
     }
+    console.log(`✅ Đã tạo ${lookbooksData.length} lookbook.`);
+  } catch (err) {
+    console.log('ℹ️ Bỏ qua seed Lookbook (Bảng lookbooks chưa có trong CSDL MySQL).');
   }
-  console.log(`✅ Đã tạo ${lookbooksData.length} lookbook.`);
 
   console.log('\n🎉 --- Hoàn thành Khởi tạo Dữ liệu Mẫu thành công! ---');
 }
