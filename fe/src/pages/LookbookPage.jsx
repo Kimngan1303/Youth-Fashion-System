@@ -32,7 +32,7 @@ import {
   ArrowRight,
   Info
 } from 'lucide-react';
-import { lookbookService, getLookbookPositionValue } from '../services/lookbookService';
+import { lookbookService, getLookbookPositionValue, getLookCodeByPosition } from '../services/lookbookService';
 import { useAuth } from '../context/AuthContext';
 
 export default function LookbookPage() {
@@ -85,22 +85,25 @@ export default function LookbookPage() {
   // PHẦN 2: PHÂN LOẠI & ÁNH XẠ CÁC LOOKBOOK THEO THỨ TỰ VỊ TRÍ ĐIỀU KHIỂN
   // ----------------------------------------------------------------------------
   // - heroItem: Ảnh bìa Banner lớn đầu trang (vị trí 'banner')
-  const heroItem = lookbooks.find(l => l.position === 'banner' || l.type === 'hero' || l.lookCode === 'BANNER') || lookbooks[0];
+  const heroItem = lookbooks.find(l => String(l.position).toLowerCase() === 'banner' || l.type === 'hero') || lookbooks[0];
 
-  // - look1 đến look4: Các look chính cố định theo layout tạp chí
-  const look1 = lookbooks.find(l => String(l.position) === '1' || l.lookCode === 'LOOK 01');
-  const look2 = lookbooks.find(l => String(l.position) === '2' || l.lookCode === 'LOOK 02');
-  const look3 = lookbooks.find(l => String(l.position) === '3' || l.lookCode === 'LOOK 03');
-  const look4 = lookbooks.find(l => String(l.position) === '4' || l.lookCode === 'LOOK 04');
+  // - look1 đến look4: Các look chính cố định chuẩn xác theo số thứ tự vị trí trong Quản Lý
+  const look1 = lookbooks.find(l => String(l.position) === '1');
+  const look2 = lookbooks.find(l => String(l.position) === '2');
+  const look3 = lookbooks.find(l => String(l.position) === '3');
+  const look4 = lookbooks.find(l => String(l.position) === '4');
 
-  // - extraLooks: Các lookbook bổ sung do Quản trị viên tự do thêm mới sau này
-  const extraLooks = lookbooks.filter(l =>
-    l.id !== heroItem?.id &&
-    l.id !== look1?.id &&
-    l.id !== look2?.id &&
-    l.id !== look3?.id &&
-    l.id !== look4?.id
-  );
+  // - extraLooks: Các lookbook bổ sung (vị trí 5, 6, 7...)
+  const extraLooks = lookbooks
+    .filter(l =>
+      l.id !== heroItem?.id &&
+      String(l.position).toLowerCase() !== 'banner' &&
+      String(l.position) !== '1' &&
+      String(l.position) !== '2' &&
+      String(l.position) !== '3' &&
+      String(l.position) !== '4'
+    )
+    .sort((a, b) => getLookbookPositionValue(a.position) - getLookbookPositionValue(b.position));
 
   // ----------------------------------------------------------------------------
   // PHẦN 3: CÁC HÀM TIỆN ÍCH XỬ LÝ SỰ KIỆN (EVENT HANDLERS)
@@ -140,37 +143,41 @@ export default function LookbookPage() {
           min-height: 100vh;
         }
 
-        /* 1. Sub-Header Editorial Bar */
-        .lb-sub-bar {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 12px 32px;
-          background: #FFFFFF;
-          border-bottom: 1px solid #ECEAE4;
-          font-size: 11px;
-          letter-spacing: 1.2px;
-          text-transform: uppercase;
-          font-weight: 600;
-          color: #78716C;
+        /* 1. Breadcrumbs Bar (Trang chủ > Lookbook) */
+        .lb-breadcrumb-bar {
+          background-color: #ffffff;
+          border-bottom: 1px solid #e5e7eb;
+          padding: 14px 0;
         }
 
-        .btn-share-editorial {
+        .lb-breadcrumb-content {
           display: flex;
           align-items: center;
-          gap: 6px;
-          background: transparent;
-          border: none;
-          cursor: pointer;
-          color: #44403C;
+          gap: 8px;
           font-size: 11px;
           font-weight: 600;
-          letter-spacing: 0.8px;
-          transition: color 0.2s;
+          letter-spacing: 0.5px;
+          color: #6b7280;
         }
 
-        .btn-share-editorial:hover {
-          color: #111111;
+        .bc-link {
+          color: #6b7280;
+          text-decoration: none;
+          transition: color 0.15s;
+        }
+
+        .bc-link:hover {
+          color: #111827;
+        }
+
+        .bc-sep {
+          color: #d1d5db;
+          font-size: 10px;
+        }
+
+        .bc-current {
+          color: #111827;
+          font-weight: 700;
         }
 
         /* 2. Hero Cinematic Banner */
@@ -222,38 +229,44 @@ export default function LookbookPage() {
 
         .lb-hero-campaign-tag {
           display: inline-block;
+          font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
           font-size: 11px;
-          letter-spacing: 2px;
+          letter-spacing: 2.5px;
           text-transform: uppercase;
           font-weight: 700;
-          color: #E2DFD7;
-          margin-bottom: 12px;
-          background: rgba(255, 255, 255, 0.15);
-          backdrop-filter: blur(8px);
-          padding: 4px 12px;
+          color: #D6D3D1;
+          margin-bottom: 14px;
+          background: rgba(20, 20, 20, 0.55);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          padding: 5px 14px;
           border-radius: 4px;
-          border: 1px solid rgba(255, 255, 255, 0.2);
+          border: 1px solid rgba(255, 255, 255, 0.25);
         }
 
         .lb-hero-main-heading {
-          font-family: 'Playfair Display', Georgia, serif;
-          font-size: clamp(38px, 6vw, 68px);
-          font-weight: 700;
-          letter-spacing: 2px;
-          line-height: 1.08;
+          font-family: 'Cormorant Garamond', 'Playfair Display', 'Bodoni Moda', Georgia, serif;
+          font-size: clamp(38px, 5.5vw, 68px);
+          font-weight: 500;
+          letter-spacing: 3px;
+          line-height: 1.1;
           text-transform: uppercase;
           margin: 0 0 16px 0;
           color: #FFFFFF;
-          text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+          text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
         }
 
         .lb-hero-desc {
-          font-size: clamp(14px, 1.8vw, 17px);
-          line-height: 1.6;
-          color: #F0EEE9;
-          max-width: 640px;
+          font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+          font-style: italic;
+          font-size: clamp(16px, 1.9vw, 20px);
+          line-height: 1.65;
+          color: rgba(255, 255, 255, 0.92);
+          max-width: 680px;
           margin-bottom: 28px;
-          font-weight: 300;
+          font-weight: 400;
+          letter-spacing: 0.3px;
+          text-shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
         }
 
         /* Glassmorphism Audio/Campaign Pill */
@@ -716,15 +729,14 @@ export default function LookbookPage() {
       `}</style>
 
       {/* ----------------------------------------------------------------------
-          KHỐI 1: THANH THÔNG TIN PHỤ (SUB-HEADER EDITORIAL BAR)
-          - Hiển thị tên chiến dịch toàn cầu và nút sao chép liên kết chia sẻ
+          KHỐI 1: THANH ĐIỀU HƯỚNG BREADCRUMBS (TRANG CHỦ > LOOKBOOK)
           ---------------------------------------------------------------------- */}
-      <div className="lb-sub-bar">
-        <span>BỘ SƯU TẬP MỚI NHẤT 2026</span>
-        <button type="button" className="btn-share-editorial" onClick={handleShare}>
-          <Share2 size={13} />
-          <span>CHIA SẺ BỘ SƯU TẬP</span>
-        </button>
+      <div className="lb-breadcrumb-bar">
+        <div className="container lb-breadcrumb-content">
+          <Link to="/" className="bc-link">TRANG CHỦ</Link>
+          <span className="bc-sep">&gt;</span>
+          <span className="bc-current">LOOKBOOK</span>
+        </div>
       </div>
 
       {isLoading ? (
@@ -769,10 +781,13 @@ export default function LookbookPage() {
                     heroItem.season.includes('•')
                       ? heroItem.season.toUpperCase()
                       : `${heroItem.season.toUpperCase()}`
-                  ) : "BỘ SƯU TẬP MÙA THU ĐÔNG 2025"}
+                  ) : "LOOKBOOK EDITORIAL VOL. 04"}
                 </span>
+                <h1 className="lb-hero-main-heading">
+                  {heroItem.title ? heroItem.title.replace(/^Ảnh Bìa Hero Banner:\s*/i, '') : "L'AUTOMNE ÉTERNEL"}
+                </h1>
                 <p className="lb-hero-desc">
-                  {heroItem.description || ""}
+                  {heroItem.description || "Khắc họa vẻ đẹp vĩnh cửu giữa thu Paris — Bản giao hưởng của dạ cashmere & lụa tơ tằm thượng hạng."}
                 </p>
               </div>
             </section>
@@ -816,7 +831,7 @@ export default function LookbookPage() {
                   <div>
                     <div className="lb-look-tag-row">
                       <span className="lb-look-category">
-                        {look1.season || 'PHONG CÁCH THU ĐÔNG'} • {look1.lookCode || 'LOOK 01'}
+                        {look1.season || 'PHONG CÁCH THU ĐÔNG'} • {getLookCodeByPosition(look1.position)}
                       </span>
                       <span className="lb-badge-pill">{look1.badge || 'SIGNATURE'}</span>
                     </div>
@@ -846,7 +861,7 @@ export default function LookbookPage() {
                     <button
                       type="button"
                       className="btn-buy-combo"
-                      onClick={() => showToast(`Đã thêm trọn bộ ${look1.lookCode || 'Look 01'} vào giỏ hàng!`)}
+                      onClick={() => showToast(`Đã thêm trọn bộ ${getLookCodeByPosition(look1.position)} vào giỏ hàng!`)}
                     >
                       <ShoppingBag size={16} />
                       <span>{look1.ctaText || `Mua Trọn Bộ Phối Đồ • ${look1.price || ''}`}</span>
@@ -863,7 +878,7 @@ export default function LookbookPage() {
                   <div>
                     <div className="lb-look-tag-row">
                       <span className="lb-look-category">
-                        {look2.season || 'DẠ TIỆC & HAUTE COUTURE'} • {look2.lookCode || 'LOOK 02'}
+                        {look2.season || 'DẠ TIỆC & HAUTE COUTURE'} • {getLookCodeByPosition(look2.position)}
                       </span>
                       <span className="lb-badge-pill" style={{ background: '#DCFCE7', color: '#15803D', borderColor: '#BBF7D0' }}>
                         {look2.badge || 'PHIÊN BẢN GIỚI HẠN'}
@@ -945,7 +960,7 @@ export default function LookbookPage() {
                         className="lb-editorial-img"
                       />
                       <span className="lb-badge-pill" style={{ position: 'absolute', top: '16px', left: '16px', background: '#FFFFFF' }}>
-                        {look3.lookCode || 'LOOK 03'}
+                        {getLookCodeByPosition(look3.position)}
                       </span>
                     </div>
                     <div className="lb-vert-body">
@@ -989,7 +1004,7 @@ export default function LookbookPage() {
                         className="lb-editorial-img"
                       />
                       <span className="lb-badge-pill" style={{ position: 'absolute', top: '16px', left: '16px', background: '#FFFFFF' }}>
-                        {look4.lookCode || 'LOOK 04'}
+                        {getLookCodeByPosition(look4.position)}
                       </span>
                     </div>
                     <div className="lb-vert-body">
@@ -1037,7 +1052,7 @@ export default function LookbookPage() {
                         className="lb-editorial-img"
                       />
                       <span className="lb-badge-pill" style={{ position: 'absolute', top: '16px', left: '16px', background: '#FFFFFF' }}>
-                        {item.lookCode || `LOOK ${item.position}`}
+                        {getLookCodeByPosition(item.position)}
                       </span>
                     </div>
                     <div className="lb-vert-body">

@@ -24,6 +24,27 @@ export const getLookbookPositionValue = (pos) => {
   return isNaN(n) ? 999 : n;
 };
 
+export const getLookCodeByPosition = (pos) => {
+  const p = String(pos || '').trim().toLowerCase();
+  if (p === 'banner') return 'BANNER';
+  const num = parseInt(p, 10);
+  return isNaN(num) ? p.toUpperCase() : `LOOK ${num < 10 ? '0' + num : num}`;
+};
+
+export const getLookbookCodeByPosition = (pos) => {
+  const p = String(pos || '').trim().toLowerCase();
+  if (p === 'banner') return 'LB - BANNER';
+  const num = parseInt(p, 10);
+  return isNaN(num) ? `LB - ${p.toUpperCase()}` : `LB - LOOK${num < 10 ? '0' + num : num}`;
+};
+
+export const getSectionRoleByPosition = (pos) => {
+  const p = String(pos || '').trim().toLowerCase();
+  if (p === 'banner') return 'Khối Banner';
+  const num = parseInt(p, 10);
+  return isNaN(num) ? `Khối Look ${p}` : `Khối Look ${num < 10 ? '0' + num : num}`;
+};
+
 /**
  * Phát sự kiện thông báo cập nhật Lookbook giữa các trang trong ứng dụng
  */
@@ -50,13 +71,19 @@ export const lookbookService = {
 
   // Tạo mới lookbook
   createLookbook: async (data) => {
-    const response = await axiosClient.post('/lookbooks', data);
+    const isFormData = data instanceof FormData;
+    const response = await axiosClient.post('/lookbooks', data, {
+      headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {},
+    });
     return response.data;
   },
 
   // Cập nhật lookbook
   updateLookbook: async (id, data) => {
-    const response = await axiosClient.put(`/lookbooks/${id}`, data);
+    const isFormData = data instanceof FormData;
+    const response = await axiosClient.put(`/lookbooks/${id}`, data, {
+      headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {},
+    });
     return response.data;
   },
 
@@ -78,6 +105,12 @@ export const lookbookService = {
   // Đổi thứ tự vị trí hiển thị
   updatePosition: async (id, newPos) => {
     const response = await axiosClient.put(`/lookbooks/${id}`, { position: String(newPos) });
+    return response.data;
+  },
+
+  // Hoán đổi vị trí hiển thị giữa 2 lookbook
+  swapPositions: async (id1, id2) => {
+    const response = await axiosClient.put('/lookbooks/swap-positions', { id1, id2 });
     return response.data;
   },
 
