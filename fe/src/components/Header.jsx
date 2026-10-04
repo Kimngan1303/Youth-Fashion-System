@@ -23,6 +23,7 @@ const Header = ({ onOpenAISearch }) => {
   );
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const [showSearchInput, setShowSearchInput] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const userMenuRef = useRef(null);
@@ -182,21 +183,42 @@ const Header = ({ onOpenAISearch }) => {
               onClick={() => setShowNotifications((prev) => !prev)}
             >
               <Bell size={18} />
-              <span className="badge">1</span>
+              {notifications && notifications.length > 0 && (
+                <span className="badge">{notifications.length}</span>
+              )}
             </button>
 
             {showNotifications && (
               <div className="notifications-dropdown animate-fade-in">
                 <div className="notifications-header">
-                  <span>THÔNG BÁO MỚI</span>
-                  <span className="notifications-count">1 tin mới</span>
+                  <span>THÔNG BÁO</span>
+                  {notifications && notifications.length > 0 && (
+                    <span className="notifications-count">{notifications.length} mới</span>
+                  )}
                 </div>
                 <div className="notification-list">
-                  <div className="notification-card">
-                    <span className="notif-title">Xác nhận đơn hàng #YF-89210</span>
-                    <span className="notif-desc">Đơn hàng của quý khách đang được đóng gói chuẩn bị giao.</span>
-                    <span className="notif-time">10 phút trước</span>
-                  </div>
+                  {notifications && notifications.length > 0 ? (
+                    notifications.map((item, idx) => (
+                      <div key={idx} className="notification-card">
+                        <span className="notif-title">{item.title}</span>
+                        <span className="notif-desc">{item.message}</span>
+                        <span className="notif-time">{item.time}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div
+                      className="notification-empty"
+                      style={{
+                        padding: '18px 8px',
+                        textAlign: 'center',
+                        color: '#78716C',
+                        fontSize: '12.5px',
+                        lineHeight: '18px',
+                      }}
+                    >
+                      Hiện tại quý khách chưa có thông báo mới.
+                    </div>
+                  )}
                 </div>
               </div>
             )}
