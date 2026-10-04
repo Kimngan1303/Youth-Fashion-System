@@ -22,25 +22,30 @@ const Header = ({ onOpenAISearch }) => {
     )
   );
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [showSearchInput, setShowSearchInput] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const userMenuRef = useRef(null);
+  const notificationsRef = useRef(null);
 
-  // Đóng dropdown khi click ra ngoài vùng menu tài khoản
+  // Đóng dropdown khi click ra ngoài vùng menu tài khoản hoặc thông báo
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setShowUserMenu(false);
       }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
     };
 
-    if (showUserMenu) {
+    if (showUserMenu || showNotifications) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showUserMenu]);
+  }, [showUserMenu, showNotifications]);
 
   const categoryTimeoutRef = useRef(null);
   const userTimeoutRef = useRef(null);
@@ -159,31 +164,69 @@ const Header = ({ onOpenAISearch }) => {
                 </button>
               </div>
             ) : (
-              <button className="action-icon" title="Tìm kiếm" onClick={() => setShowSearchInput(true)}>
+              <button
+                className={`action-icon ${showSearchInput ? 'active' : ''}`}
+                title="Tìm kiếm"
+                onClick={() => setShowSearchInput(true)}
+              >
                 <Search size={18} />
               </button>
             )}
           </div>
 
           {/* Notifications */}
-          <button className="action-icon" title="Thông báo">
-            <Bell size={18} />
-            <span className="badge">1</span>
-          </button>
+          <div ref={notificationsRef} className="notifications-wrapper" style={{ position: 'relative' }}>
+            <button
+              className={`action-icon ${showNotifications ? 'active' : ''}`}
+              title="Thông báo"
+              onClick={() => setShowNotifications((prev) => !prev)}
+            >
+              <Bell size={18} />
+              <span className="badge">1</span>
+            </button>
+
+            {showNotifications && (
+              <div className="notifications-dropdown animate-fade-in">
+                <div className="notifications-header">
+                  <span>THÔNG BÁO MỚI</span>
+                  <span className="notifications-count">1 tin mới</span>
+                </div>
+                <div className="notification-list">
+                  <div className="notification-card">
+                    <span className="notif-title">Xác nhận đơn hàng #YF-89210</span>
+                    <span className="notif-desc">Đơn hàng của quý khách đang được đóng gói chuẩn bị giao.</span>
+                    <span className="notif-time">10 phút trước</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Messages */}
-          <button className="action-icon" title="Tin nhắn / Tư vấn">
+          <Link
+            to="/chat"
+            className={`action-icon ${location.pathname === '/chat' ? 'active' : ''}`}
+            title="Tin nhắn / Tư vấn"
+          >
             <MessageSquare size={18} />
-          </button>
+          </Link>
 
           {/* Cart Icon */}
-          <Link to="/cart" className="action-icon" title="Giỏ hàng">
+          <Link
+            to="/cart"
+            className={`action-icon ${location.pathname === '/cart' ? 'active' : ''}`}
+            title="Giỏ hàng"
+          >
             <ShoppingBag size={18} />
             <span className="badge">{cartCount || 2}</span>
           </Link>
 
           {/* Wishlist Icon */}
-          <Link to={user ? "/profile?tab=wishlist" : "/login"} className="action-icon" title="Yêu thích">
+          <Link
+            to={user ? "/profile?tab=wishlist" : "/login"}
+            className={`action-icon ${location.pathname === '/profile' && location.search.includes('wishlist') ? 'active' : ''}`}
+            title="Yêu thích"
+          >
             <Heart size={18} />
             <span className="badge">{user ? (wishlist ? wishlist.length : 0) : 0}</span>
           </Link>
@@ -458,44 +501,140 @@ const Header = ({ onOpenAISearch }) => {
         .action-icon {
           position: relative;
           color: #111827;
-          display: flex;
+          display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 34px;
-          height: 34px;
-          border-radius: 50%;
+          width: 38px;
+          height: 38px;
+          border-radius: 11px;
           border: none;
           background: transparent;
           cursor: pointer;
-          transition: background-color 0.2s, color 0.2s;
+          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+          text-decoration: none;
+          outline: none;
+          flex-shrink: 0;
         }
 
-        .action-icon:hover,
-        .action-icon.active {
-          background-color: #000000;
+        .action-icon svg {
+          transition: color 0.18s ease, stroke 0.18s ease, transform 0.18s ease;
+        }
+
+        /* Hover effect: luxury dark rounded squircle */
+        .action-icon:hover {
+          background-color: #111111;
           color: #ffffff;
+          border-radius: 11px;
+          transform: translateY(-1px);
         }
 
-        .action-icon:hover svg,
-        .action-icon.active svg {
-          color: #ffffff;
-          stroke: #ffffff;
+        .action-icon:hover svg {
+          color: #ffffff !important;
+          stroke: #ffffff !important;
         }
 
+        /* Active / Pressed effect: exactly like the chat button in the screenshot */
+        .action-icon.active,
+        .action-icon:active {
+          background-color: #111111 !important;
+          color: #ffffff !important;
+          border-radius: 11px !important;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+        }
+
+        .action-icon:active {
+          transform: scale(0.92) !important;
+        }
+
+        .action-icon.active svg,
+        .action-icon:active svg {
+          color: #ffffff !important;
+          stroke: #ffffff !important;
+        }
+
+        /* High-contrast Badges */
         .badge {
           position: absolute;
-          top: 1px;
-          right: 1px;
+          top: -2px;
+          right: -2px;
           background-color: #111827;
           color: #ffffff;
-          font-size: 9px;
+          font-size: 9.5px;
           font-weight: 700;
-          width: 15px;
-          height: 15px;
-          border-radius: 50%;
+          min-width: 16px;
+          height: 16px;
+          padding: 0 3px;
+          border-radius: 9999px;
           display: flex;
           align-items: center;
           justify-content: center;
+          border: 2px solid #ffffff;
+          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+          pointer-events: none;
+          transition: border-color 0.2s ease;
+        }
+
+        .action-icon.active .badge,
+        .action-icon:hover .badge,
+        .action-icon:active .badge {
+          border-color: #111111;
+        }
+
+        .notifications-dropdown {
+          position: absolute;
+          top: calc(100% + 10px);
+          right: -20px;
+          width: 300px;
+          background: #FFFFFF;
+          border: 1px solid #ECE7E1;
+          border-radius: 12px;
+          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+          padding: 14px 16px;
+          z-index: 100;
+        }
+
+        .notifications-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 1.2px;
+          color: #1C1917;
+          margin-bottom: 12px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid #F5F4F0;
+        }
+
+        .notifications-count {
+          color: #B45309;
+          font-size: 10px;
+          font-weight: 600;
+        }
+
+        .notification-card {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+          padding: 6px 0;
+        }
+
+        .notif-title {
+          font-size: 13px;
+          font-weight: 600;
+          color: #1C1917;
+        }
+
+        .notif-desc {
+          font-size: 12px;
+          color: #78716C;
+          line-height: 17px;
+        }
+
+        .notif-time {
+          font-size: 11px;
+          color: #A8A29E;
+          margin-top: 4px;
         }
 
         .user-menu-wrapper {

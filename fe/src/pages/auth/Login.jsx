@@ -700,9 +700,9 @@ export default function Login() {
                   />
                   Ghi nhớ đăng nhập
                 </label>
-                <a href="#forgot" className="forgot-password-link">
+                <Link to="/forgot-password" className="forgot-password-link">
                   Quên mật khẩu?
-                </a>
+                </Link>
               </div>
 
               {/* Submit CTA */}

@@ -11,9 +11,11 @@ import ProductListPage from './pages/customer/ProductListPage';
 import ProfilePage from './pages/ProfilePage';
 import ContactPage from './pages/ContactPage';
 import LookbookPage from './pages/LookbookPage';
+import ChatPage from './pages/ChatPage';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import VerifyEmail from './pages/auth/VerifyEmail';
+import ForgotPassword from './pages/auth/ForgotPassword';
 import ManagerDashboard from './pages/manager/ManagerDashboard';
 import ProductManager from './pages/manager/ProductManager';
 import CategoryManager from './pages/manager/CategoryManager';
@@ -31,7 +33,7 @@ function AppContent() {
   const location = useLocation();
 
   // Xác định các trang không cần hiển thị Header và Footer của khách hàng
-  const hideHeaderFooter = ['/login', '/register', '/verify-email'].includes(location.pathname) || location.pathname.startsWith('/manager');
+  const hideHeaderFooter = ['/login', '/register', '/verify-email', '/forgot-password'].includes(location.pathname) || location.pathname.startsWith('/manager');
 
   return (
     <div className="app-layout">
@@ -45,6 +47,7 @@ function AppContent() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
 
           {/* Nhóm Route Dành cho Khách hàng (Customer & Guest) */}
           <Route 
@@ -56,6 +59,7 @@ function AppContent() {
             element={<ProductListPage onOpenAISearch={() => setIsAISearchOpen(true)} />} 
           />
           <Route path="/lookbook" element={<LookbookPage />} />
+          <Route path="/chat" element={<ChatPage />} />
           <Route 
             path="/profile" 
             element={

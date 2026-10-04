@@ -4,6 +4,7 @@ import productRoutes from './product.routes.js';
 import categoryRoutes from './category.routes.js';
 import brandRoutes from './brand.routes.js';
 import lookbookRoutes from './lookbook.routes.js';
+import conversationRoutes from './conversation.routes.js';
 
 const router = Router();
 
@@ -20,6 +21,8 @@ router.use('/categories', categoryRoutes);
 router.use('/brands', brandRoutes);
 
 router.use('/lookbooks', lookbookRoutes);
+
+router.use('/conversations', conversationRoutes);
 
 export default router;
 

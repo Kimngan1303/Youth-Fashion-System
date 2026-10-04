@@ -106,6 +106,30 @@ export const resendOtpSchema = z.object({
     .email({ message: 'Địa chỉ email không đúng định dạng' }),
 });
 
+// Schema kiểm tra dữ liệu đầu vào khi Quên mật khẩu (Forgot Password)
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string({ required_error: 'Email là bắt buộc' })
+    .email({ message: 'Địa chỉ email không đúng định dạng' }),
+});
+
+// Schema kiểm tra dữ liệu đầu vào khi Đặt lại mật khẩu (Reset Password)
+export const resetPasswordSchema = z.object({
+  email: z
+    .string({ required_error: 'Email là bắt buộc' })
+    .email({ message: 'Địa chỉ email không đúng định dạng' }),
+  otp: z
+    .string({ required_error: 'Mã OTP là bắt buộc' })
+    .length(6, { message: 'Mã OTP phải gồm đúng 6 chữ số' }),
+  new_password: z
+    .string({ required_error: 'Mật khẩu mới là bắt buộc' })
+    .min(6, { message: 'Mật khẩu mới phải có ít nhất 6 ký tự' })
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9])/, {
+      message: 'Mật khẩu mới phải bao gồm chữ hoa (A-Z), chữ thường (a-z), chữ số (0-9) và ký tự đặc biệt (VD: Manh123@)',
+    }),
+});
+
+
 // Middleware helper validate dữ liệu Zod cho Express Request
 export const validateBody = (schema) => (req, res, next) => {
   const result = schema.safeParse(req.body);

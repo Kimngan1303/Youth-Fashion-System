@@ -18,9 +18,14 @@ import {
   invalidateCustomerTokens,
   updateCustomerProfile,
   updateCustomerPassword,
+  createPasswordResetToken,
+  findLatestActivePasswordResetToken,
+  markPasswordResetTokenUsed,
+  invalidatePasswordResetTokens,
+  updateEmployeePassword,
 } from '../repositories/auth.repository.js';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../helpers/jwt.helper.js';
-import { sendVerificationOTP } from './email.service.js';
+import { sendVerificationOTP, sendPasswordResetOTP } from './email.service.js';
 
 /**
  * Service layer chứa toàn bộ Business Logic cho tính năng Đăng ký, Đăng nhập, Đăng xuất, Refresh Token, OTP, Profile
@@ -426,4 +431,97 @@ export const changePasswordService = async ({ customer_id, email, current_passwo
 
   return { message: 'Đổi mật khẩu thành công!' };
 };
+
+/**
+ * Xử lý nghiệp vụ Quên mật khẩu: Kiểm tra email, sinh OTP 6 chữ số, lưu token và gửi email
+ */
+export const forgotPasswordService = async ({ email }) => {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // 1. Kiểm tra tài khoản trong bảng Khách hàng hoặc Nhân viên
+  const customer = await findCustomerByEmail(normalizedEmail);
+  const employee = await findEmployeeByEmail(normalizedEmail);
+
+  if (!customer && !employee) {
+    throw { statusCode: 404, message: 'Địa chỉ email này chưa được đăng ký trong hệ thống Youth Fashion' };
+  }
+
+  const customer_id = customer?.customer_id ? customer.customer_id.toString() : null;
+  const employee_id = employee?.employee_id ? employee.employee_id.toString() : null;
+
+  // 2. Vô hiệu hóa bất kỳ OTP reset mật khẩu cũ nào chưa dùng
+  await invalidatePasswordResetTokens({ customer_id, employee_id });
+
+  // 3. Sinh mã OTP ngẫu nhiên 6 chữ số (100000 - 999999)
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  // 4. Băm OTP với SHA-256 an toàn
+  const token_hash = crypto.createHash('sha256').update(`${normalizedEmail}:${otp}`).digest('hex');
+  const expires_at = new Date(Date.now() + 15 * 60 * 1000); // 15 phút
+
+  // 5. Lưu vào CSDL
+  await createPasswordResetToken({
+    customer_id,
+    employee_id,
+    token_hash,
+    expires_at,
+  });
+
+  // 6. Gửi email chứa OTP
+  await sendPasswordResetOTP(normalizedEmail, otp);
+
+  return {
+    email: normalizedEmail,
+    message: 'Mã xác thực OTP đã được gửi đến hộp thư của bạn. Vui lòng kiểm tra email để thiết lập mật khẩu mới.',
+  };
+};
+
+/**
+ * Xử lý nghiệp vụ Đặt lại mật khẩu mới bằng OTP 6 chữ số
+ */
+export const resetPasswordService = async ({ email, otp, new_password }) => {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // 1. Tìm tài khoản
+  const customer = await findCustomerByEmail(normalizedEmail);
+  const employee = await findEmployeeByEmail(normalizedEmail);
+
+  if (!customer && !employee) {
+    throw { statusCode: 404, message: 'Tài khoản không tồn tại trong hệ thống' };
+  }
+
+  const customer_id = customer?.customer_id ? customer.customer_id.toString() : null;
+  const employee_id = employee?.employee_id ? employee.employee_id.toString() : null;
+
+  // 2. Tìm token active mới nhất
+  const resetToken = await findLatestActivePasswordResetToken({ customer_id, employee_id });
+  if (!resetToken) {
+    throw { statusCode: 400, message: 'Mã OTP không hợp lệ hoặc đã hết hạn. Quý khách vui lòng yêu cầu gửi lại mã mới.' };
+  }
+
+  // 3. Kiểm tra tính hợp lệ của OTP
+  const expectedHash = crypto.createHash('sha256').update(`${normalizedEmail}:${otp.trim()}`).digest('hex');
+  if (resetToken.token_hash !== expectedHash) {
+    throw { statusCode: 400, message: 'Mã OTP không chính xác. Quý khách vui lòng kiểm tra lại.' };
+  }
+
+  // 4. Mã hóa mật khẩu mới với Bcrypt (10 rounds)
+  const salt = await bcrypt.genSalt(10);
+  const newPasswordHash = await bcrypt.hash(new_password, salt);
+
+  // 5. Cập nhật mật khẩu mới vào cơ sở dữ liệu
+  if (customer) {
+    await updateCustomerPassword(customer.customer_id, newPasswordHash);
+  } else if (employee) {
+    await updateEmployeePassword(employee.employee_id, newPasswordHash);
+  }
+
+  // 6. Đánh dấu token đã được sử dụng
+  await markPasswordResetTokenUsed(resetToken.password_reset_token_id);
+
+  return {
+    message: 'Đặt lại mật khẩu thành công! Quý khách có thể đăng nhập ngay với mật khẩu mới.',
+  };
+};
+
 
