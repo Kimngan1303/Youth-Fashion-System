@@ -1,20 +1,21 @@
 import axios from 'axios';
 
+/**
+ * Axios Client instance configured for Youth Fashion API
+ */
 const axiosClient = axios.create({
-  // URL gốc của Backend API
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true,
+  withCredentials: true, // Crucial for receiving and sending HTTP-Only refresh token cookies
 });
 
+// Request Interceptor: Attach Access Token if present in localStorage
 axiosClient.interceptors.request.use(
   (config) => {
-    // Lấy Access Token từ bộ nhớ trình duyệt nếu có
     const token = localStorage.getItem('accessToken');
     if (token) {
-      // Đính kèm Token vào Header Authorization chuẩn Bearer
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -22,16 +23,16 @@ axiosClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Response Interceptor: Handle 401 Silent Token Refresh automatically
 axiosClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
+    // If Access Token expired (401) and request wasn't already retried
     if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/login')) {
-      originalRequest._retry = true; // Đánh dấu để tránh vòng lặp vô tận
-
+      originalRequest._retry = true;
       try {
-        // Gửi yêu cầu cấp lại token mới lên backend
         const refreshResponse = await axios.post(
           `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/refresh`,
           {},
@@ -40,22 +41,13 @@ axiosClient.interceptors.response.use(
 
         const newAccessToken = refreshResponse.data?.data?.accessToken;
         if (newAccessToken) {
-          // Lưu token mới vào localStorage
           localStorage.setItem('accessToken', newAccessToken);
-
-          // Cập nhật Header Authorization cho request cũ bằng token mới
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-
-          // Thực hiện gửi lại request ban đầu với token mới và trả kết quả về cho component
           return axiosClient(originalRequest);
         }
       } catch (refreshErr) {
-        // Nếu Refresh Token cũng đã hết hạn hoặc bị thu hồi (hết phiên 7 ngày)
-        // Dọn dẹp sạch thông tin phiên đăng nhập khỏi trình duyệt
         localStorage.removeItem('accessToken');
         localStorage.removeItem('user');
-
-        // Phát sự kiện toàn cục thông báo đăng xuất để AuthContext chuyển hướng người dùng về trang login
         window.dispatchEvent(new Event('auth:logout'));
         return Promise.reject(refreshErr);
       }

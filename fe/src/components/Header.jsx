@@ -212,6 +212,7 @@ const Header = ({ onOpenAISearch }) => {
           </Link>
 
           {/* Cart Icon */}
+          {/* Cart Icon */}
           <Link
             to="/cart"
             className={`action-icon ${location.pathname === '/cart' ? 'active' : ''}`}
@@ -222,13 +223,20 @@ const Header = ({ onOpenAISearch }) => {
           </Link>
 
           {/* Wishlist Icon */}
-          <Link
-            to={user ? "/profile?tab=wishlist" : "/login"}
-            className={`action-icon ${location.pathname === '/profile' && location.search.includes('wishlist') ? 'active' : ''}`}
-            title="Yêu thích"
+          <Link 
+            to="/wishlist" 
+            className={`action-icon ${location.pathname === '/wishlist' ? 'active' : ''}`} 
+            title="Sản phẩm yêu thích"
           >
-            <Heart size={18} />
-            <span className="badge">{user ? (wishlist ? wishlist.length : 0) : 0}</span>
+            <Heart 
+              size={18} 
+              className="wishlist-heart-icon"
+              fill={location.pathname === '/wishlist' ? '#ffffff' : 'none'} 
+              color={location.pathname === '/wishlist' ? '#ffffff' : 'currentColor'} 
+            />
+            {wishlist && wishlist.length > 0 && (
+              <span className="badge">{wishlist.length}</span>
+            )}
           </Link>
 
           {/* User Account */}
@@ -260,6 +268,13 @@ const Header = ({ onOpenAISearch }) => {
                   onClick={() => setShowUserMenu(false)}
                 >
                   Thông tin tài khoản
+                </Link>
+                <Link
+                  to="/wishlist"
+                  className="dropdown-item"
+                  onClick={() => setShowUserMenu(false)}
+                >
+                  Sản phẩm yêu thích
                 </Link>
                 {isManagerOrAdmin && (
                   <Link
