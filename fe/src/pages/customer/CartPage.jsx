@@ -61,8 +61,8 @@ export default function CartPage() {
   } = useAuth();
   const { showSuccess, showInfo, showError } = useToast();
 
-  const [voucherCode, setVoucherCode] = useState('YF-VIPMEMBER');
-  const [voucherApplied, setVoucherApplied] = useState(true);
+  const [voucherCode, setVoucherCode] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
   const [orderNote, setOrderNote] = useState('');
 
   const cartItems = cart || [];
@@ -112,12 +112,19 @@ export default function CartPage() {
       showError('Vui lòng nhập mã ưu đãi.');
       return;
     }
-    setVoucherApplied(true);
-    showSuccess('Đã áp dụng mã ưu đãi VIP Member (-300.000₫)!');
+    const code = voucherCode.trim().toUpperCase();
+    if (code === 'YOUTH10') {
+      setAppliedVoucher({ code, discountPercent: 10, discountAmount: 0 });
+      showSuccess('Đã áp dụng mã giảm giá 10%!');
+    } else {
+      setAppliedVoucher({ code, discountPercent: 0, discountAmount: 50000 });
+      showSuccess(`Đã áp dụng mã ưu đãi ${code}!`);
+    }
   };
 
   const handleRemoveVoucher = () => {
-    setVoucherApplied(false);
+    setAppliedVoucher(null);
+    setVoucherCode('');
     showInfo('Đã gỡ mã ưu đãi.');
   };
 
@@ -134,8 +141,17 @@ export default function CartPage() {
   const selectedItems = cartItems.filter(i => i.selected);
   const totalItemsCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
   const rawProductTotal = selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const vipDiscount = voucherApplied && rawProductTotal > 0 ? 300000 : 0;
-  const finalTotal = Math.max(0, rawProductTotal - vipDiscount);
+
+  let voucherDiscount = 0;
+  if (appliedVoucher && rawProductTotal > 0) {
+    if (appliedVoucher.discountPercent) {
+      voucherDiscount = Math.round((rawProductTotal * appliedVoucher.discountPercent) / 100);
+    } else if (appliedVoucher.discountAmount) {
+      voucherDiscount = Math.min(rawProductTotal, appliedVoucher.discountAmount);
+    }
+  }
+
+  const finalTotal = Math.max(0, rawProductTotal - voucherDiscount);
 
   // Original saved calculation
   const totalOriginalSaving = selectedItems.reduce((sum, item) => {
@@ -143,7 +159,7 @@ export default function CartPage() {
       return sum + (item.originalPrice - item.price) * item.quantity;
     }
     return sum;
-  }, 0) + vipDiscount;
+  }, 0) + voucherDiscount;
 
   return (
     <div className="cart-page-container">
@@ -346,14 +362,16 @@ export default function CartPage() {
                   <span className="row-value bold">{rawProductTotal.toLocaleString('vi-VN')}₫</span>
                 </div>
 
-                <div className="summary-row vip-discount-row">
-                  <span className="row-label">
-                    Ưu đãi VIP Member (-5%) <Info size={13} className="info-icon" />
-                  </span>
-                  <span className="row-value discount">
-                    -{vipDiscount.toLocaleString('vi-VN')}₫
-                  </span>
-                </div>
+                {appliedVoucher && voucherDiscount > 0 && (
+                  <div className="summary-row voucher-discount-row">
+                    <span className="row-label">
+                      Mã giảm giá ({appliedVoucher.code})
+                    </span>
+                    <span className="row-value discount">
+                      -{voucherDiscount.toLocaleString('vi-VN')}₫
+                    </span>
+                  </div>
+                )}
 
                 <div className="summary-row shipping-row">
                   <div className="shipping-label-group">
@@ -383,7 +401,7 @@ export default function CartPage() {
               {/* Voucher / Coupon Box */}
               <div className="voucher-box">
                 <span className="voucher-title">MÃ ƯU ĐÃI</span>
-                <p className="voucher-desc">Áp dụng mã giảm giá VIP Member hoặc thẻ quà tặng.</p>
+                <p className="voucher-desc">Nhập mã giảm giá hoặc thẻ quà tặng của bạn.</p>
                 <form className="voucher-input-group" onSubmit={handleApplyVoucher}>
                   <input
                     type="text"
@@ -396,11 +414,11 @@ export default function CartPage() {
                     ÁP DỤNG
                   </button>
                 </form>
-                {voucherApplied && (
+                {appliedVoucher && (
                   <div className="voucher-applied-tag">
                     <span className="applied-left">
                       <Check size={13} />
-                      <span>Voucher VIP Member (-300.000₫)</span>
+                      <span>Voucher {appliedVoucher.code} (-{voucherDiscount.toLocaleString('vi-VN')}₫)</span>
                     </span>
                     <button type="button" className="btn-remove-voucher" onClick={handleRemoveVoucher}>
                       GỠ MÃ

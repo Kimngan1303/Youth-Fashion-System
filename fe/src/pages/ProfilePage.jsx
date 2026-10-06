@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { 
-  User, Package, Lock, Heart, LogOut, CheckCircle, 
+import {
+  User, Package, Lock, Heart, LogOut, CheckCircle,
   Camera, MapPin, Calendar, Clock, CreditCard, ChevronRight, AlertCircle, Tag, Copy, LayoutDashboard, Eye, EyeOff
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -106,7 +106,7 @@ const ProfilePage = () => {
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
-  
+
   const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400';
 
   // Nén ảnh tải lên về chuẩn JPEG (max 400x400) để tối ưu lưu trữ CSDL & LocalStorage
@@ -257,7 +257,7 @@ const ProfilePage = () => {
       }
     }
   };
-  
+
   // Password State
   const [passData, setPassData] = useState({ currentPass: '', newPass: '', confirmPass: '' });
   const [showCurrentPass, setShowCurrentPass] = useState(false);
@@ -581,26 +581,26 @@ const ProfilePage = () => {
         <div className="profile-hero-banner">
           <div className="hero-banner-left">
             <div className="hero-avatar-box" title="Bấm để thay đổi ảnh đại diện">
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                accept="image/*" 
-                onChange={handleAvatarFileChange} 
-                style={{ display: 'none' }} 
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleAvatarFileChange}
+                style={{ display: 'none' }}
               />
-              <img 
-                src={formData.avatar_url || DEFAULT_AVATAR} 
-                alt={user?.full_name || 'Khách hàng Youth Fashion'} 
-                className="hero-avatar-img" 
+              <img
+                src={formData.avatar_url || DEFAULT_AVATAR}
+                alt={user?.full_name || 'Khách hàng Youth Fashion'}
+                className="hero-avatar-img"
                 onClick={() => fileInputRef.current?.click()}
                 onError={(e) => {
                   e.target.onerror = null;
                   e.target.src = DEFAULT_AVATAR;
                 }}
               />
-              <button 
-                type="button" 
-                className="avatar-change-btn" 
+              <button
+                type="button"
+                className="avatar-change-btn"
                 onClick={() => fileInputRef.current?.click()}
                 title="Thay đổi ảnh đại diện"
               >
@@ -610,13 +610,9 @@ const ProfilePage = () => {
 
             <div className="hero-info-content">
               <div className="hero-subtitle">
-                <span className="gold-text-hero">THÀNH VIÊN ĐẶC QUYỀN</span> <span className="dot">•</span> {user?.member_since || 'Từ Tháng 03/2023'}
+                <span className="gold-text-hero">THÀNH VIÊN MỚI</span> <span className="dot">•</span> {user?.member_since || 'Từ Tháng 03/2023'}
               </div>
               <h1 className="hero-user-name font-serif">{user?.full_name || 'Khách hàng Youth Fashion'}</h1>
-              <div className="hero-tier-pill">
-                <span className="tier-medal">🏅</span>
-                <span>{user?.tier || 'VIP GOLD ATELIER MEMBER'}</span>
-              </div>
             </div>
           </div>
 
@@ -639,7 +635,7 @@ const ProfilePage = () => {
 
             <div className="sidebar-nav-list">
               {/* Menu Item 1: Hồ Sơ Cá Nhân */}
-              <button 
+              <button
                 className={`nav-item-btn ${activeTab === 'info' ? 'active' : ''}`}
                 onClick={() => setActiveTab('info')}
               >
@@ -651,7 +647,7 @@ const ProfilePage = () => {
               </button>
 
               {/* Menu Item 2: Lịch Sử Đơn Hàng */}
-              <button 
+              <button
                 className={`nav-item-btn ${activeTab === 'orders' ? 'active' : ''}`}
                 onClick={() => setActiveTab('orders')}
               >
@@ -665,7 +661,7 @@ const ProfilePage = () => {
               </button>
 
               {/* Menu Item 3: Voucher & Mã Ưu Đãi */}
-              <button 
+              <button
                 className={`nav-item-btn ${activeTab === 'vouchers' ? 'active' : ''}`}
                 onClick={() => setActiveTab('vouchers')}
               >
@@ -677,7 +673,7 @@ const ProfilePage = () => {
               </button>
 
               {/* Menu Item 4: Đổi Mật Khẩu */}
-              <button 
+              <button
                 className={`nav-item-btn ${activeTab === 'password' ? 'active' : ''}`}
                 onClick={() => setActiveTab('password')}
               >
@@ -690,7 +686,7 @@ const ProfilePage = () => {
 
               {/* Menu Item: Bảng Quản Lý (Đối với tài khoản manager hoặc admin) */}
               {isManagerOrAdmin && (
-                <button 
+                <button
                   className="nav-item-btn"
                   onClick={() => navigate('/manager')}
                   style={{ color: '#0284c7', borderLeft: '3px solid #0284c7' }}
@@ -704,7 +700,7 @@ const ProfilePage = () => {
               )}
 
               {/* Menu Item 5: Đăng Xuất */}
-              <button 
+              <button
                 className="nav-item-btn logout-item-btn"
                 onClick={handleLogout}
               >
@@ -740,8 +736,8 @@ const ProfilePage = () => {
                       <label className="field-label">
                         HỌ VÀ TÊN <span className="field-required">*</span>
                       </label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         name="full_name"
                         className={`custom-input ${fullNameError ? 'input-error' : ''}`}
                         value={formData.full_name}
@@ -763,8 +759,8 @@ const ProfilePage = () => {
                       <label className="field-label">
                         ĐỊA CHỈ EMAIL <span className="field-required">*</span>
                       </label>
-                      <input 
-                        type="email" 
+                      <input
+                        type="email"
                         name="email"
                         className="custom-input input-disabled"
                         value={formData.email}
@@ -778,8 +774,8 @@ const ProfilePage = () => {
                       <label className="field-label">
                         SỐ ĐIỆN THOẠI DI ĐỘNG <span className="field-required">*</span>
                       </label>
-                      <input 
-                        type="tel" 
+                      <input
+                        type="tel"
                         name="phone"
                         className={`custom-input ${phoneError ? 'input-error' : ''}`}
                         value={formData.phone}
@@ -802,8 +798,8 @@ const ProfilePage = () => {
                         NGÀY SINH NHẬT <span className="field-required">*</span>
                       </label>
                       <div className="dob-picker-group">
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           name="dob"
                           className={`custom-input dob-text-input ${dobError ? 'input-error' : ''}`}
                           value={formData.dob}
@@ -814,15 +810,15 @@ const ProfilePage = () => {
                           inputMode="numeric"
                           required
                         />
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           className="dob-calendar-btn"
                           onClick={() => hiddenDateRef.current?.showPicker ? hiddenDateRef.current.showPicker() : hiddenDateRef.current?.click()}
                           title="Mở lịch chọn ngày"
                         >
                           <Calendar size={18} />
                         </button>
-                        <input 
+                        <input
                           ref={hiddenDateRef}
                           type="date"
                           tabIndex={-1}
@@ -850,9 +846,9 @@ const ProfilePage = () => {
                     <div className="gender-radio-options">
                       {['Nữ', 'Nam', 'Khác / Không tiết lộ'].map((g) => (
                         <label key={g} className="custom-radio-label">
-                          <input 
-                            type="radio" 
-                            name="gender" 
+                          <input
+                            type="radio"
+                            name="gender"
                             value={g}
                             checked={formData.gender === g}
                             onChange={handleInputChange}
@@ -1019,7 +1015,7 @@ const ProfilePage = () => {
                         <p className="voucher-desc">{v.desc}</p>
                         <div className="voucher-footer">
                           <span className="voucher-expiry">{v.expiry}</span>
-                          <button 
+                          <button
                             className="copy-code-btn"
                             onClick={() => handleCopyVoucher(v.code)}
                           >
@@ -1053,8 +1049,8 @@ const ProfilePage = () => {
                   <div className="field-group">
                     <label className="field-label">MẬT KHẨU HIỆN TẠI <span className="field-required">*</span></label>
                     <div className="password-input-relative">
-                      <input 
-                        type={showCurrentPass ? 'text' : 'password'} 
+                      <input
+                        type={showCurrentPass ? 'text' : 'password'}
                         className="custom-input"
                         value={passData.currentPass}
                         onChange={(e) => setPassData(p => ({ ...p, currentPass: e.target.value }))}
@@ -1076,8 +1072,8 @@ const ProfilePage = () => {
                   <div className="field-group">
                     <label className="field-label">MẬT KHẨU MỚI <span className="field-required">*</span></label>
                     <div className="password-input-relative">
-                      <input 
-                        type={showNewPass ? 'text' : 'password'} 
+                      <input
+                        type={showNewPass ? 'text' : 'password'}
                         className={`custom-input ${newPassError ? 'input-error' : ''}`}
                         value={passData.newPass}
                         onChange={handleNewPassChange}
@@ -1106,8 +1102,8 @@ const ProfilePage = () => {
                   <div className="field-group">
                     <label className="field-label">XÁC NHẬN MẬT KHẨU MỚI <span className="field-required">*</span></label>
                     <div className="password-input-relative">
-                      <input 
-                        type={showConfirmPass ? 'text' : 'password'} 
+                      <input
+                        type={showConfirmPass ? 'text' : 'password'}
                         className={`custom-input ${confirmPassError ? 'input-error' : ''}`}
                         value={passData.confirmPass}
                         onChange={handleConfirmPassChange}

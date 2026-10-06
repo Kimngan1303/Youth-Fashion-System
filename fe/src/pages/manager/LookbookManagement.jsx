@@ -184,6 +184,36 @@ export default function LookbookManagement() {
     return filteredLookbooks.slice(start, start + itemsPerPage);
   }, [filteredLookbooks, currentPage, itemsPerPage]);
 
+  const getPaginationPages = (page, total) => {
+    if (total <= 5) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const delta = 1;
+    const range = [];
+    const pagesWithDots = [];
+
+    for (let i = 1; i <= total; i++) {
+      if (i === 1 || i === total || (i >= page - delta && i <= page + delta)) {
+        range.push(i);
+      }
+    }
+
+    let prevPage;
+    for (let i of range) {
+      if (prevPage) {
+        if (i - prevPage === 2) {
+          pagesWithDots.push(prevPage + 1);
+        } else if (i - prevPage !== 1) {
+          pagesWithDots.push('...');
+        }
+      }
+      pagesWithDots.push(i);
+      prevPage = i;
+    }
+
+    return pagesWithDots;
+  };
+
   // ==========================================================================
   // [PHẦN 4] XỬ LÝ CHỌN CHECKBOX VÀ XÓA LOOKBOOK
   // ==========================================================================
@@ -689,7 +719,7 @@ export default function LookbookManagement() {
         .manager-layout {
           display: flex;
           flex-direction: row;
-          align-items: flex-start;
+          align-items: stretch;
           padding: 0px;
           width: 100%;
           min-height: 100vh;
@@ -1850,16 +1880,25 @@ export default function LookbookManagement() {
                     &lt; Trang trước
                   </button>
 
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                    <button
-                      key={page}
-                      type="button"
-                      className={`btn-page-num ${currentPage === page ? 'active' : ''}`}
-                      onClick={() => setCurrentPage(page)}
-                    >
-                      {page}
-                    </button>
-                  ))}
+                  {getPaginationPages(currentPage, totalPages).map((page, idx) => {
+                    if (page === '...') {
+                      return (
+                        <span key={`dots-${idx}`} className="btn-page-ellipsis" style={{ minWidth: '28px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8C857B', fontWeight: 700 }}>
+                          ...
+                        </span>
+                      );
+                    }
+                    return (
+                      <button
+                        key={page}
+                        type="button"
+                        className={`btn-page-num ${currentPage === page ? 'active' : ''}`}
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
 
                   <button
                     type="button"

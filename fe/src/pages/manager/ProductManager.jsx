@@ -33,7 +33,7 @@ const productManagerStyles = `
   .manager-layout {
     display: flex;
     flex-direction: row;
-    align-items: flex-start;
+    align-items: stretch;
     padding: 0px;
     width: 100%;
     min-height: 100vh;
@@ -51,9 +51,16 @@ const productManagerStyles = `
     padding: 0px;
     width: 268px;
     min-width: 268px;
-    min-height: 100vh;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    left: 0;
+    align-self: stretch;
+    flex-shrink: 0;
     background: #FFFFFF;
     border-right: 1px solid #E8E6E1;
+    overflow-y: auto;
+    z-index: 100;
   }
 
   .sidebar-top-part {
@@ -80,11 +87,12 @@ const productManagerStyles = `
   .brand-logo-text {
     font-family: 'Playfair Display', serif;
     font-weight: 900;
-    font-size: 17px;
-    line-height: 26px;
-    letter-spacing: 3px;
+    font-size: 15px;
+    line-height: 1.2;
+    letter-spacing: 1.5px;
     text-transform: uppercase;
     color: #111111;
+    white-space: nowrap;
   }
 
   .nav-section-label {
@@ -858,12 +866,127 @@ const productManagerStyles = `
     font-weight: 600;
     cursor: pointer;
   }
+
+  /* Pagination styles */
+  .product-pagination-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-top: 1px solid #E8E6E1;
+    background: #FFFFFF;
+    border-radius: 0 0 12px 12px;
+    font-size: 13px;
+    color: #57534E;
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  .pagination-buttons-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-page-nav {
+    padding: 6px 14px;
+    border: 1px solid #E7E5E4;
+    background: #FFFFFF;
+    color: #1C1917;
+    border-radius: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-page-nav:hover:not(:disabled) {
+    background: #F5F4EF;
+    border-color: #D6D3D1;
+  }
+
+  .btn-page-nav:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn-page-num {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 6px;
+    border: 1px solid #E7E5E4;
+    background: #FFFFFF;
+    color: #1C1917;
+    border-radius: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+  }
+
+  .btn-page-num:hover:not(.active):not(:disabled) {
+    background: #F5F4EF;
+    border-color: #D6D3D1;
+  }
+
+  .btn-page-num.active {
+    background: #111111;
+    color: #FFFFFF;
+    border-color: #111111;
+  }
+
+  .btn-page-ellipsis {
+    min-width: 28px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #8C857B;
+    font-size: 13px;
+    font-weight: 700;
+    user-select: none;
+  }
 `;
 
 export default function ProductManager() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
+
+  // Helper tính toán danh sách trang hiển thị động: luôn hiển thị trang trước, hiện tại, kế tiếp và trang đầu/cuối
+  const getPaginationPages = (currentPage, totalPages) => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const delta = 1; // Luôn hiển thị 1 trang trước và 1 trang kế tiếp xung quanh trang hiện tại
+    const range = [];
+    const pagesWithDots = [];
+
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
+        range.push(i);
+      }
+    }
+
+    let prevPage;
+    for (let i of range) {
+      if (prevPage) {
+        if (i - prevPage === 2) {
+          pagesWithDots.push(prevPage + 1);
+        } else if (i - prevPage !== 1) {
+          pagesWithDots.push('...');
+        }
+      }
+      pagesWithDots.push(i);
+      prevPage = i;
+    }
+
+    return pagesWithDots;
+  };
 
   // State quản lý danh sách sản phẩm từ MySQL
   const [products, setProducts] = useState([]);
@@ -872,10 +995,10 @@ export default function ProductManager() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  // Filter & Search & Pagination
+  // Filter & Search & Pagination (5 sản phẩm 1 trang)
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
+  const [pagination, setPagination] = useState({ page: 1, limit: 5, total: 0, totalPages: 1 });
 
   // Drawer modal state for Create / Edit / View
   const [drawerMode, setDrawerMode] = useState(null); // 'create' | 'edit' | 'view'
@@ -1193,7 +1316,10 @@ export default function ProductManager() {
         {/* Header Bar */}
         <ManagerHeader
           searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
+          onSearchChange={(val) => {
+            setSearchTerm(val);
+            setPagination((prev) => ({ ...prev, page: 1 }));
+          }}
           searchPlaceholder="Tìm tên sản phẩm trong CSDL MySQL..."
         />
 
@@ -1252,7 +1378,10 @@ export default function ProductManager() {
                   <input
                     placeholder="Lọc theo tên..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setPagination((prev) => ({ ...prev, page: 1 }));
+                    }}
                   />
                 </div>
 
@@ -1260,7 +1389,10 @@ export default function ProductManager() {
                   <select
                     className="filter-select"
                     value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedCategory(e.target.value);
+                      setPagination((prev) => ({ ...prev, page: 1 }));
+                    }}
                   >
                     <option value="">Danh mục: Tất cả</option>
                     {categories.map((c) => (
@@ -1288,93 +1420,145 @@ export default function ProductManager() {
                 <p>Không tìm thấy sản phẩm nào trong MySQL.</p>
               </div>
             ) : (
-              <table className="product-data-table">
-                <thead>
-                  <tr>
-                    <th>SẢN PHẨM & ẢNH ĐẠI DIỆN</th>
-                    <th>DANH MỤC / BRAND</th>
-                    <th>GIÁ BÁN</th>
-                    <th>TỒN KHO & BIẾN THỂ</th>
-                    <th style={{ textAlign: 'center' }}>TRẠNG THÁI</th>
-                    <th style={{ textAlign: 'right', paddingRight: '24px' }}>THAO TÁC</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((p) => {
-                    const primaryImg = p.images?.find((img) => img.is_primary) || p.images?.[0];
-                    const minPrice = p.variants?.length > 0 ? Math.min(...p.variants.map((v) => v.price)) : 0;
-                    const totalStock = calculateStock(p.variants);
+              <>
+                <table className="product-data-table">
+                  <thead>
+                    <tr>
+                      <th>SẢN PHẨM & ẢNH ĐẠI DIỆN</th>
+                      <th>DANH MỤC / BRAND</th>
+                      <th>GIÁ BÁN</th>
+                      <th>TỒN KHO & BIẾN THỂ</th>
+                      <th style={{ textAlign: 'center' }}>TRẠNG THÁI</th>
+                      <th style={{ textAlign: 'right', paddingRight: '24px' }}>THAO TÁC</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((p) => {
+                      const primaryImg = p.images?.find((img) => img.is_primary) || p.images?.[0];
+                      const minPrice = p.variants?.length > 0 ? Math.min(...p.variants.map((v) => v.price)) : 0;
+                      const totalStock = calculateStock(p.variants);
 
-                    return (
-                      <tr key={p.product_id}>
-                        <td>
-                          <div className="product-info-cell">
-                            <img
-                              src={primaryImg?.image_url || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=150'}
-                              alt={p.product_name}
-                              className="product-thumb"
-                            />
-                            <div>
-                              <div className="product-name-title">{p.product_name}</div>
-                              <div style={{ fontSize: '11px', color: '#78716C' }}>
-                                #{p.product_id} • {p.images?.length || 0} ảnh trong bộ sưu tập
+                      return (
+                        <tr key={p.product_id}>
+                          <td>
+                            <div className="product-info-cell">
+                              <img
+                                src={primaryImg?.image_url || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=150'}
+                                alt={p.product_name}
+                                className="product-thumb"
+                              />
+                              <div>
+                                <div className="product-name-title">{p.product_name}</div>
+                                <div style={{ fontSize: '11px', color: '#78716C' }}>
+                                  #{p.product_id} • {p.images?.length || 0} ảnh trong bộ sưu tập
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ fontWeight: 600 }}>{p.category?.category_name || 'N/A'}</div>
-                          <div style={{ fontSize: '11px', color: '#78716C' }}>{p.brand?.brand_name || 'N/A'}</div>
-                        </td>
-                        <td>
-                          <div className="price-cell-main">{formatPrice(minPrice)}</div>
-                        </td>
-                        <td>
-                          <span className="stock-total-bold">{totalStock} chiếc</span>
-                          <span className="stock-sizes-subtext">
-                            ({p.variants?.map((v) => `${v.size}/${v.color}:${v.stock}`).join(', ')})
-                          </span>
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <span className={p.status === 'ACTIVE' ? 'status-pill-green' : 'status-pill-orange'}>
-                            {p.status === 'ACTIVE' ? 'Đang bán' : 'Ẩn'}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: 'right', paddingRight: '20px' }}>
-                          <div className="action-buttons-cell">
-                            <button
-                              type="button"
-                              className="action-btn-item edit"
-                              title="Chỉnh sửa & Quản lý ảnh"
-                              onClick={() => handleOpenEditDrawer(p, 'edit')}
-                            >
-                              <Edit size={16} />
-                            </button>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{p.category?.category_name || 'N/A'}</div>
+                            <div style={{ fontSize: '11px', color: '#78716C' }}>{p.brand?.brand_name || 'N/A'}</div>
+                          </td>
+                          <td>
+                            <div className="price-cell-main">{formatPrice(minPrice)}</div>
+                          </td>
+                          <td>
+                            <span className="stock-total-bold">{totalStock} chiếc</span>
+                            <span className="stock-sizes-subtext">
+                              ({p.variants?.map((v) => `${v.size}/${v.color}:${v.stock}`).join(', ')})
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className={p.status === 'ACTIVE' ? 'status-pill-green' : 'status-pill-orange'}>
+                              {p.status === 'ACTIVE' ? 'Đang bán' : 'Ẩn'}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                            <div className="action-buttons-cell">
+                              <button
+                                type="button"
+                                className="action-btn-item edit"
+                                title="Chỉnh sửa & Quản lý ảnh"
+                                onClick={() => handleOpenEditDrawer(p, 'edit')}
+                              >
+                                <Edit size={16} />
+                              </button>
 
-                            <button
-                              type="button"
-                              className="action-btn-item view"
-                              title="Xem chi tiết"
-                              onClick={() => handleOpenEditDrawer(p, 'view')}
-                            >
-                              <Eye size={16} />
-                            </button>
+                              <button
+                                type="button"
+                                className="action-btn-item view"
+                                title="Xem chi tiết"
+                                onClick={() => handleOpenEditDrawer(p, 'view')}
+                              >
+                                <Eye size={16} />
+                              </button>
 
-                            <button
-                              type="button"
-                              className="action-btn-item delete"
-                              title="Xóa sản phẩm"
-                              onClick={() => setDeleteProductItem(p)}
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                              <button
+                                type="button"
+                                className="action-btn-item delete"
+                                title="Xóa sản phẩm"
+                                onClick={() => setDeleteProductItem(p)}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                {/* Pagination Controls */}
+                {pagination.totalPages > 1 && (
+                  <div className="product-pagination-row">
+                    <div className="pagination-info-text">
+                      Hiển thị <strong>{products.length > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0} - {Math.min(pagination.page * pagination.limit, pagination.total)}</strong> trong tổng số <strong>{pagination.total}</strong> sản phẩm
+                    </div>
+
+                    <div className="pagination-buttons-group">
+                      <button
+                        type="button"
+                        className="btn-page-nav"
+                        disabled={pagination.page <= 1 || loading}
+                        onClick={() => setPagination((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+                      >
+                        &lt; Trang trước
+                      </button>
+
+                      {getPaginationPages(pagination.page, pagination.totalPages).map((p, idx) => {
+                        if (p === '...') {
+                          return (
+                            <span key={`ellipsis-${idx}`} className="btn-page-ellipsis">
+                              ...
+                            </span>
+                          );
+                        }
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            className={`btn-page-num ${pagination.page === p ? 'active' : ''}`}
+                            disabled={loading}
+                            onClick={() => setPagination((prev) => ({ ...prev, page: p }))}
+                          >
+                            {p}
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        type="button"
+                        className="btn-page-nav"
+                        disabled={pagination.page >= pagination.totalPages || loading}
+                        onClick={() => setPagination((prev) => ({ ...prev, page: Math.min(prev.totalPages, prev.page + 1) }))}
+                      >
+                        Trang sau &gt;
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
