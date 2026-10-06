@@ -4,7 +4,14 @@ import { useAuth } from '../context/AuthContext';
 
 const ProductCard = ({ product }) => {
   const { wishlist, toggleWishlist } = useAuth();
-  const isLiked = wishlist.includes(product.id);
+
+  const isLiked = wishlist.some(i => (typeof i === 'object' ? (i.id === product.id || i.product_id === product.id) : i === product.id));
+
+  const handleToggleFavorite = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleWishlist(product);
+  };
 
   return (
     <div className="product-card">
@@ -20,9 +27,10 @@ const ProductCard = ({ product }) => {
 
         {/* Favorite heart button */}
         <button 
+          type="button"
           className={`favorite-btn ${isLiked ? 'liked' : ''}`}
-          onClick={() => toggleWishlist(product.id)}
-          title={isLiked ? 'Đã lưu' : 'Thêm vào yêu thích'}
+          onClick={handleToggleFavorite}
+          title={isLiked ? 'Đã lưu trong yêu thích' : 'Thêm vào yêu thích'}
         >
           <Heart size={15} fill={isLiked ? '#ef4444' : 'none'} color={isLiked ? '#ef4444' : '#111827'} />
         </button>

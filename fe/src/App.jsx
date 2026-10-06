@@ -8,6 +8,8 @@ import Footer from './components/Footer';
 import AISearchModal from './components/AISearchModal';
 import HomePage from './pages/HomePage';
 import ProductListPage from './pages/customer/ProductListPage';
+import WishlistPage from './pages/customer/WishlistPage';
+import CartPage from './pages/customer/CartPage';
 import ProfilePage from './pages/ProfilePage';
 import ContactPage from './pages/ContactPage';
 import LookbookPage from './pages/LookbookPage';
@@ -26,7 +28,6 @@ function ProtectedRoute({ children }) {
 }
 
 function AppContent() {
-  // Quản lý trạng thái đóng/mở của hộp thoại Tìm kiếm AI đa phương thức
   const [isAISearchOpen, setIsAISearchOpen] = useState(false);
   const location = useLocation();
 
@@ -35,13 +36,10 @@ function AppContent() {
 
   return (
     <div className="app-layout">
-      {/* 1. Header điều hướng chính (chỉ hiển thị ở các trang mua sắm thông thường) */}
       {!hideHeaderFooter && <Header onOpenAISearch={() => setIsAISearchOpen(true)} />}
 
-      {/* 2. Khu vực hiển thị nội dung trang theo URL (Routing) */}
       <main className="app-main">
         <Routes>
-          {/* Nhóm Route Xác thực (Authentication) */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
@@ -56,6 +54,8 @@ function AppContent() {
             element={<ProductListPage onOpenAISearch={() => setIsAISearchOpen(true)} />} 
           />
           <Route path="/lookbook" element={<LookbookPage />} />
+          <Route path="/wishlist" element={<WishlistPage />} />
+          <Route path="/cart" element={<CartPage />} />
           <Route 
             path="/profile" 
             element={
@@ -65,8 +65,6 @@ function AppContent() {
             } 
           />
           <Route path="/contact" element={<ContactPage />} />
-
-          {/* Nhóm Route Quản trị viên & Quản lý cửa hàng (Manager Dashboard) */}
           <Route
             path="/manager"
             element={
@@ -75,6 +73,7 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
+          
           <Route
             path="/manager/products"
             element={
@@ -107,27 +106,25 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
-
-          {/* Chuyển về trang chủ nếu gõ sai đường dẫn */}
-          <Route
-            path="*"
-            element={<HomePage onOpenAISearch={() => setIsAISearchOpen(true)} />}
+          
+          {/* Fallback routes */}
+          <Route 
+            path="*" 
+            element={<HomePage onOpenAISearch={() => setIsAISearchOpen(true)} />} 
           />
         </Routes>
       </main>
 
-      {/* 3. Footer chân trang */}
       {!hideHeaderFooter && <Footer />}
 
-      {/* 4. Modal tìm kiếm AI đa phương thức (Văn bản + Hình ảnh thông minh) */}
+      {/* Multimodal AI Search Modal */}
       {!hideHeaderFooter && (
-        <AISearchModal
-          isOpen={isAISearchOpen}
-          onClose={() => setIsAISearchOpen(false)}
+        <AISearchModal 
+          isOpen={isAISearchOpen} 
+          onClose={() => setIsAISearchOpen(false)} 
         />
       )}
 
-      {/* Tùy chỉnh CSS cục bộ cho cấu trúc khung giao diện */}
       <style>{`
         .app-layout {
           display: flex;
