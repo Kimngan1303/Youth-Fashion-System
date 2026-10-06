@@ -29,10 +29,17 @@ const sidebarStyles = `
     padding: 0px;
     width: 268px;
     min-width: 268px;
-    min-height: 100vh;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    left: 0;
+    align-self: stretch;
+    flex-shrink: 0;
     background: #FFFFFF;
     border-right: 1px solid #E8E6E1;
     font-family: 'Inter', sans-serif;
+    overflow-y: auto;
+    z-index: 100;
   }
 
   .sidebar-top-part {
@@ -59,11 +66,12 @@ const sidebarStyles = `
   .brand-logo-text {
     font-family: 'Playfair Display', serif;
     font-weight: 900;
-    font-size: 17px;
-    line-height: 26px;
-    letter-spacing: 3.06px;
+    font-size: 15px;
+    line-height: 1.2;
+    letter-spacing: 1.5px;
     text-transform: uppercase;
     color: #111111;
+    white-space: nowrap;
   }
 
   .nav-section-label {

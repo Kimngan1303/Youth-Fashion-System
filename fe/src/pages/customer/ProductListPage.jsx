@@ -96,6 +96,15 @@ export default function ProductListPage({ onOpenAISearch }) {
 
   return (
     <div className="product-list-page">
+      {/* 0. Breadcrumbs Bar (Trang chủ > Danh mục) */}
+      <div className="catalog-breadcrumb-bar">
+        <div className="container catalog-breadcrumb-content">
+          <Link to="/" className="bc-link">TRANG CHỦ</Link>
+          <span className="bc-sep">&gt;</span>
+          <span className="bc-current">DANH MỤC</span>
+        </div>
+      </div>
+
       {/* 1. Header Banner */}
       <section className="catalog-banner">
         <div className="container banner-inner">
@@ -285,6 +294,43 @@ export default function ProductListPage({ onOpenAISearch }) {
           background-color: #faf9f6;
           min-height: 100vh;
           padding-bottom: 80px;
+        }
+
+        /* 0. Breadcrumbs Bar (Trang chủ > Danh mục) */
+        .catalog-breadcrumb-bar {
+          background-color: #ffffff;
+          border-bottom: 1px solid #e5e7eb;
+          padding: 14px 0;
+        }
+
+        .catalog-breadcrumb-content {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.5px;
+          color: #6b7280;
+        }
+
+        .bc-link {
+          color: #6b7280;
+          text-decoration: none;
+          transition: color 0.15s;
+        }
+
+        .bc-link:hover {
+          color: #111827;
+        }
+
+        .bc-sep {
+          color: #d1d5db;
+          font-size: 10px;
+        }
+
+        .bc-current {
+          color: #111827;
+          font-weight: 700;
         }
 
         .catalog-banner {

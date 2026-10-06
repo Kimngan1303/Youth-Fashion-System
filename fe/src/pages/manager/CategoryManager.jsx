@@ -21,7 +21,7 @@ const categoryManagerStyles = `
   .manager-layout {
     display: flex;
     flex-direction: row;
-    align-items: flex-start;
+    align-items: stretch;
     padding: 0px;
     width: 100%;
     min-height: 100vh;

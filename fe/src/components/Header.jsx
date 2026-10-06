@@ -123,7 +123,7 @@ const Header = ({ onOpenAISearch }) => {
           <li className={location.pathname === '/' ? 'active' : ''}>
             <Link to="/">TRANG CHỦ</Link>
           </li>
-          <li 
+          <li
             className={`dropdown-trigger ${location.pathname.startsWith('/products') || location.pathname.startsWith('/category') ? 'active' : ''}`}
             onMouseEnter={handleCategoryMouseEnter}
             onMouseLeave={handleCategoryMouseLeave}
@@ -177,9 +177,9 @@ const Header = ({ onOpenAISearch }) => {
           </button>
 
           {/* Cart Icon */}
-          <Link 
-            to="/cart" 
-            className={`action-icon ${location.pathname === '/cart' ? 'active' : ''}`} 
+          <Link
+            to="/cart"
+            className={`action-icon ${location.pathname === '/cart' ? 'active' : ''}`}
             title="Giỏ hàng"
           >
             <ShoppingBag size={18} />
@@ -187,16 +187,16 @@ const Header = ({ onOpenAISearch }) => {
           </Link>
 
           {/* Wishlist Icon */}
-          <Link 
-            to="/wishlist" 
-            className={`action-icon ${location.pathname === '/wishlist' ? 'active' : ''}`} 
+          <Link
+            to="/wishlist"
+            className={`action-icon ${location.pathname === '/wishlist' ? 'active' : ''}`}
             title="Sản phẩm yêu thích"
           >
-            <Heart 
-              size={18} 
+            <Heart
+              size={18}
               className="wishlist-heart-icon"
-              fill={location.pathname === '/wishlist' ? '#ffffff' : 'none'} 
-              color={location.pathname === '/wishlist' ? '#ffffff' : 'currentColor'} 
+              fill={location.pathname === '/wishlist' ? '#ffffff' : 'none'}
+              color={location.pathname === '/wishlist' ? '#ffffff' : 'currentColor'}
             />
             {wishlist && wishlist.length > 0 && (
               <span className="badge">{wishlist.length}</span>
