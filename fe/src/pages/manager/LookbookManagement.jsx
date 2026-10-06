@@ -1747,7 +1747,7 @@ export default function LookbookManagement() {
                                   alt={lb.title}
                                   className="lb-thumb-img"
                                   onError={(e) => {
-                                    e.target.src = 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600';
+                                    e.target.style.display = 'none';
                                   }}
                                 />
                                 <div>
@@ -1780,10 +1780,10 @@ export default function LookbookManagement() {
                             <td>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <span style={{ fontWeight: 700, fontSize: '13px', color: '#111111' }}>
-                                  {lb.price || '5.445.000₫'}
+                                  {lb.price || '—'}
                                 </span>
                                 <span style={{ fontSize: '11.5px', color: '#6B7280' }}>
-                                  {lb.productCount || 1} sản phẩm phối
+                                  {lb.productCount || 0} sản phẩm phối
                                 </span>
                               </div>
                             </td>

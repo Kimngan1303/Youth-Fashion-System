@@ -160,9 +160,11 @@ const HomePage = ({ onOpenAISearch }) => {
             <h2 className="lookbook-title font-serif">
               {featuredLookbook.title}
             </h2>
-            <p className="lookbook-desc">
-              {featuredLookbook.description || "Nơi phong cách thanh lịch hòa cùng nghệ thuật may đo thủ công Pháp. Khám phá các thiết kế thời thượng tôn vinh thần thái của bạn."}
-            </p>
+            {featuredLookbook.description && (
+              <p className="lookbook-desc">
+                {featuredLookbook.description}
+              </p>
+            )}
             <Link to="/lookbook" className="btn-black lookbook-btn">
               KHÁM PHÁ TUYỂN TẬP LOOKBOOK &rarr;
             </Link>
@@ -171,31 +173,33 @@ const HomePage = ({ onOpenAISearch }) => {
           {/* Lưới 3 ảnh Lookbook tương ứng với các vị trí 1, 2, 3 */}
           <div className="lookbook-photos-grid">
             {/* Ảnh Lookbook Vị trí #1 */}
-            <div className="lb-photo-col" style={{ position: 'relative' }}>
-              <span style={{
-                position: 'absolute',
-                top: '16px',
-                left: '16px',
-                background: '#FFFFFF',
-                color: '#111827',
-                padding: '4px 10px',
-                fontSize: '11px',
-                fontWeight: 700,
-                borderRadius: '4px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                zIndex: 2
-              }}>
-                {getLookCodeByPosition(featuredLookbook.position)}
-              </span>
-              <img
-                src={featuredLookbook.image || "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=600"}
-                alt={featuredLookbook.title}
-                className="lb-img"
-              />
-            </div>
+            {featuredLookbook.image && (
+              <div className="lb-photo-col" style={{ position: 'relative' }}>
+                <span style={{
+                  position: 'absolute',
+                  top: '16px',
+                  left: '16px',
+                  background: '#FFFFFF',
+                  color: '#111827',
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  borderRadius: '4px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                  zIndex: 2
+                }}>
+                  {getLookCodeByPosition(featuredLookbook.position)}
+                </span>
+                <img
+                  src={featuredLookbook.image}
+                  alt={featuredLookbook.title || ''}
+                  className="lb-img"
+                />
+              </div>
+            )}
 
             {/* Ảnh Lookbook Vị trí #2 */}
-            {secondLookbook && (
+            {secondLookbook && secondLookbook.image && (
               <div className="lb-photo-col" style={{ position: 'relative' }}>
                 <span style={{
                   position: 'absolute',
@@ -213,15 +217,15 @@ const HomePage = ({ onOpenAISearch }) => {
                   {getLookCodeByPosition(secondLookbook.position)}
                 </span>
                 <img
-                  src={secondLookbook.image || "https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=600"}
-                  alt={secondLookbook.title || "Lookbook Highlight 2"}
+                  src={secondLookbook.image}
+                  alt={secondLookbook.title || ''}
                   className="lb-img"
                 />
               </div>
             )}
 
             {/* Ảnh Lookbook Vị trí #3 */}
-            {thirdLookbook && (
+            {thirdLookbook && thirdLookbook.image && (
               <div className="lb-photo-col" style={{ position: 'relative' }}>
                 <span style={{
                   position: 'absolute',
@@ -239,8 +243,8 @@ const HomePage = ({ onOpenAISearch }) => {
                   {getLookCodeByPosition(thirdLookbook.position)}
                 </span>
                 <img
-                  src={thirdLookbook.image || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600"}
-                  alt={thirdLookbook.title || "Lookbook Highlight 3"}
+                  src={thirdLookbook.image}
+                  alt={thirdLookbook.title || ''}
                   className="lb-img"
                 />
               </div>

@@ -764,31 +764,35 @@ export default function LookbookPage() {
         <>
           {/* ------------------------------------------------------------------
               KHỐI 2: ẢNH BÌA HERO CINEMATIC BANNER (ĐIỀU KHIỂN BỞI VỊ TRÍ BANNER)
-              - Ảnh chụp toàn cảnh đại lộ Paris, tag chiến dịch và mô tả phong cách
+              - Ảnh chụp toàn cảnh, tag chiến dịch và mô tả phong cách từ SQL
               ------------------------------------------------------------------ */}
           {heroItem && (
             <section className="lb-hero-editorial">
-              <img
-                src={heroItem.image || "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1600"}
-                alt={heroItem.title}
-                className="lb-hero-bg-img"
-              />
+              {heroItem.image && (
+                <img
+                  src={heroItem.image}
+                  alt={heroItem.title || ''}
+                  className="lb-hero-bg-img"
+                />
+              )}
               <div className="lb-hero-overlay" />
 
               <div className="lb-hero-content">
-                <span className="lb-hero-campaign-tag">
-                  {heroItem.season ? (
-                    heroItem.season.includes('•')
-                      ? heroItem.season.toUpperCase()
-                      : `${heroItem.season.toUpperCase()}`
-                  ) : "LOOKBOOK EDITORIAL VOL. 04"}
-                </span>
-                <h1 className="lb-hero-main-heading">
-                  {heroItem.title ? heroItem.title.replace(/^Ảnh Bìa Hero Banner:\s*/i, '') : "L'AUTOMNE ÉTERNEL"}
-                </h1>
-                <p className="lb-hero-desc">
-                  {heroItem.description || "Khắc họa vẻ đẹp vĩnh cửu giữa thu Paris — Bản giao hưởng của dạ cashmere & lụa tơ tằm thượng hạng."}
-                </p>
+                {heroItem.season && (
+                  <span className="lb-hero-campaign-tag">
+                    {heroItem.season.toUpperCase()}
+                  </span>
+                )}
+                {heroItem.title && (
+                  <h1 className="lb-hero-main-heading">
+                    {heroItem.title}
+                  </h1>
+                )}
+                {heroItem.description && (
+                  <p className="lb-hero-desc">
+                    {heroItem.description}
+                  </p>
+                )}
               </div>
             </section>
           )}
@@ -799,16 +803,18 @@ export default function LookbookPage() {
               ------------------------------------------------------------------ */}
           <main className="lb-editorial-body">
 
-            {/* --- KHỐI 4.1: LOOK 01 (Áo Măng Tô & Điểm Chạm Tương Tác Hotspots) --- */}
+            {/* --- KHỐI 4.1: LOOK 01 (Điểm Chạm Tương Tác Hotspots) --- */}
             {look1 && (
               <section className="lb-split-look-card">
                 {/* Cột ảnh trái với các điểm chạm (+) xem tên phụ kiện */}
                 <div className="lb-photo-relative">
-                  <img
-                    src={look1.image || "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=1000"}
-                    alt={look1.title}
-                    className="lb-editorial-img"
-                  />
+                  {look1.image && (
+                    <img
+                      src={look1.image}
+                      alt={look1.title || ''}
+                      className="lb-editorial-img"
+                    />
+                  )}
                   {look1.hotspots?.map((hs, idx) => (
                     <div
                       key={idx}
@@ -831,18 +837,20 @@ export default function LookbookPage() {
                   <div>
                     <div className="lb-look-tag-row">
                       <span className="lb-look-category">
-                        {look1.season || 'PHONG CÁCH THU ĐÔNG'} • {getLookCodeByPosition(look1.position)}
+                        {look1.season ? `${look1.season} • ` : ''}{getLookCodeByPosition(look1.position)}
                       </span>
-                      <span className="lb-badge-pill">{look1.badge || 'SIGNATURE'}</span>
+                      {look1.badge && <span className="lb-badge-pill">{look1.badge}</span>}
                     </div>
 
                     <h2 className="lb-look-title">
                       {look1.title}
                     </h2>
 
-                    <p className="lb-look-desc">
-                      {look1.description}
-                    </p>
+                    {look1.description && (
+                      <p className="lb-look-desc">
+                        {look1.description}
+                      </p>
+                    )}
 
                     {look1.products && look1.products.length > 0 && (
                       <>
@@ -864,38 +872,42 @@ export default function LookbookPage() {
                       onClick={() => showToast(`Đã thêm trọn bộ ${getLookCodeByPosition(look1.position)} vào giỏ hàng!`)}
                     >
                       <ShoppingBag size={16} />
-                      <span>{look1.ctaText || `Mua Trọn Bộ Phối Đồ • ${look1.price || ''}`}</span>
+                      <span>{look1.ctaText || (look1.price ? `Mua Trọn Bộ Phối Đồ • ${look1.price}` : 'Mua Trọn Bộ Phối Đồ')}</span>
                     </button>
                   </div>
                 </div>
               </section>
             )}
 
-            {/* --- KHỐI 4.2: LOOK 02 (Đầm Dạ Tiệc Lụa - Thiết Kế Thẻ Đảo Chiều Inverted) --- */}
+            {/* --- KHỐI 4.2: LOOK 02 (Thiết Kế Thẻ Đảo Chiều Inverted) --- */}
             {look2 && (
               <section className="lb-split-look-card inverted">
                 <div className="lb-look-details-col">
                   <div>
                     <div className="lb-look-tag-row">
                       <span className="lb-look-category">
-                        {look2.season || 'DẠ TIỆC & HAUTE COUTURE'} • {getLookCodeByPosition(look2.position)}
+                        {look2.season ? `${look2.season} • ` : ''}{getLookCodeByPosition(look2.position)}
                       </span>
-                      <span className="lb-badge-pill" style={{ background: '#DCFCE7', color: '#15803D', borderColor: '#BBF7D0' }}>
-                        {look2.badge || 'PHIÊN BẢN GIỚI HẠN'}
-                      </span>
+                      {look2.badge && (
+                        <span className="lb-badge-pill" style={{ background: '#DCFCE7', color: '#15803D', borderColor: '#BBF7D0' }}>
+                          {look2.badge}
+                        </span>
+                      )}
                     </div>
 
                     <h2 className="lb-look-title">
                       {look2.title}
                     </h2>
 
-                    <div className="lb-quote-card">
-                      {(() => {
-                        const text = look2.description || look2.quote || "Thiết kế được lựa chọn trình diễn tại Paris Fashion Week 2025, mang hơi thở quý phái vượt thời gian.";
-                        const trimmed = text.trim();
-                        return trimmed.startsWith('"') && trimmed.endsWith('"') ? trimmed : `"${trimmed}"`;
-                      })()}
-                    </div>
+                    {(look2.description || look2.quote) && (
+                      <div className="lb-quote-card">
+                        {(() => {
+                          const text = look2.description || look2.quote;
+                          const trimmed = text.trim();
+                          return trimmed.startsWith('"') && trimmed.endsWith('"') ? trimmed : `"${trimmed}"`;
+                        })()}
+                      </div>
+                    )}
 
                     {look2.products && look2.products.length > 0 && (
                       <>
@@ -909,14 +921,20 @@ export default function LookbookPage() {
                       </>
                     )}
 
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '26px', fontWeight: 700, color: '#111', fontFamily: "'Playfair Display', Georgia, serif" }}>
-                        {look2.price || '2.950.000₫'}
-                      </span>
-                      <span style={{ fontSize: '12px', color: '#B45309', fontWeight: 600 }}>
-                        {look2.stockInfo}
-                      </span>
-                    </div>
+                    {(look2.price || look2.stockInfo) && (
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '8px' }}>
+                        {look2.price && (
+                          <span style={{ fontSize: '26px', fontWeight: 700, color: '#111', fontFamily: "'Playfair Display', Georgia, serif" }}>
+                            {look2.price}
+                          </span>
+                        )}
+                        {look2.stockInfo && (
+                          <span style={{ fontSize: '12px', color: '#B45309', fontWeight: 600 }}>
+                            {look2.stockInfo}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="lb-cta-container">
@@ -932,46 +950,54 @@ export default function LookbookPage() {
                 </div>
 
                 <div className="lb-photo-relative">
-                  <img
-                    src={look2.image || "https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=1000"}
-                    alt={look2.title}
-                    className="lb-editorial-img"
-                  />
-                  <span
-                    className="lb-badge-pill"
-                    style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(0,0,0,0.65)', color: '#FFFFFF', borderColor: 'transparent' }}
-                  >
-                    HAUTE COUTURE EDITION
-                  </span>
+                  {look2.image && (
+                    <img
+                      src={look2.image}
+                      alt={look2.title || ''}
+                      className="lb-editorial-img"
+                    />
+                  )}
+                  {look2.badge && (
+                    <span
+                      className="lb-badge-pill"
+                      style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(0,0,0,0.65)', color: '#FFFFFF', borderColor: 'transparent' }}
+                    >
+                      {look2.badge}
+                    </span>
+                  )}
                 </div>
               </section>
             )}
 
-            {/* --- KHỐI 4.3: LƯỚI 2 CỘT SONG SONG (LOOK 03 IVORY TWEED & LOOK 04 CHARCOAL BLAZER) --- */}
+            {/* --- KHỐI 4.3: LƯỚI 2 CỘT SONG SONG (LOOK 03 & LOOK 04) --- */}
             {(look3 || look4) && (
               <section className="lb-two-cols-grid">
                 {/* Look 03 */}
                 {look3 && (
                   <div className="lb-vertical-look-card">
                     <div className="lb-vert-img-box">
-                      <img
-                        src={look3.image || "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&q=80&w=800"}
-                        alt={look3.title}
-                        className="lb-editorial-img"
-                      />
+                      {look3.image && (
+                        <img
+                          src={look3.image}
+                          alt={look3.title || ''}
+                          className="lb-editorial-img"
+                        />
+                      )}
                       <span className="lb-badge-pill" style={{ position: 'absolute', top: '16px', left: '16px', background: '#FFFFFF' }}>
                         {getLookCodeByPosition(look3.position)}
                       </span>
                     </div>
                     <div className="lb-vert-body">
                       <div>
-                        <span className="lb-look-category">{look3.season || 'PARISIAN CHIC'}</span>
+                        {look3.season && <span className="lb-look-category">{look3.season}</span>}
                         <h3 className="lb-look-title" style={{ fontSize: '20px', margin: '6px 0 10px 0' }}>
                           {look3.title}
                         </h3>
-                        <p className="lb-look-desc" style={{ fontSize: '13px', marginBottom: '16px' }}>
-                          {look3.description}
-                        </p>
+                        {look3.description && (
+                          <p className="lb-look-desc" style={{ fontSize: '13px', marginBottom: '16px' }}>
+                            {look3.description}
+                          </p>
+                        )}
                         {look3.products?.map((p, i) => (
                           <div key={i} className="lb-product-row" style={{ fontSize: '12.5px' }}>
                             <span>{p.name}</span>
@@ -980,7 +1006,7 @@ export default function LookbookPage() {
                         ))}
                       </div>
                       <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                        <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>{look3.price || '3.040.000₫'}</span>
+                        <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>{look3.price || ''}</span>
                         <button
                           type="button"
                           className="btn-buy-combo"
@@ -998,24 +1024,28 @@ export default function LookbookPage() {
                 {look4 && (
                   <div className="lb-vertical-look-card">
                     <div className="lb-vert-img-box">
-                      <img
-                        src={look4.image || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=800"}
-                        alt={look4.title}
-                        className="lb-editorial-img"
-                      />
+                      {look4.image && (
+                        <img
+                          src={look4.image}
+                          alt={look4.title || ''}
+                          className="lb-editorial-img"
+                        />
+                      )}
                       <span className="lb-badge-pill" style={{ position: 'absolute', top: '16px', left: '16px', background: '#FFFFFF' }}>
                         {getLookCodeByPosition(look4.position)}
                       </span>
                     </div>
                     <div className="lb-vert-body">
                       <div>
-                        <span className="lb-look-category">{look4.season || 'MODERN TAILORING'}</span>
+                        {look4.season && <span className="lb-look-category">{look4.season}</span>}
                         <h3 className="lb-look-title" style={{ fontSize: '20px', margin: '6px 0 10px 0' }}>
                           {look4.title}
                         </h3>
-                        <p className="lb-look-desc" style={{ fontSize: '13px', marginBottom: '16px' }}>
-                          {look4.description}
-                        </p>
+                        {look4.description && (
+                          <p className="lb-look-desc" style={{ fontSize: '13px', marginBottom: '16px' }}>
+                            {look4.description}
+                          </p>
+                        )}
                         {look4.products?.map((p, i) => (
                           <div key={i} className="lb-product-row" style={{ fontSize: '12.5px' }}>
                             <span>{p.name}</span>
@@ -1024,7 +1054,7 @@ export default function LookbookPage() {
                         ))}
                       </div>
                       <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                        <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>{look4.price || '2.700.000₫'}</span>
+                        <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>{look4.price || ''}</span>
                         <button
                           type="button"
                           className="btn-buy-combo"
