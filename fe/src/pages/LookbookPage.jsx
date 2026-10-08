@@ -989,7 +989,7 @@ export default function LookbookPage() {
                               title={`Thêm ${p.name} vào giỏ hàng`}
                             >
                               <ShoppingBag size={13} />
-                              <span>+ Thêm giỏ</span>
+                              <span>Thêm giỏ</span>
                             </button>
                           </div>
                         ))}
@@ -1064,7 +1064,7 @@ export default function LookbookPage() {
                               title={`Thêm ${p.name} vào giỏ hàng`}
                             >
                               <ShoppingBag size={13} />
-                              <span>+ Thêm giỏ</span>
+                              <span>Thêm giỏ</span>
                             </button>
                           </div>
                         ))}
@@ -1166,7 +1166,7 @@ export default function LookbookPage() {
                               title={`Thêm ${p.name} vào giỏ hàng`}
                             >
                               <ShoppingBag size={12} />
-                              <span>+ Thêm</span>
+                              <span>Thêm giỏ</span>
                             </button>
                           </div>
                         ))}
@@ -1230,7 +1230,7 @@ export default function LookbookPage() {
                               title={`Thêm ${p.name} vào giỏ hàng`}
                             >
                               <ShoppingBag size={12} />
-                              <span>+ Thêm</span>
+                              <span>Thêm giỏ</span>
                             </button>
                           </div>
                         ))}
@@ -1296,7 +1296,7 @@ export default function LookbookPage() {
                                   title={`Thêm ${p.name} vào giỏ hàng`}
                                 >
                                   <ShoppingBag size={12} />
-                                  <span>+ Thêm</span>
+                                  <span>Thêm giỏ</span>
                                 </button>
                               </div>
                             ))}
