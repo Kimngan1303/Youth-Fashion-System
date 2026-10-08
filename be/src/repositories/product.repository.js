@@ -7,7 +7,19 @@ import { prisma } from './prisma.js';
 /**
  * Tìm danh sách sản phẩm có phân trang, lọc theo danh mục, tìm kiếm theo tên
  */
-export const findProducts = async ({ page = 1, limit = 10, category_id, brand_id, search_name, status }) => {
+export const findProducts = async ({
+  page = 1,
+  limit = 10,
+  category_id,
+  brand_id,
+  brand_ids,
+  search_name,
+  status,
+  sort,
+  size,
+  min_price,
+  max_price,
+}) => {
   const where = {};
 
   if (status) {
@@ -18,7 +30,12 @@ export const findProducts = async ({ page = 1, limit = 10, category_id, brand_id
     where.category_id = BigInt(category_id);
   }
 
-  if (brand_id) {
+  if (brand_ids && (Array.isArray(brand_ids) ? brand_ids.length > 0 : brand_ids)) {
+    const list = Array.isArray(brand_ids) ? brand_ids : String(brand_ids).split(',').filter(Boolean);
+    if (list.length > 0) {
+      where.brand_id = { in: list.map((id) => BigInt(id)) };
+    }
+  } else if (brand_id) {
     where.brand_id = BigInt(brand_id);
   }
 
@@ -26,6 +43,32 @@ export const findProducts = async ({ page = 1, limit = 10, category_id, brand_id
     where.product_name = {
       contains: search_name,
     };
+  }
+
+  const variantFilter = {};
+  if (size) {
+    variantFilter.size = size;
+  }
+  if (min_price !== undefined && min_price !== null && min_price !== '') {
+    variantFilter.price = { ...variantFilter.price, gte: Number(min_price) };
+  }
+  if (max_price !== undefined && max_price !== null && max_price !== '') {
+    variantFilter.price = { ...variantFilter.price, lte: Number(max_price) };
+  }
+
+  if (Object.keys(variantFilter).length > 0) {
+    where.variants = {
+      some: variantFilter,
+    };
+  }
+
+  let orderBy = { created_at: 'desc' };
+  if (sort === 'oldest') {
+    orderBy = { created_at: 'asc' };
+  } else if (sort === 'name_asc') {
+    orderBy = { product_name: 'asc' };
+  } else if (sort === 'name_desc') {
+    orderBy = { product_name: 'desc' };
   }
 
   const skip = (page - 1) * limit;
@@ -45,7 +88,7 @@ export const findProducts = async ({ page = 1, limit = 10, category_id, brand_id
           orderBy: { variant_id: 'asc' },
         },
       },
-      orderBy: { created_at: 'desc' },
+      orderBy,
     }),
     prisma.product.count({ where }),
   ]);
@@ -242,6 +285,15 @@ export const setPrimaryProductImage = async (product_id, image_id) => {
 export const findAllCategories = async () => {
   return await prisma.category.findMany({
     where: { status: 'ACTIVE' },
+    include: {
+      _count: {
+        select: {
+          products: {
+            where: { status: 'ACTIVE' },
+          },
+        },
+      },
+    },
     orderBy: { category_name: 'asc' },
   });
 };
@@ -252,6 +304,15 @@ export const findAllCategories = async () => {
 export const findAllBrands = async () => {
   return await prisma.brand.findMany({
     where: { status: 'ACTIVE' },
+    include: {
+      _count: {
+        select: {
+          products: {
+            where: { status: 'ACTIVE' },
+          },
+        },
+      },
+    },
     orderBy: { brand_name: 'asc' },
   });
 };

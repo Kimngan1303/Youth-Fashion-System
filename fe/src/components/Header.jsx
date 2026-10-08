@@ -183,7 +183,7 @@ const Header = ({ onOpenAISearch }) => {
             title="Giỏ hàng"
           >
             <ShoppingBag size={18} />
-            {location.pathname !== '/cart' && <span className="badge">{cartCount || 2}</span>}
+            {cartCount > 0 && <span className="badge">{cartCount}</span>}
           </Link>
 
           {/* Wishlist Icon */}
