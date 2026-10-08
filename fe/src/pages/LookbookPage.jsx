@@ -36,7 +36,7 @@ import { lookbookService, getLookbookPositionValue, getLookCodeByPosition } from
 import { useAuth } from '../context/AuthContext';
 
 export default function LookbookPage() {
-  const { user } = useAuth();
+  const { user, addToCart } = useAuth();
   // ----------------------------------------------------------------------------
   // PHẦN 1: QUẢN LÝ TRẠNG THÁI (STATE) VÀ ĐỒNG BỘ DỮ LIỆU TỪ MYSQL
   // ----------------------------------------------------------------------------
@@ -112,6 +112,65 @@ export default function LookbookPage() {
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 3000);
+  };
+
+  // Thêm 1 sản phẩm gắn tag trực tiếp vào giỏ hàng
+  const handleAddToCartSingle = (e, product) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!product) return;
+    const prodId = product.product_id || product.id || 'PROD';
+    const title = product.name || product.title || product.product_name || 'Sản phẩm Lookbook';
+    const priceVal = product.price_num || (typeof product.price === 'number' ? product.price : parseInt(String(product.price).replace(/\D/g, '')) || 0);
+
+    addToCart({
+      id: prodId,
+      product_id: prodId,
+      title: title,
+      name: title,
+      price: priceVal,
+      image: product.image || product.image_url || 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=800',
+      sku: product.sku || `YF-${prodId}`,
+      categoryName: product.category_name || 'Lookbook Collection'
+    });
+    showToast(`Đã thêm "${title}" vào giỏ hàng!`);
+  };
+
+  // Thêm trọn bộ combo (tất cả các sản phẩm gắn tag) vào giỏ hàng
+  const handleAddComboToCart = (look) => {
+    if (!look) return;
+    const prods = look.products || [];
+    if (prods.length > 0) {
+      prods.forEach((p, idx) => {
+        const prodId = p.product_id || p.id || `LOOK-${look.id}-${idx}`;
+        const title = p.name || p.title || p.product_name || `Món phối #${idx + 1}`;
+        const priceVal = p.price_num || (typeof p.price === 'number' ? p.price : parseInt(String(p.price).replace(/\D/g, '')) || 0);
+        addToCart({
+          id: prodId,
+          product_id: prodId,
+          title: title,
+          name: title,
+          price: priceVal,
+          image: p.image || p.image_url || look.image,
+          sku: p.sku || `YF-${prodId}`,
+          categoryName: p.category_name || look.season || 'Lookbook Combo'
+        });
+      });
+      showToast(`Đã thêm trọn bộ ${getLookCodeByPosition(look.position)} (${prods.length} sản phẩm) vào giỏ hàng!`);
+    } else {
+      const priceVal = typeof look.price === 'number' ? look.price : parseInt(String(look.price).replace(/\D/g, '')) || 2950000;
+      addToCart({
+        id: `LOOK-${look.id}`,
+        product_id: `LOOK-${look.id}`,
+        title: look.title,
+        name: look.title,
+        price: priceVal,
+        image: look.image,
+        sku: `YF-LOOK-${look.id}`,
+        categoryName: look.season || 'Lookbook'
+      });
+      showToast(`Đã thêm combo "${look.title}" vào giỏ hàng!`);
+    }
   };
 
   // Sao chép liên kết trang hiện tại vào bộ nhớ tạm (Clipboard) để chia sẻ
@@ -512,19 +571,74 @@ export default function LookbookPage() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 10px 0;
-          border-bottom: 1px dashed #E7E5DF;
-          font-size: 13.5px;
+          padding: 8px 12px;
+          background: #FAFAF9;
+          border-radius: 8px;
+          border: 1px solid #ECEAE4;
+          margin-bottom: 8px;
+          transition: all 0.2s ease;
+        }
+
+        .lb-product-row:hover {
+          background: #F5F4EF;
+          border-color: #DFDCD4;
+        }
+
+        .lb-product-info-left {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex: 1;
+          min-width: 0;
+        }
+
+        .lb-product-thumb-img {
+          width: 38px;
+          height: 38px;
+          border-radius: 6px;
+          object-fit: cover;
+          border: 1px solid #E5E2DC;
+          flex-shrink: 0;
+          background: #EAE6DF;
         }
 
         .lb-product-name {
           color: #1C1917;
-          font-weight: 500;
+          font-weight: 600;
+          font-size: 13px;
+          line-height: 1.3;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .lb-product-price {
           font-weight: 700;
           color: #111111;
+          font-size: 13px;
+          white-space: nowrap;
+        }
+
+        .btn-add-item-cart {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          background: #111111;
+          color: #FFFFFF;
+          border: none;
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-size: 11.5px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: all 0.2s ease;
+          flex-shrink: 0;
+        }
+
+        .btn-add-item-cart:hover {
+          background: #27272A;
+          transform: translateY(-1px);
         }
 
         .lb-cta-container {
@@ -857,8 +971,26 @@ export default function LookbookPage() {
                         <div className="lb-products-subheading">DANH SÁCH SẢN PHẨM PHỐI:</div>
                         {look1.products.map((p, i) => (
                           <div key={i} className="lb-product-row">
-                            <span className="lb-product-name">{p.name}</span>
-                            <span className="lb-product-price">{p.price}</span>
+                            <div className="lb-product-info-left">
+                              {p.image ? (
+                                <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
+                              ) : (
+                                <div className="lb-product-thumb-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#8C857B' }}>SP</div>
+                              )}
+                              <div style={{ minWidth: 0 }}>
+                                <div className="lb-product-name">{p.name}</div>
+                                <div className="lb-product-price">{p.price}</div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-add-item-cart"
+                              onClick={(e) => handleAddToCartSingle(e, p)}
+                              title={`Thêm ${p.name} vào giỏ hàng`}
+                            >
+                              <ShoppingBag size={13} />
+                              <span>+ Thêm giỏ</span>
+                            </button>
                           </div>
                         ))}
                       </>
@@ -869,7 +1001,7 @@ export default function LookbookPage() {
                     <button
                       type="button"
                       className="btn-buy-combo"
-                      onClick={() => showToast(`Đã thêm trọn bộ ${getLookCodeByPosition(look1.position)} vào giỏ hàng!`)}
+                      onClick={() => handleAddComboToCart(look1)}
                     >
                       <ShoppingBag size={16} />
                       <span>{look1.ctaText || (look1.price ? `Mua Trọn Bộ Phối Đồ • ${look1.price}` : 'Mua Trọn Bộ Phối Đồ')}</span>
@@ -914,8 +1046,26 @@ export default function LookbookPage() {
                         <div className="lb-products-subheading">DANH SÁCH SẢN PHẨM PHỐI:</div>
                         {look2.products.map((p, i) => (
                           <div key={i} className="lb-product-row">
-                            <span className="lb-product-name">{p.name}</span>
-                            <span className="lb-product-price">{p.price}</span>
+                            <div className="lb-product-info-left">
+                              {p.image ? (
+                                <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
+                              ) : (
+                                <div className="lb-product-thumb-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#8C857B' }}>SP</div>
+                              )}
+                              <div style={{ minWidth: 0 }}>
+                                <div className="lb-product-name">{p.name}</div>
+                                <div className="lb-product-price">{p.price}</div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-add-item-cart"
+                              onClick={(e) => handleAddToCartSingle(e, p)}
+                              title={`Thêm ${p.name} vào giỏ hàng`}
+                            >
+                              <ShoppingBag size={13} />
+                              <span>+ Thêm giỏ</span>
+                            </button>
                           </div>
                         ))}
                       </>
@@ -941,10 +1091,10 @@ export default function LookbookPage() {
                     <button
                       type="button"
                       className="btn-buy-combo"
-                      onClick={() => showToast(`Đã thêm ${look2.title} vào giỏ hàng!`)}
+                      onClick={() => handleAddComboToCart(look2)}
                     >
                       <ShoppingBag size={16} />
-                      <span>{look2.ctaText || 'ĐẶT MUA NGAY'}</span>
+                      <span>{look2.ctaText || 'ĐẶT MUA TRỌN BỘ'}</span>
                     </button>
                   </div>
                 </div>
@@ -999,9 +1149,25 @@ export default function LookbookPage() {
                           </p>
                         )}
                         {look3.products?.map((p, i) => (
-                          <div key={i} className="lb-product-row" style={{ fontSize: '12.5px' }}>
-                            <span>{p.name}</span>
-                            <strong>{p.price}</strong>
+                          <div key={i} className="lb-product-row">
+                            <div className="lb-product-info-left">
+                              {p.image ? (
+                                <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
+                              ) : null}
+                              <div style={{ minWidth: 0 }}>
+                                <div className="lb-product-name">{p.name}</div>
+                                <div className="lb-product-price">{p.price}</div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-add-item-cart"
+                              onClick={(e) => handleAddToCartSingle(e, p)}
+                              title={`Thêm ${p.name} vào giỏ hàng`}
+                            >
+                              <ShoppingBag size={12} />
+                              <span>+ Thêm</span>
+                            </button>
                           </div>
                         ))}
                       </div>
@@ -1011,7 +1177,7 @@ export default function LookbookPage() {
                           type="button"
                           className="btn-buy-combo"
                           style={{ width: 'auto', padding: '10px 18px' }}
-                          onClick={() => showToast(`Đã thêm ${look3.title} vào giỏ hàng!`)}
+                          onClick={() => handleAddComboToCart(look3)}
                         >
                           {look3.ctaText || 'Mua Ngay'}
                         </button>
@@ -1047,9 +1213,25 @@ export default function LookbookPage() {
                           </p>
                         )}
                         {look4.products?.map((p, i) => (
-                          <div key={i} className="lb-product-row" style={{ fontSize: '12.5px' }}>
-                            <span>{p.name}</span>
-                            <strong>{p.price}</strong>
+                          <div key={i} className="lb-product-row">
+                            <div className="lb-product-info-left">
+                              {p.image ? (
+                                <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
+                              ) : null}
+                              <div style={{ minWidth: 0 }}>
+                                <div className="lb-product-name">{p.name}</div>
+                                <div className="lb-product-price">{p.price}</div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-add-item-cart"
+                              onClick={(e) => handleAddToCartSingle(e, p)}
+                              title={`Thêm ${p.name} vào giỏ hàng`}
+                            >
+                              <ShoppingBag size={12} />
+                              <span>+ Thêm</span>
+                            </button>
                           </div>
                         ))}
                       </div>
@@ -1059,7 +1241,7 @@ export default function LookbookPage() {
                           type="button"
                           className="btn-buy-combo"
                           style={{ width: 'auto', padding: '10px 18px' }}
-                          onClick={() => showToast(`Đã thêm ${look4.title} vào giỏ hàng!`)}
+                          onClick={() => handleAddComboToCart(look4)}
                         >
                           {look4.ctaText || 'Mua Ngay'}
                         </button>
@@ -1097,9 +1279,25 @@ export default function LookbookPage() {
                         {item.products && item.products.length > 0 && (
                           <div style={{ margin: '10px 0' }}>
                             {item.products.map((p, i) => (
-                              <div key={i} className="lb-product-row" style={{ fontSize: '12.5px' }}>
-                                <span>{p.name}</span>
-                                <strong>{p.price}</strong>
+                              <div key={i} className="lb-product-row">
+                                <div className="lb-product-info-left">
+                                  {p.image ? (
+                                    <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
+                                  ) : null}
+                                  <div style={{ minWidth: 0 }}>
+                                    <div className="lb-product-name">{p.name}</div>
+                                    <div className="lb-product-price">{p.price}</div>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="btn-add-item-cart"
+                                  onClick={(e) => handleAddToCartSingle(e, p)}
+                                  title={`Thêm ${p.name} vào giỏ hàng`}
+                                >
+                                  <ShoppingBag size={12} />
+                                  <span>+ Thêm</span>
+                                </button>
                               </div>
                             ))}
                           </div>
@@ -1111,7 +1309,7 @@ export default function LookbookPage() {
                           type="button"
                           className="btn-buy-combo"
                           style={{ width: 'auto', padding: '10px 18px' }}
-                          onClick={() => showToast(`Đã thêm ${item.title} vào giỏ hàng!`)}
+                          onClick={() => handleAddComboToCart(item)}
                         >
                           Mua Ngay
                         </button>

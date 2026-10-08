@@ -16,9 +16,11 @@ import {
   ChevronDown,
   RotateCcw,
   Undo2,
-  Loader2
+  Loader2,
+  Package
 } from 'lucide-react';
 import { lookbookService, getLookbookPositionValue, notifyLookbookUpdated } from '../../services/lookbookService';
+import { productService } from '../../services/productService';
 import { useToast } from '../../context/ToastContext';
 import { useConfirmModal } from '../../context/ConfirmModalContext';
 import ManagerSidebar from '../../components/ManagerSidebar';
@@ -58,6 +60,7 @@ export default function LookbookManagement() {
 
   // [STATE] Danh sách lookbook từ MySQL database qua lookbookService
   const [lookbooks, setLookbooks] = useState([]);
+  const [catalogProducts, setCatalogProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // [STATE] Ngăn xếp lưu lịch sử các thao tác đã sửa để có thể quay lại (Undo)
@@ -82,8 +85,19 @@ export default function LookbookManagement() {
     }
   };
 
+  const fetchCatalogProducts = async () => {
+    try {
+      const res = await productService.getProducts({ limit: 100 });
+      const items = res?.data?.products || res?.products || [];
+      setCatalogProducts(items);
+    } catch (err) {
+      console.error('Lỗi khi tải danh mục sản phẩm từ CSDL:', err);
+    }
+  };
+
   useEffect(() => {
     fetchLookbooks();
+    fetchCatalogProducts();
   }, []);
 
   // [STATE] Tab lọc trạng thái: 'all' (tất cả), 'published' (đã phát hành), 'hidden' (tạm ẩn)
@@ -446,18 +460,55 @@ export default function LookbookManagement() {
   };
 
   // ==========================================================================
-  // [PHẦN 6] QUẢN LÝ DANH SÁCH SẢN PHẨM PHỐI ĐỒ (GẮN TAGS)
-  // - Cho phép thêm dòng mới, sửa tên/giá và xóa dòng sản phẩm phối
+  // [PHẦN 6] QUẢN LÝ DANH SÁCH SẢN PHẨM PHỐI ĐỒ (GẮN TAGS TỪ DATABASE)
+  // - Cho phép chọn sản phẩm từ CSDL/Danh mục, tự động lấy giá, ảnh, danh mục
   // ==========================================================================
-  // Thêm một dòng sản phẩm rỗng vào form
+  // Thêm một dòng sản phẩm rỗng vào form để chọn từ catalog
   const handleAddProductRow = () => {
     setFormData(prev => ({
       ...prev,
-      products: [...(prev.products || []), { name: '', price: '' }]
+      products: [
+        ...(prev.products || []),
+        { product_id: '', name: '', price: '', price_num: 0, image: '', category_name: '', sku: '' }
+      ]
     }));
   };
 
-  // Cập nhật tên hoặc giá của từng sản phẩm phối theo index
+  // Xử lý chọn sản phẩm từ danh sách Danh mục / Database
+  const handleSelectCatalogProduct = (index, selectedProductId) => {
+    const p = catalogProducts.find(item => String(item.product_id) === String(selectedProductId));
+    setFormData(prev => {
+      const updated = [...(prev.products || [])];
+      if (!p) {
+        updated[index] = { product_id: '', name: '', price: '', price_num: 0, image: '', category_name: '', sku: '' };
+      } else {
+        const primaryImg = p.images?.find(i => i.is_primary)?.image_url || p.images?.[0]?.image_url || '';
+        const priceVal = p.variants?.[0]?.price ? Number(p.variants[0].price) : 0;
+        const formattedPrice = priceVal > 0 ? priceVal.toLocaleString('vi-VN') + '₫' : '';
+        updated[index] = {
+          product_id: String(p.product_id),
+          name: p.product_name,
+          price: formattedPrice,
+          price_num: priceVal,
+          image: primaryImg,
+          category_name: p.category?.category_name || '',
+          sku: p.variants?.[0]?.sku || `YF-${p.product_id}`
+        };
+      }
+
+      // Tự động tính tổng giá combo nếu chưa có hoặc cập nhật
+      const totalComboPrice = updated.reduce((sum, item) => sum + (Number(item.price_num) || parseInt(String(item.price || '').replace(/\D/g, '')) || 0), 0);
+      const newComboPrice = totalComboPrice > 0 ? totalComboPrice.toLocaleString('vi-VN') + '₫' : prev.price;
+
+      return {
+        ...prev,
+        price: prev.price && prev.price !== '3.000.000₫' ? prev.price : newComboPrice,
+        products: updated
+      };
+    });
+  };
+
+  // Cập nhật tên hoặc giá của từng sản phẩm phối theo index (nếu chỉnh sửa tay)
   const handleProductChange = (index, field, value) => {
     setFormData(prev => {
       const updated = [...(prev.products || [])];
@@ -499,14 +550,12 @@ export default function LookbookManagement() {
       season: 'PHONG CÁCH THU ĐÔNG',
       badge: 'MỚI',
       position: String(nextPos),
-      productCount: 2,
-      price: '3.000.000₫',
+      productCount: 0,
+      price: '',
       status: 'published',
       image: '',
       description: '',
-      products: [
-        { name: '', price: '' }
-      ]
+      products: []
     });
     setIsModalOpen(true);
   };
@@ -2028,16 +2077,16 @@ export default function LookbookManagement() {
                         </div>
                       )}
 
-                      {/* [MỤC 5] Danh sách sản phẩm phối gắn tag (TỰ ĐỘNG ẨN khi vị trí là Banner) */}
+                      {/* [MỤC 5] Danh sách sản phẩm phối gắn tag từ CSDL / Danh Mục (TỰ ĐỘNG ẨN khi vị trí là Banner) */}
                       {formData.position !== 'banner' && (
-                        <div className="lb-form-group" style={{ background: '#F9FAFB', padding: '14px', borderRadius: '10px', border: '1px solid #E5E7EB' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <div className="lb-form-group" style={{ background: '#F9FAFB', padding: '16px', borderRadius: '10px', border: '1px solid #E5E7EB' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                             <div>
                               <label className="lb-form-label" style={{ fontWeight: 700, fontSize: '13px', color: '#111827', display: 'block', margin: 0 }}>
-                                Danh Sách Sản Phẩm Phối (Gắn Tag)
+                                Danh Sách Sản Phẩm Phối (Gắn Tag Từ Danh Mục & CSDL)
                               </label>
                               <span style={{ fontSize: '11px', color: '#6B7280' }}>
-                                Các sản phẩm hiển thị tên & giá chi tiết trong khối Lookbook
+                                Chọn sản phẩm từ MySQL để hiển thị chi tiết và cho phép khách bấm thêm thẳng vào giỏ hàng
                               </span>
                             </div>
                             <button
@@ -2046,7 +2095,7 @@ export default function LookbookManagement() {
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '4px',
+                                gap: '5px',
                                 background: '#111827',
                                 border: 'none',
                                 borderRadius: '6px',
@@ -2054,7 +2103,8 @@ export default function LookbookManagement() {
                                 fontSize: '12px',
                                 fontWeight: 600,
                                 color: '#FFFFFF',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
                               }}
                             >
                               <Plus size={13} strokeWidth={2.5} /> Thêm sản phẩm
@@ -2062,47 +2112,109 @@ export default function LookbookManagement() {
                           </div>
 
                           {formData.products && formData.products.length > 0 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                               {formData.products.map((prod, idx) => (
-                                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 38px', gap: '8px', alignItems: 'center' }}>
-                                  <input
-                                    type="text"
-                                    className="lb-form-input"
-                                    placeholder="Tên sản phẩm (VD: Áo Khoác Tweed Ivory Cropped)"
-                                    value={prod.name}
-                                    onChange={(e) => handleProductChange(idx, 'name', e.target.value)}
-                                  />
-                                  <input
-                                    type="text"
-                                    className="lb-form-input"
-                                    placeholder="Giá (VD: 2.150.000₫)"
-                                    value={prod.price}
-                                    onChange={(e) => handleProductChange(idx, 'price', e.target.value)}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveProductRow(idx)}
-                                    style={{
-                                      background: '#FEF2F2',
-                                      border: '1px solid #FEE2E2',
-                                      borderRadius: '6px',
-                                      height: '38px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      color: '#EF4444',
-                                      cursor: 'pointer'
-                                    }}
-                                    title="Xóa sản phẩm này"
-                                  >
-                                    <Trash2 size={15} />
-                                  </button>
+                                <div
+                                  key={idx}
+                                  style={{
+                                    background: '#FFFFFF',
+                                    border: '1px solid #E5E7EB',
+                                    borderRadius: '8px',
+                                    padding: '10px 12px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '8px',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                                  }}
+                                >
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 34px', gap: '8px', alignItems: 'center' }}>
+                                    <select
+                                      className="lb-form-select"
+                                      value={prod.product_id || ''}
+                                      onChange={(e) => handleSelectCatalogProduct(idx, e.target.value)}
+                                      style={{ fontWeight: 500, fontSize: '13px' }}
+                                    >
+                                      <option value="">-- Chọn sản phẩm từ Danh mục / MySQL Database ({catalogProducts.length} SP) --</option>
+                                      {catalogProducts.map((cp) => {
+                                        const priceVal = cp.variants?.[0]?.price ? Number(cp.variants[0].price).toLocaleString('vi-VN') + '₫' : 'Liên hệ';
+                                        return (
+                                          <option key={cp.product_id} value={cp.product_id}>
+                                            {cp.product_name} • [{priceVal}] {cp.category?.category_name ? `• (${cp.category.category_name})` : ''}
+                                          </option>
+                                        );
+                                      })}
+                                    </select>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveProductRow(idx)}
+                                      style={{
+                                        background: '#FEF2F2',
+                                        border: '1px solid #FEE2E2',
+                                        borderRadius: '6px',
+                                        height: '38px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#EF4444',
+                                        cursor: 'pointer'
+                                      }}
+                                      title="Xóa sản phẩm này"
+                                    >
+                                      <Trash2 size={15} />
+                                    </button>
+                                  </div>
+
+                                  {/* Hiển thị thẻ thông tin sản phẩm đã chọn từ CSDL */}
+                                  {prod.name ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#F8FAFC', padding: '8px 10px', borderRadius: '6px', border: '1px solid #F1F5F9' }}>
+                                      {prod.image ? (
+                                        <img
+                                          src={prod.image}
+                                          alt={prod.name}
+                                          style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #E2E8F0' }}
+                                        />
+                                      ) : (
+                                        <div style={{ width: '42px', height: '42px', background: '#E2E8F0', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#64748B' }}>
+                                          No img
+                                        </div>
+                                      )}
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          {prod.name}
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                                          <span style={{ fontSize: '11.5px', color: '#059669', fontWeight: 700 }}>
+                                            {prod.price}
+                                          </span>
+                                          {prod.category_name && (
+                                            <span style={{ fontSize: '10px', background: '#E2E8F0', color: '#475569', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                              {prod.category_name}
+                                            </span>
+                                          )}
+                                          {prod.product_id && (
+                                            <span style={{ fontSize: '10.5px', color: '#64748B' }}>
+                                              ID #{prod.product_id}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <span style={{ fontSize: '11px', color: '#16A34A', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px', background: '#DCFCE7', padding: '2px 8px', borderRadius: '4px' }}>
+                                          <Check size={12} strokeWidth={3} /> Đã liên kết CSDL
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div style={{ fontSize: '11.5px', color: '#94A3B8', fontStyle: 'italic', paddingLeft: '4px' }}>
+                                      Vui lòng chọn 1 sản phẩm trong danh sách thả xuống ở trên để gắn tag.
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            <div style={{ fontSize: '12px', color: '#9CA3AF', fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>
-                              Chưa có sản phẩm nào trong danh sách. Bấm "+ Thêm sản phẩm" để thêm từng món đồ phối.
+                            <div style={{ fontSize: '12px', color: '#9CA3AF', fontStyle: 'italic', textAlign: 'center', padding: '16px 0' }}>
+                              Chưa gắn tag sản phẩm nào từ danh mục. Bấm "+ Thêm sản phẩm" để chọn các sản phẩm phối đồ từ CSDL.
                             </div>
                           )}
                         </div>
