@@ -2092,7 +2092,7 @@ export default function LookbookManagement() {
                                 Danh Sách Sản Phẩm Phối (Gắn Tag)
                               </label>
                               <span style={{ fontSize: '11px', color: '#6B7280' }}>
-                                Chọn sản phẩm từ MySQL để hiển thị chi tiết và cho phép khách bấm thêm thẳng vào giỏ hàng
+
                               </span>
                             </div>
                             <button
