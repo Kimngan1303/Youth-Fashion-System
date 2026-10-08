@@ -1060,7 +1060,7 @@ export default function LookbookPage() {
                       onClick={() => handleAddComboToCart(look1)}
                     >
                       <ShoppingBag size={16} />
-                      <span>{look1.ctaText || (look1.price ? `Mua Trọn Bộ Phối Đồ • ${look1.price}` : 'Mua Trọn Bộ Phối Đồ')}</span>
+                      <span>{look1.ctaText || 'Đặt Mua Ngay'}</span>
                     </button>
                   </div>
                 </div>
@@ -1153,7 +1153,7 @@ export default function LookbookPage() {
                       onClick={() => handleAddComboToCart(look2)}
                     >
                       <ShoppingBag size={16} />
-                      <span>{look2.ctaText || 'ĐẶT MUA TRỌN BỘ'}</span>
+                      <span>{look2.ctaText || 'Đặt Mua Ngay'}</span>
                     </button>
                   </div>
                 </div>
@@ -1241,7 +1241,8 @@ export default function LookbookPage() {
                           style={{ width: 'auto', padding: '10px 18px' }}
                           onClick={() => handleAddComboToCart(look3)}
                         >
-                          {look3.ctaText || 'Mua Ngay'}
+                          <ShoppingBag size={15} />
+                          <span>{look3.ctaText || 'Đặt Mua Ngay'}</span>
                         </button>
                       </div>
                     </div>
@@ -1308,7 +1309,8 @@ export default function LookbookPage() {
                           style={{ width: 'auto', padding: '10px 18px' }}
                           onClick={() => handleAddComboToCart(look4)}
                         >
-                          {look4.ctaText || 'Mua Ngay'}
+                          <ShoppingBag size={15} />
+                          <span>{look4.ctaText || 'Đặt Mua Ngay'}</span>
                         </button>
                       </div>
                     </div>
@@ -1379,7 +1381,8 @@ export default function LookbookPage() {
                           style={{ width: 'auto', padding: '10px 18px' }}
                           onClick={() => handleAddComboToCart(item)}
                         >
-                          Mua Ngay
+                          <ShoppingBag size={15} />
+                          <span>{item.ctaText || 'Đặt Mua Ngay'}</span>
                         </button>
                       </div>
                     </div>
