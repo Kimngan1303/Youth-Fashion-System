@@ -1060,7 +1060,7 @@ export default function LookbookPage() {
                       onClick={() => handleAddComboToCart(look1)}
                     >
                       <ShoppingBag size={16} />
-                      <span>{look1.ctaText || 'Đặt Mua Ngay'}</span>
+                      <span>Đặt Mua Ngay</span>
                     </button>
                   </div>
                 </div>
@@ -1153,7 +1153,7 @@ export default function LookbookPage() {
                       onClick={() => handleAddComboToCart(look2)}
                     >
                       <ShoppingBag size={16} />
-                      <span>{look2.ctaText || 'Đặt Mua Ngay'}</span>
+                      <span>Đặt Mua Ngay</span>
                     </button>
                   </div>
                 </div>
@@ -1242,7 +1242,7 @@ export default function LookbookPage() {
                           onClick={() => handleAddComboToCart(look3)}
                         >
                           <ShoppingBag size={15} />
-                          <span>{look3.ctaText || 'Đặt Mua Ngay'}</span>
+                          <span>Đặt Mua Ngay</span>
                         </button>
                       </div>
                     </div>
@@ -1310,7 +1310,7 @@ export default function LookbookPage() {
                           onClick={() => handleAddComboToCart(look4)}
                         >
                           <ShoppingBag size={15} />
-                          <span>{look4.ctaText || 'Đặt Mua Ngay'}</span>
+                          <span>Đặt Mua Ngay</span>
                         </button>
                       </div>
                     </div>
@@ -1382,7 +1382,7 @@ export default function LookbookPage() {
                           onClick={() => handleAddComboToCart(item)}
                         >
                           <ShoppingBag size={15} />
-                          <span>{item.ctaText || 'Đặt Mua Ngay'}</span>
+                          <span>Đặt Mua Ngay</span>
                         </button>
                       </div>
                     </div>
