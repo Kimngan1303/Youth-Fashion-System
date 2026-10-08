@@ -132,16 +132,20 @@ export default function LookbookPage() {
     setTimeout(() => setToastMessage(''), 3000);
   };
 
-  // Thêm 1 sản phẩm gắn tag trực tiếp vào giỏ hàng
+  // Thêm 1 sản phẩm gắn tag trực tiếp vào giỏ hàng (nếu đã có trong giỏ thì không thêm được nữa)
   const handleAddToCartSingle = (e, product) => {
     e.preventDefault();
     e.stopPropagation();
     if (!product) return;
+
+    if (isProductInCart(product)) {
+      showToast('Đã thêm vào giỏ hàng sản phẩm này rồi!');
+      return;
+    }
+
     const prodId = product.product_id || product.id || 'PROD';
     const title = product.name || product.title || product.product_name || 'Sản phẩm Lookbook';
     const priceVal = product.price_num || (typeof product.price === 'number' ? product.price : parseInt(String(product.price).replace(/\D/g, '')) || 0);
-
-    const alreadyInCart = isProductInCart(product);
 
     addToCart({
       id: prodId,
@@ -154,19 +158,21 @@ export default function LookbookPage() {
       categoryName: product.category_name || 'Lookbook Collection'
     });
 
-    if (alreadyInCart) {
-      showToast(`Đã thêm vào giỏ hàng sản phẩm này!`);
-    } else {
-      showToast(`Đã thêm "${title}" vào giỏ hàng!`);
-    }
+    showToast(`Đã thêm "${title}" vào giỏ hàng!`);
   };
 
-  // Thêm trọn bộ combo (tất cả các sản phẩm gắn tag) vào giỏ hàng
+  // Thêm trọn bộ combo (tất cả các sản phẩm gắn tag chưa có trong giỏ hàng)
   const handleAddComboToCart = (look) => {
     if (!look) return;
     const prods = look.products || [];
     if (prods.length > 0) {
-      prods.forEach((p, idx) => {
+      const prodsToAdd = prods.filter(p => !isProductInCart(p));
+      if (prodsToAdd.length === 0) {
+        showToast('Tất cả sản phẩm trong bộ phối này đã có trong giỏ hàng rồi!');
+        return;
+      }
+
+      prodsToAdd.forEach((p, idx) => {
         const prodId = p.product_id || p.id || `LOOK-${look.id}-${idx}`;
         const title = p.name || p.title || p.product_name || `Món phối #${idx + 1}`;
         const priceVal = p.price_num || (typeof p.price === 'number' ? p.price : parseInt(String(p.price).replace(/\D/g, '')) || 0);
@@ -181,12 +187,23 @@ export default function LookbookPage() {
           categoryName: p.category_name || look.season || 'Lookbook Combo'
         });
       });
-      showToast(`Đã thêm trọn bộ ${getLookCodeByPosition(look.position)} (${prods.length} sản phẩm) vào giỏ hàng!`);
+
+      if (prodsToAdd.length < prods.length) {
+        showToast(`Đã thêm ${prodsToAdd.length} sản phẩm mới vào giỏ hàng (các món khác đã có sẵn)!`);
+      } else {
+        showToast(`Đã thêm trọn bộ ${getLookCodeByPosition(look.position)} (${prodsToAdd.length} sản phẩm) vào giỏ hàng!`);
+      }
     } else {
+      const comboId = `LOOK-${look.id}`;
+      const isAlready = cart && cart.some(item => item.id === comboId);
+      if (isAlready) {
+        showToast('Bộ phối này đã có trong giỏ hàng rồi!');
+        return;
+      }
       const priceVal = typeof look.price === 'number' ? look.price : parseInt(String(look.price).replace(/\D/g, '')) || 2950000;
       addToCart({
-        id: `LOOK-${look.id}`,
-        product_id: `LOOK-${look.id}`,
+        id: comboId,
+        product_id: comboId,
         title: look.title,
         name: look.title,
         price: priceVal,
@@ -666,6 +683,17 @@ export default function LookbookPage() {
           transform: translateY(-1px);
         }
 
+        .btn-add-item-cart.in-cart {
+          background: #DCFCE7;
+          color: #15803D;
+          border: 1px solid #BBF7D0;
+        }
+
+        .btn-add-item-cart.in-cart:hover {
+          background: #D1FAE5;
+          transform: none;
+        }
+
         .lb-cta-container {
           margin-top: 28px;
         }
@@ -994,30 +1022,33 @@ export default function LookbookPage() {
                     {look1.products && look1.products.length > 0 && (
                       <>
                         <div className="lb-products-subheading">DANH SÁCH SẢN PHẨM PHỐI:</div>
-                        {look1.products.map((p, i) => (
-                          <div key={i} className="lb-product-row">
-                            <div className="lb-product-info-left">
-                              {p.image ? (
-                                <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
-                              ) : (
-                                <div className="lb-product-thumb-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#8C857B' }}>SP</div>
-                              )}
-                              <div style={{ minWidth: 0 }}>
-                                <div className="lb-product-name">{p.name}</div>
-                                <div className="lb-product-price">{p.price}</div>
+                        {look1.products.map((p, i) => {
+                          const inCart = isProductInCart(p);
+                          return (
+                            <div key={i} className="lb-product-row">
+                              <div className="lb-product-info-left">
+                                {p.image ? (
+                                  <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
+                                ) : (
+                                  <div className="lb-product-thumb-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#8C857B' }}>SP</div>
+                                )}
+                                <div style={{ minWidth: 0 }}>
+                                  <div className="lb-product-name">{p.name}</div>
+                                  <div className="lb-product-price">{p.price}</div>
+                                </div>
                               </div>
+                              <button
+                                type="button"
+                                className={`btn-add-item-cart ${inCart ? 'in-cart' : ''}`}
+                                onClick={(e) => handleAddToCartSingle(e, p)}
+                                title={inCart ? `Sản phẩm ${p.name} đã có trong giỏ hàng` : `Thêm ${p.name} vào giỏ hàng`}
+                              >
+                                {inCart ? <Check size={13} /> : <ShoppingBag size={13} />}
+                                <span>{inCart ? 'Đã thêm' : 'Thêm giỏ'}</span>
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              className="btn-add-item-cart"
-                              onClick={(e) => handleAddToCartSingle(e, p)}
-                              title={`Thêm ${p.name} vào giỏ hàng`}
-                            >
-                              <ShoppingBag size={13} />
-                              <span>Thêm giỏ</span>
-                            </button>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </>
                     )}
                   </div>
@@ -1069,30 +1100,33 @@ export default function LookbookPage() {
                     {look2.products && look2.products.length > 0 && (
                       <>
                         <div className="lb-products-subheading">DANH SÁCH SẢN PHẨM PHỐI:</div>
-                        {look2.products.map((p, i) => (
-                          <div key={i} className="lb-product-row">
-                            <div className="lb-product-info-left">
-                              {p.image ? (
-                                <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
-                              ) : (
-                                <div className="lb-product-thumb-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#8C857B' }}>SP</div>
-                              )}
-                              <div style={{ minWidth: 0 }}>
-                                <div className="lb-product-name">{p.name}</div>
-                                <div className="lb-product-price">{p.price}</div>
+                        {look2.products.map((p, i) => {
+                          const inCart = isProductInCart(p);
+                          return (
+                            <div key={i} className="lb-product-row">
+                              <div className="lb-product-info-left">
+                                {p.image ? (
+                                  <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
+                                ) : (
+                                  <div className="lb-product-thumb-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#8C857B' }}>SP</div>
+                                )}
+                                <div style={{ minWidth: 0 }}>
+                                  <div className="lb-product-name">{p.name}</div>
+                                  <div className="lb-product-price">{p.price}</div>
+                                </div>
                               </div>
+                              <button
+                                type="button"
+                                className={`btn-add-item-cart ${inCart ? 'in-cart' : ''}`}
+                                onClick={(e) => handleAddToCartSingle(e, p)}
+                                title={inCart ? `Sản phẩm ${p.name} đã có trong giỏ hàng` : `Thêm ${p.name} vào giỏ hàng`}
+                              >
+                                {inCart ? <Check size={13} /> : <ShoppingBag size={13} />}
+                                <span>{inCart ? 'Đã thêm' : 'Thêm giỏ'}</span>
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              className="btn-add-item-cart"
-                              onClick={(e) => handleAddToCartSingle(e, p)}
-                              title={`Thêm ${p.name} vào giỏ hàng`}
-                            >
-                              <ShoppingBag size={13} />
-                              <span>Thêm giỏ</span>
-                            </button>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </>
                     )}
 
@@ -1173,28 +1207,31 @@ export default function LookbookPage() {
                             {look3.description}
                           </p>
                         )}
-                        {look3.products?.map((p, i) => (
-                          <div key={i} className="lb-product-row">
-                            <div className="lb-product-info-left">
-                              {p.image ? (
-                                <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
-                              ) : null}
-                              <div style={{ minWidth: 0 }}>
-                                <div className="lb-product-name">{p.name}</div>
-                                <div className="lb-product-price">{p.price}</div>
+                        {look3.products?.map((p, i) => {
+                          const inCart = isProductInCart(p);
+                          return (
+                            <div key={i} className="lb-product-row">
+                              <div className="lb-product-info-left">
+                                {p.image ? (
+                                  <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
+                                ) : null}
+                                <div style={{ minWidth: 0 }}>
+                                  <div className="lb-product-name">{p.name}</div>
+                                  <div className="lb-product-price">{p.price}</div>
+                                </div>
                               </div>
+                              <button
+                                type="button"
+                                className={`btn-add-item-cart ${inCart ? 'in-cart' : ''}`}
+                                onClick={(e) => handleAddToCartSingle(e, p)}
+                                title={inCart ? `Sản phẩm ${p.name} đã có trong giỏ hàng` : `Thêm ${p.name} vào giỏ hàng`}
+                              >
+                                {inCart ? <Check size={12} /> : <ShoppingBag size={12} />}
+                                <span>{inCart ? 'Đã thêm' : 'Thêm giỏ'}</span>
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              className="btn-add-item-cart"
-                              onClick={(e) => handleAddToCartSingle(e, p)}
-                              title={`Thêm ${p.name} vào giỏ hàng`}
-                            >
-                              <ShoppingBag size={12} />
-                              <span>Thêm giỏ</span>
-                            </button>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                       <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                         <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>{look3.price || ''}</span>
@@ -1204,7 +1241,7 @@ export default function LookbookPage() {
                           style={{ width: 'auto', padding: '10px 18px' }}
                           onClick={() => handleAddComboToCart(look3)}
                         >
-                          {look3.ctaText || 'Mua Ngaya'}
+                          {look3.ctaText || 'Mua Ngay'}
                         </button>
                       </div>
                     </div>
@@ -1237,28 +1274,31 @@ export default function LookbookPage() {
                             {look4.description}
                           </p>
                         )}
-                        {look4.products?.map((p, i) => (
-                          <div key={i} className="lb-product-row">
-                            <div className="lb-product-info-left">
-                              {p.image ? (
-                                <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
-                              ) : null}
-                              <div style={{ minWidth: 0 }}>
-                                <div className="lb-product-name">{p.name}</div>
-                                <div className="lb-product-price">{p.price}</div>
+                        {look4.products?.map((p, i) => {
+                          const inCart = isProductInCart(p);
+                          return (
+                            <div key={i} className="lb-product-row">
+                              <div className="lb-product-info-left">
+                                {p.image ? (
+                                  <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
+                                ) : null}
+                                <div style={{ minWidth: 0 }}>
+                                  <div className="lb-product-name">{p.name}</div>
+                                  <div className="lb-product-price">{p.price}</div>
+                                </div>
                               </div>
+                              <button
+                                type="button"
+                                className={`btn-add-item-cart ${inCart ? 'in-cart' : ''}`}
+                                onClick={(e) => handleAddToCartSingle(e, p)}
+                                title={inCart ? `Sản phẩm ${p.name} đã có trong giỏ hàng` : `Thêm ${p.name} vào giỏ hàng`}
+                              >
+                                {inCart ? <Check size={12} /> : <ShoppingBag size={12} />}
+                                <span>{inCart ? 'Đã thêm' : 'Thêm giỏ'}</span>
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              className="btn-add-item-cart"
-                              onClick={(e) => handleAddToCartSingle(e, p)}
-                              title={`Thêm ${p.name} vào giỏ hàng`}
-                            >
-                              <ShoppingBag size={12} />
-                              <span>Thêm giỏ</span>
-                            </button>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                       <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                         <span style={{ fontWeight: 700, fontSize: '16px', color: '#111' }}>{look4.price || ''}</span>
@@ -1303,28 +1343,31 @@ export default function LookbookPage() {
                         </p>
                         {item.products && item.products.length > 0 && (
                           <div style={{ margin: '10px 0' }}>
-                            {item.products.map((p, i) => (
-                              <div key={i} className="lb-product-row">
-                                <div className="lb-product-info-left">
-                                  {p.image ? (
-                                    <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
-                                  ) : null}
-                                  <div style={{ minWidth: 0 }}>
-                                    <div className="lb-product-name">{p.name}</div>
-                                    <div className="lb-product-price">{p.price}</div>
+                            {item.products.map((p, i) => {
+                              const inCart = isProductInCart(p);
+                              return (
+                                <div key={i} className="lb-product-row">
+                                  <div className="lb-product-info-left">
+                                    {p.image ? (
+                                      <img src={p.image} alt={p.name} className="lb-product-thumb-img" />
+                                    ) : null}
+                                    <div style={{ minWidth: 0 }}>
+                                      <div className="lb-product-name">{p.name}</div>
+                                      <div className="lb-product-price">{p.price}</div>
+                                    </div>
                                   </div>
+                                  <button
+                                    type="button"
+                                    className={`btn-add-item-cart ${inCart ? 'in-cart' : ''}`}
+                                    onClick={(e) => handleAddToCartSingle(e, p)}
+                                    title={inCart ? `Sản phẩm ${p.name} đã có trong giỏ hàng` : `Thêm ${p.name} vào giỏ hàng`}
+                                  >
+                                    {inCart ? <Check size={12} /> : <ShoppingBag size={12} />}
+                                    <span>{inCart ? 'Đã thêm' : 'Thêm giỏ'}</span>
+                                  </button>
                                 </div>
-                                <button
-                                  type="button"
-                                  className="btn-add-item-cart"
-                                  onClick={(e) => handleAddToCartSingle(e, p)}
-                                  title={`Thêm ${p.name} vào giỏ hàng`}
-                                >
-                                  <ShoppingBag size={12} />
-                                  <span>Thêm giỏ</span>
-                                </button>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>
