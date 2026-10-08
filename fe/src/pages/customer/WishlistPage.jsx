@@ -6,7 +6,7 @@ import { useToast } from '../../context/ToastContext';
 import { productService } from '../../services/productService';
 
 export default function WishlistPage() {
-  const { wishlist, toggleWishlist, addToCart } = useAuth();
+  const { wishlist, toggleWishlist, addToCart, cart } = useAuth();
   const { showSuccess, showError } = useToast();
   const [activeCategory, setActiveCategory] = useState('ALL');
   const [selectedSizes, setSelectedSizes] = useState({});
@@ -35,10 +35,25 @@ export default function WishlistPage() {
 
   const handleAddToCart = (product) => {
     const chosenSize = selectedSizes[product.id] || product.selectedSize || 'M';
+    const prodId = String(product.id || product.product_id || '').trim();
+    const prodTitle = String(product.title || product.name || '').trim().toLowerCase();
+    const isAlreadyInCart = cart && cart.some(item => {
+      const itemProdId = String(item.productId || item.product_id || item.id || '').trim();
+      const itemTitle = String(item.title || item.name || '').trim().toLowerCase();
+      if (prodId && (itemProdId === prodId || itemProdId.startsWith(prodId) || prodId.startsWith(itemProdId))) return true;
+      if (prodTitle && itemTitle && (prodTitle === itemTitle || prodTitle.includes(itemTitle) || itemTitle.includes(prodTitle))) return true;
+      return false;
+    });
+
     if (addToCart) {
       addToCart(product, chosenSize, 1);
     }
-    showSuccess(`Đã thêm "${product.title || product.name}" (Size: ${chosenSize}) vào giỏ hàng!`);
+
+    if (isAlreadyInCart) {
+      showSuccess(`Đã thêm vào giỏ hàng sản phẩm này!`);
+    } else {
+      showSuccess(`Đã thêm "${product.title || product.name}" (Size: ${chosenSize}) vào giỏ hàng!`);
+    }
   };
 
   const handleAddAllToCart = () => {

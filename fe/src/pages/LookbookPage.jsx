@@ -36,7 +36,7 @@ import { lookbookService, getLookbookPositionValue, getLookCodeByPosition } from
 import { useAuth } from '../context/AuthContext';
 
 export default function LookbookPage() {
-  const { user, addToCart } = useAuth();
+  const { user, cart, addToCart } = useAuth();
   // ----------------------------------------------------------------------------
   // PHẦN 1: QUẢN LÝ TRẠNG THÁI (STATE) VÀ ĐỒNG BỘ DỮ LIỆU TỪ MYSQL
   // ----------------------------------------------------------------------------
@@ -108,6 +108,24 @@ export default function LookbookPage() {
   // ----------------------------------------------------------------------------
   // PHẦN 3: CÁC HÀM TIỆN ÍCH XỬ LÝ SỰ KIỆN (EVENT HANDLERS)
   // ----------------------------------------------------------------------------
+  // Kiểm tra xem sản phẩm đã có trong giỏ hàng hay chưa
+  const isProductInCart = (product) => {
+    if (!product || !cart) return false;
+    const prodId = String(product.product_id || product.id || '').trim();
+    const prodName = String(product.name || product.title || product.product_name || '').trim().toLowerCase();
+    return cart.some(item => {
+      const itemProdId = String(item.productId || item.product_id || item.id || '').trim();
+      const itemTitle = String(item.title || item.name || '').trim().toLowerCase();
+      if (prodId && (itemProdId === prodId || itemProdId.startsWith(prodId) || prodId.startsWith(itemProdId) || itemProdId.includes(prodId))) {
+        return true;
+      }
+      if (prodName && itemTitle && (prodName === itemTitle || prodName.includes(itemTitle) || itemTitle.includes(prodName))) {
+        return true;
+      }
+      return false;
+    });
+  };
+
   // Hiển thị thông báo Toast trong 3 giây
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -123,6 +141,8 @@ export default function LookbookPage() {
     const title = product.name || product.title || product.product_name || 'Sản phẩm Lookbook';
     const priceVal = product.price_num || (typeof product.price === 'number' ? product.price : parseInt(String(product.price).replace(/\D/g, '')) || 0);
 
+    const alreadyInCart = isProductInCart(product);
+
     addToCart({
       id: prodId,
       product_id: prodId,
@@ -133,7 +153,12 @@ export default function LookbookPage() {
       sku: product.sku || `YF-${prodId}`,
       categoryName: product.category_name || 'Lookbook Collection'
     });
-    showToast(`Đã thêm "${title}" vào giỏ hàng!`);
+
+    if (alreadyInCart) {
+      showToast(`Đã thêm vào giỏ hàng sản phẩm này!`);
+    } else {
+      showToast(`Đã thêm "${title}" vào giỏ hàng!`);
+    }
   };
 
   // Thêm trọn bộ combo (tất cả các sản phẩm gắn tag) vào giỏ hàng
@@ -1179,7 +1204,7 @@ export default function LookbookPage() {
                           style={{ width: 'auto', padding: '10px 18px' }}
                           onClick={() => handleAddComboToCart(look3)}
                         >
-                          {look3.ctaText || 'Mua Ngay'}
+                          {look3.ctaText || 'Mua Ngaya'}
                         </button>
                       </div>
                     </div>
