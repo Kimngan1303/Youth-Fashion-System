@@ -1,8 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Search, Filter, Grid, ChevronLeft, ChevronRight, SlidersHorizontal, Tag, Folder, ShoppingBag } from 'lucide-react';
+import { Search, Filter, Grid, ChevronLeft, ChevronRight, SlidersHorizontal, Tag, Folder, ShoppingBag, ChevronDown, Check } from 'lucide-react';
 import ProductCard from '../../components/ProductCard';
 import { productService } from '../../services/productService';
+
+const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+const PRICE_RANGES = [
+  { id: 'under_1m', label: 'Dưới 1.000.000đ', min: 0, max: 1000000 },
+  { id: '1m_2.5m', label: '1.000.000đ - 2.500.000đ', min: 1000000, max: 2500000 },
+  { id: '2.5m_5m', label: '2.500.000đ - 5.000.000đ', min: 2500000, max: 5000000 },
+  { id: 'above_5m', label: 'Trên 5.000.000đ', min: 5000000, max: null },
+];
 
 export default function ProductListPage({ onOpenAISearch }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -10,6 +19,7 @@ export default function ProductListPage({ onOpenAISearch }) {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
+  const [metaTotal, setMetaTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Pagination state
@@ -17,11 +27,30 @@ export default function ProductListPage({ onOpenAISearch }) {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
-  // Filter state
+  // Draft Filter state (UI selection before clicking Apply)
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category_id') || '');
-  const [selectedBrand, setSelectedBrand] = useState(searchParams.get('brand_id') || '');
-  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
-  const [searchInput, setSearchInput] = useState(searchParams.get('search') || '');
+  const [selectedBrands, setSelectedBrands] = useState(
+    searchParams.get('brand_ids')
+      ? searchParams.get('brand_ids').split(',')
+      : searchParams.get('brand_id')
+      ? [searchParams.get('brand_id')]
+      : []
+  );
+  const [selectedSize, setSelectedSize] = useState(searchParams.get('size') || '');
+  const [selectedPriceRange, setSelectedPriceRange] = useState(searchParams.get('price_range') || '');
+  const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'newest');
+
+  // Applied filter state (filters sent to backend query, updated when Apply or Clear is clicked)
+  const [appliedFilters, setAppliedFilters] = useState({
+    category_id: searchParams.get('category_id') || '',
+    brand_ids: searchParams.get('brand_ids')
+      ? searchParams.get('brand_ids').split(',')
+      : searchParams.get('brand_id')
+      ? [searchParams.get('brand_id')]
+      : [],
+    size: searchParams.get('size') || '',
+    price_range: searchParams.get('price_range') || '',
+  });
 
   // Load Meta (Categories & Brands)
   useEffect(() => {
@@ -31,6 +60,7 @@ export default function ProductListPage({ onOpenAISearch }) {
         if (metaRes.status && metaRes.data) {
           setCategories(metaRes.data.categories || []);
           setBrands(metaRes.data.brands || []);
+          setMetaTotal(metaRes.data.totalProducts || 0);
         }
       } catch (err) {
         console.error('Lỗi khi tải danh mục & thương hiệu:', err);
@@ -39,16 +69,21 @@ export default function ProductListPage({ onOpenAISearch }) {
     fetchMeta();
   }, []);
 
-  // Fetch Products based on page & filters
+  // Fetch Products based on page & applied filters & sort
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
+      const currentPriceRange = PRICE_RANGES.find((r) => r.id === appliedFilters.price_range);
+
       const res = await productService.getProducts({
         page,
-        limit: 12, // 12 sản phẩm / trang -> với 36 sản phẩm sẽ ra đúng 3 trang
-        category_id: selectedCategory || undefined,
-        brand_id: selectedBrand || undefined,
-        search: searchTerm || undefined,
+        limit: 12, // 12 sản phẩm / trang
+        category_id: appliedFilters.category_id || undefined,
+        brand_ids: appliedFilters.brand_ids.length > 0 ? appliedFilters.brand_ids.join(',') : undefined,
+        size: appliedFilters.size || undefined,
+        min_price: currentPriceRange ? currentPriceRange.min : undefined,
+        max_price: currentPriceRange && currentPriceRange.max ? currentPriceRange.max : undefined,
+        sort: sortBy || undefined,
       });
 
       const responseData = res.data || res;
@@ -63,34 +98,60 @@ export default function ProductListPage({ onOpenAISearch }) {
     } finally {
       setLoading(false);
     }
-  }, [page, selectedCategory, selectedBrand, searchTerm]);
+  }, [page, appliedFilters, sortBy]);
 
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
-  // Sync state with URL params
-  const handleCategoryChange = (catId) => {
+  // Handle draft selection changes
+  const handleCategorySelect = (catId) => {
     setSelectedCategory(catId);
+  };
+
+  const handleSizeToggle = (size) => {
+    setSelectedSize((prev) => (prev === size ? '' : size));
+  };
+
+  const handleBrandToggle = (brandId) => {
+    const bIdStr = String(brandId);
+    setSelectedBrands((prev) => {
+      if (prev.includes(bIdStr)) {
+        return prev.filter((id) => id !== bIdStr);
+      } else {
+        return [...prev, bIdStr];
+      }
+    });
+  };
+
+  const handlePriceRangeToggle = (rangeId) => {
+    setSelectedPriceRange((prev) => (prev === rangeId ? '' : rangeId));
+  };
+
+  // Explicitly apply filters only when user clicks "ÁP DỤNG BỘ LỌC"
+  const handleApplyFilters = () => {
+    setAppliedFilters({
+      category_id: selectedCategory,
+      brand_ids: selectedBrands,
+      size: selectedSize,
+      price_range: selectedPriceRange,
+    });
     setPage(1);
   };
 
-  const handleBrandChange = (bId) => {
-    setSelectedBrand(bId);
-    setPage(1);
-  };
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    setSearchTerm(searchInput);
-    setPage(1);
-  };
-
+  // Reset filters
   const handleClearFilters = () => {
     setSelectedCategory('');
-    setSelectedBrand('');
-    setSearchTerm('');
-    setSearchInput('');
+    setSelectedBrands([]);
+    setSelectedSize('');
+    setSelectedPriceRange('');
+    setAppliedFilters({
+      category_id: '',
+      brand_ids: [],
+      size: '',
+      price_range: '',
+    });
+    setSortBy('newest');
     setPage(1);
   };
 
@@ -120,105 +181,158 @@ export default function ProductListPage({ onOpenAISearch }) {
       <div className="container catalog-body">
         {/* Left Sidebar Filter */}
         <aside className="catalog-sidebar">
-          <div className="filter-block">
-            <div className="filter-header">
-              <span className="filter-title font-serif">Bộ Lọc Tìm Kiếm</span>
-              {(selectedCategory || selectedBrand || searchTerm) && (
-                <button className="clear-filter-btn" onClick={handleClearFilters}>
-                  Xóa lọc
+          {/* 1. DANH MỤC SẢN PHẨM */}
+          <div className="filter-section">
+            <h3 className="filter-section-title">DANH MỤC SẢN PHẨM</h3>
+            <div className="filter-title-line"></div>
+            <ul className="category-filter-list">
+              <li>
+                <button
+                  type="button"
+                  className={`category-item-row ${selectedCategory === '' ? 'active' : ''}`}
+                  onClick={() => handleCategorySelect('')}
+                >
+                  <span className="cat-name">Tất cả</span>
+                  <span className="cat-count">({metaTotal || totalItems})</span>
                 </button>
-              )}
-            </div>
-
-            {/* Search Input */}
-            <form onSubmit={handleSearchSubmit} className="sidebar-search-box">
-              <input
-                type="text"
-                placeholder="Tìm tên sản phẩm..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="search-input"
-              />
-              <button type="submit" className="search-btn">
-                <Search size={14} />
-              </button>
-            </form>
-
-            {/* Category Filter List */}
-            <div className="filter-group">
-              <h4 className="group-label">
-                <Folder size={14} /> Danh Mục ({categories.length})
-              </h4>
-              <ul className="filter-list">
-                <li>
+              </li>
+              {categories.map((cat) => (
+                <li key={cat.category_id}>
                   <button
-                    className={`filter-item-btn ${selectedCategory === '' ? 'active' : ''}`}
-                    onClick={() => handleCategoryChange('')}
+                    type="button"
+                    className={`category-item-row ${String(selectedCategory) === String(cat.category_id) ? 'active' : ''}`}
+                    onClick={() => handleCategorySelect(cat.category_id)}
                   >
-                    Tất cả danh mục
+                    <span className="cat-name">{cat.category_name}</span>
+                    <span className="cat-count">({cat.product_count ?? 0})</span>
                   </button>
                 </li>
-                {categories.map((cat) => (
-                  <li key={cat.category_id}>
-                    <button
-                      className={`filter-item-btn ${String(selectedCategory) === String(cat.category_id) ? 'active' : ''}`}
-                      onClick={() => handleCategoryChange(cat.category_id)}
-                    >
-                      {cat.category_name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+              ))}
+            </ul>
+          </div>
 
-            {/* Brand Filter List */}
-            <div className="filter-group">
-              <h4 className="group-label">
-                <Tag size={14} /> Thương Hiệu ({brands.length})
-              </h4>
-              <ul className="filter-list">
-                <li>
-                  <button
-                    className={`filter-item-btn ${selectedBrand === '' ? 'active' : ''}`}
-                    onClick={() => handleBrandChange('')}
+          {/* 2. KÍCH CỠ */}
+          <div className="filter-section">
+            <h3 className="filter-section-title">KÍCH CỠ</h3>
+            <div className="filter-title-line"></div>
+            <div className="sizes-grid">
+              {SIZES.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  className={`size-grid-btn ${selectedSize === size ? 'active' : ''}`}
+                  onClick={() => handleSizeToggle(size)}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 3. THƯƠNG HIỆU */}
+          <div className="filter-section">
+            <h3 className="filter-section-title">THƯƠNG HIỆU</h3>
+            <div className="filter-title-line"></div>
+            <div className="checkbox-filter-list">
+              {brands.map((b) => {
+                const isChecked = selectedBrands.includes(String(b.brand_id));
+                return (
+                  <label
+                    key={b.brand_id}
+                    className="custom-checkbox-row"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleBrandToggle(b.brand_id);
+                    }}
                   >
-                    Tất cả thương hiệu
-                  </button>
-                </li>
-                {brands.map((b) => (
-                  <li key={b.brand_id}>
-                    <button
-                      className={`filter-item-btn ${String(selectedBrand) === String(b.brand_id) ? 'active' : ''}`}
-                      onClick={() => handleBrandChange(b.brand_id)}
-                    >
+                    <div className={`custom-checkbox-box ${isChecked ? 'checked' : ''}`}>
+                      {isChecked && <Check size={11} strokeWidth={3.5} color="#ffffff" />}
+                    </div>
+                    <span className={`custom-checkbox-label ${isChecked ? 'active' : ''}`}>
                       {b.brand_name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                    </span>
+                  </label>
+                );
+              })}
             </div>
+          </div>
+
+          {/* 4. MỨC GIÁ */}
+          <div className="filter-section">
+            <h3 className="filter-section-title">MỨC GIÁ</h3>
+            <div className="filter-title-line"></div>
+            <div className="checkbox-filter-list">
+              {PRICE_RANGES.map((range) => {
+                const isChecked = selectedPriceRange === range.id;
+                return (
+                  <label
+                    key={range.id}
+                    className="custom-checkbox-row"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handlePriceRangeToggle(range.id);
+                    }}
+                  >
+                    <div className={`custom-checkbox-box ${isChecked ? 'checked' : ''}`}>
+                      {isChecked && <Check size={11} strokeWidth={3.5} color="#ffffff" />}
+                    </div>
+                    <span className={`custom-checkbox-label ${isChecked ? 'active' : ''}`}>
+                      {range.label}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 5. ACTION BUTTONS */}
+          <div className="sidebar-action-buttons">
+            <button type="button" className="btn-apply-filters" onClick={handleApplyFilters}>
+              ÁP DỤNG BỘ LỌC
+            </button>
+            <button type="button" className="btn-reset-filters" onClick={handleClearFilters}>
+              XÓA BỘ LỌC
+            </button>
           </div>
         </aside>
 
         {/* Right Content Area */}
         <main className="catalog-content">
-          {/* Top Bar Status & Total info */}
+          {/* Top Bar Status & Sort */}
           <div className="catalog-topbar">
             <div className="result-count">
-              Hiển thị <strong>{products.length}</strong> / <strong>{totalItems}</strong> sản phẩm
-              {selectedCategory && categories.find(c => String(c.category_id) === String(selectedCategory)) && (
+              Hiển thị <strong>{products.length}</strong> trên tổng số <strong>{totalItems}</strong> sản phẩm
+              {appliedFilters.category_id && categories.find((c) => String(c.category_id) === String(appliedFilters.category_id)) && (
                 <span className="active-tag-pill">
-                  Danh mục: {categories.find(c => String(c.category_id) === String(selectedCategory))?.category_name}
+                  Danh mục: {categories.find((c) => String(c.category_id) === String(appliedFilters.category_id))?.category_name}
+                </span>
+              )}
+              {appliedFilters.size && (
+                <span className="active-tag-pill">
+                  Size: {appliedFilters.size}
                 </span>
               )}
             </div>
 
-            <div className="topbar-actions">
-              {onOpenAISearch && (
-                <button className="btn-ai-search" onClick={onOpenAISearch}>
-                  <Search size={14} /> Tìm kiếm AI (Hình ảnh / Chữ)
-                </button>
-              )}
+            <div className="sort-group">
+              <span className="sort-label">SẮP XẾP:</span>
+              <div className="sort-select-wrapper">
+                <select
+                  id="catalog-sort-select"
+                  className="sort-select"
+                  value={sortBy}
+                  onChange={(e) => {
+                    setSortBy(e.target.value);
+                    setPage(1);
+                  }}
+                >
+                  <option value="newest">Mới nhất</option>
+                  <option value="oldest">Cũ nhất</option>
+                  <option value="name_asc">Tên: A - Z</option>
+                  <option value="name_desc">Tên: Z - A</option>
+                </select>
+                <ChevronDown size={14} className="sort-caret" />
+              </div>
             </div>
           </div>
 
@@ -373,114 +487,221 @@ export default function ProductListPage({ onOpenAISearch }) {
 
         .catalog-sidebar {
           background: #ffffff;
-          border: 1px solid #e5e7eb;
-          border-radius: 8px;
-          padding: 24px;
+          border: 1px solid #eae8e1;
+          border-radius: 4px;
+          padding: 24px 20px;
           align-self: flex-start;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.03);
-        }
-
-        .filter-header {
           display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 16px;
-          padding-bottom: 12px;
-          border-bottom: 1px solid #f3f4f6;
+          flex-direction: column;
+          gap: 28px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.02);
         }
 
-        .filter-title {
-          font-size: 16px;
-          font-weight: 600;
-          color: #111827;
+        .filter-section {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .filter-section-title {
+          font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, sans-serif !important;
+          font-size: 13.5px;
+          font-weight: 800;
+          letter-spacing: 2px;
+          color: #000000;
           margin: 0;
+          text-transform: uppercase;
+          line-height: 1.2;
         }
 
-        .clear-filter-btn {
-          font-size: 11px;
-          color: #ef4444;
-          background: none;
-          border: none;
-          cursor: pointer;
-          font-weight: 600;
-        }
-
-        .sidebar-search-box {
-          display: flex;
-          align-items: center;
-          background: #f9fafb;
-          border: 1px solid #d1d5db;
-          border-radius: 6px;
-          padding: 6px 10px;
-          margin-bottom: 24px;
-        }
-
-        .search-input {
-          border: none;
-          background: transparent;
-          outline: none;
-          font-size: 12.5px;
+        .filter-title-line {
+          height: 1.5px;
+          background-color: #222222;
+          margin-top: 8px;
+          margin-bottom: 16px;
           width: 100%;
         }
 
-        .search-btn {
-          background: none;
-          border: none;
-          color: #6b7280;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-        }
-
-        .filter-group {
-          margin-bottom: 24px;
-        }
-
-        .group-label {
-          font-size: 12px;
-          font-weight: 700;
-          letter-spacing: 0.5px;
-          text-transform: uppercase;
-          color: #374151;
-          margin-bottom: 12px;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-
-        .filter-list {
+        /* 1. Category list */
+        .category-filter-list {
           list-style: none;
           padding: 0;
           margin: 0;
           display: flex;
           flex-direction: column;
-          gap: 4px;
-          max-height: 280px;
+          gap: 8px;
+          max-height: 240px;
           overflow-y: auto;
         }
 
-        .filter-item-btn {
+        .category-item-row {
           width: 100%;
-          text-align: left;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
           background: none;
           border: none;
-          padding: 6px 10px;
-          border-radius: 4px;
+          padding: 4px 0;
           font-size: 13px;
           color: #4b5563;
           cursor: pointer;
           transition: all 0.15s;
+          text-align: left;
         }
 
-        .filter-item-btn:hover {
-          background: #f3f4f6;
+        .category-item-row:hover {
           color: #111827;
         }
 
-        .filter-item-btn.active {
-          background: #111827;
-          color: #ffffff;
+        .category-item-row.active {
+          font-weight: 700;
+          color: #111827;
+        }
+
+        .category-item-row .cat-name {
+          flex: 1;
+        }
+
+        .category-item-row .cat-count {
+          color: #9ca3af;
+          font-size: 12px;
+          font-weight: 400;
+          margin-left: 8px;
+        }
+
+        .category-item-row.active .cat-count {
+          color: #6b7280;
           font-weight: 600;
+        }
+
+        /* 2. Sizes Grid */
+        .sizes-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+        }
+
+        .size-grid-btn {
+          height: 38px;
+          background: #fafafa;
+          border: 1px solid #e5e7eb;
+          border-radius: 2px;
+          font-size: 12px;
+          font-weight: 500;
+          color: #374151;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .size-grid-btn:hover {
+          border-color: #111827;
+          color: #111827;
+        }
+
+        .size-grid-btn.active {
+          background: #000000;
+          color: #ffffff;
+          border-color: #000000;
+          font-weight: 700;
+        }
+
+        /* 3. Checkbox Filter Lists */
+        .checkbox-filter-list {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          max-height: 220px;
+          overflow-y: auto;
+        }
+
+        .custom-checkbox-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          cursor: pointer;
+          user-select: none;
+        }
+
+        .custom-checkbox-box {
+          width: 16px;
+          height: 16px;
+          border: 1.5px solid #d1d5db;
+          border-radius: 2px;
+          background: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          transition: all 0.15s ease;
+        }
+
+        .custom-checkbox-box.checked {
+          background: #000000;
+          border-color: #000000;
+        }
+
+        .custom-checkbox-label {
+          font-size: 13px;
+          color: #4b5563;
+          transition: color 0.15s;
+        }
+
+        .custom-checkbox-row:hover .custom-checkbox-label {
+          color: #111827;
+        }
+
+        .custom-checkbox-label.active {
+          color: #111827;
+          font-weight: 500;
+        }
+
+        /* 4. Action Buttons */
+        .sidebar-action-buttons {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-top: 4px;
+        }
+
+        .btn-apply-filters {
+          width: 100%;
+          height: 44px;
+          background: #000000;
+          color: #ffffff;
+          border: 1px solid #000000;
+          border-radius: 2px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 1.5px;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+
+        .btn-apply-filters:hover {
+          background: #262626;
+        }
+
+        .btn-reset-filters {
+          width: 100%;
+          height: 44px;
+          background: #ffffff;
+          color: #4b5563;
+          border: 1px solid #e5e7eb;
+          border-radius: 2px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 1.5px;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-reset-filters:hover {
+          border-color: #111827;
+          color: #111827;
         }
 
         .catalog-topbar {
@@ -488,16 +709,21 @@ export default function ProductListPage({ onOpenAISearch }) {
           align-items: center;
           justify-content: space-between;
           margin-bottom: 24px;
-          padding-bottom: 16px;
+          padding-bottom: 14px;
           border-bottom: 1px solid #e5e7eb;
         }
 
         .result-count {
           font-size: 13px;
-          color: #4b5563;
+          color: #6b7280;
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
+        }
+
+        .result-count strong {
+          color: #111827;
+          font-weight: 700;
         }
 
         .active-tag-pill {
@@ -507,25 +733,57 @@ export default function ProductListPage({ onOpenAISearch }) {
           padding: 2px 8px;
           border-radius: 12px;
           font-weight: 600;
+          margin-left: 6px;
         }
 
-        .btn-ai-search {
-          background: #111827;
-          color: #ffffff;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 600;
+        .sort-group {
           display: flex;
           align-items: center;
-          gap: 8px;
-          cursor: pointer;
-          transition: background 0.2s;
+          gap: 12px;
         }
 
-        .btn-ai-search:hover {
-          background: #374151;
+        .sort-label {
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.8px;
+          color: #6b7280;
+          text-transform: uppercase;
+        }
+
+        .sort-select-wrapper {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+        }
+
+        .sort-select {
+          appearance: none;
+          -webkit-appearance: none;
+          -moz-appearance: none;
+          background: transparent;
+          border: none;
+          border-bottom: 1px solid #d1d5db;
+          border-radius: 0;
+          padding: 3px 22px 3px 4px;
+          font-size: 13px;
+          font-weight: 500;
+          color: #111827;
+          cursor: pointer;
+          outline: none;
+          min-width: 120px;
+          transition: border-color 0.2s;
+        }
+
+        .sort-select:hover,
+        .sort-select:focus {
+          border-bottom-color: #111827;
+        }
+
+        .sort-caret {
+          position: absolute;
+          right: 2px;
+          pointer-events: none;
+          color: #6b7280;
         }
 
         .products-grid-4 {
