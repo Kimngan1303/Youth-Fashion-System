@@ -634,7 +634,7 @@ export default function LookbookManagement() {
     // Kiểm tra trùng lặp vị trí: mỗi 1 vị trí chỉ có thể pick 1 Lookbook
     const conflictingItem = lookbooks.find(
       lb => (!editingLookbook || lb.id !== editingLookbook.id) &&
-            String(lb.position).toLowerCase() === String(pos).toLowerCase()
+        String(lb.position).toLowerCase() === String(pos).toLowerCase()
     );
 
     // Nếu là Banner thì danh sách sản phẩm phối là rỗng (vì Banner là ảnh bìa lớn)
@@ -1427,6 +1427,10 @@ export default function LookbookManagement() {
           outline: none;
           background: #FFFFFF;
           font-family: inherit;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
         }
 
         .lb-form-input:focus, .lb-form-textarea:focus, .lb-form-select:focus {
@@ -1435,8 +1439,10 @@ export default function LookbookManagement() {
 
         .lb-form-row-2 {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
           gap: 14px;
+          width: 100%;
+          box-sizing: border-box;
         }
 
         .lb-img-preview-box {
@@ -2044,7 +2050,7 @@ export default function LookbookManagement() {
                           {(() => {
                             const occupiedBy = lookbooks.find(
                               item => (!editingLookbook || item.id !== editingLookbook.id) &&
-                                      String(item.position).toLowerCase() === String(formData.position).toLowerCase()
+                                String(item.position).toLowerCase() === String(formData.position).toLowerCase()
                             );
                             if (occupiedBy) {
                               return (
@@ -2083,7 +2089,7 @@ export default function LookbookManagement() {
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                             <div>
                               <label className="lb-form-label" style={{ fontWeight: 700, fontSize: '13px', color: '#111827', display: 'block', margin: 0 }}>
-                                Danh Sách Sản Phẩm Phối (Gắn Tag Từ Danh Mục & CSDL)
+                                Danh Sách Sản Phẩm Phối (Gắn Tag)
                               </label>
                               <span style={{ fontSize: '11px', color: '#6B7280' }}>
                                 Chọn sản phẩm từ MySQL để hiển thị chi tiết và cho phép khách bấm thêm thẳng vào giỏ hàng
@@ -2127,14 +2133,21 @@ export default function LookbookManagement() {
                                     boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                                   }}
                                 >
-                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 34px', gap: '8px', alignItems: 'center' }}>
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 38px', gap: '8px', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
                                     <select
                                       className="lb-form-select"
                                       value={prod.product_id || ''}
                                       onChange={(e) => handleSelectCatalogProduct(idx, e.target.value)}
-                                      style={{ fontWeight: 500, fontSize: '13px' }}
+                                      style={{
+                                        fontWeight: 500,
+                                        fontSize: '13px',
+                                        width: '100%',
+                                        maxWidth: '100%',
+                                        minWidth: 0,
+                                        boxSizing: 'border-box'
+                                      }}
                                     >
-                                      <option value="">-- Chọn sản phẩm từ Danh mục / MySQL Database ({catalogProducts.length} SP) --</option>
+                                      <option value="">-- Chọn sản phẩm từ Danh mục / Database ({catalogProducts.length} SP) --</option>
                                       {catalogProducts.map((cp) => {
                                         const priceVal = cp.variants?.[0]?.price ? Number(cp.variants[0].price).toLocaleString('vi-VN') + '₫' : 'Liên hệ';
                                         return (
@@ -2152,6 +2165,8 @@ export default function LookbookManagement() {
                                         border: '1px solid #FEE2E2',
                                         borderRadius: '6px',
                                         height: '38px',
+                                        width: '38px',
+                                        flexShrink: 0,
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -2198,11 +2213,7 @@ export default function LookbookManagement() {
                                           )}
                                         </div>
                                       </div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <span style={{ fontSize: '11px', color: '#16A34A', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px', background: '#DCFCE7', padding: '2px 8px', borderRadius: '4px' }}>
-                                          <Check size={12} strokeWidth={3} /> Đã liên kết CSDL
-                                        </span>
-                                      </div>
+
                                     </div>
                                   ) : (
                                     <div style={{ fontSize: '11.5px', color: '#94A3B8', fontStyle: 'italic', paddingLeft: '4px' }}>
