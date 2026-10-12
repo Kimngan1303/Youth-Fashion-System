@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { Search } from 'lucide-react';
+import { Search, User } from 'lucide-react';
 
 const headerStyles = `
   .top-header-bar {
@@ -15,6 +15,10 @@ const headerStyles = `
     background: #FFFFFF;
     border-bottom: 1px solid #E8E6E1;
     box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.02);
+  }
+
+  .top-header-bar.no-search {
+    justify-content: flex-end;
   }
 
   .header-search-box {
@@ -82,33 +86,39 @@ const headerStyles = `
 export default function ManagerHeader({ 
   searchTerm = '', 
   onSearchChange = null, 
-  searchPlaceholder = 'Tìm kiếm trong hệ thống quản trị...' 
+  searchPlaceholder = 'Tìm kiếm trong hệ thống quản trị...',
+  showSearch = true,
+  userName = 'Hoàng Kim Anh',
+  userRole = 'Quản Lý Cửa Hàng & Bán Hàng'
 }) {
   const { user } = useAuth();
-  const initial = user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'M';
+  const displayName = user?.full_name || userName;
+  const displayRole = user?.role || userRole;
 
   return (
-    <header className="top-header-bar">
+    <header className={`top-header-bar ${!showSearch ? 'no-search' : ''}`}>
       <style>{headerStyles}</style>
 
-      <div className="header-search-box">
-        <Search size={16} color="#A8A29E" />
-        <input
-          className="header-search-input"
-          placeholder={searchPlaceholder}
-          value={searchTerm}
-          onChange={onSearchChange ? (e) => onSearchChange(e.target.value) : undefined}
-          readOnly={!onSearchChange}
-        />
-      </div>
+      {showSearch && (
+        <div className="header-search-box">
+          <Search size={16} color="#A8A29E" />
+          <input
+            className="header-search-input"
+            placeholder={searchPlaceholder}
+            value={searchTerm}
+            onChange={onSearchChange ? (e) => onSearchChange(e.target.value) : undefined}
+            readOnly={!onSearchChange}
+          />
+        </div>
+      )}
 
       <div className="header-user-profile">
         <div className="user-avatar-circle">
-          {initial}
+          <User size={18} color="#FFFFFF" strokeWidth={2.2} />
         </div>
         <div className="user-info-text">
-          <span className="user-name">{user?.full_name || 'Quản lý Youth Fashion'}</span>
-          <span className="user-role-label">{user?.role || 'Manager / Admin'}</span>
+          <span className="user-name">{displayName}</span>
+          <span className="user-role-label">{displayRole}</span>
         </div>
       </div>
     </header>

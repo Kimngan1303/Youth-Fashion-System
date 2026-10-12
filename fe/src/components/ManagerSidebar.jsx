@@ -322,13 +322,14 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
               <MessageSquare size={16} />
               <span>Tư Vấn & CSKH</span>
             </div>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#F97316', display: 'inline-block' }}></span>
           </button>
 
           {/* 7. Voucher & Khuyến Mãi */}
           <button
             type="button"
             className={`nav-menu-link ${activeMenu === 'vouchers' ? 'active' : ''}`}
-            onClick={() => navigate('/manager')}
+            onClick={() => navigate('/manager/vouchers')}
           >
             <div className="nav-item-inner">
               <Tag size={16} />
