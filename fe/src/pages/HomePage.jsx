@@ -4,10 +4,44 @@ import { Search, Hammer, Users, Menu, Heart, Star, Edit3, RotateCcw, UserCheck }
 import ProductCard from '../components/ProductCard';
 import { productService } from '../services/productService';
 import { lookbookService, getLookbookPositionValue, getLookCodeByPosition } from '../services/lookbookService';
+import heroVideo from './hero-video.mp4';
 
+
+const DEFAULT_LOOKBOOKS = [
+  {
+    id: 1,
+    position: '1',
+    lookCode: 'LOOK 01',
+    season: 'PHONG CÁCH THU ĐÔNG',
+    badge: 'SIGNATURE',
+    title: 'Áo Măng Tô Belted Dạ Camel Cashmere Quý Phái Thời Đại',
+    description: 'Cắt may thủ công từ 100% len lông cừu Merino pha Cashmere tự nhiên, cổ bẻ kinh điển cùng thắt lưng tôn dáng sang trọng.',
+    image: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=800'
+  },
+  {
+    id: 2,
+    position: '2',
+    lookCode: 'LOOK 02',
+    season: 'DẠ TIỆC & HAUTE COUTURE',
+    badge: 'PHIÊN BẢN GIỚI HẠN',
+    title: 'Đầm Xếp Ly Emerald Lộng Lẫy Tơ Tằm Cao Cấp',
+    description: 'Chất tơ tằm dệt ánh ngọc lục bảo rực rỡ, đường xếp ly accordion tỉ mỉ tạo độ xòe bồng bềnh tựa dải sóng khi chuyển động.',
+    image: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=800'
+  },
+  {
+    id: 3,
+    position: '3',
+    lookCode: 'LOOK 03',
+    season: 'PARISIAN CHIC',
+    badge: 'BÁN CHẠY',
+    title: 'Set Áo Tweed Ivory & Quần Âu Cắt May Cổ Điển',
+    description: 'Sự tương phản kinh điển giữa trắng kem ngà và đen tuyền, nút kim loại mạ vàng chạm khắc thủ công.',
+    image: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&q=80&w=800'
+  }
+];
 
 const HomePage = ({ onOpenAISearch }) => {
-  const [publishedLookbooks, setPublishedLookbooks] = useState([]);
+  const [publishedLookbooks, setPublishedLookbooks] = useState(DEFAULT_LOOKBOOKS);
 
   useEffect(() => {
     const loadLookbooks = async () => {
@@ -15,12 +49,16 @@ const HomePage = ({ onOpenAISearch }) => {
         const res = await lookbookService.getLookbooks({ status: 'published' });
         const items = res?.data || [];
         const published = items
-          .filter(item => item.status === 'published')
+          .filter(item => item.status === 'published' || item.status === 'PUBLISHED')
           .sort((a, b) => getLookbookPositionValue(a.position) - getLookbookPositionValue(b.position));
-        setPublishedLookbooks(published);
+        if (published.length > 0) {
+          setPublishedLookbooks(published);
+        } else {
+          setPublishedLookbooks(DEFAULT_LOOKBOOKS);
+        }
       } catch (err) {
-        console.error('Lỗi khi tải Lookbook cho trang chủ từ MySQL:', err);
-        setPublishedLookbooks([]);
+        console.warn('Lỗi khi tải Lookbook cho trang chủ từ MySQL, sử dụng dữ liệu mặc định:', err);
+        setPublishedLookbooks(DEFAULT_LOOKBOOKS);
       }
     };
 
@@ -44,22 +82,26 @@ const HomePage = ({ onOpenAISearch }) => {
   // - Bỏ qua ảnh bìa lớn (banner) và hậu trường (backstage) để lấy các trang phục thực tế.
   // - Sắp xếp tăng dần theo số thứ tự vị trí (1, 2, 3...).
   // ----------------------------------------------------------------------------
-  const contentLookbooks = publishedLookbooks
+  const effectiveLookbooks = publishedLookbooks && publishedLookbooks.length > 0
+    ? publishedLookbooks
+    : DEFAULT_LOOKBOOKS;
+
+  const contentLookbooks = effectiveLookbooks
     .filter(l => l.position !== 'banner' && l.type !== 'hero' && l.type !== 'backstage')
     .sort((a, b) => Number(a.position) - Number(b.position));
 
   // Vị trí #1: Lookbook Nổi Bật (hiển thị tiêu đề, mô tả bên trái & ảnh số 1 khung lưới)
-  const featuredLookbook = contentLookbooks.find(l => Number(l.position) === 1) || contentLookbooks[0] || null;
+  const featuredLookbook = contentLookbooks.find(l => Number(l.position) === 1) || contentLookbooks[0] || DEFAULT_LOOKBOOKS[0];
 
   // Vị trí #2: Hiển thị tại ảnh số 2 trong khung lưới ảnh bên phải
   const secondLookbook = contentLookbooks.find(l => Number(l.position) === 2)
     || contentLookbooks.filter(l => l.id !== featuredLookbook?.id)[0]
-    || null;
+    || DEFAULT_LOOKBOOKS[1];
 
   // Vị trí #3: Hiển thị tại ảnh số 3 trong khung lưới ảnh bên phải
   const thirdLookbook = contentLookbooks.find(l => Number(l.position) === 3)
     || contentLookbooks.filter(l => l.id !== featuredLookbook?.id && l.id !== secondLookbook?.id)[0]
-    || null;
+    || DEFAULT_LOOKBOOKS[2];
 
   const [newProducts, setNewProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -119,10 +161,13 @@ const HomePage = ({ onOpenAISearch }) => {
           </div>
 
           <div className="hero-right">
-            <img
-              src="https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=1200"
-              alt="Youth Fashion Hero Model"
-              className="hero-img"
+            <video
+              src={heroVideo}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="hero-video"
             />
           </div>
         </div>
@@ -146,25 +191,25 @@ const HomePage = ({ onOpenAISearch }) => {
 
       {/* ----------------------------------------------------------------------
           KHỐI 4: BỘ SƯU TẬP LOOKBOOK TRANG CHỦ (LOOKBOOK SPLIT SECTION)
-          - Được điều khiển thời gian thực theo số thứ tự vị trí từ Bảng Quản Trị.
-          - Cột trái: Thông tin Lookbook Vị trí #1 (Mùa, Tiêu đề, Mô tả, Nút xem thêm).
-          - Cột phải: Khung lưới 3 ảnh tương ứng với Vị trí #1, Vị trí #2 và Vị trí #3.
+          - Hiển thị ngay dưới phần Sản Phẩm Mới
+          - Cột trái: Thông tin Lookbook Vị trí #1 (Look 01)
+          - Cột phải: Khung lưới 3 ảnh tương ứng với Vị trí #1, Vị trí #2 và Vị trí #3
           ---------------------------------------------------------------------- */}
       {featuredLookbook && (
         <section className="section-lookbook-split container">
           {/* Thẻ mô tả Lookbook chính (Vị trí 1) */}
           <div className="lookbook-left-card">
             <span className="lookbook-sub">
-              {featuredLookbook.season ? `BỘ SƯU TẬP • ${getLookCodeByPosition(featuredLookbook.position)} • ${featuredLookbook.season.toUpperCase()}` : `BỘ SƯU TẬP • ${getLookCodeByPosition(featuredLookbook.position)}`}
+              {featuredLookbook.season
+                ? `BỘ SƯU TẬP • ${featuredLookbook.lookCode || getLookCodeByPosition(featuredLookbook.position)} • ${featuredLookbook.season.toUpperCase()}`
+                : `BỘ SƯU TẬP • ${featuredLookbook.lookCode || getLookCodeByPosition(featuredLookbook.position)}`}
             </span>
             <h2 className="lookbook-title font-serif">
               {featuredLookbook.title}
             </h2>
-            {featuredLookbook.description && (
-              <p className="lookbook-desc">
-                {featuredLookbook.description}
-              </p>
-            )}
+            <p className="lookbook-desc">
+              {featuredLookbook.description || "Cắt may thủ công từ 100% len lông cừu Merino pha Cashmere tự nhiên, cổ bẻ kinh điển cùng thắt lưng tôn dáng sang trọng."}
+            </p>
             <Link to="/lookbook" className="btn-black lookbook-btn">
               KHÁM PHÁ TUYỂN TẬP LOOKBOOK &rarr;
             </Link>
@@ -173,78 +218,40 @@ const HomePage = ({ onOpenAISearch }) => {
           {/* Lưới 3 ảnh Lookbook tương ứng với các vị trí 1, 2, 3 */}
           <div className="lookbook-photos-grid">
             {/* Ảnh Lookbook Vị trí #1 */}
-            {featuredLookbook.image && (
-              <div className="lb-photo-col" style={{ position: 'relative' }}>
-                <span style={{
-                  position: 'absolute',
-                  top: '16px',
-                  left: '16px',
-                  background: '#FFFFFF',
-                  color: '#111827',
-                  padding: '4px 10px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  borderRadius: '4px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                  zIndex: 2
-                }}>
-                  {getLookCodeByPosition(featuredLookbook.position)}
-                </span>
-                <img
-                  src={featuredLookbook.image}
-                  alt={featuredLookbook.title || ''}
-                  className="lb-img"
-                />
-              </div>
-            )}
+            <div className="lb-photo-col">
+              <span className="lb-photo-badge">
+                {featuredLookbook.lookCode || getLookCodeByPosition(featuredLookbook.position)}
+              </span>
+              <img
+                src={featuredLookbook.image || DEFAULT_LOOKBOOKS[0].image}
+                alt={featuredLookbook.title || "Look 01"}
+                className="lb-img"
+              />
+            </div>
 
             {/* Ảnh Lookbook Vị trí #2 */}
-            {secondLookbook && secondLookbook.image && (
-              <div className="lb-photo-col" style={{ position: 'relative' }}>
-                <span style={{
-                  position: 'absolute',
-                  top: '16px',
-                  left: '16px',
-                  background: '#FFFFFF',
-                  color: '#111827',
-                  padding: '4px 10px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  borderRadius: '4px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                  zIndex: 2
-                }}>
-                  {getLookCodeByPosition(secondLookbook.position)}
+            {secondLookbook && (
+              <div className="lb-photo-col">
+                <span className="lb-photo-badge">
+                  {secondLookbook.lookCode || getLookCodeByPosition(secondLookbook.position)}
                 </span>
                 <img
-                  src={secondLookbook.image}
-                  alt={secondLookbook.title || ''}
+                  src={secondLookbook.image || DEFAULT_LOOKBOOKS[1].image}
+                  alt={secondLookbook.title || "Look 02"}
                   className="lb-img"
                 />
               </div>
             )}
 
             {/* Ảnh Lookbook Vị trí #3 */}
-            {thirdLookbook && thirdLookbook.image && (
-              <div className="lb-photo-col" style={{ position: 'relative' }}>
-                <span style={{
-                  position: 'absolute',
-                  top: '16px',
-                  left: '16px',
-                  background: '#FFFFFF',
-                  color: '#111827',
-                  padding: '4px 10px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  borderRadius: '4px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                  zIndex: 2
-                }}>
-                  {getLookCodeByPosition(thirdLookbook.position)}
+            {thirdLookbook && (
+              <div className="lb-photo-col">
+                <span className="lb-photo-badge">
+                  {thirdLookbook.lookCode || getLookCodeByPosition(thirdLookbook.position)}
                 </span>
                 <img
-                  src={thirdLookbook.image}
-                  alt={thirdLookbook.title || ''}
+                  src={thirdLookbook.image || DEFAULT_LOOKBOOKS[2].image}
+                  alt={thirdLookbook.title || "Look 03"}
                   className="lb-img"
                 />
               </div>
@@ -258,14 +265,15 @@ const HomePage = ({ onOpenAISearch }) => {
       <style>{`
         .hero-section-wrapper {
           padding-top: 10px;
-          padding-bottom: 20px;
+          padding-bottom: 16px;
         }
 
         /* 1. Hero Split Section */
         .hero-split-section {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          min-height: 520px;
+          height: 560px;
+          max-height: 560px;
           background-color: #f7f6f2;
           overflow: hidden;
         }
@@ -274,7 +282,7 @@ const HomePage = ({ onOpenAISearch }) => {
           display: flex;
           align-items: center;
           justify-content: flex-start;
-          padding: 60px 48px;
+          padding: 48px;
           background-color: #f7f6f2;
         }
 
@@ -337,19 +345,22 @@ const HomePage = ({ onOpenAISearch }) => {
           position: relative;
           width: 100%;
           height: 100%;
-          min-height: 520px;
+          max-height: 560px;
           overflow: hidden;
         }
 
-        .hero-img {
+        .hero-img,
+        .hero-video {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          object-position: center;
+          display: block;
         }
 
         /* 2. Section New Products (5 Columns) */
         .section-new-products {
-          padding: 32px 48px;
+          padding: 24px 48px 32px 48px;
         }
 
         .section-title-row {
@@ -485,7 +496,8 @@ const HomePage = ({ onOpenAISearch }) => {
           display: grid;
           grid-template-columns: 1fr 1.5fr;
           gap: 0;
-          padding-bottom: 70px;
+          margin-top: 60px;
+          margin-bottom: 70px;
         }
 
         .lookbook-left-card {
@@ -533,12 +545,30 @@ const HomePage = ({ onOpenAISearch }) => {
         .lb-photo-col {
           height: 420px;
           overflow: hidden;
+          position: relative;
+        }
+
+        .lb-photo-badge {
+          position: absolute;
+          top: 14px;
+          left: 14px;
+          background: #ffffff;
+          color: #111827;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 1px;
+          padding: 4px 10px;
+          border-radius: 2px;
+          z-index: 2;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+          pointer-events: none;
         }
 
         .lb-img {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          display: block;
         }
 
         .grayscale {
@@ -569,6 +599,12 @@ const HomePage = ({ onOpenAISearch }) => {
         @media (max-width: 768px) {
           .hero-split-section {
             grid-template-columns: 1fr;
+            height: auto;
+            max-height: none;
+          }
+          .hero-right {
+            height: 360px;
+            max-height: 360px;
           }
           .hero-left {
             padding: 40px 24px;
