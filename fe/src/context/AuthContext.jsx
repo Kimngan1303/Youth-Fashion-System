@@ -34,19 +34,24 @@ export function AuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState(() => localStorage.getItem('accessToken') || null);
   const [loading, setLoading] = useState(false);
 
-  // Danh sách sản phẩm yêu thích được khởi tạo thực tế và đồng bộ localStorage
+  // Helper tạo storage key theo người dùng (ngăn chặn rò rỉ dữ liệu sang khách vãng lai)
+  const getUserStorageKey = (prefix, u) => {
+    if (!u) return null;
+    const identifier = u.customer_id || u.id || u.email;
+    return identifier ? `${prefix}_${identifier}` : null;
+  };
+
+  // Danh sách sản phẩm yêu thích: Khách vãng lai (Guest) chưa đăng nhập LUÔN LÀ rỗng []
   const [wishlist, setWishlist] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    if (!savedUser) return [];
     try {
-      const saved = localStorage.getItem('youth_fashion_wishlist');
+      const parsedUser = JSON.parse(savedUser);
+      const userKey = getUserStorageKey('youth_fashion_wishlist', parsedUser);
+      const saved = userKey ? localStorage.getItem(userKey) : null;
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const realItems = parsed.filter(item => {
-            const idStr = String(item?.id || item?.product_id || '');
-            return !idStr.startsWith('YF-COAT-CAMEL') && !idStr.startsWith('YF-TWEED-CRM') && !idStr.startsWith('YF-PLEAT-03') && !idStr.startsWith('YF-PANTS-21');
-          });
-          return realItems;
-        }
+        if (Array.isArray(parsed)) return parsed;
       }
       return [];
     } catch (e) {
@@ -54,19 +59,17 @@ export function AuthProvider({ children }) {
     }
   });
 
-  // Danh sách giỏ hàng thực tế đồng bộ với localStorage (chỉ lưu các sản phẩm thật từ MySQL)
+  // Danh sách giỏ hàng: Khách vãng lai (Guest) chưa đăng nhập LUÔN LÀ rỗng []
   const [cart, setCart] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    if (!savedUser) return [];
     try {
-      const saved = localStorage.getItem('youth_fashion_cart');
+      const parsedUser = JSON.parse(savedUser);
+      const userKey = getUserStorageKey('youth_fashion_cart', parsedUser);
+      const saved = userKey ? localStorage.getItem(userKey) : null;
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const realItems = parsed.filter(item => {
-            const idStr = String(item?.id || item?.productId || '');
-            return !idStr.startsWith('YF-COAT-CAMEL') && !idStr.startsWith('YF-TWEED-CRM') && !idStr.startsWith('YF-PLEAT-03') && !idStr.startsWith('YF-PANTS-21');
-          });
-          return realItems;
-        }
+        if (Array.isArray(parsed)) return parsed;
       }
       return [];
     } catch (e) {
@@ -76,10 +79,49 @@ export function AuthProvider({ children }) {
 
   const [orders, setOrders] = useState([]);
 
+  // Đồng bộ giỏ hàng và danh sách yêu thích khi trạng thái đăng nhập thay đổi
+  useEffect(() => {
+    // Dọn dẹp key cũ không gắn với user để tránh rò rỉ sang khách vãng lai
+    try {
+      localStorage.removeItem('youth_fashion_cart');
+      localStorage.removeItem('youth_fashion_wishlist');
+    } catch (e) {}
+
+    if (!user) {
+      // Guest: Không có giỏ hàng, không có danh sách yêu thích
+      setWishlist([]);
+      setCart([]);
+      return;
+    }
+
+    // Đã đăng nhập: Tải giỏ hàng & yêu thích của tài khoản này
+    const cartKey = getUserStorageKey('youth_fashion_cart', user);
+    const wishlistKey = getUserStorageKey('youth_fashion_wishlist', user);
+
+    if (cartKey) {
+      try {
+        const saved = localStorage.getItem(cartKey);
+        setCart(saved ? JSON.parse(saved) : []);
+      } catch (e) {
+        setCart([]);
+      }
+    }
+    if (wishlistKey) {
+      try {
+        const saved = localStorage.getItem(wishlistKey);
+        setWishlist(saved ? JSON.parse(saved) : []);
+      } catch (e) {
+        setWishlist([]);
+      }
+    }
+  }, [user?.customer_id, user?.id, user?.email]);
+
   useEffect(() => {
     const handleLogoutEvent = () => {
       setUser(null);
       setAccessToken(null);
+      setWishlist([]);
+      setCart([]);
       localStorage.removeItem('user');
       localStorage.removeItem('accessToken');
     };
@@ -89,6 +131,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   const toggleWishlist = (product) => {
+    if (!user) {
+      return { success: false, requireLogin: true, message: 'Vui lòng đăng nhập để thêm sản phẩm vào danh sách yêu thích!' };
+    }
+
     let wasAdded = false;
     setWishlist(prev => {
       const targetId = typeof product === 'object' ? (product.id || product.product_id) : product;
@@ -138,34 +184,49 @@ export function AuthProvider({ children }) {
         };
         next = [itemToAdd, ...prev];
       }
-      try {
-        localStorage.setItem('youth_fashion_wishlist', JSON.stringify(next));
-      } catch (err) {
-        console.error('Lỗi khi lưu wishlist vào localStorage:', err);
+      const wishlistKey = getUserStorageKey('youth_fashion_wishlist', user);
+      if (wishlistKey) {
+        try {
+          localStorage.setItem(wishlistKey, JSON.stringify(next));
+        } catch (err) {
+          console.error('Lỗi khi lưu wishlist vào localStorage:', err);
+        }
       }
       return next;
     });
-    return wasAdded;
+    return { success: true, wasAdded };
   };
 
   const removeFromWishlist = (targetId) => {
+    if (!user) return;
     setWishlist(prev => {
       const next = prev.filter(item => (typeof item === 'object' ? (item.id !== targetId && item.product_id !== targetId) : item !== targetId));
-      try {
-        localStorage.setItem('youth_fashion_wishlist', JSON.stringify(next));
-      } catch (err) {}
+      const wishlistKey = getUserStorageKey('youth_fashion_wishlist', user);
+      if (wishlistKey) {
+        try {
+          localStorage.setItem(wishlistKey, JSON.stringify(next));
+        } catch (err) {}
+      }
       return next;
     });
   };
 
   const clearWishlist = () => {
+    if (!user) return;
     setWishlist([]);
-    try {
-      localStorage.removeItem('youth_fashion_wishlist');
-    } catch (err) {}
+    const wishlistKey = getUserStorageKey('youth_fashion_wishlist', user);
+    if (wishlistKey) {
+      try {
+        localStorage.removeItem(wishlistKey);
+      } catch (err) {}
+    }
   };
 
   const addToCart = (product, selectedSize = 'M', quantity = 1) => {
+    if (!user) {
+      return { success: false, requireLogin: true, message: 'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!' };
+    }
+
     setCart(prev => {
       const prodId = product.id || product.product_id || product.sku || 'PROD';
       const size = selectedSize || product.selectedSize || 'M';
@@ -205,14 +266,19 @@ export function AuthProvider({ children }) {
         };
         next = [newItem, ...prev];
       }
-      try {
-        localStorage.setItem('youth_fashion_cart', JSON.stringify(next));
-      } catch (err) {}
+      const cartKey = getUserStorageKey('youth_fashion_cart', user);
+      if (cartKey) {
+        try {
+          localStorage.setItem(cartKey, JSON.stringify(next));
+        } catch (err) {}
+      }
       return next;
     });
+    return { success: true };
   };
 
   const updateCartQuantity = (cartItemId, delta) => {
+    if (!user) return;
     setCart(prev => {
       const next = prev.map(item => {
         if (item.id === cartItemId) {
@@ -221,51 +287,71 @@ export function AuthProvider({ children }) {
         }
         return item;
       });
-      try {
-        localStorage.setItem('youth_fashion_cart', JSON.stringify(next));
-      } catch (err) {}
+      const cartKey = getUserStorageKey('youth_fashion_cart', user);
+      if (cartKey) {
+        try {
+          localStorage.setItem(cartKey, JSON.stringify(next));
+        } catch (err) {}
+      }
       return next;
     });
   };
 
   const removeFromCart = (cartItemId) => {
+    if (!user) return;
     setCart(prev => {
       const next = prev.filter(item => item.id !== cartItemId);
-      try {
-        localStorage.setItem('youth_fashion_cart', JSON.stringify(next));
-      } catch (err) {}
+      const cartKey = getUserStorageKey('youth_fashion_cart', user);
+      if (cartKey) {
+        try {
+          localStorage.setItem(cartKey, JSON.stringify(next));
+        } catch (err) {}
+      }
       return next;
     });
   };
 
   const clearCart = () => {
+    if (!user) return;
     setCart([]);
-    try {
-      localStorage.setItem('youth_fashion_cart', JSON.stringify([]));
-    } catch (err) {}
+    const cartKey = getUserStorageKey('youth_fashion_cart', user);
+    if (cartKey) {
+      try {
+        localStorage.removeItem(cartKey);
+      } catch (err) {}
+    }
   };
 
   const toggleCartItemSelection = (cartItemId) => {
+    if (!user) return;
     setCart(prev => {
       const next = prev.map(item => item.id === cartItemId ? { ...item, selected: !item.selected } : item);
-      try {
-        localStorage.setItem('youth_fashion_cart', JSON.stringify(next));
-      } catch (err) {}
+      const cartKey = getUserStorageKey('youth_fashion_cart', user);
+      if (cartKey) {
+        try {
+          localStorage.setItem(cartKey, JSON.stringify(next));
+        } catch (err) {}
+      }
       return next;
     });
   };
 
   const toggleSelectAllCart = (isSelected) => {
+    if (!user) return;
     setCart(prev => {
       const next = prev.map(item => ({ ...item, selected: isSelected }));
-      try {
-        localStorage.setItem('youth_fashion_cart', JSON.stringify(next));
-      } catch (err) {}
+      const cartKey = getUserStorageKey('youth_fashion_cart', user);
+      if (cartKey) {
+        try {
+          localStorage.setItem(cartKey, JSON.stringify(next));
+        } catch (err) {}
+      }
       return next;
     });
   };
 
-  const cartCount = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
+  // Số lượng giỏ hàng: Chỉ hiển thị khi đã đăng nhập
+  const cartCount = user ? cart.reduce((sum, item) => sum + (item.quantity || 1), 0) : 0;
 
   const updateUserProfile = async (updatedData) => {
     const newAvatar = updatedData.avatar_url;
@@ -395,6 +481,7 @@ export function AuthProvider({ children }) {
       setUser(null);
       setAccessToken(null);
       setWishlist([]);
+      setCart([]);
       localStorage.removeItem('user');
       localStorage.removeItem('accessToken');
       setLoading(false);

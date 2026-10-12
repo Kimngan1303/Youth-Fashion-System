@@ -699,11 +699,7 @@ export default function CategoryManager() {
       <main className="main-content-area">
 
         {/* Header Bar */}
-        <ManagerHeader
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          searchPlaceholder="Tìm theo tên danh mục trong CSDL MySQL..."
-        />
+        <ManagerHeader showSearch={false} />
 
         {/* Scroll Body */}
         <div className="dashboard-scroll-body">
@@ -711,7 +707,7 @@ export default function CategoryManager() {
           {/* Section Header */}
           <div className="dashboard-header-row">
             <div>
-              <p className="dashboard-header-sub">QUẢN LÝ DỮ LIỆU MYSQL THẬT 100%</p>
+              <p className="dashboard-header-sub">YOUTHFASHION • QUẢN LÝ DANH MỤC SẢN PHẨM</p>
               <h1 className="dashboard-header-title">Quản Lý Danh Mục</h1>
             </div>
 

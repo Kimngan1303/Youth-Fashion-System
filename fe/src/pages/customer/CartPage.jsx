@@ -204,7 +204,11 @@ export default function CartPage() {
                       </div>
 
                       {/* Product Thumbnail */}
-                      <div className="item-thumbnail-box">
+                      <Link 
+                        to={`/products/${item.productId || item.product_id || String(item.id).split('_')[0]}`}
+                        className="item-thumbnail-box item-thumbnail-link"
+                        title={`Xem chi tiết ${item.title}`}
+                      >
                         <img src={item.image} alt={item.title} className="item-thumb-img" />
                         {item.badge && (
                           <span 
@@ -214,12 +218,18 @@ export default function CartPage() {
                             {item.badge}
                           </span>
                         )}
-                      </div>
+                      </Link>
 
                       {/* Product Details Info */}
                       <div className="item-info-col">
                         <span className="item-category-tag">{item.categoryTag}</span>
-                        <h3 className="item-name font-serif">{item.title}</h3>
+                        <Link 
+                          to={`/products/${item.productId || item.product_id || String(item.id).split('_')[0]}`}
+                          className="item-title-link"
+                          title={`Xem chi tiết ${item.title}`}
+                        >
+                          <h3 className="item-name font-serif">{item.title}</h3>
+                        </Link>
                         <span className="item-sku">SKU: {item.sku}</span>
                         <div className="item-variant-meta">
                           <span className="color-dot" style={{ backgroundColor: item.colorDot }}></span>
@@ -461,20 +471,29 @@ export default function CartPage() {
             return (
               <div key={p.product_id} className="similar-card">
                 <div className="similar-card-media">
-                  <img src={primaryImg} alt={p.product_name} className="similar-card-img" />
+                  <Link 
+                    to={`/products/${p.product_id}`}
+                    className="similar-media-link"
+                    title={`Xem chi tiết ${p.product_name}`}
+                  >
+                    <img src={primaryImg} alt={p.product_name} className="similar-card-img" />
+                  </Link>
 
                   <button
                     type="button"
                     className="similar-heart-btn"
                     title={isLiked ? 'Bỏ thích' : 'Yêu thích'}
-                    onClick={() => toggleWishlist({
-                      id: p.product_id,
-                      product_id: p.product_id,
-                      title: p.product_name,
-                      name: p.product_name,
-                      price: priceVal,
-                      image: primaryImg,
-                    })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleWishlist({
+                        id: p.product_id,
+                        product_id: p.product_id,
+                        title: p.product_name,
+                        name: p.product_name,
+                        price: priceVal,
+                        image: primaryImg,
+                      });
+                    }}
                   >
                     <Heart size={16} fill={isLiked ? '#dc2626' : 'none'} color={isLiked ? '#dc2626' : '#111827'} strokeWidth={1.5} />
                   </button>
@@ -482,7 +501,13 @@ export default function CartPage() {
 
                 <div className="similar-card-body">
                   <span className="similar-card-tag">{p.category?.category_name || 'THỜI TRANG'}</span>
-                  <h3 className="similar-card-title font-serif">{p.product_name}</h3>
+                  <Link 
+                    to={`/products/${p.product_id}`}
+                    className="similar-title-link"
+                    title={`Xem chi tiết ${p.product_name}`}
+                  >
+                    <h3 className="similar-card-title font-serif">{p.product_name}</h3>
+                  </Link>
                   <p className="similar-card-desc">{p.brand?.brand_name || 'Youth Fashion'}</p>
 
                   <div className="similar-card-price-row">
@@ -723,6 +748,47 @@ export default function CartPage() {
           border-radius: 4px;
           overflow: hidden;
           flex-shrink: 0;
+          display: block;
+          cursor: pointer;
+          transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .item-thumbnail-link:hover {
+          opacity: 0.92;
+          transform: scale(1.02);
+        }
+
+        .item-title-link {
+          text-decoration: none;
+          color: inherit;
+          display: inline-block;
+          max-width: 100%;
+          cursor: pointer;
+        }
+
+        .item-title-link:hover .item-name {
+          color: #b45309;
+          text-decoration: underline;
+        }
+
+        .similar-media-link {
+          display: block;
+          width: 100%;
+          height: 100%;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
+        .similar-title-link {
+          text-decoration: none;
+          color: inherit;
+          display: block;
+          cursor: pointer;
+        }
+
+        .similar-title-link:hover .similar-card-title {
+          color: #b45309;
+          text-decoration: underline;
         }
 
         .item-thumb-img {

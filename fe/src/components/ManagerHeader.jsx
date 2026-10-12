@@ -87,7 +87,7 @@ export default function ManagerHeader({
   searchTerm = '', 
   onSearchChange = null, 
   searchPlaceholder = 'Tìm kiếm trong hệ thống quản trị...',
-  showSearch = true,
+  showSearch = false,
   userName = 'Hoàng Kim Anh',
   userRole = 'Quản Lý Cửa Hàng & Bán Hàng'
 }) {

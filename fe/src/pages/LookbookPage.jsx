@@ -21,7 +21,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Share2,
   ShoppingBag,
@@ -36,6 +36,7 @@ import { lookbookService, getLookbookPositionValue, getLookCodeByPosition } from
 import { useAuth } from '../context/AuthContext';
 
 export default function LookbookPage() {
+  const navigate = useNavigate();
   const { user, cart, addToCart } = useAuth();
   // ----------------------------------------------------------------------------
   // PHẦN 1: QUẢN LÝ TRẠNG THÁI (STATE) VÀ ĐỒNG BỘ DỮ LIỆU TỪ MYSQL
@@ -138,6 +139,12 @@ export default function LookbookPage() {
     e.stopPropagation();
     if (!product) return;
 
+    if (!user) {
+      showToast('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!');
+      navigate('/login');
+      return;
+    }
+
     if (isProductInCart(product)) {
       showToast('Đã thêm vào giỏ hàng sản phẩm này rồi!');
       return;
@@ -164,6 +171,13 @@ export default function LookbookPage() {
   // Thêm trọn bộ combo (tất cả các sản phẩm gắn tag chưa có trong giỏ hàng)
   const handleAddComboToCart = (look) => {
     if (!look) return;
+
+    if (!user) {
+      showToast('Vui lòng đăng nhập để thêm combo vào giỏ hàng!');
+      navigate('/login');
+      return;
+    }
+
     const prods = look.products || [];
     if (prods.length > 0) {
       const prodsToAdd = prods.filter(p => !isProductInCart(p));

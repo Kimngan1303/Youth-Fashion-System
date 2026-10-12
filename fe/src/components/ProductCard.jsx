@@ -1,20 +1,38 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 const ProductCard = ({ product }) => {
-  const { wishlist, toggleWishlist } = useAuth();
+  const navigate = useNavigate();
+  const { user, wishlist, toggleWishlist } = useAuth();
+  const { showInfo } = useToast();
 
-  const isLiked = wishlist.some(i => (typeof i === 'object' ? (i.id === product.id || i.product_id === product.id) : i === product.id));
+  const isLiked = Boolean(
+    user && wishlist.some(i => (typeof i === 'object' ? (i.id === product.id || i.product_id === product.id) : i === product.id))
+  );
 
   const handleToggleFavorite = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!user) {
+      showInfo('Vui lòng đăng nhập để lưu sản phẩm yêu thích!');
+      navigate('/login');
+      return;
+    }
     toggleWishlist(product);
   };
 
+  const handleCardClick = () => {
+    const prodId = product.id || product.product_id;
+    if (prodId) {
+      navigate(`/products/${prodId}`);
+    }
+  };
+
   return (
-    <div className="product-card">
+    <div className="product-card" onClick={handleCardClick}>
       <div className="product-img-box">
         <img 
           src={product.image} 
