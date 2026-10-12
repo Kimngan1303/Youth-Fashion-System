@@ -57,12 +57,14 @@ const ProductCard = ({ product }) => {
           overflow: hidden;
           background-color: #f3f4f6;
           margin-bottom: 8px;
+          border-radius: 12px;
         }
 
         .product-img {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          border-radius: 12px;
           transition: transform 0.4s ease;
         }
 
@@ -81,6 +83,7 @@ const ProductCard = ({ product }) => {
           letter-spacing: 0.5px;
           padding: 3px 7px;
           text-transform: uppercase;
+          border-radius: 4px;
         }
 
         .favorite-btn {

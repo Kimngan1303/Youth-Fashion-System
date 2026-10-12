@@ -23,6 +23,7 @@ import ProductManager from './pages/manager/ProductManager';
 import CategoryManager from './pages/manager/CategoryManager';
 import BrandManager from './pages/manager/BrandManager';
 import LookbookManagement from './pages/manager/LookbookManagement';
+import VoucherManager from './pages/manager/VoucherManager';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useContext(AuthContext);
@@ -107,6 +108,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <LookbookManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/manager/vouchers"
+            element={
+              <ProtectedRoute>
+                <VoucherManager />
               </ProtectedRoute>
             }
           />

@@ -39,15 +39,20 @@ const formatProduct = (product) => {
 export const getProductsService = async (query) => {
   const page = Math.max(1, parseInt(query.page, 10) || 1);
   const limit = Math.max(1, parseInt(query.limit, 10) || 10);
-  const { category_id, brand_id, search, status } = query;
+  const { category_id, brand_id, brand_ids, search, status, sort, size, min_price, max_price } = query;
 
   const { items, total } = await productRepo.findProducts({
     page,
     limit,
     category_id,
     brand_id,
+    brand_ids,
     search_name: search,
     status,
+    sort,
+    size,
+    min_price,
+    max_price,
   });
 
   const formattedItems = items.map(formatProduct);
@@ -252,8 +257,19 @@ export const getCategoriesAndBrandsService = async () => {
     productRepo.findAllBrands(),
   ]);
 
+  const totalProducts = categories.reduce((sum, c) => sum + (c._count?.products || 0), 0);
+
   return {
-    categories: categories.map((c) => ({ ...c, category_id: String(c.category_id) })),
-    brands: brands.map((b) => ({ ...b, brand_id: String(b.brand_id) })),
+    totalProducts,
+    categories: categories.map((c) => ({
+      ...c,
+      category_id: String(c.category_id),
+      product_count: c._count?.products || 0,
+    })),
+    brands: brands.map((b) => ({
+      ...b,
+      brand_id: String(b.brand_id),
+      product_count: b._count?.products || 0,
+    })),
   };
 };

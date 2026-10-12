@@ -1,51 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Trash2, ShoppingBag, RotateCw, ArrowLeft, ShieldCheck, RefreshCw, MessageSquare, Info, Check } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-
-const SIMILAR_PRODUCTS = [
-  {
-    id: 101,
-    tag: 'TAILORED BLAZER',
-    title: 'Áo Blazer Dạ Than Phom Oversized',
-    desc: 'Dạ len nguyên chất Ý',
-    price: 2890000,
-    badgeRight: '3 MÀU SẮC',
-    badgeRightColor: 'gray',
-    image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: 102,
-    tag: 'HAUTE SOIRÉE DRESS',
-    title: 'Đầm Dạ Tiệc Lụa Pleated Emerald',
-    desc: 'Lụa tơ tằm dập ly thủ công',
-    price: 3450000,
-    badgeRight: 'GIỚI HẠN 50 BẢN',
-    badgeRightColor: 'gold',
-    image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: 103,
-    tag: 'BESPOKE TAILORING',
-    title: 'Quần Tây Ống Rộng Phom Suông',
-    desc: 'Vải len pha lụa đứng dáng',
-    price: 1890000,
-    badgeRight: 'ĐẦY ĐỦ SIZE',
-    badgeRightColor: 'gray',
-    image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: 104,
-    tag: 'GENTLEMAN ESSENTIALS',
-    title: 'Áo Dệt Kim Polo Navy Cổ Điển',
-    desc: 'Sợi Cotton Sea Island siêu mịn',
-    price: 1550000,
-    badgeRight: 'BEST MATCH',
-    badgeRightColor: 'gray',
-    image: 'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?auto=format&fit=crop&q=80&w=800'
-  }
-];
+import { productService } from '../../services/productService';
 
 export default function CartPage() {
   const { 
@@ -61,9 +19,24 @@ export default function CartPage() {
   } = useAuth();
   const { showSuccess, showInfo, showError } = useToast();
 
-  const [voucherCode, setVoucherCode] = useState('YF-VIPMEMBER');
-  const [voucherApplied, setVoucherApplied] = useState(true);
+  const [similarProducts, setSimilarProducts] = useState([]);
+  const [voucherCode, setVoucherCode] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
   const [orderNote, setOrderNote] = useState('');
+
+  // Tải danh sách sản phẩm gợi ý trực tiếp từ CSDL MySQL
+  useEffect(() => {
+    const fetchSimilar = async () => {
+      try {
+        const res = await productService.getProducts({ limit: 4 });
+        const items = res.data?.products || res.products || [];
+        setSimilarProducts(items);
+      } catch (err) {
+        console.error('Lỗi khi tải sản phẩm tương tự từ MySQL:', err);
+      }
+    };
+    fetchSimilar();
+  }, []);
 
   const cartItems = cart || [];
   const allSelected = cartItems.length > 0 && cartItems.every(i => i.selected);
@@ -112,12 +85,19 @@ export default function CartPage() {
       showError('Vui lòng nhập mã ưu đãi.');
       return;
     }
-    setVoucherApplied(true);
-    showSuccess('Đã áp dụng mã ưu đãi VIP Member (-300.000₫)!');
+    const code = voucherCode.trim().toUpperCase();
+    if (code === 'YOUTH10') {
+      setAppliedVoucher({ code, discountPercent: 10, discountAmount: 0 });
+      showSuccess('Đã áp dụng mã giảm giá 10%!');
+    } else {
+      setAppliedVoucher({ code, discountPercent: 0, discountAmount: 50000 });
+      showSuccess(`Đã áp dụng mã ưu đãi ${code}!`);
+    }
   };
 
   const handleRemoveVoucher = () => {
-    setVoucherApplied(false);
+    setAppliedVoucher(null);
+    setVoucherCode('');
     showInfo('Đã gỡ mã ưu đãi.');
   };
 
@@ -134,8 +114,17 @@ export default function CartPage() {
   const selectedItems = cartItems.filter(i => i.selected);
   const totalItemsCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
   const rawProductTotal = selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const vipDiscount = voucherApplied && rawProductTotal > 0 ? 300000 : 0;
-  const finalTotal = Math.max(0, rawProductTotal - vipDiscount);
+
+  let voucherDiscount = 0;
+  if (appliedVoucher && rawProductTotal > 0) {
+    if (appliedVoucher.discountPercent) {
+      voucherDiscount = Math.round((rawProductTotal * appliedVoucher.discountPercent) / 100);
+    } else if (appliedVoucher.discountAmount) {
+      voucherDiscount = Math.min(rawProductTotal, appliedVoucher.discountAmount);
+    }
+  }
+
+  const finalTotal = Math.max(0, rawProductTotal - voucherDiscount);
 
   // Original saved calculation
   const totalOriginalSaving = selectedItems.reduce((sum, item) => {
@@ -143,7 +132,7 @@ export default function CartPage() {
       return sum + (item.originalPrice - item.price) * item.quantity;
     }
     return sum;
-  }, 0) + vipDiscount;
+  }, 0) + voucherDiscount;
 
   return (
     <div className="cart-page-container">
@@ -346,14 +335,16 @@ export default function CartPage() {
                   <span className="row-value bold">{rawProductTotal.toLocaleString('vi-VN')}₫</span>
                 </div>
 
-                <div className="summary-row vip-discount-row">
-                  <span className="row-label">
-                    Ưu đãi VIP Member (-5%) <Info size={13} className="info-icon" />
-                  </span>
-                  <span className="row-value discount">
-                    -{vipDiscount.toLocaleString('vi-VN')}₫
-                  </span>
-                </div>
+                {appliedVoucher && voucherDiscount > 0 && (
+                  <div className="summary-row voucher-discount-row">
+                    <span className="row-label">
+                      Mã giảm giá ({appliedVoucher.code})
+                    </span>
+                    <span className="row-value discount">
+                      -{voucherDiscount.toLocaleString('vi-VN')}₫
+                    </span>
+                  </div>
+                )}
 
                 <div className="summary-row shipping-row">
                   <div className="shipping-label-group">
@@ -383,7 +374,7 @@ export default function CartPage() {
               {/* Voucher / Coupon Box */}
               <div className="voucher-box">
                 <span className="voucher-title">MÃ ƯU ĐÃI</span>
-                <p className="voucher-desc">Áp dụng mã giảm giá VIP Member hoặc thẻ quà tặng.</p>
+                <p className="voucher-desc">Nhập mã giảm giá hoặc thẻ quà tặng của bạn.</p>
                 <form className="voucher-input-group" onSubmit={handleApplyVoucher}>
                   <input
                     type="text"
@@ -396,11 +387,11 @@ export default function CartPage() {
                     ÁP DỤNG
                   </button>
                 </form>
-                {voucherApplied && (
+                {appliedVoucher && (
                   <div className="voucher-applied-tag">
                     <span className="applied-left">
                       <Check size={13} />
-                      <span>Voucher VIP Member (-300.000₫)</span>
+                      <span>Voucher {appliedVoucher.code} (-{voucherDiscount.toLocaleString('vi-VN')}₫)</span>
                     </span>
                     <button type="button" className="btn-remove-voucher" onClick={handleRemoveVoucher}>
                       GỠ MÃ
@@ -462,36 +453,44 @@ export default function CartPage() {
         <h2 className="similar-section-title font-serif">Sản phẩm tương tự</h2>
 
         <div className="similar-grid">
-          {SIMILAR_PRODUCTS.map((prod) => {
-            const isLiked = wishlist.some(i => (typeof i === 'object' ? (i.id === prod.id || i.product_id === prod.id || i.title === prod.title) : i === prod.id));
-            const priceNum = typeof prod.price === 'number' ? prod.price : 2890000;
+          {similarProducts.map((p) => {
+            const primaryImg = p.images?.find((i) => i.is_primary)?.image_url || p.images?.[0]?.image_url || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800';
+            const priceVal = p.variants?.[0]?.price ? Number(p.variants[0].price) : 0;
+            const isLiked = wishlist.some((i) => (typeof i === 'object' ? (i.id === p.product_id || i.product_id === p.product_id) : i === p.product_id));
 
             return (
-              <div key={prod.id} className="similar-card">
+              <div key={p.product_id} className="similar-card">
                 <div className="similar-card-media">
-                  <img src={prod.image} alt={prod.title} className="similar-card-img" />
+                  <img src={primaryImg} alt={p.product_name} className="similar-card-img" />
 
                   <button
                     type="button"
                     className="similar-heart-btn"
                     title={isLiked ? 'Bỏ thích' : 'Yêu thích'}
-                    onClick={() => toggleWishlist(prod)}
+                    onClick={() => toggleWishlist({
+                      id: p.product_id,
+                      product_id: p.product_id,
+                      title: p.product_name,
+                      name: p.product_name,
+                      price: priceVal,
+                      image: primaryImg,
+                    })}
                   >
                     <Heart size={16} fill={isLiked ? '#dc2626' : 'none'} color={isLiked ? '#dc2626' : '#111827'} strokeWidth={1.5} />
                   </button>
                 </div>
 
                 <div className="similar-card-body">
-                  <span className="similar-card-tag">{prod.tag}</span>
-                  <h3 className="similar-card-title font-serif">{prod.title}</h3>
-                  <p className="similar-card-desc">{prod.desc}</p>
+                  <span className="similar-card-tag">{p.category?.category_name || 'THỜI TRANG'}</span>
+                  <h3 className="similar-card-title font-serif">{p.product_name}</h3>
+                  <p className="similar-card-desc">{p.brand?.brand_name || 'Youth Fashion'}</p>
 
                   <div className="similar-card-price-row">
                     <span className="similar-card-price">
-                      {priceNum.toLocaleString('vi-VN')}₫
+                      {priceVal > 0 ? priceVal.toLocaleString('vi-VN') + '₫' : 'Liên hệ'}
                     </span>
-                    <span className={`similar-card-badge-right ${prod.badgeRightColor === 'gold' ? 'gold' : ''}`}>
-                      {prod.badgeRight}
+                    <span className="similar-card-badge-right">
+                      MỚI
                     </span>
                   </div>
                 </div>
@@ -1324,6 +1323,8 @@ export default function CartPage() {
         .similar-card {
           background-color: #ffffff;
           border: 1px solid #ebebeb;
+          border-radius: 12px;
+          overflow: hidden;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
           display: flex;
           flex-direction: column;
@@ -1343,6 +1344,8 @@ export default function CartPage() {
           aspect-ratio: 3 / 4;
           background-color: #f3f4f6;
           overflow: hidden;
+          border-top-left-radius: 12px;
+          border-top-right-radius: 12px;
         }
 
         .similar-card-img {
@@ -1350,6 +1353,8 @@ export default function CartPage() {
           height: 100%;
           object-fit: cover;
           display: block;
+          border-top-left-radius: 12px;
+          border-top-right-radius: 12px;
           transition: transform 0.4s ease;
         }
 

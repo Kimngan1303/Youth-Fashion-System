@@ -593,7 +593,134 @@ async function main() {
         { sku: 'AT-TANK-36-L-TRANG', size: 'L', color: 'Trắng', price: 180000, stock: 50 },
       ],
     },
+    // Các sản phẩm chủ đạo trong Tuyển tập Lookbook
+    {
+      product_name: 'Áo Măng Tô Dạ Camel Cashmere',
+      description: 'Cắt may thủ công từ 100% len lông cừu Merino pha Cashmere tự nhiên, cổ bẻ kinh điển cùng thắt lưng tôn dáng sang trọng.',
+      category_name: 'Áo khoác & Jacket',
+      brand_name: 'Atelier Elegance',
+      images: [
+        { url: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=1000', is_primary: true, alt: 'Áo Măng Tô Dạ Camel Cashmere' },
+      ],
+      variants: [
+        { sku: 'MT-CAMEL-01-S', size: 'S', color: 'Camel', price: 3850000, stock: 20 },
+        { sku: 'MT-CAMEL-01-M', size: 'M', color: 'Camel', price: 3850000, stock: 25 },
+        { sku: 'MT-CAMEL-01-L', size: 'L', color: 'Camel', price: 3850000, stock: 15 },
+      ],
+    },
+    {
+      product_name: 'Áo Len Cổ Lọ Cream Knitwear',
+      description: 'Áo len dệt kim cổ lọ mềm mịn cao cấp màu kem thanh lịch, giữ ấm hoàn hảo cho mùa thu đông.',
+      category_name: 'Đồ Đông & Áo Len',
+      brand_name: 'Nordic Pure',
+      images: [
+        { url: 'https://images.unsplash.com/photo-1576871337632-b9aef4c17ab9?auto=format&fit=crop&q=80&w=800', is_primary: true, alt: 'Áo Len Cổ Lọ Cream Knitwear' },
+      ],
+      variants: [
+        { sku: 'AL-CREAM-02-S', size: 'S', color: 'Kem Cream', price: 950000, stock: 30 },
+        { sku: 'AL-CREAM-02-M', size: 'M', color: 'Kem Cream', price: 950000, stock: 35 },
+        { sku: 'AL-CREAM-02-L', size: 'L', color: 'Kem Cream', price: 950000, stock: 20 },
+      ],
+    },
+    {
+      product_name: 'Quần Âu Ống Suông Wool Tencel',
+      description: 'Quần âu ống suông chất liệu len Wool pha sợi Tencel mềm mượt, phom dáng đứng thanh lịch.',
+      category_name: 'Quần Tây & Trouser',
+      brand_name: 'Atelier Elegance',
+      images: [
+        { url: 'https://images.unsplash.com/photo-1506629082955-511b1aa562c8?auto=format&fit=crop&q=80&w=800', is_primary: true, alt: 'Quần Âu Ống Suông Wool Tencel' },
+      ],
+      variants: [
+        { sku: 'QA-SUONG-03-29', size: '29', color: 'Nâu Be', price: 1250000, stock: 15 },
+        { sku: 'QA-SUONG-03-30', size: '30', color: 'Nâu Be', price: 1250000, stock: 20 },
+        { sku: 'QA-SUONG-03-31', size: '31', color: 'Nâu Be', price: 1250000, stock: 18 },
+      ],
+    },
+    {
+      product_name: 'Đầm Lụa Emerald Pleated Gown',
+      description: 'Chất tơ tằm dệt ánh ngọc lục bảo rực rỡ, đường xếp ly accordion tỉ mỉ tạo độ xòe bồng bềnh tựa dải sóng khi chuyển động.',
+      category_name: 'Váy & Đầm Thiết Kế',
+      brand_name: 'Modern Luxe',
+      images: [
+        { url: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=1000', is_primary: true, alt: 'Đầm Lụa Emerald Pleated Gown' },
+      ],
+      variants: [
+        { sku: 'DL-EMERALD-04-S', size: 'S', color: 'Xanh Emerald', price: 2950000, stock: 10 },
+        { sku: 'DL-EMERALD-04-M', size: 'M', color: 'Xanh Emerald', price: 2950000, stock: 15 },
+        { sku: 'DL-EMERALD-04-L', size: 'L', color: 'Xanh Emerald', price: 2950000, stock: 8 },
+      ],
+    },
+    {
+      product_name: 'Áo Khoác Tweed Ivory Cropped',
+      description: 'Áo khoác dáng ngắn vải tweed dệt sợi len ngà Ivory sang trọng, nút kim loại mạ vàng chạm khắc tỉ mỉ.',
+      category_name: 'Áo Vest & Blazer',
+      brand_name: 'Atelier Elegance',
+      images: [
+        { url: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&q=80&w=800', is_primary: true, alt: 'Áo Khoác Tweed Ivory Cropped' },
+      ],
+      variants: [
+        { sku: 'AK-TWEED-05-S', size: 'S', color: 'Trắng Ivory', price: 2150000, stock: 18 },
+        { sku: 'AK-TWEED-05-M', size: 'M', color: 'Trắng Ivory', price: 2150000, stock: 22 },
+      ],
+    },
+    {
+      product_name: 'Quần Tây Slim Fit Black',
+      description: 'Quần tây phom ôm nhẹ tôn dáng màu đen tuyền kinh điển, chống nhăn đứng dáng.',
+      category_name: 'Quần Tây & Trouser',
+      brand_name: 'Minimalist Line',
+      images: [
+        { url: 'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=800', is_primary: true, alt: 'Quần Tây Slim Fit Black' },
+      ],
+      variants: [
+        { sku: 'QT-SLIM-06-29', size: '29', color: 'Đen Tuyền', price: 890000, stock: 25 },
+        { sku: 'QT-SLIM-06-30', size: '30', color: 'Đen Tuyền', price: 890000, stock: 30 },
+        { sku: 'QT-SLIM-06-31', size: '31', color: 'Đen Tuyền', price: 890000, stock: 20 },
+      ],
+    },
+    {
+      product_name: 'Áo Blazer Kẻ Sọc Pinstripe',
+      description: 'Áo blazer kẻ sọc pinstripe tinh xảo, phom dáng oversize hiện đại mang phong cách Modern Tailoring.',
+      category_name: 'Áo Vest & Blazer',
+      brand_name: 'Signature Atelier',
+      images: [
+        { url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=800', is_primary: true, alt: 'Áo Blazer Kẻ Sọc Pinstripe' },
+      ],
+      variants: [
+        { sku: 'BL-STRIPE-07-M', size: 'M', color: 'Ghi Xám Kẻ', price: 1950000, stock: 15 },
+        { sku: 'BL-STRIPE-07-L', size: 'L', color: 'Ghi Xám Kẻ', price: 1950000, stock: 12 },
+      ],
+    },
+    {
+      product_name: 'Sơ Mi Poplin Cotton Trắng',
+      description: 'Áo sơ mi vải Poplin 100% cotton dệt mật độ cao đanh mịn, cổ đứng kinh điển thanh lịch.',
+      category_name: 'Áo sơ mi',
+      brand_name: 'Casual Essentials',
+      images: [
+        { url: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=800', is_primary: true, alt: 'Sơ Mi Poplin Cotton Trắng' },
+      ],
+      variants: [
+        { sku: 'SM-POPLIN-08-S', size: 'S', color: 'Trắng Tinh Khôi', price: 750000, stock: 30 },
+        { sku: 'SM-POPLIN-08-M', size: 'M', color: 'Trắng Tinh Khôi', price: 750000, stock: 40 },
+        { sku: 'SM-POPLIN-08-L', size: 'L', color: 'Trắng Tinh Khôi', price: 750000, stock: 25 },
+      ],
+    },
+    {
+      product_name: 'Bốt Da Nappa Cổ Điển',
+      description: 'Bốt da nappa thật cao cấp, phom mũi vuông thời thượng gót 5cm êm ái tôn dáng.',
+      category_name: 'Giày & Sandal',
+      brand_name: 'Modern Luxe',
+      images: [
+        { url: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=800', is_primary: true, alt: 'Bốt Da Nappa Cổ Điển' },
+      ],
+      variants: [
+        { sku: 'BT-NAPPA-09-37', size: '37', color: 'Đen Da Nappa', price: 2100000, stock: 10 },
+        { sku: 'BT-NAPPA-09-38', size: '38', color: 'Đen Da Nappa', price: 2100000, stock: 14 },
+        { sku: 'BT-NAPPA-09-39', size: '39', color: 'Đen Da Nappa', price: 2100000, stock: 8 },
+      ],
+    },
   ];
+
+  const createdProductsMap = {};
 
   for (const item of productsData) {
     const category = categories[item.category_name];
@@ -604,12 +731,13 @@ async function main() {
       continue;
     }
 
-    const existingProduct = await prisma.product.findFirst({
+    let existingProduct = await prisma.product.findFirst({
       where: { product_name: item.product_name },
+      include: { variants: true, images: true, category: true, brand: true }
     });
 
     if (!existingProduct) {
-      const createdProd = await prisma.product.create({
+      existingProduct = await prisma.product.create({
         data: {
           product_name: item.product_name,
           description: item.description,
@@ -635,12 +763,31 @@ async function main() {
             })),
           },
         },
+        include: { variants: true, images: true, category: true, brand: true }
       });
-      console.log(`  ➕ Đã thêm sản phẩm: ${createdProd.product_name}`);
+      console.log(`  ➕ Đã thêm sản phẩm: ${existingProduct.product_name}`);
     } else {
       console.log(`  ℹ️ Sản phẩm đã tồn tại: ${existingProduct.product_name}`);
     }
+    createdProductsMap[item.product_name] = existingProduct;
   }
+
+  // Helper để map thông tin sản phẩm vào lookbook
+  const buildTaggedProduct = (productName) => {
+    const p = createdProductsMap[productName];
+    if (!p) return null;
+    const primaryImg = p.images?.find(i => i.is_primary)?.image_url || p.images?.[0]?.image_url || '';
+    const priceVal = p.variants?.[0]?.price ? Number(p.variants[0].price) : 0;
+    return {
+      product_id: String(p.product_id),
+      name: p.product_name,
+      price: priceVal > 0 ? priceVal.toLocaleString('vi-VN') + '₫' : 'Liên hệ',
+      price_num: priceVal,
+      image: primaryImg,
+      category_name: p.category?.category_name || '',
+      sku: p.variants?.[0]?.sku || `YF-${p.product_id}`
+    };
+  };
 
   // 5. Seed Lookbooks (5 Tuyển tập Lookbook mẫu)
   console.log('\n📖 --- Tạo Danh sách Lookbook mẫu (5 bộ sưu tập) ---');
@@ -654,12 +801,13 @@ async function main() {
       season: 'CHIẾN DỊCH CHÍNH THỨC',
       badge: 'HERO COVER',
       position: 'banner',
-      product_count: 1,
+      product_count: 0,
       status: 'PUBLISHED',
       image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1600',
       description: 'Khúc xạ của thu vĩnh cửu giữa đại lộ Paris — Nơi phong cách hòa cùng nghệ thuật may đo thủ công Pháp.',
       campaign_audio: 'Paris Autumn Symphony • 3:42 mins',
       conversion_rate: '42%',
+      products: [],
     },
     {
       type: 'look',
@@ -679,10 +827,10 @@ async function main() {
       cta_text: 'Mua Trọn Bộ Phối Đồ (Tiết Kiệm 10%) • 5.445.000₫',
       conversion_rate: '36%',
       products: [
-        { name: 'Áo Măng Tô Dạ Camel Cashmere', price: '3.850.000₫' },
-        { name: 'Áo Len Cổ Lọ Cream Knitwear', price: '950.000₫' },
-        { name: 'Quần Âu Ống Suông Wool Tencel', price: '1.250.000₫' },
-      ],
+        buildTaggedProduct('Áo Măng Tô Dạ Camel Cashmere'),
+        buildTaggedProduct('Áo Len Cổ Lọ Cream Knitwear'),
+        buildTaggedProduct('Quần Âu Ống Suông Wool Tencel'),
+      ].filter(Boolean),
       hotspots: [
         { top: '38%', left: '46%', label: 'Áo Măng Tô Dạ Camel — 3.850.000₫' },
         { top: '82%', left: '54%', label: 'Bốt Da Nappa Cổ Điển — 2.100.000₫' },
@@ -707,8 +855,8 @@ async function main() {
       cta_text: 'ĐẶT MUA NGAY',
       conversion_rate: '28%',
       products: [
-        { name: 'Đầm Lụa Emerald Pleated Gown', price: '2.950.000₫' },
-      ],
+        buildTaggedProduct('Đầm Lụa Emerald Pleated Gown'),
+      ].filter(Boolean),
     },
     {
       type: 'look',
@@ -727,9 +875,9 @@ async function main() {
       cta_text: 'Mua Ngay',
       conversion_rate: '24%',
       products: [
-        { name: 'Áo Khoác Tweed Ivory Cropped', price: '2.150.000₫' },
-        { name: 'Quần Tây Slim Fit Black', price: '890.000₫' },
-      ],
+        buildTaggedProduct('Áo Khoác Tweed Ivory Cropped'),
+        buildTaggedProduct('Quần Tây Slim Fit Black'),
+      ].filter(Boolean),
     },
     {
       type: 'look',
@@ -748,9 +896,9 @@ async function main() {
       cta_text: 'Mua Ngay',
       conversion_rate: '21%',
       products: [
-        { name: 'Áo Blazer Kẻ Sọc Pinstripe', price: '1.950.000₫' },
-        { name: 'Sơ Mi Poplin Cotton Trắng', price: '750.000₫' },
-      ],
+        buildTaggedProduct('Áo Blazer Kẻ Sọc Pinstripe'),
+        buildTaggedProduct('Sơ Mi Poplin Cotton Trắng'),
+      ].filter(Boolean),
     },
   ];
 
@@ -765,12 +913,24 @@ async function main() {
         });
         console.log(`  ➕ Đã thêm Lookbook: ${lb.title}`);
       } else {
-        console.log(`  ℹ️ Lookbook đã tồn tại: ${existing.title}`);
+        await prisma.lookbook.update({
+          where: { lookbook_id: existing.lookbook_id },
+          data: {
+            products: lb.products,
+            price: lb.price,
+            product_count: lb.products?.length || lb.product_count,
+            image: lb.image,
+            description: lb.description,
+            season: lb.season,
+            badge: lb.badge,
+          }
+        });
+        console.log(`  🔄 Đã cập nhật Lookbook & gắn tag CSDL: ${existing.title}`);
       }
     }
-    console.log(`✅ Đã tạo ${lookbooksData.length} lookbook.`);
+    console.log(`✅ Đã đồng bộ ${lookbooksData.length} lookbook với CSDL sản phẩm.`);
   } catch (err) {
-    console.log('ℹ️ Bỏ qua seed Lookbook (Bảng lookbooks chưa có trong CSDL MySQL).');
+    console.log('ℹ️ Lỗi khi cập nhật Lookbook:', err.message);
   }
 
   console.log('\n🎉 --- Hoàn thành Khởi tạo Dữ liệu Mẫu thành công! ---');

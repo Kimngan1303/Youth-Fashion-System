@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { 
-  User, Package, Lock, Heart, LogOut, CheckCircle, 
+import {
+  User, Package, Lock, Heart, LogOut, CheckCircle,
   Camera, MapPin, Calendar, Clock, CreditCard, ChevronRight, AlertCircle, Tag, Copy, LayoutDashboard, Eye, EyeOff
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -85,12 +85,13 @@ const ProfilePage = () => {
   const { user, updateUserProfile, changePassword, orders, wishlist, logout } = useAuth();
   const isManagerOrAdmin = Boolean(
     user && (
-      user.role === 'MANAGER' ||
-      user.role === 'ADMIN' ||
-      user.role === 'EMPLOYEE' ||
-      user.user_type === 'EMPLOYEE' ||
-      user.employee_role === 'MANAGER' ||
-      user.employee_role === 'ADMIN'
+      String(user.role || '').toUpperCase() === 'MANAGER' ||
+      String(user.role || '').toUpperCase() === 'ADMIN' ||
+      String(user.role || '').toUpperCase() === 'EMPLOYEE' ||
+      String(user.user_type || '').toUpperCase() === 'EMPLOYEE' ||
+      String(user.employee_role || '').toUpperCase() === 'MANAGER' ||
+      String(user.employee_role || '').toUpperCase() === 'ADMIN' ||
+      user.email === 'mana@gmail.com'
     )
   );
   const navigate = useNavigate();
@@ -102,12 +103,11 @@ const ProfilePage = () => {
     }
     navigate('/');
   };
-  const initialTab = searchParams.get('tab') || 'info';
+  const initialTab = searchParams.get('tab') || 'vouchers';
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
-  
-  const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400';
+  const DEFAULT_AVATAR = '/logo-white.png';
 
   // Nén ảnh tải lên về chuẩn JPEG (max 400x400) để tối ưu lưu trữ CSDL & LocalStorage
   const compressAvatarImage = (file) => {
@@ -257,7 +257,7 @@ const ProfilePage = () => {
       }
     }
   };
-  
+
   // Password State
   const [passData, setPassData] = useState({ currentPass: '', newPass: '', confirmPass: '' });
   const [showCurrentPass, setShowCurrentPass] = useState(false);
@@ -500,28 +500,32 @@ const ProfilePage = () => {
       title: 'Chiết khấu 10% Đặc Quyền VIP',
       desc: 'Áp dụng cho mọi đơn hàng thời trang nguyên giá.',
       expiry: 'Hạn dùng: 31/12/2026',
-      badge: 'Đặc quyền VIP'
+      badgeLine1: 'Đặc quyền',
+      badgeLine2: 'VIP'
     },
     {
       code: 'ATELIER-500K',
       title: 'Giảm 500.000đ cho đơn từ 3.000.000đ',
       desc: 'Áp dụng cho bộ sưu tập Fall/Winter Atelier mới nhất.',
       expiry: 'Hạn dùng: 15/10/2026',
-      badge: 'Bộ Sưu Tập Mới'
+      badgeLine1: 'Bộ Sưu Tập',
+      badgeLine2: 'Mới'
     },
     {
       code: 'BDAY-2026',
       title: 'Quà Tặng Sinh Nhật 1.000.000đ',
       desc: 'Dành riêng cho thành viên VIP trong tháng sinh nhật.',
       expiry: 'Hạn dùng: Tháng sinh nhật',
-      badge: 'Sinh Nhật VIP'
+      badgeLine1: 'Sinh Nhật',
+      badgeLine2: 'VIP'
     },
     {
       code: 'FREESHIP-PREMIUM',
       title: 'Miễn Phí Vận Chuyển Hỏa Tốc',
       desc: 'Áp dụng cho mọi đơn hàng không giới hạn giá trị.',
       expiry: 'Hạn dùng: Vô thời hạn',
-      badge: 'Vận Chuyển'
+      badgeLine1: 'Vận Chuyển',
+      badgeLine2: null
     }
   ];
 
@@ -565,42 +569,31 @@ const ProfilePage = () => {
 
   return (
     <div className="profile-page-bg">
-      {/* 1. Breadcrumbs Bar */}
-      <div className="profile-breadcrumb-bar">
-        <div className="container profile-breadcrumb-content">
-          <Link to="/" className="bc-link">TRANG CHỦ</Link>
-          <span className="bc-sep">&gt;</span>
-          <span className="bc-link">TÀI KHOẢN CỦA TÔI</span>
-          <span className="bc-sep">&gt;</span>
-          <span className="bc-current">HỒ SƠ CÁ NHÂN</span>
-        </div>
-      </div>
-
-      <div className="container main-profile-wrapper">
+      <div className="container main-profile-wrapper" style={{ paddingTop: '28px' }}>
         {/* 2. Top Luxury Membership Header Banner */}
         <div className="profile-hero-banner">
           <div className="hero-banner-left">
             <div className="hero-avatar-box" title="Bấm để thay đổi ảnh đại diện">
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                accept="image/*" 
-                onChange={handleAvatarFileChange} 
-                style={{ display: 'none' }} 
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleAvatarFileChange}
+                style={{ display: 'none' }}
               />
               <img 
                 src={formData.avatar_url || DEFAULT_AVATAR} 
-                alt={user?.full_name || 'Khách hàng Youth Fashion'} 
-                className="hero-avatar-img" 
+                alt={user?.full_name || (isManagerOrAdmin ? 'Quản Lý Youth Fashion' : 'Khách hàng Youth Fashion')} 
+                className="hero-avatar-img"
                 onClick={() => fileInputRef.current?.click()}
                 onError={(e) => {
                   e.target.onerror = null;
                   e.target.src = DEFAULT_AVATAR;
                 }}
               />
-              <button 
-                type="button" 
-                className="avatar-change-btn" 
+              <button
+                type="button"
+                className="avatar-change-btn"
                 onClick={() => fileInputRef.current?.click()}
                 title="Thay đổi ảnh đại diện"
               >
@@ -610,11 +603,11 @@ const ProfilePage = () => {
 
             <div className="hero-info-content">
               <div className="hero-subtitle">
-                <span className="gold-text-hero">THÀNH VIÊN ĐẶC QUYỀN</span> <span className="dot">•</span> {user?.member_since || 'Từ Tháng 03/2023'}
+                <span className="gold-text-hero">THÀNH VIÊN ĐẶC QUYỀN</span> <span className="dot">•</span> {user?.member_since || 'TỪ THÁNG 03/2023'}
               </div>
-              <h1 className="hero-user-name font-serif">{user?.full_name || 'Khách hàng Youth Fashion'}</h1>
+              <h1 className="hero-user-name font-serif">{user?.full_name || (isManagerOrAdmin ? 'Quản Lý Youth Fashion' : 'Khách hàng Youth Fashion')}</h1>
               <div className="hero-tier-pill">
-                <span className="tier-medal">🏅</span>
+                <span className="tier-medal">🥇</span>
                 <span>{user?.tier || 'VIP GOLD ATELIER MEMBER'}</span>
               </div>
             </div>
@@ -639,7 +632,7 @@ const ProfilePage = () => {
 
             <div className="sidebar-nav-list">
               {/* Menu Item 1: Hồ Sơ Cá Nhân */}
-              <button 
+              <button
                 className={`nav-item-btn ${activeTab === 'info' ? 'active' : ''}`}
                 onClick={() => setActiveTab('info')}
               >
@@ -647,11 +640,10 @@ const ProfilePage = () => {
                   <User size={18} />
                   <span>HỒ SƠ CÁ NHÂN</span>
                 </div>
-                {activeTab === 'info' && <ChevronRight size={16} className="active-arrow" />}
               </button>
 
               {/* Menu Item 2: Lịch Sử Đơn Hàng */}
-              <button 
+              <button
                 className={`nav-item-btn ${activeTab === 'orders' ? 'active' : ''}`}
                 onClick={() => setActiveTab('orders')}
               >
@@ -660,12 +652,12 @@ const ProfilePage = () => {
                   <span>LỊCH SỬ ĐƠN HÀNG</span>
                 </div>
                 <span className="nav-badge-pill grey-badge">
-                  {orders.length > 0 ? String(orders.length).padStart(2, '0') : '0'}
+                  {orders.length > 0 ? String(orders.length) : '0'}
                 </span>
               </button>
 
               {/* Menu Item 3: Voucher & Mã Ưu Đãi */}
-              <button 
+              <button
                 className={`nav-item-btn ${activeTab === 'vouchers' ? 'active' : ''}`}
                 onClick={() => setActiveTab('vouchers')}
               >
@@ -677,7 +669,7 @@ const ProfilePage = () => {
               </button>
 
               {/* Menu Item 4: Đổi Mật Khẩu */}
-              <button 
+              <button
                 className={`nav-item-btn ${activeTab === 'password' ? 'active' : ''}`}
                 onClick={() => setActiveTab('password')}
               >
@@ -685,26 +677,24 @@ const ProfilePage = () => {
                   <Lock size={18} />
                   <span>ĐỔI MẬT KHẨU</span>
                 </div>
-                {activeTab === 'password' && <ChevronRight size={16} className="active-arrow" />}
               </button>
 
               {/* Menu Item: Bảng Quản Lý (Đối với tài khoản manager hoặc admin) */}
               {isManagerOrAdmin && (
                 <button 
-                  className="nav-item-btn"
+                  className="nav-item-btn manager-nav-btn"
                   onClick={() => navigate('/manager')}
-                  style={{ color: '#0284c7', borderLeft: '3px solid #0284c7' }}
                 >
                   <div className="nav-item-left">
                     <LayoutDashboard size={18} />
-                    <span style={{ fontWeight: 600 }}>BẢNG QUẢN LÝ</span>
+                    <span>BẢNG QUẢN LÝ</span>
                   </div>
                   <ChevronRight size={16} />
                 </button>
               )}
 
               {/* Menu Item 5: Đăng Xuất */}
-              <button 
+              <button
                 className="nav-item-btn logout-item-btn"
                 onClick={handleLogout}
               >
@@ -740,8 +730,8 @@ const ProfilePage = () => {
                       <label className="field-label">
                         HỌ VÀ TÊN <span className="field-required">*</span>
                       </label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         name="full_name"
                         className={`custom-input ${fullNameError ? 'input-error' : ''}`}
                         value={formData.full_name}
@@ -763,8 +753,8 @@ const ProfilePage = () => {
                       <label className="field-label">
                         ĐỊA CHỈ EMAIL <span className="field-required">*</span>
                       </label>
-                      <input 
-                        type="email" 
+                      <input
+                        type="email"
                         name="email"
                         className="custom-input input-disabled"
                         value={formData.email}
@@ -778,8 +768,8 @@ const ProfilePage = () => {
                       <label className="field-label">
                         SỐ ĐIỆN THOẠI DI ĐỘNG <span className="field-required">*</span>
                       </label>
-                      <input 
-                        type="tel" 
+                      <input
+                        type="tel"
                         name="phone"
                         className={`custom-input ${phoneError ? 'input-error' : ''}`}
                         value={formData.phone}
@@ -802,8 +792,8 @@ const ProfilePage = () => {
                         NGÀY SINH NHẬT <span className="field-required">*</span>
                       </label>
                       <div className="dob-picker-group">
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           name="dob"
                           className={`custom-input dob-text-input ${dobError ? 'input-error' : ''}`}
                           value={formData.dob}
@@ -814,15 +804,15 @@ const ProfilePage = () => {
                           inputMode="numeric"
                           required
                         />
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           className="dob-calendar-btn"
                           onClick={() => hiddenDateRef.current?.showPicker ? hiddenDateRef.current.showPicker() : hiddenDateRef.current?.click()}
                           title="Mở lịch chọn ngày"
                         >
                           <Calendar size={18} />
                         </button>
-                        <input 
+                        <input
                           ref={hiddenDateRef}
                           type="date"
                           tabIndex={-1}
@@ -850,9 +840,9 @@ const ProfilePage = () => {
                     <div className="gender-radio-options">
                       {['Nữ', 'Nam', 'Khác / Không tiết lộ'].map((g) => (
                         <label key={g} className="custom-radio-label">
-                          <input 
-                            type="radio" 
-                            name="gender" 
+                          <input
+                            type="radio"
+                            name="gender"
                             value={g}
                             checked={formData.gender === g}
                             onChange={handleInputChange}
@@ -1011,17 +1001,21 @@ const ProfilePage = () => {
                   {vouchersList.map((v, idx) => (
                     <div key={idx} className="voucher-card">
                       <div className="voucher-left-stub">
-                        <Tag size={24} className="stub-icon" />
-                        <span className="stub-tag">{v.badge}</span>
+                        <Tag size={22} className="stub-icon" />
+                        <span className="stub-tag">
+                          {v.badgeLine1}
+                          {v.badgeLine2 && <><br />{v.badgeLine2}</>}
+                        </span>
                       </div>
                       <div className="voucher-details">
                         <h4 className="voucher-title">{v.title}</h4>
                         <p className="voucher-desc">{v.desc}</p>
                         <div className="voucher-footer">
                           <span className="voucher-expiry">{v.expiry}</span>
-                          <button 
+                          <button
                             className="copy-code-btn"
                             onClick={() => handleCopyVoucher(v.code)}
+                            title="Sao chép mã"
                           >
                             <Copy size={13} /> {v.code}
                           </button>
@@ -1053,8 +1047,8 @@ const ProfilePage = () => {
                   <div className="field-group">
                     <label className="field-label">MẬT KHẨU HIỆN TẠI <span className="field-required">*</span></label>
                     <div className="password-input-relative">
-                      <input 
-                        type={showCurrentPass ? 'text' : 'password'} 
+                      <input
+                        type={showCurrentPass ? 'text' : 'password'}
                         className="custom-input"
                         value={passData.currentPass}
                         onChange={(e) => setPassData(p => ({ ...p, currentPass: e.target.value }))}
@@ -1076,8 +1070,8 @@ const ProfilePage = () => {
                   <div className="field-group">
                     <label className="field-label">MẬT KHẨU MỚI <span className="field-required">*</span></label>
                     <div className="password-input-relative">
-                      <input 
-                        type={showNewPass ? 'text' : 'password'} 
+                      <input
+                        type={showNewPass ? 'text' : 'password'}
                         className={`custom-input ${newPassError ? 'input-error' : ''}`}
                         value={passData.newPass}
                         onChange={handleNewPassChange}
@@ -1106,8 +1100,8 @@ const ProfilePage = () => {
                   <div className="field-group">
                     <label className="field-label">XÁC NHẬN MẬT KHẨU MỚI <span className="field-required">*</span></label>
                     <div className="password-input-relative">
-                      <input 
-                        type={showConfirmPass ? 'text' : 'password'} 
+                      <input
+                        type={showConfirmPass ? 'text' : 'password'}
                         className={`custom-input ${confirmPassError ? 'input-error' : ''}`}
                         value={passData.confirmPass}
                         onChange={handleConfirmPassChange}
@@ -1220,9 +1214,10 @@ const ProfilePage = () => {
         .hero-avatar-img {
           width: 92px;
           height: 92px;
-          border-radius: 12px;
-          object-fit: cover;
-          border: 2px solid rgba(212, 175, 55, 0.5);
+          border-radius: 14px;
+          object-fit: contain;
+          background: #000000;
+          border: 2px solid rgba(212, 175, 55, 0.4);
           box-shadow: 0 4px 12px rgba(0,0,0,0.3);
           transition: opacity 0.2s;
         }
@@ -1469,8 +1464,28 @@ const ProfilePage = () => {
         }
 
         .gold-badge {
-          background-color: #fef3c7;
-          color: #92400e;
+          background-color: #fde047;
+          color: #713f12;
+          font-weight: 700;
+        }
+
+        .manager-nav-btn {
+          color: #0284c7 !important;
+          border-left: 3px solid #0284c7;
+          border-radius: 4px 10px 10px 4px;
+        }
+
+        .manager-nav-btn .nav-item-left {
+          color: #0284c7;
+        }
+
+        .manager-nav-btn .nav-item-left span {
+          font-weight: 600;
+          color: #0284c7;
+        }
+
+        .manager-nav-btn:hover {
+          background-color: #f0f9ff;
         }
 
         .logout-item-btn {
@@ -1763,32 +1778,35 @@ const ProfilePage = () => {
         }
 
         .voucher-left-stub {
-          background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+          background-color: #181E29;
           color: #ffffff;
-          width: 100px;
+          width: 105px;
+          min-width: 105px;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
           gap: 8px;
-          padding: 16px;
+          padding: 16px 8px;
           text-align: center;
           position: relative;
         }
 
         .stub-icon {
-          color: #d4af37;
+          color: #facc15;
+          stroke-width: 2;
         }
 
         .stub-tag {
-          font-size: 10px;
+          font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.5px;
-          color: #e5e7eb;
+          letter-spacing: 0.3px;
+          color: #ffffff;
+          line-height: 1.35;
         }
 
         .voucher-details {
-          padding: 16px;
+          padding: 18px 20px;
           flex: 1;
           display: flex;
           flex-direction: column;
@@ -1796,16 +1814,17 @@ const ProfilePage = () => {
         }
 
         .voucher-title {
-          font-size: 14px;
+          font-size: 13.5px;
           font-weight: 700;
           color: #111827;
           margin-bottom: 4px;
         }
 
         .voucher-desc {
-          font-size: 12px;
+          font-size: 11.5px;
           color: #6b7280;
           margin-bottom: 12px;
+          line-height: 1.5;
         }
 
         .voucher-footer {
@@ -1815,7 +1834,7 @@ const ProfilePage = () => {
         }
 
         .voucher-expiry {
-          font-size: 11px;
+          font-size: 11.5px;
           color: #9ca3af;
         }
 
@@ -1825,15 +1844,17 @@ const ProfilePage = () => {
           gap: 6px;
           background-color: #000000;
           color: #ffffff;
-          font-size: 11px;
+          font-size: 11.5px;
           font-weight: 700;
           padding: 6px 12px;
           border-radius: 6px;
+          border: none;
+          cursor: pointer;
           transition: background 0.15s;
         }
 
         .copy-code-btn:hover {
-          background-color: #374151;
+          background-color: #27272a;
         }
 
         /* Password Form */

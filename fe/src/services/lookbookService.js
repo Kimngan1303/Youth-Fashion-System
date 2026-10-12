@@ -1,15 +1,3 @@
-/**
- * ==============================================================================
- * DỊCH VỤ DỮ LIỆU & API LOOKBOOK (LOOKBOOK SERVICE)
- * ==============================================================================
- * Cung cấp:
- * 1. Các phương thức gọi API Backend (MySQL Database qua axiosClient):
- *    - getLookbooks, getLookbookById, createLookbook, updateLookbook, deleteLookbook
- *    - toggleStatus, updatePosition, bulkDeleteLookbooks
- * 2. Các hàm tiện ích: getLookbookPositionValue, notifyLookbookUpdated
- * ==============================================================================
- */
-
 import axiosClient from './axiosClient';
 
 /**
