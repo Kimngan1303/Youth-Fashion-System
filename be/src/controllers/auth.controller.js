@@ -7,6 +7,8 @@ import {
   resendVerificationOtpService,
   updateProfileService,
   changePasswordService,
+  forgotPasswordService,
+  resetPasswordService,
 } from '../services/auth.service.js';
 import { BaseResponse } from '../utils/baseResponse.js';
 
@@ -169,3 +171,42 @@ export const changePasswordController = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Endpoint Yêu cầu Quên mật khẩu (POST /api/auth/forgot-password)
+ */
+export const forgotPasswordController = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const result = await forgotPasswordService({ email });
+
+    return BaseResponse.success(
+      res,
+      result.message || 'Mã xác thực OTP đã được gửi đến email của bạn',
+      result,
+      200
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Endpoint Đặt lại mật khẩu bằng OTP (POST /api/auth/reset-password)
+ */
+export const resetPasswordController = async (req, res, next) => {
+  try {
+    const { email, otp, new_password } = req.body;
+    const result = await resetPasswordService({ email, otp, new_password });
+
+    return BaseResponse.success(
+      res,
+      result.message || 'Đặt lại mật khẩu thành công!',
+      result,
+      200
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+

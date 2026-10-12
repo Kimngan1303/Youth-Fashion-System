@@ -13,19 +13,30 @@ import CartPage from './pages/customer/CartPage';
 import ProfilePage from './pages/ProfilePage';
 import ContactPage from './pages/ContactPage';
 import LookbookPage from './pages/LookbookPage';
+import ChatPage from './pages/ChatPage';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import VerifyEmail from './pages/auth/VerifyEmail';
+import ForgotPassword from './pages/auth/ForgotPassword';
 import ManagerDashboard from './pages/manager/ManagerDashboard';
 import ProductManager from './pages/manager/ProductManager';
 import CategoryManager from './pages/manager/CategoryManager';
 import BrandManager from './pages/manager/BrandManager';
 import LookbookManagement from './pages/manager/LookbookManagement';
 import VoucherManager from './pages/manager/VoucherManager';
+import UserManagement from './pages/manager/UserManagement';
+import SystemConfig from './pages/manager/SystemConfig';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useContext(AuthContext);
   return isAuthenticated ? children : <Navigate to="/login" replace />;
+}
+
+function AdminRoute({ children }) {
+  const { user, isAuthenticated } = useContext(AuthContext);
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const isAdmin = user?.role === 'ADMIN' || user?.employee_role === 'ADMIN';
+  return isAdmin ? children : <Navigate to="/manager" replace />;
 }
 
 function AppContent() {
@@ -33,7 +44,7 @@ function AppContent() {
   const location = useLocation();
 
   // Xác định các trang không cần hiển thị Header và Footer của khách hàng
-  const hideHeaderFooter = ['/login', '/register', '/verify-email'].includes(location.pathname) || location.pathname.startsWith('/manager');
+  const hideHeaderFooter = ['/login', '/register', '/verify-email', '/forgot-password'].includes(location.pathname) || location.pathname.startsWith('/manager') || location.pathname.startsWith('/admin');
 
   return (
     <div className="app-layout">
@@ -44,6 +55,7 @@ function AppContent() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
 
           {/* Nhóm Route Dành cho Khách hàng (Customer & Guest) */}
           <Route 
@@ -55,6 +67,7 @@ function AppContent() {
             element={<ProductListPage onOpenAISearch={() => setIsAISearchOpen(true)} />} 
           />
           <Route path="/lookbook" element={<LookbookPage />} />
+          <Route path="/chat" element={<ChatPage />} />
           <Route path="/wishlist" element={<WishlistPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route 
@@ -113,6 +126,38 @@ function AppContent() {
               <ProtectedRoute>
                 <VoucherManager />
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/manager/users"
+            element={
+              <AdminRoute>
+                <UserManagement />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <AdminRoute>
+                <UserManagement />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/manager/system-config"
+            element={
+              <AdminRoute>
+                <SystemConfig />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/system-config"
+            element={
+              <AdminRoute>
+                <SystemConfig />
+              </AdminRoute>
             }
           />
           

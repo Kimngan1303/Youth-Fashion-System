@@ -14,7 +14,9 @@ import {
   Tag, 
   BarChart2, 
   Home, 
-  LogOut 
+  LogOut,
+  Users,
+  Settings 
 } from 'lucide-react';
 
 const sidebarStyles = `
@@ -200,9 +202,11 @@ const sidebarStyles = `
 
 export default function ManagerSidebar({ activeMenu = 'products' }) {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const { showSuccess } = useToast();
   const { confirmModal } = useConfirmModal();
+
+  const isAdmin = user?.role === 'ADMIN' || user?.employee_role === 'ADMIN';
 
   const handleLogout = async () => {
     const confirmed = await confirmModal({
@@ -248,6 +252,20 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
               <span>Tổng Quan</span>
             </div>
           </button>
+
+          {/* 1.1. Quản Lý Người Dùng (Chỉ tài khoản Admin mới có) */}
+          {isAdmin && (
+            <button
+              type="button"
+              className={`nav-menu-link ${activeMenu === 'users' ? 'active' : ''}`}
+              onClick={() => navigate('/manager/users')}
+            >
+              <div className="nav-item-inner">
+                <Users size={16} />
+                <span>Quản Lý Người Dùng</span>
+              </div>
+            </button>
+          )}
 
           {/* 2. Quản Lý Sản Phẩm */}
           <button
@@ -348,6 +366,20 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
               <span>Báo Cáo & Doanh Thu</span>
             </div>
           </button>
+
+          {/* 9. Cấu Hình Hệ Thống (Chỉ tài khoản Admin mới có) */}
+          {isAdmin && (
+            <button
+              type="button"
+              className={`nav-menu-link ${activeMenu === 'system-config' ? 'active' : ''}`}
+              onClick={() => navigate('/manager/system-config')}
+            >
+              <div className="nav-item-inner">
+                <Settings size={16} />
+                <span>Cấu Hình Hệ Thống</span>
+              </div>
+            </button>
+          )}
         </nav>
       </div>
 

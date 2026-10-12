@@ -247,3 +247,102 @@ export const invalidateCustomerTokens = async (customer_id) => {
   });
 };
 
+/**
+ * ==============================================================================
+ * REPOSITORY DÀNH CHO QUÊN MẬT KHẨU / ĐẶT LẠI MẬT KHẨU (PASSWORD RESET TOKENS)
+ * ==============================================================================
+ */
+
+/**
+ * Tạo Password Reset Token mới
+ */
+export const createPasswordResetToken = async ({ customer_id, employee_id, token_hash, expires_at }) => {
+  return await prisma.passwordResetToken.create({
+    data: {
+      customer_id: customer_id ? BigInt(customer_id) : null,
+      employee_id: employee_id ? BigInt(employee_id) : null,
+      token_hash,
+      expires_at,
+    },
+  });
+};
+
+/**
+ * Lấy token đặt lại mật khẩu mới nhất còn hiệu lực
+ */
+export const findLatestActivePasswordResetToken = async ({ customer_id, employee_id }) => {
+  const where = {
+    used_at: null,
+    expires_at: {
+      gt: new Date(),
+    },
+  };
+
+  if (customer_id) {
+    where.customer_id = BigInt(customer_id);
+  } else if (employee_id) {
+    where.employee_id = BigInt(employee_id);
+  }
+
+  return await prisma.passwordResetToken.findFirst({
+    where,
+    orderBy: {
+      created_at: 'desc',
+    },
+  });
+};
+
+/**
+ * Đánh dấu token đặt lại mật khẩu đã được sử dụng
+ */
+export const markPasswordResetTokenUsed = async (password_reset_token_id) => {
+  return await prisma.passwordResetToken.update({
+    where: {
+      password_reset_token_id: BigInt(password_reset_token_id),
+    },
+    data: {
+      used_at: new Date(),
+    },
+  });
+};
+
+/**
+ * Vô hiệu hóa toàn bộ token reset cũ của người dùng
+ */
+export const invalidatePasswordResetTokens = async ({ customer_id, employee_id }) => {
+  const where = {
+    used_at: null,
+  };
+
+  if (customer_id) {
+    where.customer_id = BigInt(customer_id);
+  } else if (employee_id) {
+    where.employee_id = BigInt(employee_id);
+  }
+
+  return await prisma.passwordResetToken.updateMany({
+    where,
+    data: {
+      expires_at: new Date(Date.now() - 1000),
+    },
+  });
+};
+
+/**
+ * Cập nhật mật khẩu cho Nhân viên (Employee)
+ */
+export const updateEmployeePassword = async (employee_id, new_password_hash) => {
+  return await prisma.employee.update({
+    where: { employee_id: BigInt(employee_id) },
+    data: {
+      password_hash: new_password_hash,
+    },
+    select: {
+      employee_id: true,
+      email: true,
+      updated_at: true,
+    },
+  });
+};
+
+

@@ -8,6 +8,8 @@ import {
   resendVerificationOtpController,
   updateProfileController,
   changePasswordController,
+  forgotPasswordController,
+  resetPasswordController,
 } from '../controllers/auth.controller.js';
 import {
   registerSchema,
@@ -16,6 +18,8 @@ import {
   resendOtpSchema,
   updateProfileSchema,
   changePasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
   validateBody,
 } from '../validations/auth.validation.js';
 import { verifyAccessToken } from '../helpers/jwt.helper.js';
@@ -44,6 +48,12 @@ router.post('/verify-email', validateBody(verifyEmailSchema), verifyEmailControl
 
 // POST /api/auth/resend-verification-otp - Gửi lại mã xác thực OTP
 router.post('/resend-verification-otp', validateBody(resendOtpSchema), resendVerificationOtpController);
+
+// POST /api/auth/forgot-password - Gửi yêu cầu quên mật khẩu (nhận mã OTP qua email)
+router.post('/forgot-password', validateBody(forgotPasswordSchema), forgotPasswordController);
+
+// POST /api/auth/reset-password - Đặt lại mật khẩu mới bằng OTP 6 số
+router.post('/reset-password', validateBody(resetPasswordSchema), resetPasswordController);
 
 // POST /api/auth/login - Đăng nhập (Customer hoặc Employee)
 router.post('/login', validateBody(loginSchema), loginController);

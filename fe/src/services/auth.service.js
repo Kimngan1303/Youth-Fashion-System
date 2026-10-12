@@ -75,5 +75,24 @@ export const authService = {
     const response = await axiosClient.put('/auth/change-password', passwordData);
     return response.data;
   },
+
+  /**
+   * Request password reset OTP
+   * @param {Object} data - { email }
+   */
+  forgotPassword: async ({ email }) => {
+    const response = await axiosClient.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  /**
+   * Reset password with 6-digit OTP
+   * @param {Object} data - { email, otp, new_password }
+   */
+  resetPassword: async ({ email, otp, new_password }) => {
+    const response = await axiosClient.post('/auth/reset-password', { email, otp, new_password });
+    return response.data;
+  },
 };
+
 
