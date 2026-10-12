@@ -239,17 +239,6 @@ const productManagerStyles = `
     box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.02);
   }
 
-  .header-search-box {
-    display: flex;
-    align-items: center;
-    background: #F7F6F3;
-    border: 1px solid #E2DFD7;
-    border-radius: 8px;
-    padding: 6px 14px;
-    width: 340px;
-    gap: 8px;
-  }
-
   .header-search-input {
     border: none;
     background: transparent;
@@ -1314,20 +1303,13 @@ export default function ProductManager() {
       {/* MAIN CONTENT AREA */}
       <main className="main-content-area">
         {/* Header Bar */}
-        <ManagerHeader
-          searchTerm={searchTerm}
-          onSearchChange={(val) => {
-            setSearchTerm(val);
-            setPagination((prev) => ({ ...prev, page: 1 }));
-          }}
-          searchPlaceholder="Tìm tên sản phẩm trong CSDL MySQL..."
-        />
+        <ManagerHeader showSearch={false} />
 
         {/* Scroll Body */}
         <div className="dashboard-scroll-body">
           <div className="dashboard-header-row">
             <div>
-              <p className="dashboard-header-sub">QUẢN LÝ DỮ LIỆU MYSQL THẬT 100%</p>
+              <p className="dashboard-header-sub">YOUTHFASHION • QUẢN LÝ SẢN PHẨM & BỘ SƯU TẬP ẢNH</p>
               <h1 className="dashboard-header-title">Quản Lý Sản Phẩm & Bộ Sưu Tập Ảnh</h1>
             </div>
 

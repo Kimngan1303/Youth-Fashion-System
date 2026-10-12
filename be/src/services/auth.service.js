@@ -255,13 +255,9 @@ export const loginService = async ({ email, password, user_type }) => {
     if (user.status !== 'ACTIVE') {
       throw { statusCode: 403, message: 'Tài khoản khách hàng đang bị khóa hoặc ngưng hoạt động' };
     }
-    // KIỂM TRA BẮT BUỘC: Tài khoản khách hàng phải xác thực email mới được phép đăng nhập
+    // Khách hàng đăng nhập trực tiếp bằng email & mật khẩu, không yêu cầu OTP
     if (!user.email_verified_at) {
-      throw {
-        statusCode: 403,
-        message: 'Vui lòng xác thực email trước khi đăng nhập.',
-        unverifiedEmail: user.email,
-      };
+      await markCustomerEmailVerified(user.customer_id);
     }
     role = 'CUSTOMER';
   } else if (user_type === 'EMPLOYEE') {

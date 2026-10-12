@@ -9,7 +9,7 @@ const Header = ({ onOpenAISearch }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, wishlist, cartCount, logout } = useAuth();
-  const { showSuccess } = useToast();
+  const { showSuccess, showInfo } = useToast();
   const { confirmModal } = useConfirmModal();
   const isManagerOrAdmin = Boolean(
     user && (
@@ -235,27 +235,37 @@ const Header = ({ onOpenAISearch }) => {
 
           {/* Cart Icon */}
           <Link
-            to="/cart"
+            to={user ? "/cart" : "/login"}
             className={`action-icon ${location.pathname === '/cart' ? 'active' : ''}`}
             title="Giỏ hàng"
+            onClick={(e) => {
+              if (!user) {
+                showInfo('Vui lòng đăng nhập để xem giỏ hàng của bạn!');
+              }
+            }}
           >
             <ShoppingBag size={18} />
-            {cartCount > 0 && <span className="badge">{cartCount}</span>}
+            {user && cartCount > 0 && <span className="badge">{cartCount}</span>}
           </Link>
 
           {/* Wishlist Icon */}
           <Link
-            to="/wishlist"
+            to={user ? "/wishlist" : "/login"}
             className={`action-icon ${location.pathname === '/wishlist' ? 'active' : ''}`}
             title="Sản phẩm yêu thích"
+            onClick={(e) => {
+              if (!user) {
+                showInfo('Vui lòng đăng nhập để xem danh sách yêu thích của bạn!');
+              }
+            }}
           >
             <Heart
               size={18}
               className="wishlist-heart-icon"
-              fill={location.pathname === '/wishlist' ? '#ffffff' : 'none'}
-              color={location.pathname === '/wishlist' ? '#ffffff' : 'currentColor'}
+              fill={location.pathname === '/wishlist' && user ? '#ffffff' : 'none'}
+              color={location.pathname === '/wishlist' && user ? '#ffffff' : 'currentColor'}
             />
-            {wishlist && wishlist.length > 0 && (
+            {user && wishlist && wishlist.length > 0 && (
               <span className="badge">{wishlist.length}</span>
             )}
           </Link>

@@ -529,7 +529,7 @@ export default function ManagerDashboard() {
       <main className="main-content-area">
 
         {/* Top Header Bar */}
-        <ManagerHeader searchPlaceholder="Tìm kiếm đơn hàng, sản phẩm, lookbook..." />
+        <ManagerHeader showSearch={false} />
 
         {/* Scrollable Dashboard Body (Overview) */}
         <div className="dashboard-scroll-body">

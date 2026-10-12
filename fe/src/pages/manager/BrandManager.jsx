@@ -62,13 +62,24 @@ const brandStyles = `
     width: 100%;
   }
 
+  .dashboard-header-sub {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: 11.5px;
+    line-height: 16px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: #8C857B;
+    margin: 0;
+  }
+
   .bm-title-heading {
     font-family: 'Playfair Display', Georgia, serif;
-    font-size: 28px;
+    font-size: 26px;
     font-weight: 700;
     color: #111111;
-    margin: 0;
-    line-height: 1.2;
+    margin: 4px 0 0 0;
+    line-height: 32px;
     letter-spacing: -0.3px;
   }
 
@@ -1018,6 +1029,7 @@ export default function BrandManager() {
           {/* TIÊU ĐỀ TRANG & NÚT THÊM THƯƠNG HIỆU */}
           <div className="bm-header-row">
             <div>
+              <p className="dashboard-header-sub">YOUTHFASHION • QUẢN LÝ THƯƠNG HIỆU</p>
               <h1 className="bm-title-heading">Danh Sách Thương Hiệu</h1>
               <p className="bm-title-sub">
                 Kiểm soát danh mục {totalCount} nhà mốt liên kết, chỉ số doanh thu đối tác và chính sách phân phối độc quyền.

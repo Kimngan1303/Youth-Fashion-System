@@ -1512,7 +1512,7 @@ export default function LookbookManagement() {
       {/* MAIN CONTENT AREA */}
       <main className="main-content-area">
         {/* Header Bar */}
-        <ManagerHeader searchPlaceholder="Tìm kiếm tuyển tập lookbook..." />
+        <ManagerHeader showSearch={false} />
 
         <div className="dashboard-scroll-body">
           <div className="lookbook-page-container">

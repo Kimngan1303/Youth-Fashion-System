@@ -219,7 +219,13 @@ export default function WishlistPage() {
                   <div key={product.id} className="wishlist-card">
                     {/* Ảnh sản phẩm với Badges và nút Trái tim */}
                     <div className="wishlist-card-media">
-                      <img src={product.image} alt={product.title || product.name} className="wishlist-card-img" />
+                      <Link 
+                        to={`/products/${product.id || product.product_id}`}
+                        className="wishlist-media-link"
+                        title={`Xem chi tiết ${product.title || product.name}`}
+                      >
+                        <img src={product.image} alt={product.title || product.name} className="wishlist-card-img" />
+                      </Link>
 
                       <div className="wishlist-card-badges">
                         {badgeTopText && (
@@ -244,7 +250,10 @@ export default function WishlistPage() {
                         type="button"
                         className="wishlist-heart-btn"
                         title="Bỏ khỏi yêu thích"
-                        onClick={() => handleRemoveItem(product)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveItem(product);
+                        }}
                       >
                         <Heart size={16} fill="#dc2626" color="#dc2626" />
                       </button>
@@ -261,9 +270,15 @@ export default function WishlistPage() {
                       </div>
 
                       {/* 2. Tên sản phẩm */}
-                      <h3 className="wishlist-card-title font-serif">
-                        {product.title || product.name}
-                      </h3>
+                      <Link 
+                        to={`/products/${product.id || product.product_id}`}
+                        className="wishlist-title-link"
+                        title={`Xem chi tiết ${product.title || product.name}`}
+                      >
+                        <h3 className="wishlist-card-title font-serif">
+                          {product.title || product.name}
+                        </h3>
+                      </Link>
 
                       {/* 3. Giá tiền */}
                       <div className="wishlist-price-row">
@@ -328,20 +343,29 @@ export default function WishlistPage() {
             return (
               <div key={p.product_id} className="similar-card">
                 <div className="similar-card-media">
-                  <img src={primaryImg} alt={p.product_name} className="similar-card-img" />
+                  <Link 
+                    to={`/products/${p.product_id}`}
+                    className="similar-media-link"
+                    title={`Xem chi tiết ${p.product_name}`}
+                  >
+                    <img src={primaryImg} alt={p.product_name} className="similar-card-img" />
+                  </Link>
 
                   <button
                     type="button"
                     className="similar-heart-btn"
                     title={isLiked ? 'Bỏ thích' : 'Yêu thích'}
-                    onClick={() => toggleWishlist({
-                      id: p.product_id,
-                      product_id: p.product_id,
-                      title: p.product_name,
-                      name: p.product_name,
-                      price: priceVal,
-                      image: primaryImg,
-                    })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleWishlist({
+                        id: p.product_id,
+                        product_id: p.product_id,
+                        title: p.product_name,
+                        name: p.product_name,
+                        price: priceVal,
+                        image: primaryImg,
+                      });
+                    }}
                   >
                     <Heart size={16} fill={isLiked ? '#dc2626' : 'none'} color={isLiked ? '#dc2626' : '#111827'} strokeWidth={1.5} />
                   </button>
@@ -349,7 +373,13 @@ export default function WishlistPage() {
 
                 <div className="similar-card-body">
                   <span className="similar-card-tag">{p.category?.category_name || 'THỜI TRANG'}</span>
-                  <h3 className="similar-card-title font-serif">{p.product_name}</h3>
+                  <Link 
+                    to={`/products/${p.product_id}`}
+                    className="similar-title-link"
+                    title={`Xem chi tiết ${p.product_name}`}
+                  >
+                    <h3 className="similar-card-title font-serif">{p.product_name}</h3>
+                  </Link>
                   <p className="similar-card-desc">{p.brand?.brand_name || 'Youth Fashion'}</p>
 
                   <div className="similar-card-price-row">
@@ -508,6 +538,46 @@ export default function WishlistPage() {
           overflow: hidden;
           border-top-left-radius: 12px;
           border-top-right-radius: 12px;
+        }
+
+        .wishlist-media-link {
+          display: block;
+          width: 100%;
+          height: 100%;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
+        .wishlist-title-link {
+          text-decoration: none;
+          color: inherit;
+          display: block;
+          cursor: pointer;
+        }
+
+        .wishlist-title-link:hover .wishlist-card-title {
+          color: #b45309;
+          text-decoration: underline;
+        }
+
+        .similar-media-link {
+          display: block;
+          width: 100%;
+          height: 100%;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
+        .similar-title-link {
+          text-decoration: none;
+          color: inherit;
+          display: block;
+          cursor: pointer;
+        }
+
+        .similar-title-link:hover .similar-card-title {
+          color: #b45309;
+          text-decoration: underline;
         }
 
         .wishlist-card-img {

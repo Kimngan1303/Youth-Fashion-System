@@ -603,16 +603,6 @@ export default function Login() {
             {errorMessage && (
               <div className="alert-box alert-error">
                 <span>⚠️ {errorMessage}</span>
-                {(errorMessage.toLowerCase().includes('xác thực') || errorMessage.toLowerCase().includes('verify')) && (
-                  <div style={{ marginTop: '6px' }}>
-                    <Link
-                      to={`/verify-email?email=${encodeURIComponent(email)}`}
-                      style={{ color: '#991B1B', fontWeight: 600, textDecoration: 'underline' }}
-                    >
-                      Bấm vào đây để nhập mã xác thực OTP &rarr;
-                    </Link>
-                  </div>
-                )}
               </div>
             )}
             {successMessage && (
