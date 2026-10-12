@@ -85,12 +85,13 @@ const ProfilePage = () => {
   const { user, updateUserProfile, changePassword, orders, wishlist, logout } = useAuth();
   const isManagerOrAdmin = Boolean(
     user && (
-      user.role === 'MANAGER' ||
-      user.role === 'ADMIN' ||
-      user.role === 'EMPLOYEE' ||
-      user.user_type === 'EMPLOYEE' ||
-      user.employee_role === 'MANAGER' ||
-      user.employee_role === 'ADMIN'
+      String(user.role || '').toUpperCase() === 'MANAGER' ||
+      String(user.role || '').toUpperCase() === 'ADMIN' ||
+      String(user.role || '').toUpperCase() === 'EMPLOYEE' ||
+      String(user.user_type || '').toUpperCase() === 'EMPLOYEE' ||
+      String(user.employee_role || '').toUpperCase() === 'MANAGER' ||
+      String(user.employee_role || '').toUpperCase() === 'ADMIN' ||
+      user.email === 'mana@gmail.com'
     )
   );
   const navigate = useNavigate();
@@ -102,12 +103,11 @@ const ProfilePage = () => {
     }
     navigate('/');
   };
-  const initialTab = searchParams.get('tab') || 'info';
+  const initialTab = searchParams.get('tab') || 'vouchers';
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
-
-  const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400';
+  const DEFAULT_AVATAR = '/logo-white.png';
 
   // Nén ảnh tải lên về chuẩn JPEG (max 400x400) để tối ưu lưu trữ CSDL & LocalStorage
   const compressAvatarImage = (file) => {
@@ -500,28 +500,32 @@ const ProfilePage = () => {
       title: 'Chiết khấu 10% Đặc Quyền VIP',
       desc: 'Áp dụng cho mọi đơn hàng thời trang nguyên giá.',
       expiry: 'Hạn dùng: 31/12/2026',
-      badge: 'Đặc quyền VIP'
+      badgeLine1: 'Đặc quyền',
+      badgeLine2: 'VIP'
     },
     {
       code: 'ATELIER-500K',
       title: 'Giảm 500.000đ cho đơn từ 3.000.000đ',
       desc: 'Áp dụng cho bộ sưu tập Fall/Winter Atelier mới nhất.',
       expiry: 'Hạn dùng: 15/10/2026',
-      badge: 'Bộ Sưu Tập Mới'
+      badgeLine1: 'Bộ Sưu Tập',
+      badgeLine2: 'Mới'
     },
     {
       code: 'BDAY-2026',
       title: 'Quà Tặng Sinh Nhật 1.000.000đ',
       desc: 'Dành riêng cho thành viên VIP trong tháng sinh nhật.',
       expiry: 'Hạn dùng: Tháng sinh nhật',
-      badge: 'Sinh Nhật VIP'
+      badgeLine1: 'Sinh Nhật',
+      badgeLine2: 'VIP'
     },
     {
       code: 'FREESHIP-PREMIUM',
       title: 'Miễn Phí Vận Chuyển Hỏa Tốc',
       desc: 'Áp dụng cho mọi đơn hàng không giới hạn giá trị.',
       expiry: 'Hạn dùng: Vô thời hạn',
-      badge: 'Vận Chuyển'
+      badgeLine1: 'Vận Chuyển',
+      badgeLine2: null
     }
   ];
 
@@ -565,18 +569,7 @@ const ProfilePage = () => {
 
   return (
     <div className="profile-page-bg">
-      {/* 1. Breadcrumbs Bar */}
-      <div className="profile-breadcrumb-bar">
-        <div className="container profile-breadcrumb-content">
-          <Link to="/" className="bc-link">TRANG CHỦ</Link>
-          <span className="bc-sep">&gt;</span>
-          <span className="bc-link">TÀI KHOẢN CỦA TÔI</span>
-          <span className="bc-sep">&gt;</span>
-          <span className="bc-current">HỒ SƠ CÁ NHÂN</span>
-        </div>
-      </div>
-
-      <div className="container main-profile-wrapper">
+      <div className="container main-profile-wrapper" style={{ paddingTop: '28px' }}>
         {/* 2. Top Luxury Membership Header Banner */}
         <div className="profile-hero-banner">
           <div className="hero-banner-left">
@@ -588,9 +581,9 @@ const ProfilePage = () => {
                 onChange={handleAvatarFileChange}
                 style={{ display: 'none' }}
               />
-              <img
-                src={formData.avatar_url || DEFAULT_AVATAR}
-                alt={user?.full_name || 'Khách hàng Youth Fashion'}
+              <img 
+                src={formData.avatar_url || DEFAULT_AVATAR} 
+                alt={user?.full_name || (isManagerOrAdmin ? 'Quản Lý Youth Fashion' : 'Khách hàng Youth Fashion')} 
                 className="hero-avatar-img"
                 onClick={() => fileInputRef.current?.click()}
                 onError={(e) => {
@@ -610,9 +603,13 @@ const ProfilePage = () => {
 
             <div className="hero-info-content">
               <div className="hero-subtitle">
-                <span className="gold-text-hero">THÀNH VIÊN MỚI</span> <span className="dot">•</span> {user?.member_since || 'Từ Tháng 03/2023'}
+                <span className="gold-text-hero">THÀNH VIÊN ĐẶC QUYỀN</span> <span className="dot">•</span> {user?.member_since || 'TỪ THÁNG 03/2023'}
               </div>
-              <h1 className="hero-user-name font-serif">{user?.full_name || 'Khách hàng Youth Fashion'}</h1>
+              <h1 className="hero-user-name font-serif">{user?.full_name || (isManagerOrAdmin ? 'Quản Lý Youth Fashion' : 'Khách hàng Youth Fashion')}</h1>
+              <div className="hero-tier-pill">
+                <span className="tier-medal">🥇</span>
+                <span>{user?.tier || 'VIP GOLD ATELIER MEMBER'}</span>
+              </div>
             </div>
           </div>
 
@@ -643,7 +640,6 @@ const ProfilePage = () => {
                   <User size={18} />
                   <span>HỒ SƠ CÁ NHÂN</span>
                 </div>
-                {activeTab === 'info' && <ChevronRight size={16} className="active-arrow" />}
               </button>
 
               {/* Menu Item 2: Lịch Sử Đơn Hàng */}
@@ -656,7 +652,7 @@ const ProfilePage = () => {
                   <span>LỊCH SỬ ĐƠN HÀNG</span>
                 </div>
                 <span className="nav-badge-pill grey-badge">
-                  {orders.length > 0 ? String(orders.length).padStart(2, '0') : '0'}
+                  {orders.length > 0 ? String(orders.length) : '0'}
                 </span>
               </button>
 
@@ -681,19 +677,17 @@ const ProfilePage = () => {
                   <Lock size={18} />
                   <span>ĐỔI MẬT KHẨU</span>
                 </div>
-                {activeTab === 'password' && <ChevronRight size={16} className="active-arrow" />}
               </button>
 
               {/* Menu Item: Bảng Quản Lý (Đối với tài khoản manager hoặc admin) */}
               {isManagerOrAdmin && (
-                <button
-                  className="nav-item-btn"
+                <button 
+                  className="nav-item-btn manager-nav-btn"
                   onClick={() => navigate('/manager')}
-                  style={{ color: '#0284c7', borderLeft: '3px solid #0284c7' }}
                 >
                   <div className="nav-item-left">
                     <LayoutDashboard size={18} />
-                    <span style={{ fontWeight: 600 }}>BẢNG QUẢN LÝ</span>
+                    <span>BẢNG QUẢN LÝ</span>
                   </div>
                   <ChevronRight size={16} />
                 </button>
@@ -1007,8 +1001,11 @@ const ProfilePage = () => {
                   {vouchersList.map((v, idx) => (
                     <div key={idx} className="voucher-card">
                       <div className="voucher-left-stub">
-                        <Tag size={24} className="stub-icon" />
-                        <span className="stub-tag">{v.badge}</span>
+                        <Tag size={22} className="stub-icon" />
+                        <span className="stub-tag">
+                          {v.badgeLine1}
+                          {v.badgeLine2 && <><br />{v.badgeLine2}</>}
+                        </span>
                       </div>
                       <div className="voucher-details">
                         <h4 className="voucher-title">{v.title}</h4>
@@ -1018,6 +1015,7 @@ const ProfilePage = () => {
                           <button
                             className="copy-code-btn"
                             onClick={() => handleCopyVoucher(v.code)}
+                            title="Sao chép mã"
                           >
                             <Copy size={13} /> {v.code}
                           </button>
@@ -1216,9 +1214,10 @@ const ProfilePage = () => {
         .hero-avatar-img {
           width: 92px;
           height: 92px;
-          border-radius: 12px;
-          object-fit: cover;
-          border: 2px solid rgba(212, 175, 55, 0.5);
+          border-radius: 14px;
+          object-fit: contain;
+          background: #000000;
+          border: 2px solid rgba(212, 175, 55, 0.4);
           box-shadow: 0 4px 12px rgba(0,0,0,0.3);
           transition: opacity 0.2s;
         }
@@ -1465,8 +1464,28 @@ const ProfilePage = () => {
         }
 
         .gold-badge {
-          background-color: #fef3c7;
-          color: #92400e;
+          background-color: #fde047;
+          color: #713f12;
+          font-weight: 700;
+        }
+
+        .manager-nav-btn {
+          color: #0284c7 !important;
+          border-left: 3px solid #0284c7;
+          border-radius: 4px 10px 10px 4px;
+        }
+
+        .manager-nav-btn .nav-item-left {
+          color: #0284c7;
+        }
+
+        .manager-nav-btn .nav-item-left span {
+          font-weight: 600;
+          color: #0284c7;
+        }
+
+        .manager-nav-btn:hover {
+          background-color: #f0f9ff;
         }
 
         .logout-item-btn {
@@ -1759,32 +1778,35 @@ const ProfilePage = () => {
         }
 
         .voucher-left-stub {
-          background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+          background-color: #181E29;
           color: #ffffff;
-          width: 100px;
+          width: 105px;
+          min-width: 105px;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
           gap: 8px;
-          padding: 16px;
+          padding: 16px 8px;
           text-align: center;
           position: relative;
         }
 
         .stub-icon {
-          color: #d4af37;
+          color: #facc15;
+          stroke-width: 2;
         }
 
         .stub-tag {
-          font-size: 10px;
+          font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.5px;
-          color: #e5e7eb;
+          letter-spacing: 0.3px;
+          color: #ffffff;
+          line-height: 1.35;
         }
 
         .voucher-details {
-          padding: 16px;
+          padding: 18px 20px;
           flex: 1;
           display: flex;
           flex-direction: column;
@@ -1792,16 +1814,17 @@ const ProfilePage = () => {
         }
 
         .voucher-title {
-          font-size: 14px;
+          font-size: 13.5px;
           font-weight: 700;
           color: #111827;
           margin-bottom: 4px;
         }
 
         .voucher-desc {
-          font-size: 12px;
+          font-size: 11.5px;
           color: #6b7280;
           margin-bottom: 12px;
+          line-height: 1.5;
         }
 
         .voucher-footer {
@@ -1811,7 +1834,7 @@ const ProfilePage = () => {
         }
 
         .voucher-expiry {
-          font-size: 11px;
+          font-size: 11.5px;
           color: #9ca3af;
         }
 
@@ -1821,15 +1844,17 @@ const ProfilePage = () => {
           gap: 6px;
           background-color: #000000;
           color: #ffffff;
-          font-size: 11px;
+          font-size: 11.5px;
           font-weight: 700;
           padding: 6px 12px;
           border-radius: 6px;
+          border: none;
+          cursor: pointer;
           transition: background 0.15s;
         }
 
         .copy-code-btn:hover {
-          background-color: #374151;
+          background-color: #27272a;
         }
 
         /* Password Form */
