@@ -24,10 +24,19 @@ import CategoryManager from './pages/manager/CategoryManager';
 import BrandManager from './pages/manager/BrandManager';
 import LookbookManagement from './pages/manager/LookbookManagement';
 import VoucherManager from './pages/manager/VoucherManager';
+import UserManagement from './pages/manager/UserManagement';
+import SystemConfig from './pages/manager/SystemConfig';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useContext(AuthContext);
   return isAuthenticated ? children : <Navigate to="/login" replace />;
+}
+
+function AdminRoute({ children }) {
+  const { user, isAuthenticated } = useContext(AuthContext);
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const isAdmin = user?.role === 'ADMIN' || user?.employee_role === 'ADMIN';
+  return isAdmin ? children : <Navigate to="/manager" replace />;
 }
 
 function AppContent() {
@@ -35,7 +44,7 @@ function AppContent() {
   const location = useLocation();
 
   // Xác định các trang không cần hiển thị Header và Footer của khách hàng
-  const hideHeaderFooter = ['/login', '/register', '/verify-email', '/forgot-password'].includes(location.pathname) || location.pathname.startsWith('/manager');
+  const hideHeaderFooter = ['/login', '/register', '/verify-email', '/forgot-password'].includes(location.pathname) || location.pathname.startsWith('/manager') || location.pathname.startsWith('/admin');
 
   return (
     <div className="app-layout">
@@ -117,6 +126,38 @@ function AppContent() {
               <ProtectedRoute>
                 <VoucherManager />
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/manager/users"
+            element={
+              <AdminRoute>
+                <UserManagement />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <AdminRoute>
+                <UserManagement />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/manager/system-config"
+            element={
+              <AdminRoute>
+                <SystemConfig />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/system-config"
+            element={
+              <AdminRoute>
+                <SystemConfig />
+              </AdminRoute>
             }
           />
           
