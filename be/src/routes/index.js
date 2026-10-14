@@ -6,6 +6,7 @@ import brandRoutes from './brand.routes.js';
 import lookbookRoutes from './lookbook.routes.js';
 import conversationRoutes from './conversation.routes.js';
 import adminRoutes from './admin.routes.js';
+import voucherRoutes from './voucher.routes.js';
 
 const router = Router();
 
@@ -29,6 +30,9 @@ router.use('/brands', brandRoutes);
 router.use('/lookbooks', lookbookRoutes);
 
 router.use('/conversations', conversationRoutes);
+
+// Voucher Routes
+router.use('/vouchers', voucherRoutes);
 
 // Admin Routes (Users & System Configuration)
 router.use('/admin', adminRoutes);
