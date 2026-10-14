@@ -763,6 +763,49 @@ const voucherPageStyles = `
     box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.08);
   }
 
+  .date-picker-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+  }
+
+  .form-date-input {
+    cursor: pointer;
+    padding-right: 38px !important;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1C1917;
+    background-color: #FFFFFF;
+    position: relative;
+  }
+
+  /* Make entire date box clickable to open native calendar picker */
+  .form-date-input::-webkit-calendar-picker-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .date-picker-icon {
+    position: absolute;
+    right: 12px;
+    color: #78716C;
+    pointer-events: none;
+    transition: color 0.15s;
+  }
+
+  .date-picker-input-wrapper:hover .date-picker-icon {
+    color: #111111;
+  }
+
   .modal-actions-footer {
     display: flex;
     justify-content: flex-end;
@@ -801,6 +844,31 @@ export default function VoucherManager() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [activeVoucherDetail, setActiveVoucherDetail] = useState(null);
 
+  // Date helper functions for interactive calendar picker
+  const getTodayISO = () => {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const getFutureISO = (days = 30) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const formatDateVN = (dateStr) => {
+    if (!dateStr) return '';
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+    }
+    return dateStr;
+  };
+
   // New Voucher form state
   const [newVoucher, setNewVoucher] = useState({
     code: '',
@@ -810,8 +878,8 @@ export default function VoucherManager() {
     maxDiscount: '',
     minOrder: '',
     totalLimit: 500,
-    startDate: '',
-    endDate: '',
+    startDate: getTodayISO(),
+    endDate: getFutureISO(30),
     categoryLimit: 'Ready-To-Wear',
   });
 
@@ -931,7 +999,9 @@ export default function VoucherManager() {
       totalLimit: Number(newVoucher.totalLimit) || 500,
       progressPercent: 0,
       progressColor: '#111111',
-      validityDisplay: newVoucher.startDate && newVoucher.endDate ? `${newVoucher.startDate} - ${newVoucher.endDate}` : '30 ngày kể từ kích hoạt',
+      validityDisplay: newVoucher.startDate && newVoucher.endDate 
+        ? `${formatDateVN(newVoucher.startDate)} - ${formatDateVN(newVoucher.endDate)}` 
+        : (newVoucher.endDate ? `Hạn dùng: ${formatDateVN(newVoucher.endDate)}` : '30 ngày kể từ kích hoạt'),
       statusText: 'Đang áp dụng',
       statusColor: '#059669',
       statusTab: 'active',
@@ -947,8 +1017,8 @@ export default function VoucherManager() {
       maxDiscount: '',
       minOrder: '',
       totalLimit: 500,
-      startDate: '',
-      endDate: '',
+      startDate: getTodayISO(),
+      endDate: getFutureISO(30),
       categoryLimit: 'Ready-To-Wear',
     });
     showSuccess(`Đã tạo và kích hoạt mã voucher "${createdItem.code}" thành công!`);
@@ -1510,24 +1580,30 @@ export default function VoucherManager() {
                 <div className="form-row-2col">
                   <div className="form-group-item">
                     <label className="form-label-txt">Ngày Bắt Đầu</label>
-                    <input 
-                      type="text" 
-                      className="form-input-ctrl"
-                      placeholder="15/10/2025"
-                      value={newVoucher.startDate}
-                      onChange={(e) => setNewVoucher({ ...newVoucher, startDate: e.target.value })}
-                    />
+                    <div className="date-picker-input-wrapper">
+                      <input 
+                        type="date" 
+                        className="form-input-ctrl form-date-input"
+                        value={newVoucher.startDate}
+                        onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                        onChange={(e) => setNewVoucher({ ...newVoucher, startDate: e.target.value })}
+                      />
+                      <Calendar size={16} className="date-picker-icon" />
+                    </div>
                   </div>
 
                   <div className="form-group-item">
                     <label className="form-label-txt">Ngày Kết Thúc</label>
-                    <input 
-                      type="text" 
-                      className="form-input-ctrl"
-                      placeholder="15/11/2025"
-                      value={newVoucher.endDate}
-                      onChange={(e) => setNewVoucher({ ...newVoucher, endDate: e.target.value })}
-                    />
+                    <div className="date-picker-input-wrapper">
+                      <input 
+                        type="date" 
+                        className="form-input-ctrl form-date-input"
+                        value={newVoucher.endDate}
+                        onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                        onChange={(e) => setNewVoucher({ ...newVoucher, endDate: e.target.value })}
+                      />
+                      <Calendar size={16} className="date-picker-icon" />
+                    </div>
                   </div>
                 </div>
               </div>
