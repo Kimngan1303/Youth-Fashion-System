@@ -26,10 +26,28 @@ export const authenticateToken = (req, res, next) => {
  * @param  {...String} allowedRoles - Danh sách role được phép (VD: 'CUSTOMER', 'MANAGER', 'ADMIN')
  */
 export const authorizeRoles = (...allowedRoles) => {
+  const normalizedAllowed = allowedRoles.map((r) => String(r).toUpperCase());
+
   return (req, res, next) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
+    if (!req.user) {
       return BaseResponse.error(res, 'Bạn không có quyền truy cập tài nguyên này', [], 403);
     }
-    next();
+
+    const rawRole = req.user.role || req.user.employee_role;
+    const userRole = rawRole ? String(rawRole).toUpperCase() : null;
+
+    if (userRole && normalizedAllowed.includes(userRole)) {
+      return next();
+    }
+
+    // Nếu người dùng đăng nhập là nhân viên/quản trị viên hệ thống (EMPLOYEE)
+    if (
+      String(req.user.user_type).toUpperCase() === 'EMPLOYEE' &&
+      (normalizedAllowed.includes('MANAGER') || normalizedAllowed.includes('ADMIN'))
+    ) {
+      return next();
+    }
+
+    return BaseResponse.error(res, 'Bạn không có quyền truy cập tài nguyên này', [], 403);
   };
 };
