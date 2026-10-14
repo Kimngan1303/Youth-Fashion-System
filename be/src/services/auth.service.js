@@ -353,9 +353,31 @@ export const refreshAccessTokenService = async (refreshToken) => {
     throw { statusCode: 401, message: 'Refresh token đã bị thu hồi hoặc hết hạn' };
   }
 
-  // 3. Sinh Access Token mới
+  // 3. Tra cứu thông tin người dùng để phục hồi role và email trong Access Token mới
+  let role = 'CUSTOMER';
+  let email = null;
+  if (decoded.user_type === 'EMPLOYEE') {
+    const employee = await prisma.employee.findUnique({
+      where: { employee_id: BigInt(decoded.id) },
+    });
+    if (employee && employee.status === 'ACTIVE') {
+      role = employee.employee_role;
+      email = employee.email;
+    }
+  } else {
+    const customer = await prisma.customer.findUnique({
+      where: { customer_id: BigInt(decoded.id) },
+    });
+    if (customer && customer.status === 'ACTIVE') {
+      email = customer.email;
+    }
+  }
+
+  // 4. Sinh Access Token mới đầy đủ thông tin quyền hạn
   const newAccessToken = generateAccessToken({
     id: decoded.id,
+    email,
+    role,
     user_type: decoded.user_type,
   });
 
