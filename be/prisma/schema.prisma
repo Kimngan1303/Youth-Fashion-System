@@ -518,3 +518,27 @@ enum LookbookStatus {
   HIDDEN
 }
 
+model Voucher {
+  voucher_id       BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  code             String    @unique @db.VarChar(50)
+  name             String    @db.VarChar(255)
+  discount_type    String    @default("percent") @db.VarChar(30)
+  discount_percent Int       @default(0)
+  discount_amount  Decimal   @default(0.00) @db.Decimal(12, 2)
+  min_order        Decimal   @default(0.00) @db.Decimal(12, 2)
+  max_discount     Decimal   @default(0.00) @db.Decimal(12, 2)
+  used_count       Int       @default(0)
+  total_limit      Int       @default(500)
+  start_date       DateTime? @db.DateTime(0)
+  end_date         DateTime? @db.DateTime(0)
+  category_limit   String?   @db.VarChar(100)
+  status           String    @default("ACTIVE") @db.VarChar(30)
+  badge_type       String?   @default("dark") @db.VarChar(30)
+  created_at       DateTime  @default(now()) @db.DateTime(0)
+  updated_at       DateTime  @default(now()) @updatedAt @db.DateTime(0)
+
+  @@index([status], map: "vouchers_status_idx")
+  @@index([code], map: "vouchers_code_idx")
+  @@map("vouchers")
+}
+

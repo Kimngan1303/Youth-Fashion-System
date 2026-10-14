@@ -933,6 +933,81 @@ async function main() {
     console.log('ℹ️ Lỗi khi cập nhật Lookbook:', err.message);
   }
 
+  // 6. Seed Vouchers mẫu
+  console.log('\n🎟️ --- Tạo Mã Giảm Giá (Vouchers) mẫu ---');
+  const defaultVouchers = [
+    {
+      code: 'YOUTH-VIP10',
+      name: 'Chiết khấu 10% Đặc Quyền VIP',
+      discount_type: 'percent',
+      discount_percent: 10,
+      discount_amount: 0,
+      min_order: 0,
+      max_discount: 0,
+      used_count: 142,
+      total_limit: 500,
+      end_date: new Date('2026-12-31T23:59:59Z'),
+      category_limit: 'Áp dụng mọi đơn hàng',
+      status: 'ACTIVE',
+      badge_type: 'gold',
+    },
+    {
+      code: 'ATELIER-500K',
+      name: 'Giảm 500.000đ cho đơn từ 3.000.000đ',
+      discount_type: 'fixed',
+      discount_percent: 0,
+      discount_amount: 500000,
+      min_order: 3000000,
+      max_discount: 500000,
+      used_count: 88,
+      total_limit: 300,
+      end_date: new Date('2026-12-31T23:59:59Z'),
+      category_limit: 'BST Fall/Winter Atelier mới nhất',
+      status: 'ACTIVE',
+      badge_type: 'dark',
+    },
+    {
+      code: 'BDAY-2026',
+      name: 'Quà Tặng Sinh Nhật 1.000.000đ',
+      discount_type: 'fixed',
+      discount_percent: 0,
+      discount_amount: 1000000,
+      min_order: 2000000,
+      max_discount: 1000000,
+      used_count: 35,
+      total_limit: 100,
+      end_date: new Date('2026-12-31T23:59:59Z'),
+      category_limit: 'Áp dụng trong tháng sinh nhật',
+      status: 'ACTIVE',
+      badge_type: 'purple',
+    },
+    {
+      code: 'FREESHIP-PREMIUM',
+      name: 'Miễn Phí Vận Chuyển Hỏa Tốc',
+      discount_type: 'shipping',
+      discount_percent: 0,
+      discount_amount: 50000,
+      min_order: 0,
+      max_discount: 50000,
+      used_count: 290,
+      total_limit: 1000,
+      end_date: new Date('2026-12-31T23:59:59Z'),
+      category_limit: 'Áp dụng toàn bộ đơn hàng',
+      status: 'ACTIVE',
+      badge_type: 'blue',
+    },
+  ];
+
+  for (const v of defaultVouchers) {
+    await prisma.voucher.upsert({
+      where: { code: v.code },
+      update: v,
+      create: v,
+    });
+    console.log(`  🎟️ Đã đồng bộ Voucher: ${v.code} (${v.name})`);
+  }
+  console.log(`✅ Đã đồng bộ ${defaultVouchers.length} vouchers với CSDL.`);
+
   console.log('\n🎉 --- Hoàn thành Khởi tạo Dữ liệu Mẫu thành công! ---');
 }
 
