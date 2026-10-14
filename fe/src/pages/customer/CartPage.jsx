@@ -30,8 +30,9 @@ export default function CartPage() {
   const [availableVouchers, setAvailableVouchers] = useState(() => voucherService.getCustomerVouchers());
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
 
-  // Lắng nghe cập nhật danh sách voucher từ Trang cá nhân / Quản lý
+  // Lắng nghe cập nhật danh sách voucher từ Trang cá nhân / Quản lý và CSDL
   useEffect(() => {
+    voucherService.fetchVouchers().catch(() => {});
     const unsubscribe = voucherService.subscribe(() => {
       setAvailableVouchers(voucherService.getCustomerVouchers());
     });
@@ -691,14 +692,15 @@ export default function CartPage() {
         <div className="cart-modal-backdrop" onClick={() => setIsVoucherModalOpen(false)}>
           <div className="cart-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="cart-modal-header">
-              <div className="modal-title-left">
-                <Ticket size={20} color="#111827" />
-                <h3 className="modal-title-text font-serif">Ví Voucher Của Bạn</h3>
-                <span className="modal-count-pill">{availableVouchers.length} mã khả dụng</span>
+              <div className="cart-modal-title-group">
+                <div className="cart-modal-icon-badge">
+                  <Ticket size={18} />
+                </div>
+                <h3 className="cart-modal-title font-serif">Ví Voucher Của Bạn</h3>
               </div>
               <button 
                 type="button" 
-                className="cart-modal-close-btn" 
+                className="btn-close-modal" 
                 onClick={() => setIsVoucherModalOpen(false)}
                 title="Đóng"
               >
@@ -1839,8 +1841,8 @@ export default function CartPage() {
         .cart-modal-card {
           background: #ffffff;
           width: 100%;
-          max-width: 580px;
-          max-height: 85vh;
+          max-width: 620px;
+          max-height: 90vh;
           border-radius: 8px;
           box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
           display: flex;
@@ -1865,18 +1867,19 @@ export default function CartPage() {
         .cart-modal-title-group {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
         }
 
         .cart-modal-icon-badge {
-          width: 34px;
-          height: 34px;
+          width: 36px;
+          height: 36px;
           border-radius: 8px;
           background: #fef3c7;
           color: #b45309;
           display: flex;
           align-items: center;
           justify-content: center;
+          flex-shrink: 0;
         }
 
         .cart-modal-title {
@@ -1907,9 +1910,9 @@ export default function CartPage() {
         }
 
         .cart-modal-sub {
-          padding: 10px 24px 0;
+          padding: 12px 24px 0;
           margin: 0;
-          font-size: 12px;
+          font-size: 12.5px;
           color: #6b7280;
           line-height: 1.5;
         }
@@ -1920,7 +1923,9 @@ export default function CartPage() {
           display: flex;
           flex-direction: column;
           gap: 12px;
-          flex-grow: 1;
+          flex: 1 1 auto;
+          min-height: 0;
+          max-height: 520px;
         }
 
         .cart-voucher-card {
@@ -1928,7 +1933,9 @@ export default function CartPage() {
           align-items: stretch;
           background: #ffffff;
           border: 1px solid #e5e7eb;
-          border-radius: 6px;
+          border-radius: 8px;
+          flex-shrink: 0;
+          min-height: 108px;
           overflow: hidden;
           transition: all 0.2s;
         }
@@ -1949,10 +1956,10 @@ export default function CartPage() {
         }
 
         .cart-voucher-stub {
-          width: 80px;
+          width: 86px;
           background: #18181b;
           color: #fef08a;
-          padding: 14px 8px;
+          padding: 14px 6px;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -1975,7 +1982,7 @@ export default function CartPage() {
         .stub-tag-text {
           font-size: 10px;
           font-weight: 800;
-          line-height: 1.2;
+          line-height: 1.25;
           letter-spacing: 0.5px;
           text-transform: uppercase;
           font-family: var(--font-sans, sans-serif) !important;
@@ -1986,8 +1993,8 @@ export default function CartPage() {
           padding: 12px 16px;
           display: flex;
           flex-direction: column;
-          justify-content: center;
-          gap: 4px;
+          justify-content: space-between;
+          gap: 6px;
           min-width: 0;
           font-family: var(--font-sans, sans-serif) !important;
         }
@@ -2008,9 +2015,9 @@ export default function CartPage() {
           letter-spacing: 0.8px;
           color: #111827;
           background: #f3f4f6;
-          padding: 3px 8px;
+          padding: 2px 8px;
           border-radius: 4px;
-          line-height: 1.2;
+          line-height: 1.25;
           width: fit-content;
           font-variant-numeric: lining-nums tabular-nums;
           font-feature-settings: "lnum" 1, "tnum" 1;
@@ -2021,7 +2028,7 @@ export default function CartPage() {
           font-size: 13.5px;
           font-weight: 600;
           color: #111827;
-          line-height: 1.45;
+          line-height: 1.35;
           margin: 0;
           letter-spacing: -0.1px;
           font-variant-numeric: lining-nums tabular-nums;
@@ -2033,7 +2040,7 @@ export default function CartPage() {
           font-size: 11.5px;
           color: #6b7280;
           margin: 0;
-          line-height: 1.4;
+          line-height: 1.35;
           font-variant-numeric: lining-nums tabular-nums;
           font-feature-settings: "lnum" 1, "tnum" 1;
         }
@@ -2043,15 +2050,17 @@ export default function CartPage() {
           align-items: center;
           justify-content: space-between;
           gap: 8px;
-          margin-top: 4px;
+          margin-top: 6px;
+          padding-top: 2px;
           font-family: var(--font-sans, sans-serif) !important;
           font-variant-numeric: lining-nums tabular-nums;
           font-feature-settings: "lnum" 1, "tnum" 1;
         }
 
         .voucher-item-exp {
-          font-size: 10.5px;
-          color: #9ca3af;
+          font-size: 11px;
+          color: #6b7280;
+          line-height: 1.3;
           font-family: var(--font-sans, sans-serif) !important;
         }
 
@@ -2059,9 +2068,10 @@ export default function CartPage() {
           display: inline-flex;
           align-items: center;
           gap: 4px;
-          font-size: 11px;
+          font-size: 11.5px;
           font-weight: 600;
           color: #15803d;
+          line-height: 1.3;
           font-family: var(--font-sans, sans-serif) !important;
         }
 
@@ -2069,14 +2079,15 @@ export default function CartPage() {
           display: inline-flex;
           align-items: center;
           gap: 4px;
-          font-size: 11px;
+          font-size: 11.5px;
           font-weight: 600;
           color: #d97706;
+          line-height: 1.3;
           font-family: var(--font-sans, sans-serif) !important;
         }
 
         .cart-voucher-action {
-          padding: 12px 16px;
+          padding: 12px 18px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -2085,11 +2096,11 @@ export default function CartPage() {
         }
 
         .btn-voucher-action {
-          height: 34px;
-          padding: 0 16px;
+          height: 36px;
+          padding: 0 18px;
           border-radius: 4px;
           font-family: var(--font-sans, sans-serif) !important;
-          font-size: 11.5px;
+          font-size: 12px;
           font-weight: 700;
           display: inline-flex;
           align-items: center;
