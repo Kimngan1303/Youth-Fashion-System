@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Trash2, ShoppingBag, RotateCw, ArrowLeft, ShieldCheck, RefreshCw, MessageSquare, Info, Check } from 'lucide-react';
+import { 
+  Heart, Trash2, ShoppingBag, RotateCw, ArrowLeft, ShieldCheck, 
+  RefreshCw, MessageSquare, Info, Check, Ticket, Tag, ChevronDown, X, AlertCircle, CheckCircle 
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { productService } from '../../services/productService';
+import { voucherService } from '../../services/voucherService';
 
 export default function CartPage() {
   const { 
@@ -23,6 +27,17 @@ export default function CartPage() {
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState(null);
   const [orderNote, setOrderNote] = useState('');
+  const [availableVouchers, setAvailableVouchers] = useState(() => voucherService.getCustomerVouchers());
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+
+  // Lắng nghe cập nhật danh sách voucher từ Trang cá nhân / Quản lý và CSDL
+  useEffect(() => {
+    voucherService.fetchVouchers().catch(() => {});
+    const unsubscribe = voucherService.subscribe(() => {
+      setAvailableVouchers(voucherService.getCustomerVouchers());
+    });
+    return unsubscribe;
+  }, []);
 
   // Tải danh sách sản phẩm gợi ý trực tiếp từ CSDL MySQL
   useEffect(() => {
@@ -79,20 +94,145 @@ export default function CartPage() {
     showInfo('Đã làm trống giỏ hàng.');
   };
 
+  const KNOWN_VOUCHERS = {
+    'ATELIER-500K': {
+      code: 'ATELIER-500K',
+      discountAmount: 500000,
+      minOrder: 3000000,
+      title: 'Giảm 500.000đ cho đơn từ 3.000.000đ',
+    },
+    'BDAY-2026': {
+      code: 'BDAY-2026',
+      discountAmount: 1000000,
+      minOrder: 2000000,
+      title: 'Quà tặng sinh nhật VIP 1.000.000đ',
+    },
+    'YOUTH-VIP10': {
+      code: 'YOUTH-VIP10',
+      discountPercent: 10,
+      title: 'Chiết khấu 10% Đặc Quyền VIP',
+    },
+    'YOUTH10': {
+      code: 'YOUTH10',
+      discountPercent: 10,
+      title: 'Giảm giá 10% đơn hàng',
+    },
+    'WELCOME10': {
+      code: 'WELCOME10',
+      discountPercent: 10,
+      title: 'Ưu Đãi Hội Viên Mới Đăng Ký 10%',
+    },
+    'YF-WELCOME10': {
+      code: 'YF-WELCOME10',
+      discountPercent: 10,
+      title: 'Ưu Đãi Hội Viên Mới Đăng Ký 10%',
+    },
+    'WINTER25': {
+      code: 'WINTER25',
+      discountPercent: 20,
+      maxDiscount: 500000,
+      minOrder: 1500000,
+      title: 'Giảm 20% BST Thu Đông 2025 (Tối đa 500.000đ)',
+    },
+    'YF-WINTER25': {
+      code: 'YF-WINTER25',
+      discountPercent: 20,
+      maxDiscount: 500000,
+      minOrder: 1500000,
+      title: 'Giảm 20% BST Thu Đông 2025 (Tối đa 500.000đ)',
+    },
+    'FREESHIP-PREMIUM': {
+      code: 'FREESHIP-PREMIUM',
+      discountAmount: 50000,
+      title: 'Miễn Phí Vận Chuyển Hỏa Tốc',
+    },
+    'FREESHIP': {
+      code: 'FREESHIP',
+      discountAmount: 50000,
+      title: 'Miễn Phí Vận Chuyển',
+    },
+  };
+
+  // Áp dụng voucher theo mã (dùng cho cả Chọn từ ví và Nhập tay)
+  const applyVoucherByCode = (inputCode) => {
+    if (!inputCode) return;
+    const cleanCode = inputCode.trim().toUpperCase().replace(/\s+/g, '');
+
+    // 1. Kiểm tra từ Kho Voucher Trang cá nhân / Hệ thống
+    const serviceVoucher = voucherService.findVoucherByCode(cleanCode) || voucherService.findVoucherByCode(inputCode);
+    if (serviceVoucher) {
+      if (serviceVoucher.minOrder && rawProductTotal < serviceVoucher.minOrder) {
+        showError(`Mã ${serviceVoucher.code} chỉ áp dụng cho đơn hàng từ ${serviceVoucher.minOrder.toLocaleString('vi-VN')}₫ trở lên (cần thêm ${(serviceVoucher.minOrder - rawProductTotal).toLocaleString('vi-VN')}₫).`);
+        return;
+      }
+      const applied = {
+        code: serviceVoucher.code,
+        discountAmount: serviceVoucher.discountAmount || 0,
+        discountPercent: serviceVoucher.discountPercent || 0,
+        maxDiscount: serviceVoucher.maxDiscount || 0,
+        minOrder: serviceVoucher.minOrder || 0,
+        title: serviceVoucher.name || serviceVoucher.title,
+      };
+      setAppliedVoucher(applied);
+      setVoucherCode(serviceVoucher.code);
+      const discountDesc = applied.discountAmount 
+        ? `${applied.discountAmount.toLocaleString('vi-VN')}₫` 
+        : `${applied.discountPercent}%`;
+      showSuccess(`Đã áp dụng mã ưu đãi ${applied.code} (-${discountDesc})!`);
+      setIsVoucherModalOpen(false);
+      return;
+    }
+
+    // 2. Kiểm tra danh sách mã fallback dự phòng
+    const matched = KNOWN_VOUCHERS[cleanCode] || KNOWN_VOUCHERS[inputCode.trim().toUpperCase()];
+    if (matched) {
+      if (matched.minOrder && rawProductTotal < matched.minOrder) {
+        showError(`Mã ${matched.code} chỉ áp dụng cho đơn hàng từ ${matched.minOrder.toLocaleString('vi-VN')}₫ trở lên.`);
+        return;
+      }
+      setAppliedVoucher(matched);
+      setVoucherCode(matched.code);
+      const discountDesc = matched.discountAmount 
+        ? `${matched.discountAmount.toLocaleString('vi-VN')}₫` 
+        : `${matched.discountPercent}%`;
+      showSuccess(`Đã áp dụng mã ưu đãi ${matched.code} (-${discountDesc})!`);
+      setIsVoucherModalOpen(false);
+      return;
+    }
+
+    // 3. Nhận diện động theo cú pháp mã (ví dụ: ATELIER-500K, SALE-200K, VIP-15%,...)
+    let discountAmount = 0;
+    let discountPercent = 0;
+    const kMatch = cleanCode.match(/(\d+)K$/i) || cleanCode.match(/-(\d+)K/i);
+    const pctMatch = cleanCode.match(/(\d+)%/i) || cleanCode.match(/-(\d+)%/i);
+
+    if (kMatch) {
+      discountAmount = parseInt(kMatch[1], 10) * 1000;
+    } else if (pctMatch) {
+      discountPercent = parseInt(pctMatch[1], 10);
+    } else {
+      discountAmount = 50000;
+    }
+
+    const applied = {
+      code: inputCode.trim().toUpperCase(),
+      discountAmount,
+      discountPercent,
+    };
+    setAppliedVoucher(applied);
+    setVoucherCode(applied.code);
+    const displayVal = discountAmount ? `${discountAmount.toLocaleString('vi-VN')}₫` : `${discountPercent}%`;
+    showSuccess(`Đã áp dụng mã ưu đãi ${applied.code} (-${displayVal})!`);
+    setIsVoucherModalOpen(false);
+  };
+
   const handleApplyVoucher = (e) => {
     e.preventDefault();
     if (!voucherCode.trim()) {
-      showError('Vui lòng nhập mã ưu đãi.');
+      showError('Vui lòng chọn hoặc nhập mã ưu đãi.');
       return;
     }
-    const code = voucherCode.trim().toUpperCase();
-    if (code === 'YOUTH10') {
-      setAppliedVoucher({ code, discountPercent: 10, discountAmount: 0 });
-      showSuccess('Đã áp dụng mã giảm giá 10%!');
-    } else {
-      setAppliedVoucher({ code, discountPercent: 0, discountAmount: 50000 });
-      showSuccess(`Đã áp dụng mã ưu đãi ${code}!`);
-    }
+    applyVoucherByCode(voucherCode);
   };
 
   const handleRemoveVoucher = () => {
@@ -117,8 +257,14 @@ export default function CartPage() {
 
   let voucherDiscount = 0;
   if (appliedVoucher && rawProductTotal > 0) {
-    if (appliedVoucher.discountPercent) {
-      voucherDiscount = Math.round((rawProductTotal * appliedVoucher.discountPercent) / 100);
+    if (appliedVoucher.minOrder && rawProductTotal < appliedVoucher.minOrder) {
+      voucherDiscount = 0;
+    } else if (appliedVoucher.discountPercent) {
+      let percentVal = Math.round((rawProductTotal * appliedVoucher.discountPercent) / 100);
+      if (appliedVoucher.maxDiscount) {
+        percentVal = Math.min(percentVal, appliedVoucher.maxDiscount);
+      }
+      voucherDiscount = percentVal;
     } else if (appliedVoucher.discountAmount) {
       voucherDiscount = Math.min(rawProductTotal, appliedVoucher.discountAmount);
     }
@@ -381,22 +527,38 @@ export default function CartPage() {
                 </div>
               </div>
 
-              {/* Voucher / Coupon Box */}
+              {/* Voucher / Coupon Box với tính năng CHỌN VOUCHER TỪ VÍ */}
               <div className="voucher-box">
-                <span className="voucher-title">MÃ ƯU ĐÃI</span>
-                <p className="voucher-desc">Nhập mã giảm giá hoặc thẻ quà tặng của bạn.</p>
+                <div className="voucher-header-flex">
+                  <span className="voucher-title">MÃ ƯU ĐÃI</span>
+                  {availableVouchers.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn-open-wallet"
+                      onClick={() => setIsVoucherModalOpen(true)}
+                    >
+                      <Ticket size={12} />
+                      <span>Chọn voucher từ ví ({availableVouchers.length})</span>
+                    </button>
+                  )}
+                </div>
+                <p className="voucher-desc">
+                  Nhập mã giảm giá hoặc thẻ quà tặng của bạn.
+                </p>
+
                 <form className="voucher-input-group" onSubmit={handleApplyVoucher}>
                   <input
                     type="text"
                     value={voucherCode}
                     onChange={(e) => setVoucherCode(e.target.value)}
-                    placeholder="Nhập mã ưu đãi..."
+                    placeholder="NHẬP MÃ ƯU ĐÃI..."
                     className="voucher-input"
                   />
                   <button type="submit" className="btn-apply-voucher">
                     ÁP DỤNG
                   </button>
                 </form>
+
                 {appliedVoucher && (
                   <div className="voucher-applied-tag">
                     <span className="applied-left">
@@ -524,6 +686,114 @@ export default function CartPage() {
           })}
         </div>
       </section>
+
+      {/* 5. Modal: Ví Voucher Khách Hàng (Xem đầy đủ chi tiết và bấm Áp dụng) */}
+      {isVoucherModalOpen && (
+        <div className="cart-modal-backdrop" onClick={() => setIsVoucherModalOpen(false)}>
+          <div className="cart-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="cart-modal-header">
+              <div className="cart-modal-title-group">
+                <div className="cart-modal-icon-badge">
+                  <Ticket size={18} />
+                </div>
+                <h3 className="cart-modal-title font-serif">Ví Voucher Của Bạn</h3>
+              </div>
+              <button 
+                type="button" 
+                className="btn-close-modal" 
+                onClick={() => setIsVoucherModalOpen(false)}
+                title="Đóng"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="cart-modal-sub">
+              Dưới đây là các mã ưu đãi có trong trang cá nhân của bạn. Bấm "Áp Dụng" để nhận chiết khấu cho đơn hàng này.
+            </p>
+
+            <div className="cart-modal-vouchers-list">
+              {availableVouchers.map((v) => {
+                const minVal = v.raw?.minOrder || 0;
+                const isEligible = !minVal || rawProductTotal >= minVal;
+                const isApplied = appliedVoucher?.code === v.code;
+                const neededMore = minVal - rawProductTotal;
+
+                return (
+                  <div key={v.code} className={`cart-voucher-card ${isApplied ? 'applied' : ''} ${!isEligible ? 'ineligible' : ''}`}>
+                    <div className="cart-voucher-stub">
+                      <Tag size={20} className="stub-tag-icon" />
+                      <span className="stub-tag-text">
+                        {v.badgeLine1}
+                        {v.badgeLine2 && <><br />{v.badgeLine2}</>}
+                      </span>
+                    </div>
+
+                    <div className="cart-voucher-body">
+                      <div className="cart-voucher-main">
+                        <div className="voucher-code-badge">{v.code}</div>
+                        <h4 className="voucher-item-title">{v.title}</h4>
+                        <p className="voucher-item-desc">{v.desc}</p>
+                      </div>
+
+                      <div className="cart-voucher-foot">
+                        <span className="voucher-item-exp">{v.expiry}</span>
+
+                        {isEligible ? (
+                          <div className="eligible-status-tag">
+                            <CheckCircle size={12} />
+                            <span>Đủ điều kiện</span>
+                          </div>
+                        ) : (
+                          <div className="ineligible-status-tag">
+                            <AlertCircle size={12} />
+                            <span>Mua thêm {neededMore.toLocaleString('vi-VN')}₫</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="cart-voucher-action">
+                      {isApplied ? (
+                        <button
+                          type="button"
+                          className="btn-voucher-action applied"
+                          onClick={() => {
+                            handleRemoveVoucher();
+                          }}
+                        >
+                          Đang dùng (Gỡ)
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-voucher-action apply"
+                          disabled={!isEligible}
+                          onClick={() => {
+                            applyVoucherByCode(v.code);
+                          }}
+                        >
+                          Áp Dụng
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="cart-modal-footer">
+              <button 
+                type="button" 
+                className="btn-modal-done"
+                onClick={() => setIsVoucherModalOpen(false)}
+              >
+                Hoàn Tất
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .cart-page-container {
@@ -1191,12 +1461,38 @@ export default function CartPage() {
           flex-direction: column;
         }
 
+        .voucher-header-flex {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 6px;
+        }
+
         .voucher-title {
           font-size: 11px;
           font-weight: 700;
           letter-spacing: 0.6px;
           color: #111827;
-          margin-bottom: 4px;
+        }
+
+        .btn-open-wallet {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 11px;
+          font-weight: 700;
+          color: #b45309;
+          background: #fef3c7;
+          border: 1px solid #fde68a;
+          padding: 3px 8px;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-open-wallet:hover {
+          background: #fde68a;
+          color: #92400e;
         }
 
         .voucher-desc {
@@ -1209,7 +1505,7 @@ export default function CartPage() {
         .voucher-input-group {
           display: flex;
           height: 36px;
-          margin-bottom: 10px;
+          margin-bottom: 6px;
         }
 
         .voucher-input {
@@ -1221,6 +1517,11 @@ export default function CartPage() {
           color: #111827;
           font-weight: 600;
           text-transform: uppercase;
+        }
+
+        .voucher-input:focus {
+          outline: none;
+          border-color: #111827;
         }
 
         .btn-apply-voucher {
@@ -1247,24 +1548,30 @@ export default function CartPage() {
           color: #15803d;
           font-weight: 600;
           margin-top: 4px;
+          background: #f0fdf4;
+          padding: 6px 10px;
+          border-radius: 4px;
+          border: 1px solid #bbf7d0;
         }
 
         .applied-left {
           display: inline-flex;
           align-items: center;
-          gap: 4px;
+          gap: 6px;
         }
 
         .btn-remove-voucher {
           font-size: 10px;
           font-weight: 700;
-          color: #71717a;
+          color: #dc2626;
           cursor: pointer;
+          background: transparent;
+          border: none;
           text-decoration: underline;
         }
 
         .btn-remove-voucher:hover {
-          color: #ef4444;
+          color: #991b1b;
         }
 
         /* Note Box */
@@ -1510,6 +1817,349 @@ export default function CartPage() {
 
         .similar-card-badge-right.gold {
           color: #b45309;
+        }
+
+        /* 6. Voucher Wallet Modal */
+        .cart-modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background-color: rgba(0, 0, 0, 0.65);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+          padding: 16px;
+          animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        .cart-modal-card {
+          background: #ffffff;
+          width: 100%;
+          max-width: 620px;
+          max-height: 90vh;
+          border-radius: 8px;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+
+        .cart-modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 18px 24px;
+          border-bottom: 1px solid #f3f4f6;
+        }
+
+        .cart-modal-title-group {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .cart-modal-icon-badge {
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          background: #fef3c7;
+          color: #b45309;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .cart-modal-title {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: 19px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+        }
+
+        .btn-close-modal {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          border: none;
+          background: #f3f4f6;
+          color: #6b7280;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+
+        .btn-close-modal:hover {
+          background: #e5e7eb;
+          color: #111827;
+        }
+
+        .cart-modal-sub {
+          padding: 12px 24px 0;
+          margin: 0;
+          font-size: 12.5px;
+          color: #6b7280;
+          line-height: 1.5;
+        }
+
+        .cart-modal-vouchers-list {
+          padding: 16px 24px;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          flex: 1 1 auto;
+          min-height: 0;
+          max-height: 520px;
+        }
+
+        .cart-voucher-card {
+          display: flex;
+          align-items: stretch;
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          flex-shrink: 0;
+          min-height: 108px;
+          overflow: hidden;
+          transition: all 0.2s;
+        }
+
+        .cart-voucher-card:hover {
+          border-color: #111827;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .cart-voucher-card.applied {
+          background: #f0fdf4;
+          border-color: #22c55e;
+        }
+
+        .cart-voucher-card.ineligible {
+          opacity: 0.65;
+          background: #fafafa;
+        }
+
+        .cart-voucher-stub {
+          width: 86px;
+          background: #18181b;
+          color: #fef08a;
+          padding: 14px 6px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          border-right: 1px dashed rgba(255, 255, 255, 0.3);
+          flex-shrink: 0;
+          font-family: var(--font-sans, sans-serif) !important;
+        }
+
+        .cart-voucher-card.applied .cart-voucher-stub {
+          background: #15803d;
+          color: #ffffff;
+        }
+
+        .stub-tag-icon {
+          margin-bottom: 6px;
+        }
+
+        .stub-tag-text {
+          font-size: 10px;
+          font-weight: 800;
+          line-height: 1.25;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+          font-family: var(--font-sans, sans-serif) !important;
+        }
+
+        .cart-voucher-body {
+          flex: 1;
+          padding: 12px 16px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          gap: 6px;
+          min-width: 0;
+          font-family: var(--font-sans, sans-serif) !important;
+        }
+
+        .cart-voucher-main {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
+        }
+
+        .voucher-code-badge {
+          display: inline-flex;
+          align-items: center;
+          font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, sans-serif) !important;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.8px;
+          color: #111827;
+          background: #f3f4f6;
+          padding: 2px 8px;
+          border-radius: 4px;
+          line-height: 1.25;
+          width: fit-content;
+          font-variant-numeric: lining-nums tabular-nums;
+          font-feature-settings: "lnum" 1, "tnum" 1;
+        }
+
+        .voucher-item-title {
+          font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif) !important;
+          font-size: 13.5px;
+          font-weight: 600;
+          color: #111827;
+          line-height: 1.35;
+          margin: 0;
+          letter-spacing: -0.1px;
+          font-variant-numeric: lining-nums tabular-nums;
+          font-feature-settings: "lnum" 1, "tnum" 1;
+        }
+
+        .voucher-item-desc {
+          font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif) !important;
+          font-size: 11.5px;
+          color: #6b7280;
+          margin: 0;
+          line-height: 1.35;
+          font-variant-numeric: lining-nums tabular-nums;
+          font-feature-settings: "lnum" 1, "tnum" 1;
+        }
+
+        .cart-voucher-foot {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-top: 6px;
+          padding-top: 2px;
+          font-family: var(--font-sans, sans-serif) !important;
+          font-variant-numeric: lining-nums tabular-nums;
+          font-feature-settings: "lnum" 1, "tnum" 1;
+        }
+
+        .voucher-item-exp {
+          font-size: 11px;
+          color: #6b7280;
+          line-height: 1.3;
+          font-family: var(--font-sans, sans-serif) !important;
+        }
+
+        .eligible-status-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 11.5px;
+          font-weight: 600;
+          color: #15803d;
+          line-height: 1.3;
+          font-family: var(--font-sans, sans-serif) !important;
+        }
+
+        .ineligible-status-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 11.5px;
+          font-weight: 600;
+          color: #d97706;
+          line-height: 1.3;
+          font-family: var(--font-sans, sans-serif) !important;
+        }
+
+        .cart-voucher-action {
+          padding: 12px 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-left: 1px dashed #e5e7eb;
+          flex-shrink: 0;
+        }
+
+        .btn-voucher-action {
+          height: 36px;
+          padding: 0 18px;
+          border-radius: 4px;
+          font-family: var(--font-sans, sans-serif) !important;
+          font-size: 12px;
+          font-weight: 700;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          line-height: 1;
+          letter-spacing: 0.3px;
+          cursor: pointer;
+          transition: all 0.15s;
+          white-space: nowrap;
+        }
+
+        .btn-voucher-action.apply {
+          background: #111827;
+          color: #ffffff;
+          border: 1px solid #111827;
+        }
+
+        .btn-voucher-action.apply:hover:not(:disabled) {
+          background: #000000;
+        }
+
+        .btn-voucher-action.apply:disabled {
+          background: #e5e7eb;
+          color: #9ca3af;
+          border-color: #e5e7eb;
+          cursor: not-allowed;
+        }
+
+        .btn-voucher-action.applied {
+          background: #ffffff;
+          color: #dc2626;
+          border: 1px solid #fca5a5;
+        }
+
+        .btn-voucher-action.applied:hover {
+          background: #fef2f2;
+        }
+
+        .cart-modal-footer {
+          padding: 14px 24px;
+          border-top: 1px solid #f3f4f6;
+          display: flex;
+          justify-content: flex-end;
+          background: #fafafa;
+        }
+
+        .btn-modal-done {
+          padding: 8px 20px;
+          background: #111827;
+          color: #ffffff;
+          font-size: 12px;
+          font-weight: 700;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+
+        .btn-modal-done:hover {
+          background: #000000;
         }
 
         /* Responsive */

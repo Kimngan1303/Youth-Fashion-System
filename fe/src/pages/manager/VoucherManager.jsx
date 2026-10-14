@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import ManagerSidebar from '../../components/ManagerSidebar';
 import ManagerHeader from '../../components/ManagerHeader';
 import { useToast } from '../../context/ToastContext';
+import { voucherService } from '../../services/voucherService';
 import { 
   Tag, 
   Clock, 
@@ -22,186 +23,15 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-// Initial vouchers list precisely matching the design
-const INITIAL_VOUCHERS = [
-  {
-    id: 'v1',
-    code: 'YF - WINTER25',
-    name: 'Giảm 20% BST Thu Đông 2025',
-    badgeType: 'dark',
-    badgeTop: '20%',
-    badgeBottom: 'OFF',
-    discountType: 'percent',
-    discountDisplay: 'Giảm 20%',
-    discountSub: 'Tối đa 500.000₫',
-    conditionDisplay: 'Đơn từ 1.500.000₫',
-    conditionSub: 'Áp dụng Ready-To-Wear',
-    usedCount: 342,
-    totalLimit: 500,
-    progressPercent: (342 / 500) * 100,
-    progressColor: '#111111',
-    validityDisplay: '15/10/2025 - 15/11/2025',
-    statusText: 'Còn 24 ngày',
-    statusColor: '#059669', // green
-    statusTab: 'active', // Đang diễn ra
-  },
-  {
-    id: 'v2',
-    code: 'YF - WELCOME10',
-    name: 'Ưu Đãi Hội Viên Mới Đăng Ký',
-    badgeType: 'light',
-    badgeTop: '10%',
-    badgeBottom: 'NEW',
-    discountType: 'percent',
-    discountDisplay: 'Giảm 10%',
-    discountSub: 'Đơn hàng đầu tiên',
-    conditionDisplay: 'Không giới hạn',
-    conditionSub: 'Tài khoản mới',
-    usedCount: 520,
-    totalLimit: 1000,
-    progressPercent: (520 / 1000) * 100,
-    progressColor: '#111111',
-    validityDisplay: 'Không thời hạn',
-    statusText: 'Tự động kích hoạt',
-    statusColor: '#78716C', // gray
-    statusTab: 'active',
-  },
-  {
-    id: 'v3',
-    code: 'VIP - GOLD30',
-    name: 'Tri Ân Khách Hàng Thân Thiết VIP Gold',
-    badgeType: 'gold',
-    badgeTop: 'VIP',
-    badgeBottom: 'GOLD',
-    discountType: 'fixed',
-    discountDisplay: 'Giảm 300.000₫',
-    discountSub: 'Trừ trực tiếp hóa đơn',
-    conditionDisplay: 'Hạng Gold & Platinum',
-    conditionSub: 'Áp dụng toàn bộ kho',
-    usedCount: 88,
-    totalLimit: 100,
-    progressPercent: 88,
-    progressColor: '#F59E0B',
-    validityDisplay: '01/10/2025 - 31/10/2025',
-    statusText: 'Còn 9 ngày',
-    statusColor: '#D97706', // amber
-    statusTab: 'active',
-  },
-  {
-    id: 'v4',
-    code: 'FREESHIP - OCT',
-    name: 'Miễn Phí Giao Hàng Toàn Quốc Tháng 10',
-    badgeType: 'blue',
-    badgeIcon: 'truck',
-    badgeBottom: 'FREE',
-    discountType: 'shipping',
-    discountDisplay: 'Miễn Phí Vận Chuyển',
-    discountSub: 'Tối đa 40.000₫',
-    conditionDisplay: 'Đơn từ 800.000₫',
-    conditionSub: 'Tất cả tỉnh thành',
-    usedCount: 890,
-    totalLimit: 1000,
-    progressPercent: 89,
-    progressColor: '#111111',
-    validityDisplay: '01/10/2025 - 31/10/2025',
-    statusText: 'Còn 9 ngày',
-    statusColor: '#059669', // green
-    statusTab: 'active',
-  },
-  {
-    id: 'v5',
-    code: 'BLACKFRIDAY - PRE',
-    name: 'Siêu Tiệc Black Friday Sớm Cho Khách V...',
-    badgeType: 'purple',
-    badgeTop: '35%',
-    badgeBottom: 'BF-PRE',
-    discountType: 'percent',
-    discountDisplay: 'Giảm 35%',
-    discountSub: 'Toàn bộ kho hàng',
-    conditionDisplay: 'Đơn từ 2.000.000₫',
-    conditionSub: 'Tối đa 1.000.000₫',
-    usedCount: 0,
-    totalLimit: 200,
-    progressPercent: 0,
-    progressColor: '#E5E7EB',
-    validityDisplay: 'Bắt đầu: 25/11/2025',
-    statusText: 'Sắp mở trong 33 ngày',
-    statusColor: '#9333EA', // purple
-    statusTab: 'upcoming', // Sắp diễn ra
-  },
-  {
-    id: 'v6',
-    code: 'YF - FLASH50',
-    name: 'Flash Sale Giờ Vàng Đêm Hội Hoàng Gia...',
-    badgeType: 'red',
-    badgeTop: '150k',
-    badgeBottom: 'FLASH',
-    discountType: 'fixed',
-    discountDisplay: 'Giảm 150.000₫',
-    discountSub: 'Trực tiếp theo bill',
-    conditionDisplay: 'Đơn từ 999.000₫',
-    conditionSub: 'Khung giờ 20h - 24h',
-    usedCount: 300,
-    totalLimit: 300,
-    progressPercent: 100,
-    progressColor: '#EF4444',
-    validityDisplay: '20/10/2025 (1 Ngày)',
-    statusText: 'Đã hết hạn',
-    statusColor: '#9CA3AF', // muted gray
-    statusTab: 'expired', // Đã kết thúc
-  },
-  // Additional vouchers for full realistic pagination
-  {
-    id: 'v7',
-    code: 'YF - SUMMEREND',
-    name: 'Xả Kho BST Mùa Hè 2025',
-    badgeType: 'dark',
-    badgeTop: '50%',
-    badgeBottom: 'SALE',
-    discountType: 'percent',
-    discountDisplay: 'Giảm 50%',
-    discountSub: 'Tối đa 300.000₫',
-    conditionDisplay: 'Đơn từ 600.000₫',
-    conditionSub: 'Sản phẩm Outlet',
-    usedCount: 450,
-    totalLimit: 500,
-    progressPercent: 90,
-    progressColor: '#111111',
-    validityDisplay: '01/09/2025 - 30/09/2025',
-    statusText: 'Đã hết hạn',
-    statusColor: '#9CA3AF',
-    statusTab: 'expired',
-  },
-  {
-    id: 'v8',
-    code: 'VIP - PLATINUM50',
-    name: 'Đặc Quyền Hội Viên Platinum Sang Trọng',
-    badgeType: 'gold',
-    badgeTop: 'VIP',
-    badgeBottom: 'PLAT',
-    discountType: 'fixed',
-    discountDisplay: 'Giảm 500.000₫',
-    discountSub: 'Áp dụng trên mọi hóa đơn',
-    conditionDisplay: 'Hạng Platinum',
-    conditionSub: 'Không giới hạn giá trị đơn',
-    usedCount: 24,
-    totalLimit: 50,
-    progressPercent: 48,
-    progressColor: '#F59E0B',
-    validityDisplay: '01/10/2025 - 31/12/2025',
-    statusText: 'Còn 70 ngày',
-    statusColor: '#059669',
-    statusTab: 'active',
-  }
-];
+
 
 // Sample voucher usage log
 const MOCK_HISTORY = [
-  { id: 'LOG-01', code: 'YOUTH-WELCOME20', customer: 'Lê Hoàng Long', orderId: '#DH-9821', discount: '200.000₫', time: '10 phút trước', status: 'Áp dụng thành công' },
-  { id: 'LOG-02', code: 'VIP - GOLD30', customer: 'Đặng Thu Thảo', orderId: '#DH-9820', discount: '300.000₫', time: '45 phút trước', status: 'Áp dụng thành công' },
-  { id: 'LOG-03', code: 'FREESHIP - OCT', customer: 'Trần Minh Châu', orderId: '#DH-9818', discount: '40.000₫', time: '2 giờ trước', status: 'Áp dụng thành công' },
-  { id: 'LOG-04', code: 'YF - WINTER25', customer: 'Nguyễn Văn Hùng', orderId: '#DH-9815', discount: '360.000₫', time: '3 giờ trước', status: 'Áp dụng thành công' },
-  { id: 'LOG-05', code: 'YF - FLASH50', customer: 'Phạm Thu Trang', orderId: '#DH-9809', discount: '150.000₫', time: '5 giờ trước', status: 'Áp dụng thành công' },
+  { id: 'LOG-01', code: 'ATELIER-500K', customer: 'Lê Hoàng Long', orderId: '#DH-9821', discount: '500.000₫', time: '10 phút trước', status: 'Áp dụng thành công' },
+  { id: 'LOG-02', code: 'YOUTH-VIP10', customer: 'Đặng Thu Thảo', orderId: '#DH-9820', discount: '10%', time: '45 phút trước', status: 'Áp dụng thành công' },
+  { id: 'LOG-03', code: 'FREESHIP-PREMIUM', customer: 'Trần Minh Châu', orderId: '#DH-9818', discount: 'Miễn phí', time: '2 giờ trước', status: 'Áp dụng thành công' },
+  { id: 'LOG-04', code: 'BDAY-2026', customer: 'Nguyễn Văn Hùng', orderId: '#DH-9815', discount: '1.000.000₫', time: '3 giờ trước', status: 'Áp dụng thành công' },
+  { id: 'LOG-05', code: 'ATELIER-500K', customer: 'Phạm Thu Trang', orderId: '#DH-9809', discount: '500.000₫', time: '5 giờ trước', status: 'Áp dụng thành công' },
 ];
 
 const voucherPageStyles = `
@@ -933,6 +763,49 @@ const voucherPageStyles = `
     box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.08);
   }
 
+  .date-picker-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+  }
+
+  .form-date-input {
+    cursor: pointer;
+    padding-right: 38px !important;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1C1917;
+    background-color: #FFFFFF;
+    position: relative;
+  }
+
+  /* Make entire date box clickable to open native calendar picker */
+  .form-date-input::-webkit-calendar-picker-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .date-picker-icon {
+    position: absolute;
+    right: 12px;
+    color: #78716C;
+    pointer-events: none;
+    transition: color 0.15s;
+  }
+
+  .date-picker-input-wrapper:hover .date-picker-icon {
+    color: #111111;
+  }
+
   .modal-actions-footer {
     display: flex;
     justify-content: flex-end;
@@ -948,7 +821,16 @@ export default function VoucherManager() {
   const { showSuccess, showError, showInfo } = useToast();
 
   // State management
-  const [vouchers, setVouchers] = useState(INITIAL_VOUCHERS);
+  const [vouchers, setVouchers] = useState(() => voucherService.getVouchers());
+
+  // Lắng nghe thay đổi từ voucherService (khi tạo/xóa mã) và tải mới từ DB
+  useEffect(() => {
+    voucherService.fetchVouchers().catch(() => {});
+    const unsubscribe = voucherService.subscribe((updatedList) => {
+      setVouchers(updatedList);
+    });
+    return unsubscribe;
+  }, []);
   const [activeTab, setActiveTab] = useState('all'); // all, active, upcoming, expired
   const [searchQuery, setSearchQuery] = useState('');
   const [offerTypeFilter, setOfferTypeFilter] = useState('all'); // all, percent, fixed, shipping
@@ -963,6 +845,31 @@ export default function VoucherManager() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [activeVoucherDetail, setActiveVoucherDetail] = useState(null);
 
+  // Date helper functions for interactive calendar picker
+  const getTodayISO = () => {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const getFutureISO = (days = 30) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const formatDateVN = (dateStr) => {
+    if (!dateStr) return '';
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+    }
+    return dateStr;
+  };
+
   // New Voucher form state
   const [newVoucher, setNewVoucher] = useState({
     code: '',
@@ -972,8 +879,8 @@ export default function VoucherManager() {
     maxDiscount: '',
     minOrder: '',
     totalLimit: 500,
-    startDate: '',
-    endDate: '',
+    startDate: getTodayISO(),
+    endDate: getFutureISO(30),
     categoryLimit: 'Ready-To-Wear',
   });
 
@@ -1036,19 +943,24 @@ export default function VoucherManager() {
   };
 
   // Bulk delete selected vouchers
-  const handleDeleteSelected = () => {
+  // Bulk delete selected vouchers
+  const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) {
       showInfo('Chưa chọn mã voucher nào để xóa.');
       return;
     }
     const count = selectedIds.size;
-    setVouchers(prev => prev.filter(v => !selectedIds.has(v.id)));
-    setSelectedIds(new Set());
-    showSuccess(`Đã xóa thành công ${count} mã voucher đã chọn!`);
+    try {
+      await voucherService.bulkDeleteVouchers(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      showSuccess(`Đã xóa thành công ${count} mã voucher đã chọn!`);
+    } catch (err) {
+      showError(err.response?.data?.message || err.message || 'Lỗi khi xóa voucher khỏi CSDL');
+    }
   };
 
   // Handle create new voucher
-  const handleCreateSubmit = (e) => {
+  const handleCreateSubmit = async (e) => {
     e.preventDefault();
     if (!newVoucher.code.trim()) {
       showError('Vui lòng nhập mã voucher!');
@@ -1059,43 +971,69 @@ export default function VoucherManager() {
       return;
     }
 
+    const discountValNum = Number(String(newVoucher.discountValue).replace(/\D/g, '')) || 0;
+    const minOrderNum = Number(String(newVoucher.minOrder).replace(/\D/g, '')) || 0;
+    const maxDiscountNum = Number(String(newVoucher.maxDiscount).replace(/\D/g, '')) || 0;
+
     const createdItem = {
-      id: `v_${Date.now()}`,
       code: newVoucher.code.toUpperCase().trim(),
       name: newVoucher.name.trim(),
       badgeType: newVoucher.discountType === 'percent' ? 'dark' : newVoucher.discountType === 'fixed' ? 'gold' : 'blue',
-      badgeTop: newVoucher.discountType === 'percent' ? `${newVoucher.discountValue || 15}%` : 'HOT',
+      badgeTop: newVoucher.discountType === 'percent' 
+        ? `${discountValNum || 15}%` 
+        : (discountValNum >= 1000 ? `${Math.round(discountValNum / 1000)}K` : 'HOT'),
       badgeBottom: newVoucher.discountType === 'shipping' ? 'FREE' : 'SALE',
+      badgeLine1: newVoucher.discountType === 'percent' 
+        ? `${discountValNum || 15}%` 
+        : (discountValNum >= 1000 ? `${Math.round(discountValNum / 1000)}K` : 'ƯU ĐÃI'),
+      badgeLine2: newVoucher.discountType === 'shipping' ? 'FREE' : 'HOT',
       discountType: newVoucher.discountType,
-      discountDisplay: newVoucher.discountType === 'percent' ? `Giảm ${newVoucher.discountValue || 15}%` : `Giảm ${newVoucher.discountValue || '200.000'}₫`,
-      discountSub: newVoucher.maxDiscount ? `Tối đa ${newVoucher.maxDiscount}₫` : 'Trừ trực tiếp',
-      conditionDisplay: newVoucher.minOrder ? `Đơn từ ${newVoucher.minOrder}₫` : 'Không giới hạn',
+      discountPercent: newVoucher.discountType === 'percent' ? (discountValNum || 15) : 0,
+      discountAmount: newVoucher.discountType === 'fixed' 
+        ? (discountValNum || 200000) 
+        : (newVoucher.discountType === 'shipping' ? 50000 : 0),
+      discountDisplay: newVoucher.discountType === 'percent' 
+        ? `Giảm ${discountValNum || 15}%` 
+        : `Giảm ${(discountValNum || 200000).toLocaleString('vi-VN')}₫`,
+      discountSub: maxDiscountNum ? `Tối đa ${maxDiscountNum.toLocaleString('vi-VN')}₫` : 'Trừ trực tiếp',
+      conditionDisplay: minOrderNum ? `Đơn từ ${minOrderNum.toLocaleString('vi-VN')}₫` : 'Không giới hạn',
       conditionSub: newVoucher.categoryLimit || 'Áp dụng toàn bộ kho',
+      minOrder: minOrderNum,
+      maxDiscount: maxDiscountNum,
       usedCount: 0,
       totalLimit: Number(newVoucher.totalLimit) || 500,
+      startDate: newVoucher.startDate || null,
+      endDate: newVoucher.endDate || null,
+      categoryLimit: newVoucher.categoryLimit || 'Ready-To-Wear',
       progressPercent: 0,
       progressColor: '#111111',
-      validityDisplay: newVoucher.startDate && newVoucher.endDate ? `${newVoucher.startDate} - ${newVoucher.endDate}` : '30 ngày kể từ kích hoạt',
+      validityDisplay: newVoucher.startDate && newVoucher.endDate 
+        ? `${formatDateVN(newVoucher.startDate)} - ${formatDateVN(newVoucher.endDate)}` 
+        : (newVoucher.endDate ? `Hạn dùng: ${formatDateVN(newVoucher.endDate)}` : '30 ngày kể từ kích hoạt'),
       statusText: 'Đang áp dụng',
       statusColor: '#059669',
       statusTab: 'active',
     };
 
-    setVouchers([createdItem, ...vouchers]);
-    setIsCreateOpen(false);
-    setNewVoucher({
-      code: '',
-      name: '',
-      discountType: 'percent',
-      discountValue: '',
-      maxDiscount: '',
-      minOrder: '',
-      totalLimit: 500,
-      startDate: '',
-      endDate: '',
-      categoryLimit: 'Ready-To-Wear',
-    });
-    showSuccess(`Đã tạo và kích hoạt mã voucher "${createdItem.code}" thành công!`);
+    try {
+      await voucherService.createVoucher(createdItem);
+      setIsCreateOpen(false);
+      setNewVoucher({
+        code: '',
+        name: '',
+        discountType: 'percent',
+        discountValue: '',
+        maxDiscount: '',
+        minOrder: '',
+        totalLimit: 500,
+        startDate: getTodayISO(),
+        endDate: getFutureISO(30),
+        categoryLimit: 'Ready-To-Wear',
+      });
+      showSuccess(`Đã tạo và lưu mã voucher "${createdItem.code}" vào CSDL thành công!`);
+    } catch (err) {
+      showError(err.response?.data?.message || err.message || 'Lỗi khi lưu voucher vào database');
+    }
   };
 
   // Open voucher detail modal
@@ -1164,19 +1102,19 @@ export default function VoucherManager() {
               </div>
 
               <div className="kpi-value-row">
-                <span className="kpi-number-big">18</span>
+                <span className="kpi-number-big">0{vouchers.length}</span>
                 <span className="kpi-unit-label">Mã</span>
               </div>
 
               <div>
                 <div className="kpi-sub-row">
-                  <span style={{ color: '#111111', fontWeight: 500 }}>Đang áp dụng: 14</span>
-                  <span style={{ color: '#78716C' }}>Dự kiến: 04</span>
+                  <span style={{ color: '#111111', fontWeight: 500 }}>Đang áp dụng: 0{vouchers.filter(v => v.statusTab === 'active').length}</span>
+                  <span style={{ color: '#78716C' }}>Dự kiến: 0{vouchers.filter(v => v.statusTab === 'upcoming').length}</span>
                 </div>
                 <div className="kpi-progress-bar-track">
                   <div 
                     className="kpi-progress-bar-fill" 
-                    style={{ width: `${(14 / 18) * 100}%`, background: '#111111' }}
+                    style={{ width: `${(vouchers.filter(v => v.statusTab === 'active').length / Math.max(1, vouchers.length)) * 100}%`, background: '#111111' }}
                   />
                 </div>
               </div>
@@ -1218,7 +1156,7 @@ export default function VoucherManager() {
               </div>
 
               <div className="kpi-value-row">
-                <span className="kpi-number-big">1.240</span>
+                <span className="kpi-number-big">{vouchers.reduce((sum, v) => sum + (v.usedCount || 0), 0).toLocaleString('vi-VN')}</span>
                 <span className="kpi-unit-label">Lượt</span>
               </div>
 
@@ -1246,13 +1184,13 @@ export default function VoucherManager() {
               </div>
 
               <div className="kpi-value-row">
-                <span className="kpi-code-big">YOUTH-WELCOME20</span>
+                <span className="kpi-code-big">ATELIER-500K</span>
               </div>
 
               <div>
                 <div className="kpi-sub-row">
-                  <span style={{ color: '#111111', fontWeight: 500 }}>412 lượt dùng</span>
-                  <strong style={{ color: '#111111', fontWeight: 600 }}>218.000.000₫</strong>
+                  <span style={{ color: '#111111', fontWeight: 500 }}>88 lượt dùng</span>
+                  <strong style={{ color: '#111111', fontWeight: 600 }}>440.000.000₫</strong>
                 </div>
                 <div className="kpi-progress-bar-track" style={{ background: '#E0F2FE' }}>
                   <div 
@@ -1513,20 +1451,20 @@ export default function VoucherManager() {
             {/* Table Footer Pagination */}
             <div className="table-pagination-footer">
               <span className="pagination-info-text">
-                Hiển thị 1 - {paginatedVouchers.length} trong tổng số <strong>18</strong> voucher
+                Hiển thị {totalItems > 0 ? (currentPage - 1) * pageSize + 1 : 0} - {Math.min(currentPage * pageSize, totalItems)} trong tổng số <strong>{totalItems}</strong> voucher
               </span>
 
               <div className="pagination-buttons-group">
                 <button 
                   type="button" 
                   className="btn-page-nav"
-                  disabled={currentPage === 1}
+                  disabled={currentPage <= 1}
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 >
                   &lt; Trang trước
                 </button>
 
-                {[1, 2, 3].map((page) => (
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                   <button
                     key={page}
                     type="button"
@@ -1540,8 +1478,8 @@ export default function VoucherManager() {
                 <button 
                   type="button" 
                   className="btn-page-nav"
-                  disabled={currentPage >= 3}
-                  onClick={() => setCurrentPage(prev => Math.min(3, prev + 1))}
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 >
                   Trang sau &gt;
                 </button>
@@ -1654,24 +1592,30 @@ export default function VoucherManager() {
                 <div className="form-row-2col">
                   <div className="form-group-item">
                     <label className="form-label-txt">Ngày Bắt Đầu</label>
-                    <input 
-                      type="text" 
-                      className="form-input-ctrl"
-                      placeholder="15/10/2025"
-                      value={newVoucher.startDate}
-                      onChange={(e) => setNewVoucher({ ...newVoucher, startDate: e.target.value })}
-                    />
+                    <div className="date-picker-input-wrapper">
+                      <input 
+                        type="date" 
+                        className="form-input-ctrl form-date-input"
+                        value={newVoucher.startDate}
+                        onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                        onChange={(e) => setNewVoucher({ ...newVoucher, startDate: e.target.value })}
+                      />
+                      <Calendar size={16} className="date-picker-icon" />
+                    </div>
                   </div>
 
                   <div className="form-group-item">
                     <label className="form-label-txt">Ngày Kết Thúc</label>
-                    <input 
-                      type="text" 
-                      className="form-input-ctrl"
-                      placeholder="15/11/2025"
-                      value={newVoucher.endDate}
-                      onChange={(e) => setNewVoucher({ ...newVoucher, endDate: e.target.value })}
-                    />
+                    <div className="date-picker-input-wrapper">
+                      <input 
+                        type="date" 
+                        className="form-input-ctrl form-date-input"
+                        value={newVoucher.endDate}
+                        onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                        onChange={(e) => setNewVoucher({ ...newVoucher, endDate: e.target.value })}
+                      />
+                      <Calendar size={16} className="date-picker-icon" />
+                    </div>
                   </div>
                 </div>
               </div>
