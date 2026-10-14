@@ -498,6 +498,7 @@ const ProfilePage = () => {
   const [vouchersList, setVouchersList] = useState(() => voucherService.getCustomerVouchers());
 
   useEffect(() => {
+    voucherService.fetchVouchers().catch(() => {});
     const unsubscribe = voucherService.subscribe(() => {
       setVouchersList(voucherService.getCustomerVouchers());
     });

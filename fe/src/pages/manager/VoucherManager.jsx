@@ -823,8 +823,9 @@ export default function VoucherManager() {
   // State management
   const [vouchers, setVouchers] = useState(() => voucherService.getVouchers());
 
-  // Lắng nghe thay đổi từ voucherService (khi tạo/xóa mã)
+  // Lắng nghe thay đổi từ voucherService (khi tạo/xóa mã) và tải mới từ DB
   useEffect(() => {
+    voucherService.fetchVouchers().catch(() => {});
     const unsubscribe = voucherService.subscribe((updatedList) => {
       setVouchers(updatedList);
     });
@@ -942,19 +943,24 @@ export default function VoucherManager() {
   };
 
   // Bulk delete selected vouchers
-  const handleDeleteSelected = () => {
+  // Bulk delete selected vouchers
+  const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) {
       showInfo('Chưa chọn mã voucher nào để xóa.');
       return;
     }
     const count = selectedIds.size;
-    voucherService.bulkDeleteVouchers(Array.from(selectedIds));
-    setSelectedIds(new Set());
-    showSuccess(`Đã xóa thành công ${count} mã voucher đã chọn!`);
+    try {
+      await voucherService.bulkDeleteVouchers(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      showSuccess(`Đã xóa thành công ${count} mã voucher đã chọn!`);
+    } catch (err) {
+      showError(err.response?.data?.message || err.message || 'Lỗi khi xóa voucher khỏi CSDL');
+    }
   };
 
   // Handle create new voucher
-  const handleCreateSubmit = (e) => {
+  const handleCreateSubmit = async (e) => {
     e.preventDefault();
     if (!newVoucher.code.trim()) {
       showError('Vui lòng nhập mã voucher!');
@@ -970,7 +976,6 @@ export default function VoucherManager() {
     const maxDiscountNum = Number(String(newVoucher.maxDiscount).replace(/\D/g, '')) || 0;
 
     const createdItem = {
-      id: `v_${Date.now()}`,
       code: newVoucher.code.toUpperCase().trim(),
       name: newVoucher.name.trim(),
       badgeType: newVoucher.discountType === 'percent' ? 'dark' : newVoucher.discountType === 'fixed' ? 'gold' : 'blue',
@@ -997,6 +1002,9 @@ export default function VoucherManager() {
       maxDiscount: maxDiscountNum,
       usedCount: 0,
       totalLimit: Number(newVoucher.totalLimit) || 500,
+      startDate: newVoucher.startDate || null,
+      endDate: newVoucher.endDate || null,
+      categoryLimit: newVoucher.categoryLimit || 'Ready-To-Wear',
       progressPercent: 0,
       progressColor: '#111111',
       validityDisplay: newVoucher.startDate && newVoucher.endDate 
@@ -1007,21 +1015,25 @@ export default function VoucherManager() {
       statusTab: 'active',
     };
 
-    voucherService.createVoucher(createdItem);
-    setIsCreateOpen(false);
-    setNewVoucher({
-      code: '',
-      name: '',
-      discountType: 'percent',
-      discountValue: '',
-      maxDiscount: '',
-      minOrder: '',
-      totalLimit: 500,
-      startDate: getTodayISO(),
-      endDate: getFutureISO(30),
-      categoryLimit: 'Ready-To-Wear',
-    });
-    showSuccess(`Đã tạo và kích hoạt mã voucher "${createdItem.code}" thành công!`);
+    try {
+      await voucherService.createVoucher(createdItem);
+      setIsCreateOpen(false);
+      setNewVoucher({
+        code: '',
+        name: '',
+        discountType: 'percent',
+        discountValue: '',
+        maxDiscount: '',
+        minOrder: '',
+        totalLimit: 500,
+        startDate: getTodayISO(),
+        endDate: getFutureISO(30),
+        categoryLimit: 'Ready-To-Wear',
+      });
+      showSuccess(`Đã tạo và lưu mã voucher "${createdItem.code}" vào CSDL thành công!`);
+    } catch (err) {
+      showError(err.response?.data?.message || err.message || 'Lỗi khi lưu voucher vào database');
+    }
   };
 
   // Open voucher detail modal
