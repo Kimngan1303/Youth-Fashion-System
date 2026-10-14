@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
-import { productService } from '../../services/productService';
-import { useToast } from '../../context/ToastContext';
-import ManagerSidebar from '../../components/ManagerSidebar';
-import ManagerHeader from '../../components/ManagerHeader';
+import React, { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../../hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { productService } from "../../services/productService";
+import { useToast } from "../../context/ToastContext";
+import ManagerSidebar from "../../components/ManagerSidebar";
+import ManagerHeader from "../../components/ManagerHeader";
 import {
   LayoutGrid,
   Package,
@@ -24,8 +24,8 @@ import {
   Upload,
   X,
   Loader2,
-  AlertCircle
-} from 'lucide-react';
+  AlertCircle,
+} from "lucide-react";
 
 const productManagerStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,400&display=swap');
@@ -956,7 +956,11 @@ export default function ProductManager() {
     const pagesWithDots = [];
 
     for (let i = 1; i <= totalPages; i++) {
-      if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
+      if (
+        i === 1 ||
+        i === totalPages ||
+        (i >= currentPage - delta && i <= currentPage + delta)
+      ) {
         range.push(i);
       }
     }
@@ -967,7 +971,7 @@ export default function ProductManager() {
         if (i - prevPage === 2) {
           pagesWithDots.push(prevPage + 1);
         } else if (i - prevPage !== 1) {
-          pagesWithDots.push('...');
+          pagesWithDots.push("...");
         }
       }
       pagesWithDots.push(i);
@@ -985,9 +989,14 @@ export default function ProductManager() {
   const [errorMsg, setErrorMsg] = useState(null);
 
   // Filter & Search & Pagination (5 sản phẩm 1 trang)
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [pagination, setPagination] = useState({ page: 1, limit: 5, total: 0, totalPages: 1 });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 5,
+    total: 0,
+    totalPages: 1,
+  });
 
   // Drawer modal state for Create / Edit / View
   const [drawerMode, setDrawerMode] = useState(null); // 'create' | 'edit' | 'view'
@@ -995,11 +1004,11 @@ export default function ProductManager() {
 
   // Form State cho Create/Edit Product
   const [formData, setFormData] = useState({
-    product_name: '',
-    description: '',
-    category_id: '',
-    brand_id: '',
-    status: 'ACTIVE',
+    product_name: "",
+    description: "",
+    category_id: "",
+    brand_id: "",
+    status: "ACTIVE",
   });
   const [variantsData, setVariantsData] = useState([]);
 
@@ -1031,14 +1040,16 @@ export default function ProductManager() {
     setDeletingImage(true);
     try {
       await productService.deleteProductImage(deleteImageId);
-      const updatedImgs = existingImages.filter((img) => String(img.image_id) !== String(deleteImageId));
+      const updatedImgs = existingImages.filter(
+        (img) => String(img.image_id) !== String(deleteImageId),
+      );
       setExistingImages(updatedImgs);
       fetchProducts();
       setDeleteImageId(null);
-      showSuccess('Đã xóa ảnh thành công');
+      showSuccess("Đã xóa ảnh thành công");
     } catch (err) {
-      console.error('Lỗi khi xóa ảnh:', err);
-      showError(err.response?.data?.message || 'Không thể xóa ảnh');
+      console.error("Lỗi khi xóa ảnh:", err);
+      showError(err.response?.data?.message || "Không thể xóa ảnh");
     } finally {
       setDeletingImage(false);
     }
@@ -1063,8 +1074,11 @@ export default function ProductManager() {
         }
       }
     } catch (err) {
-      console.error('Lỗi lấy danh sách sản phẩm:', err);
-      setErrorMsg(err.response?.data?.message || 'Không thể tải danh sách sản phẩm từ CSDL MySQL');
+      console.error("Lỗi lấy danh sách sản phẩm:", err);
+      setErrorMsg(
+        err.response?.data?.message ||
+          "Không thể tải danh sách sản phẩm từ CSDL MySQL",
+      );
     } finally {
       setLoading(false);
     }
@@ -1078,7 +1092,7 @@ export default function ProductManager() {
         setBrands(res.data.brands || []);
       }
     } catch (err) {
-      console.error('Lỗi lấy danh mục/thương hiệu:', err);
+      console.error("Lỗi lấy danh mục/thương hiệu:", err);
     }
   };
 
@@ -1092,35 +1106,47 @@ export default function ProductManager() {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   // Mở Drawer Tạo mới
   const handleOpenCreateDrawer = () => {
     setFormData({
-      product_name: '',
-      description: '',
-      category_id: categories.length > 0 ? categories[0].category_id : '',
-      brand_id: brands.length > 0 ? brands[0].brand_id : '',
-      status: 'ACTIVE',
+      product_name: "",
+      description: "",
+      category_id: categories.length > 0 ? categories[0].category_id : "",
+      brand_id: brands.length > 0 ? brands[0].brand_id : "",
+      status: "ACTIVE",
     });
     setVariantsData([
-      { sku: `YOUTH-${Date.now().toString().slice(-4)}-S`, size: 'S', color: 'Đen', price: 250000, stock: 50 },
-      { sku: `YOUTH-${Date.now().toString().slice(-4)}-M`, size: 'M', color: 'Trắng', price: 250000, stock: 50 },
+      {
+        sku: `YOUTH-${Date.now().toString().slice(-4)}-S`,
+        size: "S",
+        color: "Đen",
+        price: 250000,
+        stock: 50,
+      },
+      {
+        sku: `YOUTH-${Date.now().toString().slice(-4)}-M`,
+        size: "M",
+        color: "Trắng",
+        price: 250000,
+        stock: 50,
+      },
     ]);
     setSelectedFiles([]);
     setImagePreviews([]);
     setExistingImages([]);
     setCurrentProduct(null);
-    setDrawerMode('create');
+    setDrawerMode("create");
   };
 
   // Mở Drawer Chỉnh sửa / Xem chi tiết
-  const handleOpenEditDrawer = (product, mode = 'edit') => {
+  const handleOpenEditDrawer = (product, mode = "edit") => {
     setCurrentProduct(product);
     setFormData({
       product_name: product.product_name,
-      description: product.description || '',
+      description: product.description || "",
       category_id: String(product.category_id),
       brand_id: String(product.brand_id),
       status: product.status,
@@ -1133,12 +1159,38 @@ export default function ProductManager() {
         color: v.color,
         price: v.price,
         stock: v.stock,
-      }))
+      })),
     );
     setExistingImages(product.images || []);
     setSelectedFiles([]);
     setImagePreviews([]);
     setDrawerMode(mode);
+  };
+
+  //Mở Drawer Chi Tiết & Chỉnh Sửa Sản Phẩm
+  const handleOpenProductDrawer = (product) => {
+    setCurrentProduct(product);
+    setFormData({
+      product_name: product.product_name,
+      description: product.description || "",
+      category_id: String(product.category_id),
+      brand_id: String(product.brand_id),
+      status: product.status,
+    });
+    setVariantsData(
+      product.variants.map((v) => ({
+        variant_id: v.variant_id,
+        sku: v.sku,
+        size: v.size,
+        color: v.color,
+        price: v.price,
+        stock: v.stock,
+      })),
+    );
+    setExistingImages(product.images || []);
+    setSelectedFiles([]);
+    setImagePreviews([]);
+    setDrawerMode("edit"); // Mở Drawer ở chế độ có thể chỉnh sửa và xem chi tiết ngay
   };
 
   // Xử lý chọn NHIỀU file ảnh từ máy tính
@@ -1165,7 +1217,10 @@ export default function ProductManager() {
   const handleSetPrimaryImage = async (imageId) => {
     if (!currentProduct) return;
     try {
-      await productService.setPrimaryProductImage(currentProduct.product_id, imageId);
+      await productService.setPrimaryProductImage(
+        currentProduct.product_id,
+        imageId,
+      );
       // Cập nhật state local ngay lập tức
       const updatedImgs = existingImages.map((img) => ({
         ...img,
@@ -1173,9 +1228,9 @@ export default function ProductManager() {
       }));
       setExistingImages(updatedImgs);
       fetchProducts(); // Cập nhật lại sản phẩm trên bảng
-      showSuccess('Đã đặt làm ảnh chính');
+      showSuccess("Đã đặt làm ảnh chính");
     } catch (err) {
-      showError(err.response?.data?.message || 'Không thể đặt làm ảnh chính');
+      showError(err.response?.data?.message || "Không thể đặt làm ảnh chính");
     }
   };
 
@@ -1193,13 +1248,21 @@ export default function ProductManager() {
     try {
       for (const file of files) {
         const formDataUpload = new FormData();
-        formDataUpload.append('image', file);
-        formDataUpload.append('is_primary', existingImages.length === 0 ? 'true' : 'false');
-        await productService.addProductImage(currentProduct.product_id, formDataUpload);
+        formDataUpload.append("image", file);
+        formDataUpload.append(
+          "is_primary",
+          existingImages.length === 0 ? "true" : "false",
+        );
+        await productService.addProductImage(
+          currentProduct.product_id,
+          formDataUpload,
+        );
       }
 
       // Tải lại chi tiết sản phẩm để nhận các ảnh vừa upload từ Cloudinary
-      const res = await productService.getProductById(currentProduct.product_id);
+      const res = await productService.getProductById(
+        currentProduct.product_id,
+      );
       if (res.status && res.data) {
         setExistingImages(res.data.images || []);
         setCurrentProduct(res.data);
@@ -1207,7 +1270,9 @@ export default function ProductManager() {
       fetchProducts();
       showSuccess(`Đã tải lên ${files.length} ảnh mới thành công`);
     } catch (err) {
-      showError(err.response?.data?.message || 'Lỗi khi upload ảnh lên Cloudinary');
+      showError(
+        err.response?.data?.message || "Lỗi khi upload ảnh lên Cloudinary",
+      );
     } finally {
       setUploadingSingleImg(false);
     }
@@ -1217,7 +1282,13 @@ export default function ProductManager() {
   const handleAddVariantRow = () => {
     setVariantsData([
       ...variantsData,
-      { sku: `SKU-${Date.now().toString().slice(-4)}`, size: 'L', color: 'Đen', price: 290000, stock: 20 },
+      {
+        sku: `SKU-${Date.now().toString().slice(-4)}`,
+        size: "L",
+        color: "Đen",
+        price: 290000,
+        stock: 20,
+      },
     ]);
   };
 
@@ -1237,34 +1308,38 @@ export default function ProductManager() {
     setSubmitting(true);
     try {
       const data = new FormData();
-      data.append('product_name', formData.product_name);
-      data.append('description', formData.description);
-      data.append('category_id', formData.category_id);
-      data.append('brand_id', formData.brand_id);
-      data.append('status', formData.status);
-      data.append('variants', JSON.stringify(variantsData));
+      data.append("product_name", formData.product_name);
+      data.append("description", formData.description);
+      data.append("category_id", formData.category_id);
+      data.append("brand_id", formData.brand_id);
+      data.append("status", formData.status);
+      data.append("variants", JSON.stringify(variantsData));
 
       // Append danh sách các file ảnh đính kèm
       for (let i = 0; i < selectedFiles.length; i++) {
-        data.append('images', selectedFiles[i]);
+        data.append("images", selectedFiles[i]);
       }
 
-      const isCreate = drawerMode === 'create';
+      const isCreate = drawerMode === "create";
       if (isCreate) {
         await productService.createProduct(data);
-      } else if (drawerMode === 'edit' && currentProduct) {
+      } else if (drawerMode === "edit" && currentProduct) {
         await productService.updateProduct(currentProduct.product_id, data);
       }
 
       setDrawerMode(null);
       fetchProducts();
-      showSuccess(isCreate ? 'Tạo mới sản phẩm thành công' : 'Đã lưu thay đổi sản phẩm thành công');
+      showSuccess(
+        isCreate
+          ? "Tạo mới sản phẩm thành công"
+          : "Đã lưu thay đổi sản phẩm thành công",
+      );
     } catch (err) {
-      console.error('Lỗi khi lưu sản phẩm:', err);
-      const detailedErrors = err.response?.data?.errors?.join(', ');
-      const errorMsg = detailedErrors 
-        ? `${err.response.data.message}: ${detailedErrors}` 
-        : (err.response?.data?.message || 'Có lỗi xảy ra khi lưu sản phẩm');
+      console.error("Lỗi khi lưu sản phẩm:", err);
+      const detailedErrors = err.response?.data?.errors?.join(", ");
+      const errorMsg = detailedErrors
+        ? `${err.response.data.message}: ${detailedErrors}`
+        : err.response?.data?.message || "Có lỗi xảy ra khi lưu sản phẩm";
       showError(errorMsg);
     } finally {
       setSubmitting(false);
@@ -1278,9 +1353,9 @@ export default function ProductManager() {
       await productService.deleteProduct(deleteProductItem.product_id);
       setDeleteProductItem(null);
       fetchProducts();
-      showSuccess('Đã xóa sản phẩm thành công');
+      showSuccess("Đã xóa sản phẩm thành công");
     } catch (err) {
-      showError(err.response?.data?.message || 'Không thể xóa sản phẩm');
+      showError(err.response?.data?.message || "Không thể xóa sản phẩm");
     }
   };
 
@@ -1290,7 +1365,10 @@ export default function ProductManager() {
   };
 
   const formatPrice = (amount) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(amount);
   };
 
   return (
@@ -1309,11 +1387,19 @@ export default function ProductManager() {
         <div className="dashboard-scroll-body">
           <div className="dashboard-header-row">
             <div>
-              <p className="dashboard-header-sub">YOUTHFASHION • QUẢN LÝ SẢN PHẨM & BỘ SƯU TẬP ẢNH</p>
-              <h1 className="dashboard-header-title">Quản Lý Sản Phẩm & Bộ Sưu Tập Ảnh</h1>
+              <p className="dashboard-header-sub">
+                YOUTHFASHION • QUẢN LÝ SẢN PHẨM & BỘ SƯU TẬP ẢNH
+              </p>
+              <h1 className="dashboard-header-title">
+                Quản Lý Sản Phẩm & Bộ Sưu Tập Ảnh
+              </h1>
             </div>
 
-            <button type="button" className="btn-add-product" onClick={handleOpenCreateDrawer}>
+            <button
+              type="button"
+              className="btn-add-product"
+              onClick={handleOpenCreateDrawer}
+            >
               <Plus size={16} />
               Thêm Sản Phẩm Mới
             </button>
@@ -1354,8 +1440,19 @@ export default function ProductManager() {
             <div className="table-filter-bar">
               <div className="filter-controls-row">
                 <div className="search-filter-input">
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#A8A29E">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  <svg
+                    width="14"
+                    height="14"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="#A8A29E"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
                   </svg>
                   <input
                     placeholder="Lọc theo tên..."
@@ -1367,7 +1464,7 @@ export default function ProductManager() {
                   />
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: "flex", gap: "8px" }}>
                   <select
                     className="filter-select"
                     value={selectedCategory}
@@ -1388,17 +1485,40 @@ export default function ProductManager() {
             </div>
 
             {loading ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#78716C' }}>
-                <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
-                <p style={{ marginTop: '8px', fontSize: '13px' }}>Đang kết nối CSDL MySQL và tải sản phẩm...</p>
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  color: "#78716C",
+                }}
+              >
+                <Loader2
+                  size={24}
+                  style={{ animation: "spin 1s linear infinite" }}
+                />
+                <p style={{ marginTop: "8px", fontSize: "13px" }}>
+                  Đang kết nối CSDL MySQL và tải sản phẩm...
+                </p>
               </div>
             ) : errorMsg ? (
-              <div style={{ padding: '30px', textAlign: 'center', color: '#DC2626' }}>
+              <div
+                style={{
+                  padding: "30px",
+                  textAlign: "center",
+                  color: "#DC2626",
+                }}
+              >
                 <AlertCircle size={24} />
-                <p style={{ marginTop: '8px', fontSize: '13px' }}>{errorMsg}</p>
+                <p style={{ marginTop: "8px", fontSize: "13px" }}>{errorMsg}</p>
               </div>
             ) : products.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#78716C' }}>
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  color: "#78716C",
+                }}
+              >
                 <p>Không tìm thấy sản phẩm nào trong MySQL.</p>
               </div>
             ) : (
@@ -1410,14 +1530,21 @@ export default function ProductManager() {
                       <th>DANH MỤC / BRAND</th>
                       <th>GIÁ BÁN</th>
                       <th>TỒN KHO & BIẾN THỂ</th>
-                      <th style={{ textAlign: 'center' }}>TRẠNG THÁI</th>
-                      <th style={{ textAlign: 'right', paddingRight: '24px' }}>THAO TÁC</th>
+                      <th style={{ textAlign: "center" }}>TRẠNG THÁI</th>
+                      <th style={{ textAlign: "right", paddingRight: "24px" }}>
+                        THAO TÁC
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {products.map((p) => {
-                      const primaryImg = p.images?.find((img) => img.is_primary) || p.images?.[0];
-                      const minPrice = p.variants?.length > 0 ? Math.min(...p.variants.map((v) => v.price)) : 0;
+                      const primaryImg =
+                        p.images?.find((img) => img.is_primary) ||
+                        p.images?.[0];
+                      const minPrice =
+                        p.variants?.length > 0
+                          ? Math.min(...p.variants.map((v) => v.price))
+                          : 0;
                       const totalStock = calculateStock(p.variants);
 
                       return (
@@ -1425,43 +1552,71 @@ export default function ProductManager() {
                           <td>
                             <div className="product-info-cell">
                               <img
-                                src={primaryImg?.image_url || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=150'}
+                                src={
+                                  primaryImg?.image_url ||
+                                  "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=150"
+                                }
                                 alt={p.product_name}
                                 className="product-thumb"
                               />
                               <div>
-                                <div className="product-name-title">{p.product_name}</div>
-                                <div style={{ fontSize: '11px', color: '#78716C' }}>
-                                  #{p.product_id} • {p.images?.length || 0} ảnh trong bộ sưu tập
+                                <div className="product-name-title">
+                                  {p.product_name}
+                                </div>
+                                <div
+                                  style={{ fontSize: "11px", color: "#78716C" }}
+                                >
+                                  #{p.product_id} • {p.images?.length || 0} ảnh
+                                  trong bộ sưu tập
                                 </div>
                               </div>
                             </div>
                           </td>
                           <td>
-                            <div style={{ fontWeight: 600 }}>{p.category?.category_name || 'N/A'}</div>
-                            <div style={{ fontSize: '11px', color: '#78716C' }}>{p.brand?.brand_name || 'N/A'}</div>
+                            <div style={{ fontWeight: 600 }}>
+                              {p.category?.category_name || "N/A"}
+                            </div>
+                            <div style={{ fontSize: "11px", color: "#78716C" }}>
+                              {p.brand?.brand_name || "N/A"}
+                            </div>
                           </td>
                           <td>
-                            <div className="price-cell-main">{formatPrice(minPrice)}</div>
+                            <div className="price-cell-main">
+                              {formatPrice(minPrice)}
+                            </div>
                           </td>
                           <td>
-                            <span className="stock-total-bold">{totalStock} chiếc</span>
+                            <span className="stock-total-bold">
+                              {totalStock} chiếc
+                            </span>
                             <span className="stock-sizes-subtext">
-                              ({p.variants?.map((v) => `${v.size}/${v.color}:${v.stock}`).join(', ')})
+                              (
+                              {p.variants
+                                ?.map((v) => `${v.size}/${v.color}:${v.stock}`)
+                                .join(", ")}
+                              )
                             </span>
                           </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <span className={p.status === 'ACTIVE' ? 'status-pill-green' : 'status-pill-orange'}>
-                              {p.status === 'ACTIVE' ? 'Đang bán' : 'Ẩn'}
+                          <td style={{ textAlign: "center" }}>
+                            <span
+                              className={
+                                p.status === "ACTIVE"
+                                  ? "status-pill-green"
+                                  : "status-pill-orange"
+                              }
+                            >
+                              {p.status === "ACTIVE" ? "Đang bán" : "Ẩn"}
                             </span>
                           </td>
-                          <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                          <td
+                            style={{ textAlign: "right", paddingRight: "20px" }}
+                          >
                             <div className="action-buttons-cell">
                               <button
                                 type="button"
                                 className="action-btn-item edit"
                                 title="Chỉnh sửa & Quản lý ảnh"
-                                onClick={() => handleOpenEditDrawer(p, 'edit')}
+                                onClick={() => handleOpenEditDrawer(p, "edit")}
                               >
                                 <Edit size={16} />
                               </button>
@@ -1470,7 +1625,7 @@ export default function ProductManager() {
                                 type="button"
                                 className="action-btn-item view"
                                 title="Xem chi tiết"
-                                onClick={() => handleOpenEditDrawer(p, 'view')}
+                                onClick={() => handleOpenEditDrawer(p, "view")}
                               >
                                 <Eye size={16} />
                               </button>
@@ -1495,7 +1650,18 @@ export default function ProductManager() {
                 {pagination.totalPages > 1 && (
                   <div className="product-pagination-row">
                     <div className="pagination-info-text">
-                      Hiển thị <strong>{products.length > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0} - {Math.min(pagination.page * pagination.limit, pagination.total)}</strong> trong tổng số <strong>{pagination.total}</strong> sản phẩm
+                      Hiển thị{" "}
+                      <strong>
+                        {products.length > 0
+                          ? (pagination.page - 1) * pagination.limit + 1
+                          : 0}{" "}
+                        -{" "}
+                        {Math.min(
+                          pagination.page * pagination.limit,
+                          pagination.total,
+                        )}
+                      </strong>{" "}
+                      trong tổng số <strong>{pagination.total}</strong> sản phẩm
                     </div>
 
                     <div className="pagination-buttons-group">
@@ -1503,15 +1669,26 @@ export default function ProductManager() {
                         type="button"
                         className="btn-page-nav"
                         disabled={pagination.page <= 1 || loading}
-                        onClick={() => setPagination((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+                        onClick={() =>
+                          setPagination((prev) => ({
+                            ...prev,
+                            page: Math.max(1, prev.page - 1),
+                          }))
+                        }
                       >
                         &lt; Trang trước
                       </button>
 
-                      {getPaginationPages(pagination.page, pagination.totalPages).map((p, idx) => {
-                        if (p === '...') {
+                      {getPaginationPages(
+                        pagination.page,
+                        pagination.totalPages,
+                      ).map((p, idx) => {
+                        if (p === "...") {
                           return (
-                            <span key={`ellipsis-${idx}`} className="btn-page-ellipsis">
+                            <span
+                              key={`ellipsis-${idx}`}
+                              className="btn-page-ellipsis"
+                            >
                               ...
                             </span>
                           );
@@ -1520,9 +1697,11 @@ export default function ProductManager() {
                           <button
                             key={p}
                             type="button"
-                            className={`btn-page-num ${pagination.page === p ? 'active' : ''}`}
+                            className={`btn-page-num ${pagination.page === p ? "active" : ""}`}
                             disabled={loading}
-                            onClick={() => setPagination((prev) => ({ ...prev, page: p }))}
+                            onClick={() =>
+                              setPagination((prev) => ({ ...prev, page: p }))
+                            }
                           >
                             {p}
                           </button>
@@ -1532,8 +1711,15 @@ export default function ProductManager() {
                       <button
                         type="button"
                         className="btn-page-nav"
-                        disabled={pagination.page >= pagination.totalPages || loading}
-                        onClick={() => setPagination((prev) => ({ ...prev, page: Math.min(prev.totalPages, prev.page + 1) }))}
+                        disabled={
+                          pagination.page >= pagination.totalPages || loading
+                        }
+                        onClick={() =>
+                          setPagination((prev) => ({
+                            ...prev,
+                            page: Math.min(prev.totalPages, prev.page + 1),
+                          }))
+                        }
                       >
                         Trang sau &gt;
                       </button>
@@ -1549,16 +1735,22 @@ export default function ProductManager() {
       {/* DRAWER FORM FOR CREATE / EDIT / VIEW */}
       {drawerMode && (
         <div className="drawer-overlay" onClick={() => setDrawerMode(null)}>
-          <div className="drawer-container" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="drawer-container"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="drawer-header">
               <h3 className="drawer-title">
-                {drawerMode === 'create'
-                  ? 'Thêm Sản Phẩm Mới'
-                  : drawerMode === 'edit'
-                    ? 'Chỉnh Sửa Sản Phẩm & Quản Lý Ảnh'
-                    : 'Chi Tiết Sản Phẩm'}
+                {drawerMode === "create"
+                  ? "Thêm Sản Phẩm Mới"
+                  : drawerMode === "edit"
+                    ? "Chỉnh Sửa Sản Phẩm & Quản Lý Ảnh"
+                    : "Chi Tiết Sản Phẩm"}
               </h3>
-              <button className="drawer-close-btn" onClick={() => setDrawerMode(null)}>
+              <button
+                className="drawer-close-btn"
+                onClick={() => setDrawerMode(null)}
+              >
                 ✕
               </button>
             </div>
@@ -1570,20 +1762,30 @@ export default function ProductManager() {
                   type="text"
                   className="form-input"
                   required
-                  disabled={drawerMode === 'view'}
+                  disabled={drawerMode === "view"}
                   value={formData.product_name}
-                  onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, product_name: e.target.value })
+                  }
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "12px",
+                }}
+              >
                 <div className="form-group">
                   <label className="form-label">Danh mục *</label>
                   <select
                     className="form-select"
-                    disabled={drawerMode === 'view'}
+                    disabled={drawerMode === "view"}
                     value={formData.category_id}
-                    onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category_id: e.target.value })
+                    }
                   >
                     {categories.map((c) => (
                       <option key={c.category_id} value={c.category_id}>
@@ -1597,9 +1799,11 @@ export default function ProductManager() {
                   <label className="form-label">Thương hiệu *</label>
                   <select
                     className="form-select"
-                    disabled={drawerMode === 'view'}
+                    disabled={drawerMode === "view"}
                     value={formData.brand_id}
-                    onChange={(e) => setFormData({ ...formData, brand_id: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, brand_id: e.target.value })
+                    }
                   >
                     {brands.map((b) => (
                       <option key={b.brand_id} value={b.brand_id}>
@@ -1615,26 +1819,46 @@ export default function ProductManager() {
                 <textarea
                   rows="3"
                   className="form-textarea"
-                  disabled={drawerMode === 'view'}
+                  disabled={drawerMode === "view"}
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
                 />
               </div>
 
               {/* BỘ SƯU TẬP ẢNH HIỆN TẠI TRONG CSDL MYSQL */}
-              {drawerMode !== 'create' && existingImages.length > 0 && (
+              {drawerMode !== "create" && existingImages.length > 0 && (
                 <div className="form-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label className="form-label">Bộ sưu tập ảnh hiện tại ({existingImages.length} ảnh)</label>
-                    {drawerMode !== 'view' && (
-                      <label style={{ fontSize: '11px', color: '#15803D', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <label className="form-label">
+                      Bộ sưu tập ảnh hiện tại ({existingImages.length} ảnh)
+                    </label>
+                    {drawerMode !== "view" && (
+                      <label
+                        style={{
+                          fontSize: "11px",
+                          color: "#15803D",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
                         <Upload size={12} />
                         Thêm ảnh trực tiếp
                         <input
                           type="file"
                           accept="image/*"
                           multiple
-                          style={{ display: 'none' }}
+                          style={{ display: "none" }}
                           onChange={handleDirectUploadImage}
                           disabled={uploadingSingleImg}
                         />
@@ -1643,13 +1867,28 @@ export default function ProductManager() {
                   </div>
 
                   {uploadingSingleImg && (
-                    <p style={{ fontSize: '11px', color: '#15803D', margin: '4px 0' }}>⏳ Đang upload ảnh mới lên Cloudinary...</p>
+                    <p
+                      style={{
+                        fontSize: "11px",
+                        color: "#15803D",
+                        margin: "4px 0",
+                      }}
+                    >
+                      ⏳ Đang upload ảnh mới lên Cloudinary...
+                    </p>
                   )}
 
                   <div className="image-gallery-grid">
                     {existingImages.map((img) => (
-                      <div key={img.image_id} className={`image-card-box ${img.is_primary ? 'is-primary' : ''}`}>
-                        <img src={img.image_url} alt="product img" className="image-card-img" />
+                      <div
+                        key={img.image_id}
+                        className={`image-card-box ${img.is_primary ? "is-primary" : ""}`}
+                      >
+                        <img
+                          src={img.image_url}
+                          alt="product img"
+                          className="image-card-img"
+                        />
 
                         {img.is_primary && (
                           <div className="badge-primary-label">
@@ -1657,13 +1896,15 @@ export default function ProductManager() {
                           </div>
                         )}
 
-                        {drawerMode !== 'view' && (
+                        {drawerMode !== "view" && (
                           <div className="image-actions-overlay">
                             {!img.is_primary && (
                               <button
                                 type="button"
                                 className="btn-img-action"
-                                onClick={() => handleSetPrimaryImage(img.image_id)}
+                                onClick={() =>
+                                  handleSetPrimaryImage(img.image_id)
+                                }
                               >
                                 <Star size={12} /> Đặt ảnh chính
                               </button>
@@ -1671,7 +1912,9 @@ export default function ProductManager() {
                             <button
                               type="button"
                               className="btn-img-action danger"
-                              onClick={() => handleDeleteExistingImage(img.image_id)}
+                              onClick={() =>
+                                handleDeleteExistingImage(img.image_id)
+                              }
                             >
                               <Trash2 size={12} /> Xóa ảnh
                             </button>
@@ -1684,9 +1927,11 @@ export default function ProductManager() {
               )}
 
               {/* CHỌN & XEM TRƯỚC NHIỀU ẢNH MỚI TRƯỚC KHI UPLOAD */}
-              {drawerMode !== 'view' && (
+              {drawerMode !== "view" && (
                 <div className="form-group">
-                  <label className="form-label">Chọn ảnh từ máy tính (Up được nhiều ảnh)</label>
+                  <label className="form-label">
+                    Chọn ảnh từ máy tính (Up được nhiều ảnh)
+                  </label>
                   <input
                     type="file"
                     accept="image/*"
@@ -1696,19 +1941,36 @@ export default function ProductManager() {
                   />
 
                   {imagePreviews.length > 0 && (
-                    <div style={{ marginTop: '10px' }}>
-                      <span style={{ fontSize: '11px', color: '#78716C', fontWeight: 600 }}>
-                        Ảnh xem trước chuẩn bị upload ({imagePreviews.length} ảnh):
+                    <div style={{ marginTop: "10px" }}>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          color: "#78716C",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Ảnh xem trước chuẩn bị upload ({imagePreviews.length}{" "}
+                        ảnh):
                       </span>
                       <div className="image-gallery-grid">
                         {imagePreviews.map((preview, idx) => (
                           <div key={idx} className="image-card-box">
-                            <img src={preview} alt={`preview ${idx}`} className="image-card-img" />
-                            <div className="image-actions-overlay" style={{ opacity: 1, background: 'rgba(0,0,0,0.3)' }}>
+                            <img
+                              src={preview}
+                              alt={`preview ${idx}`}
+                              className="image-card-img"
+                            />
+                            <div
+                              className="image-actions-overlay"
+                              style={{
+                                opacity: 1,
+                                background: "rgba(0,0,0,0.3)",
+                              }}
+                            >
                               <button
                                 type="button"
                                 className="btn-img-action danger"
-                                style={{ width: 'auto', padding: '6px' }}
+                                style={{ width: "auto", padding: "6px" }}
                                 title="Gỡ chọn ảnh này"
                                 onClick={() => handleRemovePreviewImage(idx)}
                               >
@@ -1725,69 +1987,106 @@ export default function ProductManager() {
 
               {/* Quản lý Biến thể (Variants) */}
               <div className="form-group">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label className="form-label">Biến thể (SKU, Size, Màu, Giá, Tồn kho)</label>
-                  {drawerMode !== 'view' && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <label className="form-label">
+                    Biến thể (SKU, Size, Màu, Giá, Tồn kho)
+                  </label>
+                  {drawerMode !== "view" && (
                     <button
                       type="button"
                       onClick={handleAddVariantRow}
-                      style={{ fontSize: '11px', color: '#111', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
+                      style={{
+                        fontSize: "11px",
+                        color: "#111",
+                        fontWeight: 600,
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
                     >
                       + Thêm biến thể
                     </button>
                   )}
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    marginTop: "6px",
+                  }}
+                >
                   {variantsData.map((v, idx) => (
                     <div key={idx} className="variant-row">
                       <input
                         placeholder="SKU"
                         className="form-input"
-                        style={{ padding: '6px', fontSize: '11px' }}
-                        disabled={drawerMode === 'view'}
+                        style={{ padding: "6px", fontSize: "11px" }}
+                        disabled={drawerMode === "view"}
                         value={v.sku}
-                        onChange={(e) => handleVariantChange(idx, 'sku', e.target.value)}
+                        onChange={(e) =>
+                          handleVariantChange(idx, "sku", e.target.value)
+                        }
                       />
                       <input
                         placeholder="Size"
                         className="form-input"
-                        style={{ padding: '6px', fontSize: '11px' }}
-                        disabled={drawerMode === 'view'}
+                        style={{ padding: "6px", fontSize: "11px" }}
+                        disabled={drawerMode === "view"}
                         value={v.size}
-                        onChange={(e) => handleVariantChange(idx, 'size', e.target.value)}
+                        onChange={(e) =>
+                          handleVariantChange(idx, "size", e.target.value)
+                        }
                       />
                       <input
                         placeholder="Màu"
                         className="form-input"
-                        style={{ padding: '6px', fontSize: '11px' }}
-                        disabled={drawerMode === 'view'}
+                        style={{ padding: "6px", fontSize: "11px" }}
+                        disabled={drawerMode === "view"}
                         value={v.color}
-                        onChange={(e) => handleVariantChange(idx, 'color', e.target.value)}
+                        onChange={(e) =>
+                          handleVariantChange(idx, "color", e.target.value)
+                        }
                       />
                       <input
                         placeholder="Giá (VNĐ)"
                         type="number"
                         className="form-input"
-                        style={{ padding: '6px', fontSize: '11px' }}
-                        disabled={drawerMode === 'view'}
+                        style={{ padding: "6px", fontSize: "11px" }}
+                        disabled={drawerMode === "view"}
                         value={v.price}
-                        onChange={(e) => handleVariantChange(idx, 'price', e.target.value)}
+                        onChange={(e) =>
+                          handleVariantChange(idx, "price", e.target.value)
+                        }
                       />
                       <input
                         placeholder="Kho"
                         type="number"
                         className="form-input"
-                        style={{ padding: '6px', fontSize: '11px' }}
-                        disabled={drawerMode === 'view'}
+                        style={{ padding: "6px", fontSize: "11px" }}
+                        disabled={drawerMode === "view"}
                         value={v.stock}
-                        onChange={(e) => handleVariantChange(idx, 'stock', e.target.value)}
+                        onChange={(e) =>
+                          handleVariantChange(idx, "stock", e.target.value)
+                        }
                       />
-                      {drawerMode !== 'view' && (
+                      {drawerMode !== "view" && (
                         <button
                           type="button"
                           onClick={() => handleRemoveVariantRow(idx)}
-                          style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer' }}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "#DC2626",
+                            cursor: "pointer",
+                          }}
                         >
                           ✕
                         </button>
@@ -1798,13 +2097,28 @@ export default function ProductManager() {
               </div>
 
               <div className="drawer-footer">
-                <button type="button" className="btn-secondary" onClick={() => setDrawerMode(null)}>
-                  {drawerMode === 'view' ? 'Đóng' : 'Hủy'}
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setDrawerMode(null)}
+                >
+                  {drawerMode === "view" ? "Đóng" : "Hủy"}
                 </button>
-                {drawerMode !== 'view' && (
-                  <button type="submit" className="btn-primary-black" disabled={submitting}>
-                    {submitting && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-                    {drawerMode === 'create' ? 'Tạo Sản Phẩm & Upload Ảnh' : 'Lưu Thay Đổi'}
+                {drawerMode !== "view" && (
+                  <button
+                    type="submit"
+                    className="btn-primary-black"
+                    disabled={submitting}
+                  >
+                    {submitting && (
+                      <Loader2
+                        size={14}
+                        style={{ animation: "spin 1s linear infinite" }}
+                      />
+                    )}
+                    {drawerMode === "create"
+                      ? "Tạo Sản Phẩm & Upload Ảnh"
+                      : "Lưu Thay Đổi"}
                   </button>
                 )}
               </div>
@@ -1815,20 +2129,34 @@ export default function ProductManager() {
 
       {/* CONFIRM DELETE MODAL */}
       {deleteProductItem && (
-        <div className="modal-overlay" onClick={() => setDeleteProductItem(null)}>
-          <div className="confirm-modal-box" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={() => setDeleteProductItem(null)}
+        >
+          <div
+            className="confirm-modal-box"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-warning-icon">
               <Trash2 size={24} />
             </div>
             <div className="modal-title">Xác nhận xóa sản phẩm khỏi MySQL?</div>
             <div className="modal-subtext">
-              Bạn có chắc chắn muốn xóa sản phẩm <strong>"{deleteProductItem.product_name}"</strong> khỏi CSDL MySQL không? Hành động này không thể hoàn tác.
+              Bạn có chắc chắn muốn xóa sản phẩm{" "}
+              <strong>"{deleteProductItem.product_name}"</strong> khỏi CSDL
+              MySQL không? Hành động này không thể hoàn tác.
             </div>
             <div className="modal-actions-row">
-              <button className="btn-secondary" onClick={() => setDeleteProductItem(null)}>
+              <button
+                className="btn-secondary"
+                onClick={() => setDeleteProductItem(null)}
+              >
                 Hủy bỏ
               </button>
-              <button className="btn-danger-confirm" onClick={handleConfirmDelete}>
+              <button
+                className="btn-danger-confirm"
+                onClick={handleConfirmDelete}
+              >
                 Xác nhận xóa
               </button>
             </div>
@@ -1838,14 +2166,22 @@ export default function ProductManager() {
 
       {/* CONFIRM DELETE IMAGE MODAL */}
       {deleteImageId && (
-        <div className="modal-overlay" style={{ zIndex: 10001 }} onClick={() => !deletingImage && setDeleteImageId(null)}>
-          <div className="confirm-modal-box" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          style={{ zIndex: 10001 }}
+          onClick={() => !deletingImage && setDeleteImageId(null)}
+        >
+          <div
+            className="confirm-modal-box"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-warning-icon">
               <Trash2 size={24} />
             </div>
             <div className="modal-title">Xóa ảnh này?</div>
             <div className="modal-subtext">
-              Bạn có chắc chắn muốn xóa ảnh này khỏi bộ sưu tập? Hành động này không thể hoàn tác.
+              Bạn có chắc chắn muốn xóa ảnh này khỏi bộ sưu tập? Hành động này
+              không thể hoàn tác.
             </div>
             <div className="modal-actions-row">
               <button
@@ -1861,10 +2197,15 @@ export default function ProductManager() {
                 className="btn-danger-confirm"
                 disabled={deletingImage}
                 onClick={handleConfirmDeleteImage}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                style={{ display: "flex", alignItems: "center", gap: "6px" }}
               >
-                {deletingImage && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-                {deletingImage ? 'Đang xóa...' : 'Xóa ảnh'}
+                {deletingImage && (
+                  <Loader2
+                    size={14}
+                    style={{ animation: "spin 1s linear infinite" }}
+                  />
+                )}
+                {deletingImage ? "Đang xóa..." : "Xóa ảnh"}
               </button>
             </div>
           </div>
