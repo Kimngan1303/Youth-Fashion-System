@@ -22,186 +22,101 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-// Initial vouchers list precisely matching the design
+// Initial vouchers list precisely matching the 4 vouchers in Customer Profile
 const INITIAL_VOUCHERS = [
   {
     id: 'v1',
-    code: 'YF - WINTER25',
-    name: 'Giảm 20% BST Thu Đông 2025',
-    badgeType: 'dark',
-    badgeTop: '20%',
-    badgeBottom: 'OFF',
+    code: 'YOUTH-VIP10',
+    name: 'Chiết khấu 10% Đặc Quyền VIP',
+    badgeType: 'gold',
+    badgeTop: '10%',
+    badgeBottom: 'VIP',
     discountType: 'percent',
-    discountDisplay: 'Giảm 20%',
-    discountSub: 'Tối đa 500.000₫',
-    conditionDisplay: 'Đơn từ 1.500.000₫',
-    conditionSub: 'Áp dụng Ready-To-Wear',
-    usedCount: 342,
+    discountDisplay: 'Giảm 10%',
+    discountSub: 'Đặc Quyền Hội Viên VIP',
+    conditionDisplay: 'Thời trang nguyên giá',
+    conditionSub: 'Áp dụng mọi đơn hàng',
+    usedCount: 142,
     totalLimit: 500,
-    progressPercent: (342 / 500) * 100,
+    progressPercent: (142 / 500) * 100,
     progressColor: '#111111',
-    validityDisplay: '15/10/2025 - 15/11/2025',
-    statusText: 'Còn 24 ngày',
+    validityDisplay: 'Hạn dùng: 31/12/2026',
+    statusText: 'Còn 77 ngày',
     statusColor: '#059669', // green
-    statusTab: 'active', // Đang diễn ra
+    statusTab: 'active',
   },
   {
     id: 'v2',
-    code: 'YF - WELCOME10',
-    name: 'Ưu Đãi Hội Viên Mới Đăng Ký',
-    badgeType: 'light',
-    badgeTop: '10%',
+    code: 'ATELIER-500K',
+    name: 'Giảm 500.000đ cho đơn từ 3.000.000đ',
+    badgeType: 'dark',
+    badgeTop: '500K',
     badgeBottom: 'NEW',
-    discountType: 'percent',
-    discountDisplay: 'Giảm 10%',
-    discountSub: 'Đơn hàng đầu tiên',
-    conditionDisplay: 'Không giới hạn',
-    conditionSub: 'Tài khoản mới',
-    usedCount: 520,
-    totalLimit: 1000,
-    progressPercent: (520 / 1000) * 100,
+    discountType: 'fixed',
+    discountDisplay: 'Giảm 500.000₫',
+    discountSub: 'Trừ trực tiếp vào hóa đơn',
+    conditionDisplay: 'Đơn từ 3.000.000₫',
+    conditionSub: 'BST Fall/Winter Atelier mới nhất',
+    usedCount: 88,
+    totalLimit: 300,
+    progressPercent: (88 / 300) * 100,
     progressColor: '#111111',
-    validityDisplay: 'Không thời hạn',
-    statusText: 'Tự động kích hoạt',
-    statusColor: '#78716C', // gray
+    validityDisplay: 'Hạn dùng: 15/10/2026',
+    statusText: 'Còn 365 ngày',
+    statusColor: '#059669', // green
     statusTab: 'active',
   },
   {
     id: 'v3',
-    code: 'VIP - GOLD30',
-    name: 'Tri Ân Khách Hàng Thân Thiết VIP Gold',
-    badgeType: 'gold',
-    badgeTop: 'VIP',
-    badgeBottom: 'GOLD',
+    code: 'BDAY-2026',
+    name: 'Quà Tặng Sinh Nhật 1.000.000đ',
+    badgeType: 'purple',
+    badgeTop: '1.000K',
+    badgeBottom: 'BDAY',
     discountType: 'fixed',
-    discountDisplay: 'Giảm 300.000₫',
-    discountSub: 'Trừ trực tiếp hóa đơn',
-    conditionDisplay: 'Hạng Gold & Platinum',
-    conditionSub: 'Áp dụng toàn bộ kho',
-    usedCount: 88,
+    discountDisplay: 'Giảm 1.000.000₫',
+    discountSub: 'Quà tặng thành viên VIP',
+    conditionDisplay: 'Đơn từ 2.000.000₫',
+    conditionSub: 'Áp dụng trong tháng sinh nhật',
+    usedCount: 35,
     totalLimit: 100,
-    progressPercent: 88,
-    progressColor: '#F59E0B',
-    validityDisplay: '01/10/2025 - 31/10/2025',
-    statusText: 'Còn 9 ngày',
-    statusColor: '#D97706', // amber
+    progressPercent: (35 / 100) * 100,
+    progressColor: '#9333EA',
+    validityDisplay: 'Tháng sinh nhật năm 2026',
+    statusText: 'Đang diễn ra',
+    statusColor: '#059669', // green
     statusTab: 'active',
   },
   {
     id: 'v4',
-    code: 'FREESHIP - OCT',
-    name: 'Miễn Phí Giao Hàng Toàn Quốc Tháng 10',
+    code: 'FREESHIP-PREMIUM',
+    name: 'Miễn Phí Vận Chuyển Hỏa Tốc',
     badgeType: 'blue',
     badgeIcon: 'truck',
     badgeBottom: 'FREE',
     discountType: 'shipping',
     discountDisplay: 'Miễn Phí Vận Chuyển',
-    discountSub: 'Tối đa 40.000₫',
-    conditionDisplay: 'Đơn từ 800.000₫',
-    conditionSub: 'Tất cả tỉnh thành',
-    usedCount: 890,
+    discountSub: 'Giao hỏa tốc 2-4 giờ nội thành',
+    conditionDisplay: 'Không giới hạn giá trị',
+    conditionSub: 'Áp dụng toàn bộ đơn hàng',
+    usedCount: 290,
     totalLimit: 1000,
-    progressPercent: 89,
-    progressColor: '#111111',
-    validityDisplay: '01/10/2025 - 31/10/2025',
-    statusText: 'Còn 9 ngày',
+    progressPercent: (290 / 1000) * 100,
+    progressColor: '#2563EB',
+    validityDisplay: 'Hạn dùng: Vô thời hạn',
+    statusText: 'Tự động kích hoạt',
     statusColor: '#059669', // green
     statusTab: 'active',
   },
-  {
-    id: 'v5',
-    code: 'BLACKFRIDAY - PRE',
-    name: 'Siêu Tiệc Black Friday Sớm Cho Khách V...',
-    badgeType: 'purple',
-    badgeTop: '35%',
-    badgeBottom: 'BF-PRE',
-    discountType: 'percent',
-    discountDisplay: 'Giảm 35%',
-    discountSub: 'Toàn bộ kho hàng',
-    conditionDisplay: 'Đơn từ 2.000.000₫',
-    conditionSub: 'Tối đa 1.000.000₫',
-    usedCount: 0,
-    totalLimit: 200,
-    progressPercent: 0,
-    progressColor: '#E5E7EB',
-    validityDisplay: 'Bắt đầu: 25/11/2025',
-    statusText: 'Sắp mở trong 33 ngày',
-    statusColor: '#9333EA', // purple
-    statusTab: 'upcoming', // Sắp diễn ra
-  },
-  {
-    id: 'v6',
-    code: 'YF - FLASH50',
-    name: 'Flash Sale Giờ Vàng Đêm Hội Hoàng Gia...',
-    badgeType: 'red',
-    badgeTop: '150k',
-    badgeBottom: 'FLASH',
-    discountType: 'fixed',
-    discountDisplay: 'Giảm 150.000₫',
-    discountSub: 'Trực tiếp theo bill',
-    conditionDisplay: 'Đơn từ 999.000₫',
-    conditionSub: 'Khung giờ 20h - 24h',
-    usedCount: 300,
-    totalLimit: 300,
-    progressPercent: 100,
-    progressColor: '#EF4444',
-    validityDisplay: '20/10/2025 (1 Ngày)',
-    statusText: 'Đã hết hạn',
-    statusColor: '#9CA3AF', // muted gray
-    statusTab: 'expired', // Đã kết thúc
-  },
-  // Additional vouchers for full realistic pagination
-  {
-    id: 'v7',
-    code: 'YF - SUMMEREND',
-    name: 'Xả Kho BST Mùa Hè 2025',
-    badgeType: 'dark',
-    badgeTop: '50%',
-    badgeBottom: 'SALE',
-    discountType: 'percent',
-    discountDisplay: 'Giảm 50%',
-    discountSub: 'Tối đa 300.000₫',
-    conditionDisplay: 'Đơn từ 600.000₫',
-    conditionSub: 'Sản phẩm Outlet',
-    usedCount: 450,
-    totalLimit: 500,
-    progressPercent: 90,
-    progressColor: '#111111',
-    validityDisplay: '01/09/2025 - 30/09/2025',
-    statusText: 'Đã hết hạn',
-    statusColor: '#9CA3AF',
-    statusTab: 'expired',
-  },
-  {
-    id: 'v8',
-    code: 'VIP - PLATINUM50',
-    name: 'Đặc Quyền Hội Viên Platinum Sang Trọng',
-    badgeType: 'gold',
-    badgeTop: 'VIP',
-    badgeBottom: 'PLAT',
-    discountType: 'fixed',
-    discountDisplay: 'Giảm 500.000₫',
-    discountSub: 'Áp dụng trên mọi hóa đơn',
-    conditionDisplay: 'Hạng Platinum',
-    conditionSub: 'Không giới hạn giá trị đơn',
-    usedCount: 24,
-    totalLimit: 50,
-    progressPercent: 48,
-    progressColor: '#F59E0B',
-    validityDisplay: '01/10/2025 - 31/12/2025',
-    statusText: 'Còn 70 ngày',
-    statusColor: '#059669',
-    statusTab: 'active',
-  }
 ];
 
 // Sample voucher usage log
 const MOCK_HISTORY = [
-  { id: 'LOG-01', code: 'YOUTH-WELCOME20', customer: 'Lê Hoàng Long', orderId: '#DH-9821', discount: '200.000₫', time: '10 phút trước', status: 'Áp dụng thành công' },
-  { id: 'LOG-02', code: 'VIP - GOLD30', customer: 'Đặng Thu Thảo', orderId: '#DH-9820', discount: '300.000₫', time: '45 phút trước', status: 'Áp dụng thành công' },
-  { id: 'LOG-03', code: 'FREESHIP - OCT', customer: 'Trần Minh Châu', orderId: '#DH-9818', discount: '40.000₫', time: '2 giờ trước', status: 'Áp dụng thành công' },
-  { id: 'LOG-04', code: 'YF - WINTER25', customer: 'Nguyễn Văn Hùng', orderId: '#DH-9815', discount: '360.000₫', time: '3 giờ trước', status: 'Áp dụng thành công' },
-  { id: 'LOG-05', code: 'YF - FLASH50', customer: 'Phạm Thu Trang', orderId: '#DH-9809', discount: '150.000₫', time: '5 giờ trước', status: 'Áp dụng thành công' },
+  { id: 'LOG-01', code: 'ATELIER-500K', customer: 'Lê Hoàng Long', orderId: '#DH-9821', discount: '500.000₫', time: '10 phút trước', status: 'Áp dụng thành công' },
+  { id: 'LOG-02', code: 'YOUTH-VIP10', customer: 'Đặng Thu Thảo', orderId: '#DH-9820', discount: '10%', time: '45 phút trước', status: 'Áp dụng thành công' },
+  { id: 'LOG-03', code: 'FREESHIP-PREMIUM', customer: 'Trần Minh Châu', orderId: '#DH-9818', discount: 'Miễn phí', time: '2 giờ trước', status: 'Áp dụng thành công' },
+  { id: 'LOG-04', code: 'BDAY-2026', customer: 'Nguyễn Văn Hùng', orderId: '#DH-9815', discount: '1.000.000₫', time: '3 giờ trước', status: 'Áp dụng thành công' },
+  { id: 'LOG-05', code: 'ATELIER-500K', customer: 'Phạm Thu Trang', orderId: '#DH-9809', discount: '500.000₫', time: '5 giờ trước', status: 'Áp dụng thành công' },
 ];
 
 const voucherPageStyles = `
@@ -1164,19 +1079,19 @@ export default function VoucherManager() {
               </div>
 
               <div className="kpi-value-row">
-                <span className="kpi-number-big">18</span>
+                <span className="kpi-number-big">0{vouchers.length}</span>
                 <span className="kpi-unit-label">Mã</span>
               </div>
 
               <div>
                 <div className="kpi-sub-row">
-                  <span style={{ color: '#111111', fontWeight: 500 }}>Đang áp dụng: 14</span>
-                  <span style={{ color: '#78716C' }}>Dự kiến: 04</span>
+                  <span style={{ color: '#111111', fontWeight: 500 }}>Đang áp dụng: 0{vouchers.filter(v => v.statusTab === 'active').length}</span>
+                  <span style={{ color: '#78716C' }}>Dự kiến: 0{vouchers.filter(v => v.statusTab === 'upcoming').length}</span>
                 </div>
                 <div className="kpi-progress-bar-track">
                   <div 
                     className="kpi-progress-bar-fill" 
-                    style={{ width: `${(14 / 18) * 100}%`, background: '#111111' }}
+                    style={{ width: `${(vouchers.filter(v => v.statusTab === 'active').length / Math.max(1, vouchers.length)) * 100}%`, background: '#111111' }}
                   />
                 </div>
               </div>
@@ -1218,7 +1133,7 @@ export default function VoucherManager() {
               </div>
 
               <div className="kpi-value-row">
-                <span className="kpi-number-big">1.240</span>
+                <span className="kpi-number-big">{vouchers.reduce((sum, v) => sum + (v.usedCount || 0), 0).toLocaleString('vi-VN')}</span>
                 <span className="kpi-unit-label">Lượt</span>
               </div>
 
@@ -1246,13 +1161,13 @@ export default function VoucherManager() {
               </div>
 
               <div className="kpi-value-row">
-                <span className="kpi-code-big">YOUTH-WELCOME20</span>
+                <span className="kpi-code-big">ATELIER-500K</span>
               </div>
 
               <div>
                 <div className="kpi-sub-row">
-                  <span style={{ color: '#111111', fontWeight: 500 }}>412 lượt dùng</span>
-                  <strong style={{ color: '#111111', fontWeight: 600 }}>218.000.000₫</strong>
+                  <span style={{ color: '#111111', fontWeight: 500 }}>88 lượt dùng</span>
+                  <strong style={{ color: '#111111', fontWeight: 600 }}>440.000.000₫</strong>
                 </div>
                 <div className="kpi-progress-bar-track" style={{ background: '#E0F2FE' }}>
                   <div 
@@ -1513,20 +1428,20 @@ export default function VoucherManager() {
             {/* Table Footer Pagination */}
             <div className="table-pagination-footer">
               <span className="pagination-info-text">
-                Hiển thị 1 - {paginatedVouchers.length} trong tổng số <strong>18</strong> voucher
+                Hiển thị {totalItems > 0 ? (currentPage - 1) * pageSize + 1 : 0} - {Math.min(currentPage * pageSize, totalItems)} trong tổng số <strong>{totalItems}</strong> voucher
               </span>
 
               <div className="pagination-buttons-group">
                 <button 
                   type="button" 
                   className="btn-page-nav"
-                  disabled={currentPage === 1}
+                  disabled={currentPage <= 1}
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 >
                   &lt; Trang trước
                 </button>
 
-                {[1, 2, 3].map((page) => (
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                   <button
                     key={page}
                     type="button"
@@ -1540,8 +1455,8 @@ export default function VoucherManager() {
                 <button 
                   type="button" 
                   className="btn-page-nav"
-                  disabled={currentPage >= 3}
-                  onClick={() => setCurrentPage(prev => Math.min(3, prev + 1))}
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 >
                   Trang sau &gt;
                 </button>
