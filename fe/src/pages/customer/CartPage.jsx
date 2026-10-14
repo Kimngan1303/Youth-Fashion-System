@@ -537,7 +537,7 @@ export default function CartPage() {
                       onClick={() => setIsVoucherModalOpen(true)}
                     >
                       <Ticket size={12} />
-                      <span>Chọn voucher từ ví ({availableVouchers.length}) &rarr;</span>
+                      <span>Chọn voucher từ ví ({availableVouchers.length})</span>
                     </button>
                   )}
                 </div>
