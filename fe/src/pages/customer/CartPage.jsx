@@ -537,83 +537,26 @@ export default function CartPage() {
                       onClick={() => setIsVoucherModalOpen(true)}
                     >
                       <Ticket size={12} />
-                      <span>Ví voucher ({availableVouchers.length})</span>
+                      <span>Chọn voucher từ ví ({availableVouchers.length}) &rarr;</span>
                     </button>
                   )}
                 </div>
                 <p className="voucher-desc">
-                  Chọn voucher có sẵn trong trang cá nhân hoặc nhập mã giảm giá.
+                  Nhập mã giảm giá hoặc thẻ quà tặng của bạn.
                 </p>
 
-                {/* 1. Menu chọn nhanh từ ví voucher */}
-                {availableVouchers.length > 0 && (
-                  <div className="voucher-select-group">
-                    <select
-                      className="voucher-select-input"
-                      value={appliedVoucher?.code || ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (!val) {
-                          handleRemoveVoucher();
-                        } else {
-                          applyVoucherByCode(val);
-                        }
-                      }}
-                    >
-                      <option value="">-- Chọn voucher từ ví của bạn --</option>
-                      {availableVouchers.map((v) => {
-                        const minVal = v.raw?.minOrder || 0;
-                        const isEligible = !minVal || rawProductTotal >= minVal;
-                        return (
-                          <option key={v.code} value={v.code}>
-                            {v.code}: {v.title} {isEligible ? '✓ Đủ ĐK' : `(Cần đơn từ ${minVal.toLocaleString('vi-VN')}₫)`}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                )}
-
-                {/* 2. Ô nhập mã tùy ý */}
                 <form className="voucher-input-group" onSubmit={handleApplyVoucher}>
                   <input
                     type="text"
                     value={voucherCode}
                     onChange={(e) => setVoucherCode(e.target.value)}
-                    placeholder="Hoặc nhập mã ưu đãi khác..."
+                    placeholder="NHẬP MÃ ƯU ĐÃI..."
                     className="voucher-input"
                   />
                   <button type="submit" className="btn-apply-voucher">
                     ÁP DỤNG
                   </button>
                 </form>
-
-                {/* 3. Gợi ý các thẻ chip 1 chạm */}
-                {availableVouchers.length > 0 && (
-                  <div className="voucher-quick-chips">
-                    <span className="quick-chips-label">Gợi ý từ ví:</span>
-                    <div className="chips-scroll">
-                      {availableVouchers.map((v) => {
-                        const isSelected = appliedVoucher?.code === v.code;
-                        const minVal = v.raw?.minOrder || 0;
-                        const isEligible = !minVal || rawProductTotal >= minVal;
-                        return (
-                          <button
-                            key={v.code}
-                            type="button"
-                            className={`voucher-chip ${isSelected ? 'active' : ''} ${!isEligible ? 'disabled' : ''}`}
-                            onClick={() => applyVoucherByCode(v.code)}
-                            title={v.title}
-                          >
-                            <Tag size={11} />
-                            <span>{v.code}</span>
-                            {isSelected && <Check size={11} />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
 
                 {appliedVoucher && (
                   <div className="voucher-applied-tag">
@@ -1557,34 +1500,10 @@ export default function CartPage() {
           line-height: 1.4;
         }
 
-        .voucher-select-group {
-          margin-bottom: 10px;
-        }
-
-        .voucher-select-input {
-          width: 100%;
-          height: 38px;
-          border: 1.5px solid #111827;
-          background-color: #ffffff;
-          padding: 0 10px;
-          font-size: 11.5px;
-          font-weight: 600;
-          color: #111827;
-          border-radius: 2px;
-          cursor: pointer;
-          outline: none;
-          transition: border-color 0.2s;
-        }
-
-        .voucher-select-input:focus {
-          border-color: #b45309;
-          box-shadow: 0 0 0 2px rgba(180, 83, 9, 0.15);
-        }
-
         .voucher-input-group {
           display: flex;
           height: 36px;
-          margin-bottom: 10px;
+          margin-bottom: 6px;
         }
 
         .voucher-input {
@@ -1617,61 +1536,6 @@ export default function CartPage() {
 
         .btn-apply-voucher:hover {
           opacity: 0.85;
-        }
-
-        /* Quick Voucher Chips */
-        .voucher-quick-chips {
-          margin-top: 4px;
-          margin-bottom: 10px;
-        }
-
-        .quick-chips-label {
-          display: block;
-          font-size: 10px;
-          font-weight: 600;
-          color: #6b7280;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          margin-bottom: 6px;
-        }
-
-        .chips-scroll {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-        }
-
-        .voucher-chip {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          padding: 4px 8px;
-          background: #ffffff;
-          border: 1px dashed #d1d5db;
-          border-radius: 4px;
-          font-size: 10.5px;
-          font-weight: 600;
-          color: #374151;
-          cursor: pointer;
-          transition: all 0.15s;
-        }
-
-        .voucher-chip:hover {
-          border-color: #111827;
-          background: #f9fafb;
-          color: #000000;
-        }
-
-        .voucher-chip.active {
-          background: #000000;
-          border-color: #000000;
-          color: #ffffff;
-        }
-
-        .voucher-chip.disabled {
-          opacity: 0.55;
-          border-style: dotted;
-          cursor: pointer;
         }
 
         .voucher-applied-tag {
