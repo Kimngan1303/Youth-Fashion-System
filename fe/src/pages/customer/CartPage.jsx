@@ -79,20 +79,111 @@ export default function CartPage() {
     showInfo('Đã làm trống giỏ hàng.');
   };
 
+  const KNOWN_VOUCHERS = {
+    'ATELIER-500K': {
+      code: 'ATELIER-500K',
+      discountAmount: 500000,
+      minOrder: 3000000,
+      title: 'Giảm 500.000đ cho đơn từ 3.000.000đ',
+    },
+    'BDAY-2026': {
+      code: 'BDAY-2026',
+      discountAmount: 1000000,
+      minOrder: 2000000,
+      title: 'Quà tặng sinh nhật VIP 1.000.000đ',
+    },
+    'YOUTH-VIP10': {
+      code: 'YOUTH-VIP10',
+      discountPercent: 10,
+      title: 'Chiết khấu 10% Đặc Quyền VIP',
+    },
+    'YOUTH10': {
+      code: 'YOUTH10',
+      discountPercent: 10,
+      title: 'Giảm giá 10% đơn hàng',
+    },
+    'WELCOME10': {
+      code: 'WELCOME10',
+      discountPercent: 10,
+      title: 'Ưu Đãi Hội Viên Mới Đăng Ký 10%',
+    },
+    'YF-WELCOME10': {
+      code: 'YF-WELCOME10',
+      discountPercent: 10,
+      title: 'Ưu Đãi Hội Viên Mới Đăng Ký 10%',
+    },
+    'WINTER25': {
+      code: 'WINTER25',
+      discountPercent: 20,
+      maxDiscount: 500000,
+      minOrder: 1500000,
+      title: 'Giảm 20% BST Thu Đông 2025 (Tối đa 500.000đ)',
+    },
+    'YF-WINTER25': {
+      code: 'YF-WINTER25',
+      discountPercent: 20,
+      maxDiscount: 500000,
+      minOrder: 1500000,
+      title: 'Giảm 20% BST Thu Đông 2025 (Tối đa 500.000đ)',
+    },
+    'FREESHIP-PREMIUM': {
+      code: 'FREESHIP-PREMIUM',
+      discountAmount: 50000,
+      title: 'Miễn Phí Vận Chuyển Hỏa Tốc',
+    },
+    'FREESHIP': {
+      code: 'FREESHIP',
+      discountAmount: 50000,
+      title: 'Miễn Phí Vận Chuyển',
+    },
+  };
+
   const handleApplyVoucher = (e) => {
     e.preventDefault();
     if (!voucherCode.trim()) {
       showError('Vui lòng nhập mã ưu đãi.');
       return;
     }
-    const code = voucherCode.trim().toUpperCase();
-    if (code === 'YOUTH10') {
-      setAppliedVoucher({ code, discountPercent: 10, discountAmount: 0 });
-      showSuccess('Đã áp dụng mã giảm giá 10%!');
-    } else {
-      setAppliedVoucher({ code, discountPercent: 0, discountAmount: 50000 });
-      showSuccess(`Đã áp dụng mã ưu đãi ${code}!`);
+    const cleanCode = voucherCode.trim().toUpperCase().replace(/\s+/g, '');
+
+    // 1. Kiểm tra danh sách mã chính thức
+    const matched = KNOWN_VOUCHERS[cleanCode] || KNOWN_VOUCHERS[voucherCode.trim().toUpperCase()];
+
+    if (matched) {
+      if (matched.minOrder && rawProductTotal < matched.minOrder) {
+        showError(`Mã ${matched.code} chỉ áp dụng cho đơn hàng từ ${matched.minOrder.toLocaleString('vi-VN')}₫ trở lên.`);
+        return;
+      }
+      setAppliedVoucher(matched);
+      const discountDesc = matched.discountAmount 
+        ? `${matched.discountAmount.toLocaleString('vi-VN')}₫` 
+        : `${matched.discountPercent}%`;
+      showSuccess(`Đã áp dụng mã ưu đãi ${matched.code} (-${discountDesc})!`);
+      return;
     }
+
+    // 2. Nhận diện động theo cú pháp mã (ví dụ: ATELIER-500K, SALE-200K, VIP-15%,...)
+    let discountAmount = 0;
+    let discountPercent = 0;
+    const kMatch = cleanCode.match(/(\d+)K$/i) || cleanCode.match(/-(\d+)K/i);
+    const pctMatch = cleanCode.match(/(\d+)%/i) || cleanCode.match(/-(\d+)%/i);
+
+    if (kMatch) {
+      discountAmount = parseInt(kMatch[1], 10) * 1000;
+    } else if (pctMatch) {
+      discountPercent = parseInt(pctMatch[1], 10);
+    } else {
+      discountAmount = 50000;
+    }
+
+    const applied = {
+      code: voucherCode.trim().toUpperCase(),
+      discountAmount,
+      discountPercent,
+    };
+    setAppliedVoucher(applied);
+    const displayVal = discountAmount ? `${discountAmount.toLocaleString('vi-VN')}₫` : `${discountPercent}%`;
+    showSuccess(`Đã áp dụng mã ưu đãi ${applied.code} (-${displayVal})!`);
   };
 
   const handleRemoveVoucher = () => {
@@ -117,8 +208,14 @@ export default function CartPage() {
 
   let voucherDiscount = 0;
   if (appliedVoucher && rawProductTotal > 0) {
-    if (appliedVoucher.discountPercent) {
-      voucherDiscount = Math.round((rawProductTotal * appliedVoucher.discountPercent) / 100);
+    if (appliedVoucher.minOrder && rawProductTotal < appliedVoucher.minOrder) {
+      voucherDiscount = 0;
+    } else if (appliedVoucher.discountPercent) {
+      let percentVal = Math.round((rawProductTotal * appliedVoucher.discountPercent) / 100);
+      if (appliedVoucher.maxDiscount) {
+        percentVal = Math.min(percentVal, appliedVoucher.maxDiscount);
+      }
+      voucherDiscount = percentVal;
     } else if (appliedVoucher.discountAmount) {
       voucherDiscount = Math.min(rawProductTotal, appliedVoucher.discountAmount);
     }
