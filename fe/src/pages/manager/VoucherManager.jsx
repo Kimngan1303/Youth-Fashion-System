@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import ManagerSidebar from '../../components/ManagerSidebar';
 import ManagerHeader from '../../components/ManagerHeader';
 import { useToast } from '../../context/ToastContext';
+import { voucherService } from '../../services/voucherService';
 import { 
   Tag, 
   Clock, 
@@ -22,93 +23,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-// Initial vouchers list precisely matching the 4 vouchers in Customer Profile
-const INITIAL_VOUCHERS = [
-  {
-    id: 'v1',
-    code: 'YOUTH-VIP10',
-    name: 'Chiết khấu 10% Đặc Quyền VIP',
-    badgeType: 'gold',
-    badgeTop: '10%',
-    badgeBottom: 'VIP',
-    discountType: 'percent',
-    discountDisplay: 'Giảm 10%',
-    discountSub: 'Đặc Quyền Hội Viên VIP',
-    conditionDisplay: 'Thời trang nguyên giá',
-    conditionSub: 'Áp dụng mọi đơn hàng',
-    usedCount: 142,
-    totalLimit: 500,
-    progressPercent: (142 / 500) * 100,
-    progressColor: '#111111',
-    validityDisplay: 'Hạn dùng: 31/12/2026',
-    statusText: 'Còn 77 ngày',
-    statusColor: '#059669', // green
-    statusTab: 'active',
-  },
-  {
-    id: 'v2',
-    code: 'ATELIER-500K',
-    name: 'Giảm 500.000đ cho đơn từ 3.000.000đ',
-    badgeType: 'dark',
-    badgeTop: '500K',
-    badgeBottom: 'NEW',
-    discountType: 'fixed',
-    discountDisplay: 'Giảm 500.000₫',
-    discountSub: 'Trừ trực tiếp vào hóa đơn',
-    conditionDisplay: 'Đơn từ 3.000.000₫',
-    conditionSub: 'BST Fall/Winter Atelier mới nhất',
-    usedCount: 88,
-    totalLimit: 300,
-    progressPercent: (88 / 300) * 100,
-    progressColor: '#111111',
-    validityDisplay: 'Hạn dùng: 15/10/2026',
-    statusText: 'Còn 365 ngày',
-    statusColor: '#059669', // green
-    statusTab: 'active',
-  },
-  {
-    id: 'v3',
-    code: 'BDAY-2026',
-    name: 'Quà Tặng Sinh Nhật 1.000.000đ',
-    badgeType: 'purple',
-    badgeTop: '1.000K',
-    badgeBottom: 'BDAY',
-    discountType: 'fixed',
-    discountDisplay: 'Giảm 1.000.000₫',
-    discountSub: 'Quà tặng thành viên VIP',
-    conditionDisplay: 'Đơn từ 2.000.000₫',
-    conditionSub: 'Áp dụng trong tháng sinh nhật',
-    usedCount: 35,
-    totalLimit: 100,
-    progressPercent: (35 / 100) * 100,
-    progressColor: '#9333EA',
-    validityDisplay: 'Tháng sinh nhật năm 2026',
-    statusText: 'Đang diễn ra',
-    statusColor: '#059669', // green
-    statusTab: 'active',
-  },
-  {
-    id: 'v4',
-    code: 'FREESHIP-PREMIUM',
-    name: 'Miễn Phí Vận Chuyển Hỏa Tốc',
-    badgeType: 'blue',
-    badgeIcon: 'truck',
-    badgeBottom: 'FREE',
-    discountType: 'shipping',
-    discountDisplay: 'Miễn Phí Vận Chuyển',
-    discountSub: 'Giao hỏa tốc 2-4 giờ nội thành',
-    conditionDisplay: 'Không giới hạn giá trị',
-    conditionSub: 'Áp dụng toàn bộ đơn hàng',
-    usedCount: 290,
-    totalLimit: 1000,
-    progressPercent: (290 / 1000) * 100,
-    progressColor: '#2563EB',
-    validityDisplay: 'Hạn dùng: Vô thời hạn',
-    statusText: 'Tự động kích hoạt',
-    statusColor: '#059669', // green
-    statusTab: 'active',
-  },
-];
+
 
 // Sample voucher usage log
 const MOCK_HISTORY = [
@@ -863,7 +778,15 @@ export default function VoucherManager() {
   const { showSuccess, showError, showInfo } = useToast();
 
   // State management
-  const [vouchers, setVouchers] = useState(INITIAL_VOUCHERS);
+  const [vouchers, setVouchers] = useState(() => voucherService.getVouchers());
+
+  // Lắng nghe thay đổi từ voucherService (khi tạo/xóa mã)
+  useEffect(() => {
+    const unsubscribe = voucherService.subscribe((updatedList) => {
+      setVouchers(updatedList);
+    });
+    return unsubscribe;
+  }, []);
   const [activeTab, setActiveTab] = useState('all'); // all, active, upcoming, expired
   const [searchQuery, setSearchQuery] = useState('');
   const [offerTypeFilter, setOfferTypeFilter] = useState('all'); // all, percent, fixed, shipping
@@ -957,7 +880,7 @@ export default function VoucherManager() {
       return;
     }
     const count = selectedIds.size;
-    setVouchers(prev => prev.filter(v => !selectedIds.has(v.id)));
+    voucherService.bulkDeleteVouchers(Array.from(selectedIds));
     setSelectedIds(new Set());
     showSuccess(`Đã xóa thành công ${count} mã voucher đã chọn!`);
   };
@@ -974,18 +897,36 @@ export default function VoucherManager() {
       return;
     }
 
+    const discountValNum = Number(String(newVoucher.discountValue).replace(/\D/g, '')) || 0;
+    const minOrderNum = Number(String(newVoucher.minOrder).replace(/\D/g, '')) || 0;
+    const maxDiscountNum = Number(String(newVoucher.maxDiscount).replace(/\D/g, '')) || 0;
+
     const createdItem = {
       id: `v_${Date.now()}`,
       code: newVoucher.code.toUpperCase().trim(),
       name: newVoucher.name.trim(),
       badgeType: newVoucher.discountType === 'percent' ? 'dark' : newVoucher.discountType === 'fixed' ? 'gold' : 'blue',
-      badgeTop: newVoucher.discountType === 'percent' ? `${newVoucher.discountValue || 15}%` : 'HOT',
+      badgeTop: newVoucher.discountType === 'percent' 
+        ? `${discountValNum || 15}%` 
+        : (discountValNum >= 1000 ? `${Math.round(discountValNum / 1000)}K` : 'HOT'),
       badgeBottom: newVoucher.discountType === 'shipping' ? 'FREE' : 'SALE',
+      badgeLine1: newVoucher.discountType === 'percent' 
+        ? `${discountValNum || 15}%` 
+        : (discountValNum >= 1000 ? `${Math.round(discountValNum / 1000)}K` : 'ƯU ĐÃI'),
+      badgeLine2: newVoucher.discountType === 'shipping' ? 'FREE' : 'HOT',
       discountType: newVoucher.discountType,
-      discountDisplay: newVoucher.discountType === 'percent' ? `Giảm ${newVoucher.discountValue || 15}%` : `Giảm ${newVoucher.discountValue || '200.000'}₫`,
-      discountSub: newVoucher.maxDiscount ? `Tối đa ${newVoucher.maxDiscount}₫` : 'Trừ trực tiếp',
-      conditionDisplay: newVoucher.minOrder ? `Đơn từ ${newVoucher.minOrder}₫` : 'Không giới hạn',
+      discountPercent: newVoucher.discountType === 'percent' ? (discountValNum || 15) : 0,
+      discountAmount: newVoucher.discountType === 'fixed' 
+        ? (discountValNum || 200000) 
+        : (newVoucher.discountType === 'shipping' ? 50000 : 0),
+      discountDisplay: newVoucher.discountType === 'percent' 
+        ? `Giảm ${discountValNum || 15}%` 
+        : `Giảm ${(discountValNum || 200000).toLocaleString('vi-VN')}₫`,
+      discountSub: maxDiscountNum ? `Tối đa ${maxDiscountNum.toLocaleString('vi-VN')}₫` : 'Trừ trực tiếp',
+      conditionDisplay: minOrderNum ? `Đơn từ ${minOrderNum.toLocaleString('vi-VN')}₫` : 'Không giới hạn',
       conditionSub: newVoucher.categoryLimit || 'Áp dụng toàn bộ kho',
+      minOrder: minOrderNum,
+      maxDiscount: maxDiscountNum,
       usedCount: 0,
       totalLimit: Number(newVoucher.totalLimit) || 500,
       progressPercent: 0,
@@ -996,7 +937,7 @@ export default function VoucherManager() {
       statusTab: 'active',
     };
 
-    setVouchers([createdItem, ...vouchers]);
+    voucherService.createVoucher(createdItem);
     setIsCreateOpen(false);
     setNewVoucher({
       code: '',

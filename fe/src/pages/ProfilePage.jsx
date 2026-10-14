@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ProductCard from '../components/ProductCard';
+import { voucherService } from '../services/voucherService';
 
 // Chuẩn hóa ngày hiển thị sang dạng DD/MM/YYYY
 const normalizeDobToVn = (dob) => {
@@ -493,41 +494,15 @@ const ProfilePage = () => {
     setTimeout(() => setCopiedCode(''), 3000);
   };
 
-  // Vouchers List matching design "4 MÃ"
-  const vouchersList = [
-    {
-      code: 'YOUTH-VIP10',
-      title: 'Chiết khấu 10% Đặc Quyền VIP',
-      desc: 'Áp dụng cho mọi đơn hàng thời trang nguyên giá.',
-      expiry: 'Hạn dùng: 31/12/2026',
-      badgeLine1: 'Đặc quyền',
-      badgeLine2: 'VIP'
-    },
-    {
-      code: 'ATELIER-500K',
-      title: 'Giảm 500.000đ cho đơn từ 3.000.000đ',
-      desc: 'Áp dụng cho bộ sưu tập Fall/Winter Atelier mới nhất.',
-      expiry: 'Hạn dùng: 15/10/2026',
-      badgeLine1: 'Bộ Sưu Tập',
-      badgeLine2: 'Mới'
-    },
-    {
-      code: 'BDAY-2026',
-      title: 'Quà Tặng Sinh Nhật 1.000.000đ',
-      desc: 'Dành riêng cho thành viên VIP trong tháng sinh nhật.',
-      expiry: 'Hạn dùng: Tháng sinh nhật',
-      badgeLine1: 'Sinh Nhật',
-      badgeLine2: 'VIP'
-    },
-    {
-      code: 'FREESHIP-PREMIUM',
-      title: 'Miễn Phí Vận Chuyển Hỏa Tốc',
-      desc: 'Áp dụng cho mọi đơn hàng không giới hạn giá trị.',
-      expiry: 'Hạn dùng: Vô thời hạn',
-      badgeLine1: 'Vận Chuyển',
-      badgeLine2: null
-    }
-  ];
+  // Vouchers List kết nối tự động từ Kho Voucher của Quản lý
+  const [vouchersList, setVouchersList] = useState(() => voucherService.getCustomerVouchers());
+
+  useEffect(() => {
+    const unsubscribe = voucherService.subscribe(() => {
+      setVouchersList(voucherService.getCustomerVouchers());
+    });
+    return unsubscribe;
+  }, []);
 
   // Helper Countdown timer component for 5-minute payment deadline
   const CountdownTimer = ({ deadline }) => {
@@ -665,7 +640,7 @@ const ProfilePage = () => {
                   <Tag size={18} />
                   <span>VOUCHER & MÃ ƯU ĐÃI</span>
                 </div>
-                <span className="nav-badge-pill gold-badge">4 MÃ</span>
+                <span className="nav-badge-pill gold-badge">{vouchersList.length} MÃ</span>
               </button>
 
               {/* Menu Item 4: Đổi Mật Khẩu */}
@@ -997,33 +972,41 @@ const ProfilePage = () => {
                   </div>
                 )}
 
-                <div className="vouchers-grid">
-                  {vouchersList.map((v, idx) => (
-                    <div key={idx} className="voucher-card">
-                      <div className="voucher-left-stub">
-                        <Tag size={22} className="stub-icon" />
-                        <span className="stub-tag">
-                          {v.badgeLine1}
-                          {v.badgeLine2 && <><br />{v.badgeLine2}</>}
-                        </span>
-                      </div>
-                      <div className="voucher-details">
-                        <h4 className="voucher-title">{v.title}</h4>
-                        <p className="voucher-desc">{v.desc}</p>
-                        <div className="voucher-footer">
-                          <span className="voucher-expiry">{v.expiry}</span>
-                          <button
-                            className="copy-code-btn"
-                            onClick={() => handleCopyVoucher(v.code)}
-                            title="Sao chép mã"
-                          >
-                            <Copy size={13} /> {v.code}
-                          </button>
+                {vouchersList.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '48px 24px', background: '#F9F8F6', borderRadius: 12, border: '1px dashed #E2DFD7' }}>
+                    <Tag size={36} color="#A8A29E" style={{ marginBottom: 12 }} />
+                    <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1C1917', margin: '0 0 6px' }}>Hiện chưa có mã ưu đãi</h3>
+                    <p style={{ fontSize: 13, color: '#78716C', margin: 0 }}>Các chương trình khuyến mãi và quà tặng mới nhất sẽ được cập nhật tại đây.</p>
+                  </div>
+                ) : (
+                  <div className="vouchers-grid">
+                    {vouchersList.map((v, idx) => (
+                      <div key={v.id || idx} className="voucher-card">
+                        <div className="voucher-left-stub">
+                          <Tag size={22} className="stub-icon" />
+                          <span className="stub-tag">
+                            {v.badgeLine1}
+                            {v.badgeLine2 && <><br />{v.badgeLine2}</>}
+                          </span>
+                        </div>
+                        <div className="voucher-details">
+                          <h4 className="voucher-title">{v.title}</h4>
+                          <p className="voucher-desc">{v.desc}</p>
+                          <div className="voucher-footer">
+                            <span className="voucher-expiry">{v.expiry}</span>
+                            <button
+                              className="copy-code-btn"
+                              onClick={() => handleCopyVoucher(v.code)}
+                              title="Sao chép mã"
+                            >
+                              <Copy size={13} /> {v.code}
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

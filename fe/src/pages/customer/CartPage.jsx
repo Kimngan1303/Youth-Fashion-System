@@ -4,6 +4,7 @@ import { Heart, Trash2, ShoppingBag, RotateCw, ArrowLeft, ShieldCheck, RefreshCw
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { productService } from '../../services/productService';
+import { voucherService } from '../../services/voucherService';
 
 export default function CartPage() {
   const { 
@@ -146,7 +147,30 @@ export default function CartPage() {
     }
     const cleanCode = voucherCode.trim().toUpperCase().replace(/\s+/g, '');
 
-    // 1. Kiểm tra danh sách mã chính thức
+    // 1. Kiểm tra từ Kho Voucher đồng bộ hệ thống (do Quản lý tạo ra)
+    const serviceVoucher = voucherService.findVoucherByCode(cleanCode) || voucherService.findVoucherByCode(voucherCode);
+    if (serviceVoucher) {
+      if (serviceVoucher.minOrder && rawProductTotal < serviceVoucher.minOrder) {
+        showError(`Mã ${serviceVoucher.code} chỉ áp dụng cho đơn hàng từ ${serviceVoucher.minOrder.toLocaleString('vi-VN')}₫ trở lên.`);
+        return;
+      }
+      const applied = {
+        code: serviceVoucher.code,
+        discountAmount: serviceVoucher.discountAmount || 0,
+        discountPercent: serviceVoucher.discountPercent || 0,
+        maxDiscount: serviceVoucher.maxDiscount || 0,
+        minOrder: serviceVoucher.minOrder || 0,
+        title: serviceVoucher.name || serviceVoucher.title,
+      };
+      setAppliedVoucher(applied);
+      const discountDesc = applied.discountAmount 
+        ? `${applied.discountAmount.toLocaleString('vi-VN')}₫` 
+        : `${applied.discountPercent}%`;
+      showSuccess(`Đã áp dụng mã ưu đãi ${applied.code} (-${discountDesc})!`);
+      return;
+    }
+
+    // 2. Kiểm tra danh sách mã fallback dự phòng
     const matched = KNOWN_VOUCHERS[cleanCode] || KNOWN_VOUCHERS[voucherCode.trim().toUpperCase()];
 
     if (matched) {
