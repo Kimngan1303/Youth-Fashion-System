@@ -1925,7 +1925,8 @@ export default function CartPage() {
 
         .cart-voucher-card {
           display: flex;
-          background: #fafafa;
+          align-items: stretch;
+          background: #ffffff;
           border: 1px solid #e5e7eb;
           border-radius: 6px;
           overflow: hidden;
@@ -1944,7 +1945,7 @@ export default function CartPage() {
 
         .cart-voucher-card.ineligible {
           opacity: 0.65;
-          background: #fcfcfc;
+          background: #fafafa;
         }
 
         .cart-voucher-stub {
@@ -1959,6 +1960,7 @@ export default function CartPage() {
           text-align: center;
           border-right: 1px dashed rgba(255, 255, 255, 0.3);
           flex-shrink: 0;
+          font-family: var(--font-sans, sans-serif) !important;
         }
 
         .cart-voucher-card.applied .cart-voucher-stub {
@@ -1976,45 +1978,64 @@ export default function CartPage() {
           line-height: 1.2;
           letter-spacing: 0.5px;
           text-transform: uppercase;
+          font-family: var(--font-sans, sans-serif) !important;
         }
 
         .cart-voucher-body {
           flex: 1;
-          padding: 12px 14px;
+          padding: 12px 16px;
           display: flex;
           flex-direction: column;
-          justify-content: space-between;
+          justify-content: center;
+          gap: 4px;
           min-width: 0;
+          font-family: var(--font-sans, sans-serif) !important;
         }
 
         .cart-voucher-main {
-          margin-bottom: 8px;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
         }
 
         .voucher-code-badge {
-          display: inline-block;
+          display: inline-flex;
+          align-items: center;
+          font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, sans-serif) !important;
           font-size: 11px;
-          font-weight: 800;
+          font-weight: 700;
           letter-spacing: 0.8px;
           color: #111827;
           background: #f3f4f6;
-          padding: 2px 8px;
-          border-radius: 3px;
-          margin-bottom: 4px;
+          padding: 3px 8px;
+          border-radius: 4px;
+          line-height: 1.2;
+          width: fit-content;
+          font-variant-numeric: lining-nums tabular-nums;
+          font-feature-settings: "lnum" 1, "tnum" 1;
         }
 
         .voucher-item-title {
+          font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif) !important;
           font-size: 13.5px;
-          font-weight: 700;
+          font-weight: 600;
           color: #111827;
-          margin: 0 0 2px 0;
+          line-height: 1.45;
+          margin: 0;
+          letter-spacing: -0.1px;
+          font-variant-numeric: lining-nums tabular-nums;
+          font-feature-settings: "lnum" 1, "tnum" 1;
         }
 
         .voucher-item-desc {
+          font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif) !important;
           font-size: 11.5px;
           color: #6b7280;
           margin: 0;
           line-height: 1.4;
+          font-variant-numeric: lining-nums tabular-nums;
+          font-feature-settings: "lnum" 1, "tnum" 1;
         }
 
         .cart-voucher-foot {
@@ -2022,12 +2043,16 @@ export default function CartPage() {
           align-items: center;
           justify-content: space-between;
           gap: 8px;
-          margin-top: 6px;
+          margin-top: 4px;
+          font-family: var(--font-sans, sans-serif) !important;
+          font-variant-numeric: lining-nums tabular-nums;
+          font-feature-settings: "lnum" 1, "tnum" 1;
         }
 
         .voucher-item-exp {
           font-size: 10.5px;
           color: #9ca3af;
+          font-family: var(--font-sans, sans-serif) !important;
         }
 
         .eligible-status-tag {
@@ -2037,6 +2062,7 @@ export default function CartPage() {
           font-size: 11px;
           font-weight: 600;
           color: #15803d;
+          font-family: var(--font-sans, sans-serif) !important;
         }
 
         .ineligible-status-tag {
@@ -2046,10 +2072,11 @@ export default function CartPage() {
           font-size: 11px;
           font-weight: 600;
           color: #d97706;
+          font-family: var(--font-sans, sans-serif) !important;
         }
 
         .cart-voucher-action {
-          padding: 12px 14px;
+          padding: 12px 16px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -2059,10 +2086,16 @@ export default function CartPage() {
 
         .btn-voucher-action {
           height: 34px;
-          padding: 0 14px;
+          padding: 0 16px;
           border-radius: 4px;
+          font-family: var(--font-sans, sans-serif) !important;
           font-size: 11.5px;
           font-weight: 700;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          line-height: 1;
+          letter-spacing: 0.3px;
           cursor: pointer;
           transition: all 0.15s;
           white-space: nowrap;
