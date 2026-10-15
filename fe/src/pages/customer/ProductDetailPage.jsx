@@ -23,6 +23,7 @@ import { productService } from '../../services/productService';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import ProductCard from '../../components/ProductCard';
+import { getColorHex, isLightColor } from '../../utils/colorUtils';
 
 // Dữ liệu mẫu chuẩn xác theo đúng Figma khi ID trùng hoặc fallback sản phẩm chính
 const FIGMA_COAT_DATA = {
@@ -186,7 +187,7 @@ export default function ProductDetailPage() {
             ? Array.from(new Set(availColors)).map((cName, idx) => ({
                 id: `col-${idx}`,
                 name: cName,
-                hex: cName.toLowerCase().includes('đen') ? '#1A1A1A' : cName.toLowerCase().includes('trắng') ? '#F4F4F4' : '#C19A6B',
+                hex: getColorHex(cName),
                 inStock: true
               }))
             : FIGMA_COAT_DATA.colors;
@@ -278,8 +279,8 @@ export default function ProductDetailPage() {
         price: product.price,
         originalPrice: product.original_price,
         image: activeImage,
-        colorName: currentColorObj?.name || 'Camel Tự Nhiên',
-        colorDot: currentColorObj?.hex || '#C19A6B',
+        colorName: currentColorObj?.name || 'Mặc định',
+        colorDot: currentColorObj?.hex || getColorHex(currentColorObj?.name || ''),
         badge: 'ATELIER',
         categoryTag: product.category_name,
       },
@@ -471,17 +472,25 @@ export default function ProductDetailPage() {
                 <div className="color-swatches-row">
                   {product.colors.map((color) => {
                     const isSelected = selectedColor === color.id;
+                    const isLight = isLightColor(color.hex);
                     return (
                       <button
                         key={color.id}
                         type="button"
                         className={`color-swatch-btn ${isSelected ? 'selected' : ''}`}
-                        style={{ backgroundColor: color.hex }}
+                        style={{
+                          backgroundColor: color.hex,
+                          border: isLight ? '1.5px solid #D1D5DB' : '1px solid transparent',
+                        }}
                         onClick={() => setSelectedColor(color.id)}
                         title={color.name}
                       >
-                        {isSelected && color.hex === '#1A1A1A' && (
-                          <Check size={14} color="#FFFFFF" strokeWidth={3} />
+                        {isSelected && (
+                          <Check
+                            size={13}
+                            color={isLight ? '#111111' : '#FFFFFF'}
+                            strokeWidth={3}
+                          />
                         )}
                       </button>
                     );

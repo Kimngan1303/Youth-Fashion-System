@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/auth.service';
+import { getColorHex } from '../utils/colorUtils';
 
 export const AuthContext = createContext(null);
 
@@ -253,8 +254,8 @@ export function AuthProvider({ children }) {
           sku: product.sku || (typeof prodId === 'string' && prodId.startsWith('YF-') ? prodId : `YF-${prodId}`),
           categoryTag: product.categoryTag || product.categoryName || 'ATELIER COLLECTION',
           title: product.title || product.name || 'Thiết kế cao cấp',
-          colorName: product.colorName || (product.color ? product.color : 'Camel Tự Nhiên'),
-          colorDot: product.colorDot || '#b47b4e',
+          colorName: product.colorName || (product.color ? product.color : 'Mặc định'),
+          colorDot: product.colorDot || getColorHex(product.colorName || product.color || ''),
           size: size,
           price: priceNum,
           originalPrice: product.originalPrice || null,

@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { productService } from '../../services/productService';
 import { voucherService } from '../../services/voucherService';
+import { getColorHex } from '../../utils/colorUtils';
 
 export default function CartPage() {
   const { 
@@ -378,7 +379,7 @@ export default function CartPage() {
                         </Link>
                         <span className="item-sku">SKU: {item.sku}</span>
                         <div className="item-variant-meta">
-                          <span className="color-dot" style={{ backgroundColor: item.colorDot }}></span>
+                          <span className="color-dot" style={{ backgroundColor: item.colorDot || getColorHex(item.colorName || item.color) }}></span>
                           <span className="color-text">{item.colorName}</span>
                           <span className="variant-sep">|</span>
                           <span className="size-text">Kích cỡ: {item.size}</span>
