@@ -203,6 +203,7 @@ export default function ProductDetailPage() {
             images: imagesList,
             sizes: uniqueSizes,
             colors: uniqueColors,
+            rawVariants: data.variants || [],
             description_p1: data.description || FIGMA_COAT_DATA.description_p1,
           });
 
@@ -270,13 +271,19 @@ export default function ProductDetailPage() {
     }
 
     const currentColorObj = product.colors.find(c => c.id === selectedColor);
+    const matchedVariant = product.rawVariants?.find(v => 
+      String(v.color || '').trim().toLowerCase() === String(currentColorObj?.name || '').trim().toLowerCase() &&
+      String(v.size || '').trim().toUpperCase() === String(selectedSize || '').trim().toUpperCase()
+    ) || product.rawVariants?.[0];
+
     addToCart(
       {
         id: product.id,
         product_id: product.id,
+        variant_id: matchedVariant?.variant_id,
         title: product.product_name,
         name: product.product_name,
-        price: product.price,
+        price: matchedVariant ? Number(matchedVariant.price) : product.price,
         originalPrice: product.original_price,
         image: activeImage,
         colorName: currentColorObj?.name || 'Mặc định',
