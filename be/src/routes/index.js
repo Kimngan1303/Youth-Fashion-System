@@ -7,6 +7,7 @@ import lookbookRoutes from './lookbook.routes.js';
 import conversationRoutes from './conversation.routes.js';
 import adminRoutes from './admin.routes.js';
 import voucherRoutes from './voucher.routes.js';
+import cartRoutes from './cart.routes.js';
 
 const router = Router();
 
@@ -33,6 +34,9 @@ router.use('/conversations', conversationRoutes);
 
 // Voucher Routes
 router.use('/vouchers', voucherRoutes);
+
+// Cart Routes
+router.use('/cart', cartRoutes);
 
 // Admin Routes (Users & System Configuration)
 router.use('/admin', adminRoutes);
