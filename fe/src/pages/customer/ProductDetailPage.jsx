@@ -14,10 +14,7 @@ import {
   RotateCcw, 
   MessageSquare, 
   Ruler, 
-  ThumbsUp, 
-  Sparkles,
-  ShieldCheck,
-  PackageCheck
+  ThumbsUp
 } from 'lucide-react';
 import { productService } from '../../services/productService';
 import { useAuth } from '../../context/AuthContext';
@@ -138,7 +135,6 @@ export default function ProductDetailPage() {
   const [selectedColor, setSelectedColor] = useState('camel');
   const [selectedSize, setSelectedSize] = useState('M');
   const [quantity, setQuantity] = useState(1);
-  const [activeTab, setActiveTab] = useState('description');
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -353,7 +349,7 @@ export default function ProductDetailPage() {
             <span className="bc-arrow">&gt;</span>
             <span className="bc-category">{product.category_name}</span>
             <span className="bc-arrow">&gt;</span>
-            <span className="bc-current font-serif">{product.product_name}</span>
+            <span className="bc-current">{product.product_name}</span>
           </nav>
         </div>
       </section>
@@ -657,120 +653,26 @@ export default function ProductDetailPage() {
         <div className="container description-container">
           {/* Tab Header Bar */}
           <div className="tab-nav-bar">
-            <button
-              type="button"
-              className={`tab-btn ${activeTab === 'description' ? 'active' : ''}`}
-              onClick={() => setActiveTab('description')}
-            >
+            <span className="tab-btn active">
               MÔ TẢ CHI TIẾT
-            </button>
-            <button
-              type="button"
-              className={`tab-btn ${activeTab === 'materials' ? 'active' : ''}`}
-              onClick={() => setActiveTab('materials')}
-            >
-              CHẤT LIỆU &amp; BẢO QUẢN
-            </button>
-            <button
-              type="button"
-              className={`tab-btn ${activeTab === 'shipping' ? 'active' : ''}`}
-              onClick={() => setActiveTab('shipping')}
-            >
-              CHÍNH SÁCH GIAO NHẬN
-            </button>
+            </span>
           </div>
 
-          {/* Tab Content 1: Mô tả chi tiết */}
-          {activeTab === 'description' && (
-            <div className="tab-pane-content animate-fade-in">
-              <div className="craft-gold-subtitle">
-                <span className="gold-line"></span>
-                <span className="gold-subtext">CẢM HỨNG THIẾT KẾ &amp; NGHỆ THUẬT CẮT MAY</span>
-              </div>
-
-              <h2 className="craft-main-title font-serif">
-                {product.description_heading}
-              </h2>
-
-              <p className="craft-lead-paragraph">
-                {product.description_p1}
-              </p>
-
-              {/* 4 Craftsmanship Feature Highlights */}
-              <div className="craftsmanship-grid">
-                {product.craftsmanship_points?.map((item, idx) => (
-                  <div key={idx} className="craft-card">
-                    <div className="craft-card-header">
-                      <Sparkles size={16} color="#775A00" />
-                      <h4 className="craft-card-title">{item.title}</h4>
-                    </div>
-                    <p className="craft-card-desc">{item.desc}</p>
-                  </div>
-                ))}
-              </div>
+          {/* Nội dung chi tiết */}
+          <div className="tab-pane-content animate-fade-in">
+            <div className="craft-gold-subtitle">
+              <span className="gold-line"></span>
+              <span className="gold-subtext">CẢM HỨNG THIẾT KẾ &amp; NGHỆ THUẬT CẮT MAY</span>
             </div>
-          )}
 
-          {/* Tab Content 2: Chất liệu & Bảo quản */}
-          {activeTab === 'materials' && (
-            <div className="tab-pane-content animate-fade-in">
-              <div className="craft-gold-subtitle">
-                <span className="gold-line"></span>
-                <span className="gold-subtext">HƯỚNG DẪN GIẶT ỦI &amp; BẢO QUẢN SẢN PHẨM</span>
-              </div>
-              <h2 className="craft-main-title font-serif">
-                Bảo Dưỡng Độ Mềm Mượt Của Cashmere Tự Nhiên
-              </h2>
-              <div className="care-guide-list">
-                <div className="care-item">
-                  <ShieldCheck size={20} color="#775A00" />
-                  <div>
-                    <strong>Chế độ giặt:</strong> Khuyên dùng phương pháp giặt khô chuyên nghiệp (Dry Clean Only) tại các tiệm giặt uy tín để duy trì độ bóng của sợi cashmere và cấu trúc form áo.
-                  </div>
-                </div>
-                <div className="care-item">
-                  <PackageCheck size={20} color="#775A00" />
-                  <div>
-                    <strong>Treo &amp; Cất giữ:</strong> Luôn sử dụng móc gỗ đệm vai to bản đi kèm để tránh biến dạng cầu vai. Bọc trong túi vải cotton thoáng khí khi cất tủ chuyển mùa.
-                  </div>
-                </div>
-                <div className="care-item">
-                  <Sparkles size={20} color="#775A00" />
-                  <div>
-                    <strong>Ủi là hơi nước:</strong> Chỉ sử dụng bàn là hơi nước đứng ở nhiệt độ thấp nhất dành riêng cho lụa và len cashmere. Không áp bàn là nhiệt trực tiếp lên bề mặt vải.
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+            <h2 className="craft-main-title font-serif">
+              {product.description_heading}
+            </h2>
 
-          {/* Tab Content 3: Giao nhận */}
-          {activeTab === 'shipping' && (
-            <div className="tab-pane-content animate-fade-in">
-              <div className="craft-gold-subtitle">
-                <span className="gold-line"></span>
-                <span className="gold-subtext">DỊCH VỤ KHÁCH HÀNG THƯỢNG HẠNG</span>
-              </div>
-              <h2 className="craft-main-title font-serif">
-                Trải Nghiệm Thử Đồ Tại Nhà Miễn Phí Toàn Quốc
-              </h2>
-              <p className="craft-lead-paragraph">
-                Youth Fashion cam kết mang đến dịch vụ may đo và giao nhận cao cấp nhất. Mọi đơn hàng đều được đóng gói hộp quà cứng sang trọng, kèm thiệp cảm ơn và móc treo cao cấp.
-              </p>
-              <div className="shipping-perks-row">
-                <div className="perk-box">
-                  <Truck size={24} color="#111827" />
-                  <h4>Giao Hàng Hỏa Tốc</h4>
-                  <p>Nhận hàng trong 2 - 4 giờ tại nội thành Hà Nội &amp; TP. Hồ Chí Minh. Miễn phí vận chuyển toàn quốc cho tất cả đơn hàng.</p>
-                </div>
-                <div className="perk-box">
-                  <RotateCcw size={24} color="#111827" />
-                  <h4>Thử Đồ Trước Khi Thanh Toán</h4>
-                  <p>Quý khách được quyền mặc thử trang phục trước sự chứng kiến của nhân viên giao vận, hỗ trợ đổi size ngay nếu chưa vừa vặn.</p>
-                </div>
-              </div>
-            </div>
-          )}
+            <p className="craft-lead-paragraph">
+              {product.description_p1}
+            </p>
+          </div>
         </div>
       </section>
 
@@ -1131,6 +1033,7 @@ export default function ProductDetailPage() {
           flex-direction: row;
           align-items: center;
           gap: 8px;
+          font-family: var(--font-sans);
           font-size: 11px;
           line-height: 16px;
           text-transform: uppercase;
@@ -1153,16 +1056,14 @@ export default function ProductDetailPage() {
         }
 
         .bc-category {
-          color: #444748;
-          font-size: 12px;
-          letter-spacing: 0.6px;
+          color: #737373;
+          letter-spacing: 1.98px;
         }
 
         .bc-current {
           color: #000000;
-          font-size: 12px;
           font-weight: 600;
-          letter-spacing: 0.6px;
+          letter-spacing: 1.98px;
         }
 
         /* 2. Main Product Showcase Section */
