@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
-import { useToast } from '../../context/ToastContext';
-import { categoryService } from '../../services/categoryService';
-import ManagerSidebar from '../../components/ManagerSidebar';
-import ManagerHeader from '../../components/ManagerHeader';
+import React, { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../../hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "../../context/ToastContext";
+import { categoryService } from "../../services/categoryService";
+import ManagerSidebar from "../../components/ManagerSidebar";
+import ManagerHeader from "../../components/ManagerHeader";
 import {
   Folder,
   Plus,
@@ -12,8 +12,8 @@ import {
   Eye,
   Trash2,
   Loader2,
-  AlertCircle
-} from 'lucide-react';
+  AlertCircle,
+} from "lucide-react";
 
 const categoryManagerStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,400&display=swap');
@@ -573,17 +573,17 @@ export default function CategoryManager() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  const [activeTab, setActiveTab] = useState('ALL');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState("ALL");
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Drawer state: null, or { mode: 'create' | 'edit' | 'view', category?: item }
   const [drawerMode, setDrawerMode] = useState(null);
   const [currentCategory, setCurrentCategory] = useState(null);
 
   const [formData, setFormData] = useState({
-    category_name: '',
-    description: '',
-    status: 'ACTIVE',
+    category_name: "",
+    description: "",
+    status: "ACTIVE",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -605,8 +605,11 @@ export default function CategoryManager() {
         setCategories(res.data || []);
       }
     } catch (err) {
-      console.error('Lỗi khi lấy danh mục:', err);
-      setErrorMsg(err.response?.data?.message || 'Không thể tải danh sách danh mục từ MySQL');
+      console.error("Lỗi khi lấy danh mục:", err);
+      setErrorMsg(
+        err.response?.data?.message ||
+          "Không thể tải danh sách danh mục từ MySQL",
+      );
     } finally {
       setLoading(false);
     }
@@ -620,22 +623,33 @@ export default function CategoryManager() {
   const handleOpenCreateDrawer = () => {
     setCurrentCategory(null);
     setFormData({
-      category_name: '',
-      description: '',
-      status: 'ACTIVE',
+      category_name: "",
+      description: "",
+      status: "ACTIVE",
     });
-    setDrawerMode('create');
+    setDrawerMode("create");
   };
 
   // Open Drawer Edit / View
-  const handleOpenEditDrawer = (cat, mode = 'edit') => {
+  const handleOpenEditDrawer = (cat, mode = "edit") => {
     setCurrentCategory(cat);
     setFormData({
       category_name: cat.category_name,
-      description: cat.description || '',
+      description: cat.description || "",
       status: cat.status,
     });
     setDrawerMode(mode);
+  };
+
+  // 3. Mở Drawer Chi Tiết & Chỉnh Sửa
+  const handleOpenCategoryDrawer = (cat) => {
+    setCurrentCategory(cat);
+    setFormData({
+      category_name: cat.category_name,
+      description: cat.description || "",
+      status: cat.status,
+    });
+    setDrawerMode("edit");
   };
 
   // Submit Create / Edit Category Form
@@ -643,22 +657,29 @@ export default function CategoryManager() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const isCreate = drawerMode === 'create';
+      const isCreate = drawerMode === "create";
       if (isCreate) {
         await categoryService.createCategory(formData);
-      } else if (drawerMode === 'edit' && currentCategory) {
-        await categoryService.updateCategory(currentCategory.category_id, formData);
+      } else if (drawerMode === "edit" && currentCategory) {
+        await categoryService.updateCategory(
+          currentCategory.category_id,
+          formData,
+        );
       }
 
       setDrawerMode(null);
       fetchCategories();
-      showSuccess(isCreate ? 'Tạo mới danh mục thành công' : 'Đã lưu thay đổi danh mục thành công');
+      showSuccess(
+        isCreate
+          ? "Tạo mới danh mục thành công"
+          : "Đã lưu thay đổi danh mục thành công",
+      );
     } catch (err) {
-      console.error('Lỗi khi lưu danh mục:', err);
-      const detailedErrors = err.response?.data?.errors?.join(', ');
+      console.error("Lỗi khi lưu danh mục:", err);
+      const detailedErrors = err.response?.data?.errors?.join(", ");
       const msg = detailedErrors
         ? `${err.response.data.message}: ${detailedErrors}`
-        : (err.response?.data?.message || 'Có lỗi xảy ra khi lưu danh mục');
+        : err.response?.data?.message || "Có lỗi xảy ra khi lưu danh mục";
       showError(msg);
     } finally {
       setSubmitting(false);
@@ -673,9 +694,9 @@ export default function CategoryManager() {
       await categoryService.deleteCategory(deleteCategoryItem.category_id);
       setDeleteCategoryItem(null);
       fetchCategories();
-      showSuccess('Đã xóa danh mục thành công');
+      showSuccess("Đã xóa danh mục thành công");
     } catch (err) {
-      showError(err.response?.data?.message || 'Không thể xóa danh mục này');
+      showError(err.response?.data?.message || "Không thể xóa danh mục này");
     } finally {
       setDeleting(false);
     }
@@ -683,10 +704,18 @@ export default function CategoryManager() {
 
   // KPI Computations
   const totalCatCount = categories.length;
-  const activeCount = categories.filter((c) => c.status === 'ACTIVE').length;
-  const inactiveCount = categories.filter((c) => c.status === 'INACTIVE').length;
-  const totalProductsInCat = categories.reduce((sum, c) => sum + (c.product_count || 0), 0);
-  const topCategory = categories.reduce((max, c) => ((c.product_count || 0) > (max?.product_count || 0) ? c : max), categories[0]);
+  const activeCount = categories.filter((c) => c.status === "ACTIVE").length;
+  const inactiveCount = categories.filter(
+    (c) => c.status === "INACTIVE",
+  ).length;
+  const totalProductsInCat = categories.reduce(
+    (sum, c) => sum + (c.product_count || 0),
+    0,
+  );
+  const topCategory = categories.reduce(
+    (max, c) => ((c.product_count || 0) > (max?.product_count || 0) ? c : max),
+    categories[0],
+  );
 
   return (
     <div className="manager-layout">
@@ -697,21 +726,25 @@ export default function CategoryManager() {
 
       {/* MAIN CONTENT AREA */}
       <main className="main-content-area">
-
         {/* Header Bar */}
         <ManagerHeader showSearch={false} />
 
         {/* Scroll Body */}
         <div className="dashboard-scroll-body">
-
           {/* Section Header */}
           <div className="dashboard-header-row">
             <div>
-              <p className="dashboard-header-sub">YOUTHFASHION • QUẢN LÝ DANH MỤC SẢN PHẨM</p>
+              <p className="dashboard-header-sub">
+                YOUTHFASHION • QUẢN LÝ DANH MỤC SẢN PHẨM
+              </p>
               <h1 className="dashboard-header-title">Quản Lý Danh Mục</h1>
             </div>
 
-            <button type="button" className="btn-add-category" onClick={handleOpenCreateDrawer}>
+            <button
+              type="button"
+              className="btn-add-category"
+              onClick={handleOpenCreateDrawer}
+            >
               <Plus size={16} />
               Thêm Danh Mục Mới
             </button>
@@ -719,14 +752,26 @@ export default function CategoryManager() {
 
           {/* KPI Cards Grid */}
           <div className="kpi-cards-grid">
-
             <div className="kpi-card">
               <div className="kpi-card-header">
                 <span className="kpi-title">TỔNG DANH MỤC DB</span>
                 <div className="kpi-icon-badge">📁</div>
               </div>
-              <div className="kpi-value">{totalCatCount} <span style={{ fontSize: '14px', fontWeight: 400, color: '#57534E' }}>Danh mục</span></div>
-              <div className="kpi-subtext">{activeCount} đang hiển thị • {inactiveCount} đã ẩn</div>
+              <div className="kpi-value">
+                {totalCatCount}{" "}
+                <span
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    color: "#57534E",
+                  }}
+                >
+                  Danh mục
+                </span>
+              </div>
+              <div className="kpi-subtext">
+                {activeCount} đang hiển thị • {inactiveCount} đã ẩn
+              </div>
             </div>
 
             <div className="kpi-card">
@@ -734,8 +779,12 @@ export default function CategoryManager() {
                 <span className="kpi-title">DANH MỤC NHIỀU SP NHẤT</span>
                 <div className="kpi-icon-badge">👑</div>
               </div>
-              <div className="kpi-value" style={{ fontSize: '18px' }}>{topCategory?.category_name || 'N/A'}</div>
-              <div className="kpi-subtext">Chứa {topCategory?.product_count || 0} sản phẩm liên kết</div>
+              <div className="kpi-value" style={{ fontSize: "18px" }}>
+                {topCategory?.category_name || "N/A"}
+              </div>
+              <div className="kpi-subtext">
+                Chứa {topCategory?.product_count || 0} sản phẩm liên kết
+              </div>
             </div>
 
             <div className="kpi-card">
@@ -743,44 +792,90 @@ export default function CategoryManager() {
                 <span className="kpi-title">TỔNG SẢN PHẨM PHÂN BỔ</span>
                 <div className="kpi-icon-badge">📦</div>
               </div>
-              <div className="kpi-value">{totalProductsInCat} <span style={{ fontSize: '14px', fontWeight: 400, color: '#57534E' }}>Sản phẩm</span></div>
-              <div className="kpi-subtext">Trung bình ~{totalCatCount > 0 ? Math.round(totalProductsInCat / totalCatCount) : 0} SP / danh mục</div>
+              <div className="kpi-value">
+                {totalProductsInCat}{" "}
+                <span
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    color: "#57534E",
+                  }}
+                >
+                  Sản phẩm
+                </span>
+              </div>
+              <div className="kpi-subtext">
+                Trung bình ~
+                {totalCatCount > 0
+                  ? Math.round(totalProductsInCat / totalCatCount)
+                  : 0}{" "}
+                SP / danh mục
+              </div>
             </div>
-
           </div>
 
           {/* Table Section Card */}
           <div className="table-section-card">
-
             {/* Filter Bar */}
             <div className="table-filter-bar">
               <div className="status-tabs-row">
                 <div className="status-tabs-group">
                   <button
-                    className={`status-tab-btn ${activeTab === 'ALL' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('ALL')}
+                    className={`status-tab-btn ${activeTab === "ALL" ? "active" : ""}`}
+                    onClick={() => setActiveTab("ALL")}
                   >
-                    Tất Cả <span className="tab-count-badge" style={{ background: activeTab === 'ALL' ? '#333' : '#E7E5E4' }}>{totalCatCount}</span>
+                    Tất Cả{" "}
+                    <span
+                      className="tab-count-badge"
+                      style={{
+                        background: activeTab === "ALL" ? "#333" : "#E7E5E4",
+                      }}
+                    >
+                      {totalCatCount}
+                    </span>
                   </button>
                   <button
-                    className={`status-tab-btn ${activeTab === 'ACTIVE' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('ACTIVE')}
+                    className={`status-tab-btn ${activeTab === "ACTIVE" ? "active" : ""}`}
+                    onClick={() => setActiveTab("ACTIVE")}
                   >
-                    Đang Hiển Thị <span className="tab-count-badge" style={{ background: '#DCFCE7', color: '#15803D' }}>{activeCount}</span>
+                    Đang Hiển Thị{" "}
+                    <span
+                      className="tab-count-badge"
+                      style={{ background: "#DCFCE7", color: "#15803D" }}
+                    >
+                      {activeCount}
+                    </span>
                   </button>
                   <button
-                    className={`status-tab-btn ${activeTab === 'INACTIVE' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('INACTIVE')}
+                    className={`status-tab-btn ${activeTab === "INACTIVE" ? "active" : ""}`}
+                    onClick={() => setActiveTab("INACTIVE")}
                   >
-                    Đã Ẩn <span className="tab-count-badge" style={{ background: '#FEE2E2', color: '#DC2626' }}>{inactiveCount}</span>
+                    Đã Ẩn{" "}
+                    <span
+                      className="tab-count-badge"
+                      style={{ background: "#FEE2E2", color: "#DC2626" }}
+                    >
+                      {inactiveCount}
+                    </span>
                   </button>
                 </div>
               </div>
 
               <div className="filter-controls-row">
                 <div className="search-filter-input">
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#A8A29E">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  <svg
+                    width="14"
+                    height="14"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="#A8A29E"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
                   </svg>
                   <input
                     placeholder="Lọc theo tên danh mục..."
@@ -793,17 +888,40 @@ export default function CategoryManager() {
 
             {/* Loading / Error / Data Table */}
             {loading ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#78716C' }}>
-                <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
-                <p style={{ marginTop: '8px', fontSize: '13px' }}>Đang tải danh mục từ MySQL CSDL...</p>
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  color: "#78716C",
+                }}
+              >
+                <Loader2
+                  size={24}
+                  style={{ animation: "spin 1s linear infinite" }}
+                />
+                <p style={{ marginTop: "8px", fontSize: "13px" }}>
+                  Đang tải danh mục từ MySQL CSDL...
+                </p>
               </div>
             ) : errorMsg ? (
-              <div style={{ padding: '30px', textAlign: 'center', color: '#DC2626' }}>
+              <div
+                style={{
+                  padding: "30px",
+                  textAlign: "center",
+                  color: "#DC2626",
+                }}
+              >
                 <AlertCircle size={24} />
-                <p style={{ marginTop: '8px', fontSize: '13px' }}>{errorMsg}</p>
+                <p style={{ marginTop: "8px", fontSize: "13px" }}>{errorMsg}</p>
               </div>
             ) : categories.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#78716C' }}>
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  color: "#78716C",
+                }}
+              >
                 <p>Không tìm thấy danh mục nào trong CSDL MySQL.</p>
               </div>
             ) : (
@@ -813,8 +931,10 @@ export default function CategoryManager() {
                     <th>TÊN DANH MỤC & ID</th>
                     <th>MÔ TẢ DANH MỤC</th>
                     <th>SỐ SẢN PHẨM LIÊN KẾT</th>
-                    <th style={{ textAlign: 'center' }}>TRẠNG THÁI</th>
-                    <th style={{ textAlign: 'right', paddingRight: '24px' }}>THAO TÁC</th>
+                    <th style={{ textAlign: "center" }}>TRẠNG THÁI</th>
+                    <th style={{ textAlign: "right", paddingRight: "24px" }}>
+                      THAO TÁC
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -832,27 +952,35 @@ export default function CategoryManager() {
                         </div>
                       </td>
                       <td>
-                        <div style={{ color: '#57534E', fontSize: '13px', maxWidth: '320px' }}>
-                          {c.description || 'Chưa có mô tả'}
+                        <div
+                          style={{
+                            color: "#57534E",
+                            fontSize: "13px",
+                            maxWidth: "320px",
+                          }}
+                        >
+                          {c.description || "Chưa có mô tả"}
                         </div>
                       </td>
                       <td>
                         <strong>{c.product_count}</strong> sản phẩm
                       </td>
-                      <td style={{ textAlign: 'center' }}>
-                        {c.status === 'ACTIVE' ? (
-                          <span className="status-pill-active">● Đang Hiện</span>
+                      <td style={{ textAlign: "center" }}>
+                        {c.status === "ACTIVE" ? (
+                          <span className="status-pill-active">
+                            ● Đang Hiện
+                          </span>
                         ) : (
                           <span className="status-pill-hidden">● Đã Ẩn</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                      <td style={{ textAlign: "right", paddingRight: "20px" }}>
                         <div className="action-buttons-cell">
                           <button
                             type="button"
                             className="action-btn-item edit"
                             title="Chỉnh sửa danh mục"
-                            onClick={() => handleOpenEditDrawer(c, 'edit')}
+                            onClick={() => handleOpenEditDrawer(c, "edit")}
                           >
                             <Edit size={16} />
                           </button>
@@ -861,7 +989,7 @@ export default function CategoryManager() {
                             type="button"
                             className="action-btn-item view"
                             title="Xem chi tiết"
-                            onClick={() => handleOpenEditDrawer(c, 'view')}
+                            onClick={() => handleOpenEditDrawer(c, "view")}
                           >
                             <Eye size={16} />
                           </button>
@@ -881,26 +1009,31 @@ export default function CategoryManager() {
                 </tbody>
               </table>
             )}
-
           </div>
-
         </div>
-
       </main>
 
       {/* DRAWER COMPONENT (Create / Edit / View Details) */}
       {drawerMode && (
         <div className="drawer-overlay" onClick={() => setDrawerMode(null)}>
-          <div className="drawer-container" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="drawer-container"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="drawer-header">
               <h3 className="drawer-title">
-                {drawerMode === 'create'
-                  ? 'Thêm Danh Mục Mới'
-                  : drawerMode === 'edit'
-                    ? 'Chỉnh Sửa Danh Mục'
-                    : 'Chi Tiết Danh Mục'}
+                {drawerMode === "create"
+                  ? "Thêm Danh Mục Mới"
+                  : drawerMode === "edit"
+                    ? "Chỉnh Sửa Danh Mục"
+                    : "Chi Tiết Danh Mục"}
               </h3>
-              <button className="drawer-close-btn" onClick={() => setDrawerMode(null)}>✕</button>
+              <button
+                className="drawer-close-btn"
+                onClick={() => setDrawerMode(null)}
+              >
+                ✕
+              </button>
             </div>
 
             <form onSubmit={handleSubmitCategoryForm} className="drawer-body">
@@ -910,9 +1043,11 @@ export default function CategoryManager() {
                   type="text"
                   className="form-input"
                   required
-                  disabled={drawerMode === 'view'}
+                  disabled={drawerMode === "view"}
                   value={formData.category_name}
-                  onChange={(e) => setFormData({ ...formData, category_name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category_name: e.target.value })
+                  }
                 />
               </div>
 
@@ -921,9 +1056,11 @@ export default function CategoryManager() {
                 <textarea
                   rows="4"
                   className="form-textarea"
-                  disabled={drawerMode === 'view'}
+                  disabled={drawerMode === "view"}
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
                 />
               </div>
 
@@ -931,9 +1068,11 @@ export default function CategoryManager() {
                 <label className="form-label">Trạng thái hiển thị *</label>
                 <select
                   className="form-select"
-                  disabled={drawerMode === 'view'}
+                  disabled={drawerMode === "view"}
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, status: e.target.value })
+                  }
                 >
                   <option value="ACTIVE">Đang Hiện (Hoạt động)</option>
                   <option value="INACTIVE">Đã Ẩn (Tạm ngưng)</option>
@@ -941,13 +1080,28 @@ export default function CategoryManager() {
               </div>
 
               <div className="drawer-footer">
-                <button type="button" className="btn-secondary" onClick={() => setDrawerMode(null)}>
-                  {drawerMode === 'view' ? 'Đóng' : 'Hủy'}
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setDrawerMode(null)}
+                >
+                  {drawerMode === "view" ? "Đóng" : "Hủy"}
                 </button>
-                {drawerMode !== 'view' && (
-                  <button type="submit" className="btn-primary-black" disabled={submitting}>
-                    {submitting && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-                    {drawerMode === 'create' ? 'Tạo Danh Mục Mới' : 'Lưu Thay Đổi'}
+                {drawerMode !== "view" && (
+                  <button
+                    type="submit"
+                    className="btn-primary-black"
+                    disabled={submitting}
+                  >
+                    {submitting && (
+                      <Loader2
+                        size={14}
+                        style={{ animation: "spin 1s linear infinite" }}
+                      />
+                    )}
+                    {drawerMode === "create"
+                      ? "Tạo Danh Mục Mới"
+                      : "Lưu Thay Đổi"}
                   </button>
                 )}
               </div>
@@ -958,14 +1112,22 @@ export default function CategoryManager() {
 
       {/* CONFIRM DELETE MODAL */}
       {deleteCategoryItem && (
-        <div className="modal-overlay" onClick={() => !deleting && setDeleteCategoryItem(null)}>
-          <div className="confirm-modal-box" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={() => !deleting && setDeleteCategoryItem(null)}
+        >
+          <div
+            className="confirm-modal-box"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-warning-icon">
               <Trash2 size={24} />
             </div>
             <div className="modal-title">Xác nhận xóa danh mục khỏi MySQL?</div>
             <div className="modal-subtext">
-              Bạn có chắc chắn muốn xóa danh mục <strong>"{deleteCategoryItem.category_name}"</strong> khỏi CSDL MySQL không? Hành động này không thể hoàn tác.
+              Bạn có chắc chắn muốn xóa danh mục{" "}
+              <strong>"{deleteCategoryItem.category_name}"</strong> khỏi CSDL
+              MySQL không? Hành động này không thể hoàn tác.
             </div>
             <div className="modal-actions-row">
               <button
@@ -982,14 +1144,18 @@ export default function CategoryManager() {
                 disabled={deleting}
                 onClick={handleConfirmDelete}
               >
-                {deleting && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-                {deleting ? 'Đang xóa...' : 'Xác nhận xóa'}
+                {deleting && (
+                  <Loader2
+                    size={14}
+                    style={{ animation: "spin 1s linear infinite" }}
+                  />
+                )}
+                {deleting ? "Đang xóa..." : "Xác nhận xóa"}
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

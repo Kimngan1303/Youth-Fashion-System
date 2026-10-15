@@ -27,6 +27,7 @@ import LookbookManagement from './pages/manager/LookbookManagement';
 import VoucherManager from './pages/manager/VoucherManager';
 import UserManagement from './pages/manager/UserManagement';
 import SystemConfig from './pages/manager/SystemConfig';
+import ChatManagement from './pages/manager/ChatManagement';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useContext(AuthContext);
@@ -95,6 +96,7 @@ function AppContent() {
             } 
           />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/chat" element={<ChatPage />} />
           <Route
             path="/manager"
             element={
@@ -174,6 +176,22 @@ function AppContent() {
               <AdminRoute>
                 <SystemConfig />
               </AdminRoute>
+            }
+          />
+          <Route
+            path="/manager/chat"
+            element={
+              <ProtectedRoute>
+                <ChatManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/manager/support"
+            element={
+              <ProtectedRoute>
+                <ChatManagement />
+              </ProtectedRoute>
             }
           />
           
