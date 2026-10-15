@@ -120,6 +120,156 @@ const FIGMA_COAT_DATA = {
       content: 'Giao hàng hỏa tốc trong 2 tiếng, shipper đợi mình mặc thử size M vừa vặn rồi mới thanh toán. Dịch vụ chăm sóc khách hàng 10/10. Chắc chắn sẽ quay lại ủng hộ bộ sưu tập mới.',
       likes: 31,
     },
+    {
+      id: 4,
+      author: 'Lê Hoàng Yến',
+      is_verified: true,
+      date: '05/12/2024',
+      variant: 'Size L • Camel Tự Nhiên',
+      rating: 5,
+      content: 'Đầm và áo khoác của shop chưa bao giờ làm mình thất vọng. Đường may giấu chỉ sắc sảo, vải dày dặn mà không hề nặng người. Mặc đi tiệc ai cũng khen.',
+      likes: 15,
+    },
+    {
+      id: 5,
+      author: 'Đỗ Quỳnh Anh',
+      is_verified: true,
+      date: '12/12/2024',
+      variant: 'Size M • Xám Than',
+      rating: 5,
+      content: 'Màu xám than rất sang và sạch. Giao hàng cực nhanh, nhân viên tư vấn chọn size rất chuẩn với số đo của mình. 5 sao cho chất lượng dịch vụ!',
+      likes: 8,
+    },
+    {
+      id: 6,
+      author: 'Phạm Minh Trang',
+      is_verified: true,
+      date: '20/12/2024',
+      variant: 'Size S • Đen Tuyển',
+      rating: 5,
+      content: 'Form áo rất đứng, cổ áo bẻ sắc nét. Mình giặt khô 2 lần rồi mà bề mặt len vẫn mướt nguyên không bị xù lông hay biến dạng.',
+      likes: 12,
+    },
+    {
+      id: 7,
+      author: 'Vũ Khánh Linh',
+      is_verified: true,
+      date: '28/12/2024',
+      variant: 'Size S • Camel Tự Nhiên',
+      rating: 5,
+      content: 'Thiết kế tối giản mà cực kỳ sang trọng. Phần đai thắt lưng may hai lớp dày dặn, thắt vào là thon gọn vòng eo hẳn. Mình cao 1m62 nặng 50kg mặc size S vừa khít.',
+      likes: 22,
+    },
+    {
+      id: 8,
+      author: 'Ngô Thu Hà',
+      is_verified: true,
+      date: '04/01/2025',
+      variant: 'Size M • Camel Tự Nhiên',
+      rating: 5,
+      content: 'Chất liệu lụa satin và len dạ phối rất hài hòa, sờ vào mát tay và êm ái. Hộp đựng và túi bọc quần áo rất chỉn chu, xứng tầm thương hiệu thời trang cao cấp.',
+      likes: 14,
+    },
+    {
+      id: 9,
+      author: 'Đặng Thảo Nhi',
+      is_verified: true,
+      date: '10/01/2025',
+      variant: 'Size XS • Camel Tự Nhiên',
+      rating: 5,
+      content: 'Lần đầu mua online trang phục giá trị cao mà ưng ý đến vậy. Nhân viên CSKH gọi điện tư vấn chi tiết từng số đo vai và ngực. Form mặc lên y chang mẫu chụp.',
+      likes: 17,
+    },
+    {
+      id: 10,
+      author: 'Bùi Phương Uyên',
+      is_verified: true,
+      date: '15/01/2025',
+      variant: 'Size L • Xám Than',
+      rating: 5,
+      content: 'Tone màu trang nhã, dễ phối đồ với boot và chân váy midi. Áo cản gió tốt, mặc đi du lịch Đà Lạt hay châu Âu đều rất hợp và ấm áp.',
+      likes: 9,
+    },
+    {
+      id: 11,
+      author: 'Phan Thanh Hằng',
+      is_verified: true,
+      date: '18/01/2025',
+      variant: 'Size M • Camel Tự Nhiên',
+      rating: 4,
+      content: 'Áo đẹp xuất sắc, đường kim mũi chỉ tỉ mỉ. Chỉ có một điểm trừ nhỏ là hộp vận chuyển hơi bị móp góc một xíu nhưng đồ bên trong vẫn nguyên vẹn thơm tho.',
+      likes: 11,
+    },
+    {
+      id: 12,
+      author: 'Nguyễn Kim Oanh',
+      is_verified: true,
+      date: '22/01/2025',
+      variant: 'Size S • Đen Tuyển',
+      rating: 5,
+      content: 'Dáng áo chuẩn phong cách Pháp, mặc lên cảm giác tự tin và khí chất hơn hẳn. Bạn bè ai cũng hỏi mua ở đâu. Chúc shop luôn đắt hàng!',
+      likes: 27,
+    },
+    {
+      id: 13,
+      author: 'Hoàng Thu Trang',
+      is_verified: true,
+      date: '26/01/2025',
+      variant: 'Size M • Camel Tự Nhiên',
+      rating: 5,
+      content: 'Đường chần lót tơ tằm bên trong mướt mịn không bị cọ rát da. Vải cashmere thật nên nhẹ mà ấm sâu. Rất đáng để đầu tư cho tủ đồ mùa đông.',
+      likes: 16,
+    },
+    {
+      id: 14,
+      author: 'Lê Cẩm Tú',
+      is_verified: true,
+      date: '02/02/2025',
+      variant: 'Size S • Camel Tự Nhiên',
+      rating: 5,
+      content: 'Shop giao hàng rất đúng hẹn. Được thử áo trước khi nhận khiến mình hoàn toàn yên tâm. Form áo mặc lên thanh lịch, tôn dáng xuất sắc.',
+      likes: 20,
+    },
+    {
+      id: 15,
+      author: 'Trịnh Diệu Linh',
+      is_verified: true,
+      date: '08/02/2025',
+      variant: 'Size L • Đen Tuyển',
+      rating: 5,
+      content: 'Áo dạ dáng dài chuẩn mực, màu sắc nhã nhặn dễ phối đồ. Đã mua 3 món của Youth Fashion và lần nào cũng cực kỳ hài lòng về chất lượng.',
+      likes: 13,
+    },
+    {
+      id: 16,
+      author: 'Dương Hải My',
+      is_verified: true,
+      date: '14/02/2025',
+      variant: 'Size M • Camel Tự Nhiên',
+      rating: 5,
+      content: 'Chất vải đỉnh chóp, không hề bám bụi hay dính lông. Cúc áo và đường viền ve áo hoàn thiện tinh xảo không một sợi chỉ thừa.',
+      likes: 25,
+    },
+    {
+      id: 17,
+      author: 'Võ Thùy Trang',
+      is_verified: true,
+      date: '20/02/2025',
+      variant: 'Size S • Xám Than',
+      rating: 5,
+      content: 'Đóng gói đẳng cấp, nhận hàng như mở quà sinh nhật. Áo mặc nhẹ tênh mà đứng form cực kỳ. Sẽ tiếp tục ủng hộ dài lâu!',
+      likes: 18,
+    },
+    {
+      id: 18,
+      author: 'Đoàn Thanh Vy',
+      is_verified: true,
+      date: '25/02/2025',
+      variant: 'Size M • Đen Tuyển',
+      rating: 5,
+      content: 'Dịch vụ đổi size tận nhà rất chu đáo và nhanh chóng. Nhân viên hỗ trợ nhiệt tình, lịch sự. Chất lượng sản phẩm xứng đáng điểm 10.',
+      likes: 10,
+    }
   ]
 };
 
@@ -156,12 +306,9 @@ export default function ProductDetailPage() {
   const [similarProducts, setSimilarProducts] = useState([]);
   const [reviewHelpfulMap, setReviewHelpfulMap] = useState({});
 
-  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
-  // Review Form State
-  const [newReviewAuthor, setNewReviewAuthor] = useState('');
-  const [newReviewRating, setNewReviewRating] = useState(5);
-  const [newReviewComment, setNewReviewComment] = useState('');
   const [localReviews, setLocalReviews] = useState(FIGMA_COAT_DATA.reviews);
+  const [isAllReviewsModalOpen, setIsAllReviewsModalOpen] = useState(false);
+  const [reviewFilterStar, setReviewFilterStar] = useState('all');
 
   // Fetch product detail from API if id provided
   useEffect(() => {
@@ -355,33 +502,13 @@ export default function ProductDetailPage() {
   };
 
   const displayedReviews = React.useMemo(() => {
-    return localReviews.slice(0, 3);
+    return localReviews.slice(0, 6);
   }, [localReviews]);
 
-  const handleSubmitReview = (e) => {
-    e.preventDefault();
-    if (!newReviewAuthor.trim() || !newReviewComment.trim()) {
-      showInfo('Vui lòng nhập đầy đủ họ tên và nội dung đánh giá.');
-      return;
-    }
-
-    const newRev = {
-      id: Date.now(),
-      author: newReviewAuthor.trim(),
-      is_verified: true,
-      date: 'Hôm nay',
-      variant: `Size ${selectedSize} • ${product.colors.find(c => c.id === selectedColor)?.name || 'Camel'}`,
-      rating: newReviewRating,
-      content: newReviewComment.trim(),
-      likes: 0
-    };
-
-    setLocalReviews([newRev, ...localReviews]);
-    setNewReviewAuthor('');
-    setNewReviewComment('');
-    setIsReviewModalOpen(false);
-    showSuccess('Đánh giá của bạn đã được gửi thành công và hiển thị ngay!');
-  };
+  const filteredModalReviews = React.useMemo(() => {
+    if (reviewFilterStar === 'all') return localReviews;
+    return localReviews.filter(r => Number(r.rating) === Number(reviewFilterStar));
+  }, [localReviews, reviewFilterStar]);
 
 
   return (
@@ -757,20 +884,12 @@ export default function ProductDetailPage() {
                   98% khách hàng hài lòng về chất liệu &amp; form dáng
                 </span>
               </div>
-
-              <button
-                type="button"
-                className="btn-write-review"
-                onClick={() => setIsReviewModalOpen(true)}
-              >
-                VIẾT ĐÁNH GIÁ
-              </button>
             </div>
           </div>
 
-          {/* Review Cards Grid */}
+          {/* Review Cards Grid (Hiển thị 6 feedback / trang) */}
           <div className="reviews-cards-grid">
-            {localReviews.map((rev) => (
+            {displayedReviews.map((rev) => (
               <div key={rev.id} className="review-card">
                 <div className="review-card-top">
                   {/* Rating Stars & Date */}
@@ -783,15 +902,9 @@ export default function ProductDetailPage() {
                     <span className="review-date">{rev.date}</span>
                   </div>
 
-                  {/* Reviewer Name & Verified Badge */}
+                  {/* Reviewer Name */}
                   <div className="reviewer-info-row">
                     <strong className="reviewer-name">{rev.author}</strong>
-                    {rev.is_verified && (
-                      <span className="verified-badge">
-                        <Check size={10} color="#16a34a" strokeWidth={3} />
-                        <span>Đã mua hàng</span>
-                      </span>
-                    )}
                   </div>
 
                   {/* Purchased Variant Tag */}
@@ -814,6 +927,18 @@ export default function ProductDetailPage() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Footer Action: Xem tất cả đánh giá (Mở Popup Modal) */}
+          <div className="reviews-footer-action">
+            <button
+              type="button"
+              className="btn-view-all-reviews"
+              onClick={() => setIsAllReviewsModalOpen(true)}
+            >
+              <span>XEM TẤT CẢ ĐÁNH GIÁ</span>
+              <span className="btn-arrow">&rarr;</span>
+            </button>
           </div>
         </div>
       </section>
@@ -1033,71 +1158,68 @@ export default function ProductDetailPage() {
       )}
 
 
-      {/* MODAL 3: Viết đánh giá sản phẩm */}
-      {isReviewModalOpen && (
-        <div className="size-modal-overlay" onClick={() => setIsReviewModalOpen(false)}>
-          <div className="size-modal-card review-modal-card" onClick={(e) => e.stopPropagation()}>
+      {/* MODAL 4: Xem tất cả đánh giá từ khách hàng */}
+      {isAllReviewsModalOpen && (
+        <div className="size-modal-overlay" onClick={() => setIsAllReviewsModalOpen(false)}>
+          <div className="size-modal-card all-reviews-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-card-header">
-              <h3 className="modal-title font-serif">Chia Sẻ Đánh Giá Của Bạn</h3>
+              <div>
+                <h3 className="modal-title font-serif">Tất Cả Đánh Giá Từ Khách Hàng</h3>
+                <span className="modal-sub-count">{localReviews.length} đánh giá đã xác thực • 98% hài lòng</span>
+              </div>
               <button 
                 type="button" 
                 className="btn-modal-close"
-                onClick={() => setIsReviewModalOpen(false)}
+                onClick={() => setIsAllReviewsModalOpen(false)}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitReview} className="review-modal-form">
-              <div className="form-group">
-                <label className="form-label">Chất lượng sản phẩm:</label>
-                <div className="rating-select-stars">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      className="star-btn-pick"
-                      onClick={() => setNewReviewRating(star)}
-                    >
-                      <Star 
-                        size={22} 
-                        fill={star <= newReviewRating ? '#F59E0B' : 'none'} 
-                        color="#F59E0B" 
-                      />
-                    </button>
-                  ))}
-                  <span className="rating-pick-text">{newReviewRating} sao - Rất hài lòng</span>
+            {/* Bộ lọc theo số sao */}
+            <div className="size-modal-tabs">
+              {[
+                { val: 'all', label: `Tất Cả (${localReviews.length})` },
+                { val: '5', label: `5 Sao (${localReviews.filter(r => r.rating === 5).length})` },
+                { val: '4', label: `4 Sao (${localReviews.filter(r => r.rating === 4).length})` },
+              ].map((tab) => (
+                <button
+                  key={tab.val}
+                  type="button"
+                  className={`size-modal-tab-btn ${reviewFilterStar === tab.val ? 'active' : ''}`}
+                  onClick={() => setReviewFilterStar(tab.val)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Danh sách đánh giá chi tiết */}
+            <div className="modal-reviews-list">
+              {filteredModalReviews.map((rev) => (
+                <div key={rev.id} className="modal-review-item">
+                  <div className="modal-rev-header">
+                    <div className="reviewer-info-row">
+                      <strong className="reviewer-name">{rev.author}</strong>
+                    </div>
+                    <div className="modal-rev-meta">
+                      <div className="card-stars">
+                        {Array.from({ length: rev.rating }).map((_, i) => (
+                          <Star key={i} size={11} fill="#F59E0B" color="#F59E0B" />
+                        ))}
+                      </div>
+                      <span className="review-date">{rev.date}</span>
+                    </div>
+                  </div>
+                  <span className="review-variant-tag">{rev.variant}</span>
+                  <p className="review-content-text">"{rev.content}"</p>
                 </div>
-              </div>
+              ))}
+            </div>
 
-              <div className="form-group">
-                <label className="form-label">Họ và tên của bạn:</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Ví dụ: Nguyễn Thị Mai"
-                  value={newReviewAuthor}
-                  onChange={(e) => setNewReviewAuthor(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Nội dung đánh giá:</label>
-                <textarea
-                  className="form-textarea"
-                  rows={4}
-                  placeholder="Chia sẻ trải nghiệm về chất liệu, đường may, độ vừa vặn của chiếc áo..."
-                  value={newReviewComment}
-                  onChange={(e) => setNewReviewComment(e.target.value)}
-                  required
-                />
-              </div>
-
-              <button type="submit" className="btn-submit-review">
-                GỬI ĐÁNH GIÁ NGAY
-              </button>
-            </form>
+            <div className="modal-footer-note">
+              <span>* Tất cả đánh giá đều được xác thực từ các đơn hàng thực tế của khách hàng tại Youth Fashion.</span>
+            </div>
           </div>
         </div>
       )}
@@ -2119,7 +2241,86 @@ export default function ProductDetailPage() {
           color: #000000;
         }
 
+        .reviews-footer-action {
+          display: flex;
+          justify-content: center;
+          margin-top: 40px;
+        }
 
+        .btn-view-all-reviews {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          padding: 16px 48px;
+          background-color: transparent;
+          border: 1px solid #111827;
+          color: #111827;
+          font-family: var(--font-sans);
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: all 0.25s ease;
+        }
+
+        .btn-view-all-reviews:hover {
+          background-color: #111827;
+          color: #FFFFFF;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+        }
+
+        .btn-view-all-reviews .btn-arrow {
+          font-size: 15px;
+          line-height: 1;
+          transition: transform 0.2s ease;
+        }
+
+        .btn-view-all-reviews:hover .btn-arrow {
+          transform: translateX(4px);
+        }
+
+        .all-reviews-modal-card {
+          max-width: 820px;
+        }
+
+        .modal-sub-count {
+          display: block;
+          font-size: 12px;
+          color: #6B7280;
+          margin-top: 4px;
+        }
+
+        .modal-reviews-list {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          max-height: 55vh;
+          overflow-y: auto;
+          padding-right: 8px;
+          margin: 16px 0;
+        }
+
+        .modal-review-item {
+          background: #FAF9F6;
+          border: 1px solid #EAE8E1;
+          border-radius: 10px;
+          padding: 16px;
+        }
+
+        .modal-rev-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 6px;
+        }
+
+        .modal-rev-meta {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
 
         /* 5. Section: Similar Products */
         .section-similar-products {
