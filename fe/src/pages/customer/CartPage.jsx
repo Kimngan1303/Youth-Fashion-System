@@ -27,13 +27,16 @@ export default function CartPage() {
   const [similarProducts, setSimilarProducts] = useState([]);
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState(null);
+  const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
   const [orderNote, setOrderNote] = useState('');
   const [availableVouchers, setAvailableVouchers] = useState(() => voucherService.getCustomerVouchers());
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
 
-  // Lắng nghe cập nhật danh sách voucher từ Trang cá nhân / Quản lý và CSDL
+  // Lắng nghe cập nhật danh sách voucher từ Trang cá nhân / Quản lý và CSDL MySQL
   useEffect(() => {
-    voucherService.fetchVouchers().catch(() => {});
+    voucherService.fetchVouchers().then(() => {
+      setAvailableVouchers(voucherService.getCustomerVouchers());
+    }).catch(() => {});
     const unsubscribe = voucherService.subscribe(() => {
       setAvailableVouchers(voucherService.getCustomerVouchers());
     });
@@ -95,136 +98,46 @@ export default function CartPage() {
     showInfo('Đã làm trống giỏ hàng.');
   };
 
-  const KNOWN_VOUCHERS = {
-    'ATELIER-500K': {
-      code: 'ATELIER-500K',
-      discountAmount: 500000,
-      minOrder: 3000000,
-      title: 'Giảm 500.000đ cho đơn từ 3.000.000đ',
-    },
-    'BDAY-2026': {
-      code: 'BDAY-2026',
-      discountAmount: 1000000,
-      minOrder: 2000000,
-      title: 'Quà tặng sinh nhật VIP 1.000.000đ',
-    },
-    'YOUTH-VIP10': {
-      code: 'YOUTH-VIP10',
-      discountPercent: 10,
-      title: 'Chiết khấu 10% Đặc Quyền VIP',
-    },
-    'YOUTH10': {
-      code: 'YOUTH10',
-      discountPercent: 10,
-      title: 'Giảm giá 10% đơn hàng',
-    },
-    'WELCOME10': {
-      code: 'WELCOME10',
-      discountPercent: 10,
-      title: 'Ưu Đãi Hội Viên Mới Đăng Ký 10%',
-    },
-    'YF-WELCOME10': {
-      code: 'YF-WELCOME10',
-      discountPercent: 10,
-      title: 'Ưu Đãi Hội Viên Mới Đăng Ký 10%',
-    },
-    'WINTER25': {
-      code: 'WINTER25',
-      discountPercent: 20,
-      maxDiscount: 500000,
-      minOrder: 1500000,
-      title: 'Giảm 20% BST Thu Đông 2025 (Tối đa 500.000đ)',
-    },
-    'YF-WINTER25': {
-      code: 'YF-WINTER25',
-      discountPercent: 20,
-      maxDiscount: 500000,
-      minOrder: 1500000,
-      title: 'Giảm 20% BST Thu Đông 2025 (Tối đa 500.000đ)',
-    },
-    'FREESHIP-PREMIUM': {
-      code: 'FREESHIP-PREMIUM',
-      discountAmount: 50000,
-      title: 'Miễn Phí Vận Chuyển Hỏa Tốc',
-    },
-    'FREESHIP': {
-      code: 'FREESHIP',
-      discountAmount: 50000,
-      title: 'Miễn Phí Vận Chuyển',
-    },
-  };
-
-  // Áp dụng voucher theo mã (dùng cho cả Chọn từ ví và Nhập tay)
-  const applyVoucherByCode = (inputCode) => {
+  // Áp dụng voucher theo mã qua API Backend thật (/api/vouchers/apply)
+  const applyVoucherByCode = async (inputCode) => {
     if (!inputCode) return;
     const cleanCode = inputCode.trim().toUpperCase().replace(/\s+/g, '');
 
-    // 1. Kiểm tra từ Kho Voucher Trang cá nhân / Hệ thống
-    const serviceVoucher = voucherService.findVoucherByCode(cleanCode) || voucherService.findVoucherByCode(inputCode);
-    if (serviceVoucher) {
-      if (serviceVoucher.minOrder && rawProductTotal < serviceVoucher.minOrder) {
-        showError(`Mã ${serviceVoucher.code} chỉ áp dụng cho đơn hàng từ ${serviceVoucher.minOrder.toLocaleString('vi-VN')}₫ trở lên (cần thêm ${(serviceVoucher.minOrder - rawProductTotal).toLocaleString('vi-VN')}₫).`);
-        return;
-      }
-      const applied = {
-        code: serviceVoucher.code,
-        discountAmount: serviceVoucher.discountAmount || 0,
-        discountPercent: serviceVoucher.discountPercent || 0,
-        maxDiscount: serviceVoucher.maxDiscount || 0,
-        minOrder: serviceVoucher.minOrder || 0,
-        title: serviceVoucher.name || serviceVoucher.title,
-      };
-      setAppliedVoucher(applied);
-      setVoucherCode(serviceVoucher.code);
-      const discountDesc = applied.discountAmount 
-        ? `${applied.discountAmount.toLocaleString('vi-VN')}₫` 
-        : `${applied.discountPercent}%`;
-      showSuccess(`Đã áp dụng mã ưu đãi ${applied.code} (-${discountDesc})!`);
-      setIsVoucherModalOpen(false);
+    if (selectedItems.length === 0 || rawProductTotal <= 0) {
+      showError('Vui lòng chọn ít nhất 1 sản phẩm trong giỏ hàng trước khi áp dụng mã ưu đãi.');
       return;
     }
 
-    // 2. Kiểm tra danh sách mã fallback dự phòng
-    const matched = KNOWN_VOUCHERS[cleanCode] || KNOWN_VOUCHERS[inputCode.trim().toUpperCase()];
-    if (matched) {
-      if (matched.minOrder && rawProductTotal < matched.minOrder) {
-        showError(`Mã ${matched.code} chỉ áp dụng cho đơn hàng từ ${matched.minOrder.toLocaleString('vi-VN')}₫ trở lên.`);
-        return;
+    setIsApplyingVoucher(true);
+    try {
+      const res = await voucherService.applyVoucherApi(cleanCode, rawProductTotal);
+      if (res?.status && res?.data) {
+        const { voucher, discountAmount } = res.data;
+        const applied = {
+          code: voucher.code,
+          discountAmount: discountAmount || 0,
+          discountPercent: voucher.discountPercent || 0,
+          maxDiscount: voucher.maxDiscount || 0,
+          minOrder: voucher.minOrder || 0,
+          title: voucher.name || voucher.title,
+          discountType: voucher.discountType,
+        };
+        setAppliedVoucher(applied);
+        setVoucherCode(voucher.code);
+        const discountDesc = discountAmount 
+          ? `${discountAmount.toLocaleString('vi-VN')}₫` 
+          : `${voucher.discountPercent}%`;
+        showSuccess(`Đã áp dụng mã ưu đãi ${voucher.code} (-${discountDesc})!`);
+        setIsVoucherModalOpen(false);
+      } else {
+        showError(res?.message || 'Mã ưu đãi không hợp lệ.');
       }
-      setAppliedVoucher(matched);
-      setVoucherCode(matched.code);
-      const discountDesc = matched.discountAmount 
-        ? `${matched.discountAmount.toLocaleString('vi-VN')}₫` 
-        : `${matched.discountPercent}%`;
-      showSuccess(`Đã áp dụng mã ưu đãi ${matched.code} (-${discountDesc})!`);
-      setIsVoucherModalOpen(false);
-      return;
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message || 'Mã ưu đãi không tồn tại hoặc đã hết hạn sử dụng.';
+      showError(errorMsg);
+    } finally {
+      setIsApplyingVoucher(false);
     }
-
-    // 3. Nhận diện động theo cú pháp mã (ví dụ: ATELIER-500K, SALE-200K, VIP-15%,...)
-    let discountAmount = 0;
-    let discountPercent = 0;
-    const kMatch = cleanCode.match(/(\d+)K$/i) || cleanCode.match(/-(\d+)K/i);
-    const pctMatch = cleanCode.match(/(\d+)%/i) || cleanCode.match(/-(\d+)%/i);
-
-    if (kMatch) {
-      discountAmount = parseInt(kMatch[1], 10) * 1000;
-    } else if (pctMatch) {
-      discountPercent = parseInt(pctMatch[1], 10);
-    } else {
-      discountAmount = 50000;
-    }
-
-    const applied = {
-      code: inputCode.trim().toUpperCase(),
-      discountAmount,
-      discountPercent,
-    };
-    setAppliedVoucher(applied);
-    setVoucherCode(applied.code);
-    const displayVal = discountAmount ? `${discountAmount.toLocaleString('vi-VN')}₫` : `${discountPercent}%`;
-    showSuccess(`Đã áp dụng mã ưu đãi ${applied.code} (-${displayVal})!`);
-    setIsVoucherModalOpen(false);
   };
 
   const handleApplyVoucher = (e) => {
@@ -554,9 +467,10 @@ export default function CartPage() {
                     onChange={(e) => setVoucherCode(e.target.value)}
                     placeholder="NHẬP MÃ ƯU ĐÃI..."
                     className="voucher-input"
+                    disabled={isApplyingVoucher}
                   />
-                  <button type="submit" className="btn-apply-voucher">
-                    ÁP DỤNG
+                  <button type="submit" className="btn-apply-voucher" disabled={isApplyingVoucher}>
+                    {isApplyingVoucher ? 'ĐANG XỬ LÝ...' : 'ÁP DỤNG'}
                   </button>
                 </form>
 
@@ -564,7 +478,11 @@ export default function CartPage() {
                   <div className="voucher-applied-tag">
                     <span className="applied-left">
                       <Check size={13} />
-                      <span>Voucher {appliedVoucher.code} (-{voucherDiscount.toLocaleString('vi-VN')}₫)</span>
+                      <span>
+                        Voucher {appliedVoucher.code} {voucherDiscount > 0 
+                          ? `(-${voucherDiscount.toLocaleString('vi-VN')}₫)`
+                          : `(Chưa đạt đơn tối thiểu ${appliedVoucher.minOrder?.toLocaleString('vi-VN')}₫)`}
+                      </span>
                     </span>
                     <button type="button" className="btn-remove-voucher" onClick={handleRemoveVoucher}>
                       GỠ MÃ
@@ -769,12 +687,12 @@ export default function CartPage() {
                         <button
                           type="button"
                           className="btn-voucher-action apply"
-                          disabled={!isEligible}
+                          disabled={!isEligible || isApplyingVoucher}
                           onClick={() => {
                             applyVoucherByCode(v.code);
                           }}
                         >
-                          Áp Dụng
+                          {isApplyingVoucher ? 'Đang xử lý...' : 'Áp Dụng'}
                         </button>
                       )}
                     </div>

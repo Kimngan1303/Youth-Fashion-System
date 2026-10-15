@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/auth.service';
+import { cartService } from '../services/cartService';
 import { getColorHex } from '../utils/colorUtils';
 
 export const AuthContext = createContext(null);
@@ -107,6 +108,38 @@ export function AuthProvider({ children }) {
         setCart([]);
       }
     }
+
+    // Đồng bộ trực tiếp từ Database MySQL qua API /api/cart
+    cartService.getCart()
+      .then((res) => {
+        if (res?.status && res?.data?.items) {
+          const apiItems = res.data.items.map((item) => ({
+            id: String(item.variant_id || item.cart_item_id),
+            cartItemId: String(item.cart_item_id),
+            variant_id: item.variant_id,
+            productId: item.product_id,
+            sku: item.sku,
+            categoryTag: item.category_name || 'THỜI TRANG',
+            title: item.product_name,
+            colorName: item.color,
+            colorDot: getColorHex(item.color || ''),
+            size: item.size,
+            price: item.price,
+            quantity: item.quantity,
+            stock: item.stock,
+            image: item.image,
+            selected: true,
+          }));
+          setCart(apiItems);
+          if (cartKey) {
+            localStorage.setItem(cartKey, JSON.stringify(apiItems));
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('Chưa thể đồng bộ giỏ hàng từ server, sử dụng bộ nhớ đệm:', err.message);
+      });
+
     if (wishlistKey) {
       try {
         const saved = localStorage.getItem(wishlistKey);
@@ -223,18 +256,54 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const addToCart = (product, selectedSize = 'M', quantity = 1) => {
+  const addToCart = async (product, selectedSize = 'M', quantity = 1) => {
     if (!user) {
       return { success: false, requireLogin: true, message: 'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!' };
     }
 
-    setCart(prev => {
-      const prodId = product.id || product.product_id || product.sku || 'PROD';
-      const size = selectedSize || product.selectedSize || 'M';
+    const prodId = product.id || product.product_id || product.sku || 'PROD';
+    const size = selectedSize || product.selectedSize || 'M';
+    const variantId = product.variant_id || product.variantId;
+
+    // 1. Nếu có variant_id hợp lệ, gọi Backend API lưu vào MySQL
+    if (variantId && !isNaN(Number(variantId))) {
+      try {
+        const res = await cartService.addToCart(variantId, quantity);
+        if (res?.status && res?.data?.items) {
+          const apiItems = res.data.items.map((item) => ({
+            id: String(item.variant_id || item.cart_item_id),
+            cartItemId: String(item.cart_item_id),
+            variant_id: item.variant_id,
+            productId: item.product_id,
+            sku: item.sku,
+            categoryTag: item.category_name || 'THỜI TRANG',
+            title: item.product_name,
+            colorName: item.color,
+            colorDot: getColorHex(item.color || ''),
+            size: item.size,
+            price: item.price,
+            quantity: item.quantity,
+            stock: item.stock,
+            image: item.image,
+            selected: true,
+          }));
+          setCart(apiItems);
+          const cartKey = getUserStorageKey('youth_fashion_cart', user);
+          if (cartKey) {
+            localStorage.setItem(cartKey, JSON.stringify(apiItems));
+          }
+          return { success: true };
+        }
+      } catch (err) {
+        console.warn('Lỗi gọi API cart, lưu cục bộ:', err.message);
+      }
+    }
+
+    // 2. Dự phòng cục bộ (local fallback)
+    setCart((prev) => {
       const cartItemId = `${prodId}-${size}`;
-      
-      const existingIndex = prev.findIndex(item => item.id === cartItemId || (item.productId === prodId && item.size === size));
-      
+      const existingIndex = prev.findIndex((item) => item.id === cartItemId || (item.productId === prodId && item.size === size));
+
       let next;
       if (existingIndex > -1) {
         next = prev.map((item, idx) => {
@@ -263,7 +332,7 @@ export function AuthProvider({ children }) {
           image: product.image || product.images?.[0]?.image_url || 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=800',
           badge: product.badge || product.badgeTop || null,
           badgeBg: product.badgeBg || product.badgeTopBg || '#000000',
-          selected: true
+          selected: true,
         };
         next = [newItem, ...prev];
       }
@@ -278,12 +347,22 @@ export function AuthProvider({ children }) {
     return { success: true };
   };
 
-  const updateCartQuantity = (cartItemId, delta) => {
+  const updateCartQuantity = async (cartItemId, delta) => {
     if (!user) return;
-    setCart(prev => {
-      const next = prev.map(item => {
-        if (item.id === cartItemId) {
-          const newQty = Math.max(1, item.quantity + delta);
+    const currentItem = cart.find((item) => item.id === cartItemId || item.cartItemId === cartItemId);
+    const newQty = Math.max(1, (currentItem?.quantity || 1) + delta);
+
+    // Đồng bộ API nếu mục có variant_id
+    const targetVariantId = currentItem?.variant_id || (currentItem && !isNaN(Number(currentItem.id)) ? currentItem.id : null);
+    if (targetVariantId) {
+      cartService.updateQuantity(targetVariantId, newQty).catch((err) => {
+        console.warn('Lỗi cập nhật số lượng qua API:', err.message);
+      });
+    }
+
+    setCart((prev) => {
+      const next = prev.map((item) => {
+        if (item.id === cartItemId || item.cartItemId === cartItemId) {
           return { ...item, quantity: newQty };
         }
         return item;
@@ -298,10 +377,19 @@ export function AuthProvider({ children }) {
     });
   };
 
-  const removeFromCart = (cartItemId) => {
+  const removeFromCart = async (cartItemId) => {
     if (!user) return;
-    setCart(prev => {
-      const next = prev.filter(item => item.id !== cartItemId);
+    const currentItem = cart.find((item) => item.id === cartItemId || item.cartItemId === cartItemId);
+    const targetVariantId = currentItem?.variant_id || (currentItem && !isNaN(Number(currentItem.id)) ? currentItem.id : null);
+
+    if (targetVariantId) {
+      cartService.removeFromCart(targetVariantId).catch((err) => {
+        console.warn('Lỗi xóa sản phẩm qua API:', err.message);
+      });
+    }
+
+    setCart((prev) => {
+      const next = prev.filter((item) => item.id !== cartItemId && item.cartItemId !== cartItemId);
       const cartKey = getUserStorageKey('youth_fashion_cart', user);
       if (cartKey) {
         try {
@@ -312,8 +400,11 @@ export function AuthProvider({ children }) {
     });
   };
 
-  const clearCart = () => {
+  const clearCart = async () => {
     if (!user) return;
+    cartService.clearCart().catch((err) => {
+      console.warn('Lỗi xóa sạch giỏ hàng qua API:', err.message);
+    });
     setCart([]);
     const cartKey = getUserStorageKey('youth_fashion_cart', user);
     if (cartKey) {
