@@ -5,6 +5,7 @@ import { productService } from "../../services/productService";
 import { useToast } from "../../context/ToastContext";
 import ManagerSidebar from "../../components/ManagerSidebar";
 import ManagerHeader from "../../components/ManagerHeader";
+import { getColorHex, isLightColor } from "../../utils/colorUtils";
 import {
   LayoutGrid,
   Package,
@@ -2045,16 +2046,33 @@ export default function ProductManager() {
                           handleVariantChange(idx, "size", e.target.value)
                         }
                       />
-                      <input
-                        placeholder="Màu"
-                        className="form-input"
-                        style={{ padding: "6px", fontSize: "11px" }}
-                        disabled={drawerMode === "view"}
-                        value={v.color}
-                        onChange={(e) =>
-                          handleVariantChange(idx, "color", e.target.value)
-                        }
-                      />
+                      <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                        <input
+                          placeholder="Màu (vd: Xanh biển, Đỏ, Đen...)"
+                          className="form-input"
+                          style={{ padding: "6px 26px 6px 8px", fontSize: "11px", minWidth: 90 }}
+                          disabled={drawerMode === "view"}
+                          value={v.color}
+                          onChange={(e) =>
+                            handleVariantChange(idx, "color", e.target.value)
+                          }
+                        />
+                        <span
+                          title={`Mã màu hiển thị: ${getColorHex(v.color)}`}
+                          style={{
+                            position: "absolute",
+                            right: 6,
+                            width: 14,
+                            height: 14,
+                            borderRadius: "50%",
+                            backgroundColor: getColorHex(v.color),
+                            border: isLightColor(getColorHex(v.color)) ? "1px solid #D1D5DB" : "1px solid rgba(0,0,0,0.15)",
+                            boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                            pointerEvents: "none",
+                            flexShrink: 0,
+                          }}
+                        />
+                      </div>
                       <input
                         placeholder="Giá (VNĐ)"
                         type="number"
