@@ -590,7 +590,19 @@ export default function ProductDetailPage() {
                 <button
                   type="button"
                   className="btn-contact-seller"
-                  onClick={() => navigate('/chat')}
+                  onClick={() => navigate('/chat', {
+                    state: {
+                      initialProduct: {
+                        id: product.id || product.product_id,
+                        name: product.product_name || product.name,
+                        price: product.price,
+                        image: activeImage,
+                        category: product.category_name,
+                        sku: product.sku || `YF-${product.id || product.product_id || 'PROD'}`,
+                        description: product.description || product.short_description || 'Thiết kế thời trang cao cấp, chất liệu cao cấp và kiểu dáng hiện đại từ YOUTH FASHION.',
+                      }
+                    }
+                  })}
                 >
                   <MessageSquare size={15} color="#1A1C1A" />
                   <span>LIÊN HỆ NGƯỜI BÁN</span>

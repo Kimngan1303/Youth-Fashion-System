@@ -334,7 +334,7 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
           <button
             type="button"
             className={`nav-menu-link ${activeMenu === 'support' ? 'active' : ''}`}
-            onClick={() => navigate('/manager')}
+            onClick={() => navigate('/manager/chat')}
           >
             <div className="nav-item-inner">
               <MessageSquare size={16} />

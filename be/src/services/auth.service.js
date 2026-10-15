@@ -271,8 +271,30 @@ export const loginService = async ({ email, password, user_type }) => {
     role = user.employee_role; // MANAGER hoặc ADMIN
   }
 
-  // 2. Kiểm tra mật khẩu Bcrypt
-  const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+  // 2. Kiểm tra mật khẩu (hỗ trợ cả Bcrypt hash và mật khẩu plain-text sửa trực tiếp trong CSDL)
+  let isPasswordValid = false;
+  if (user.password_hash && (user.password_hash.startsWith('$2a$') || user.password_hash.startsWith('$2b$'))) {
+    isPasswordValid = await bcrypt.compare(password, user.password_hash);
+  } else if (user.password_hash) {
+    // Trường hợp quản trị viên sửa trực tiếp mật khẩu dạng chữ (plain-text) trong MySQL Workbench
+    isPasswordValid = (password === user.password_hash);
+    if (isPasswordValid) {
+      // Tự động nâng cấp mã hóa lại thành chuẩn bcrypt hash bảo mật
+      const upgradedHash = await bcrypt.hash(password, 10);
+      if (user_type === 'CUSTOMER') {
+        await prisma.customer.update({
+          where: { customer_id: user.customer_id },
+          data: { password_hash: upgradedHash },
+        });
+      } else {
+        await prisma.employee.update({
+          where: { employee_id: user.employee_id },
+          data: { password_hash: upgradedHash },
+        });
+      }
+    }
+  }
+
   if (!isPasswordValid) {
     throw { statusCode: 401, message: 'Email hoặc mật khẩu không chính xác' };
   }

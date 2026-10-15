@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Search, User } from 'lucide-react';
+import { getInitials } from '../services/conversation.service';
 
 const headerStyles = `
   .top-header-bar {
@@ -88,7 +89,7 @@ export default function ManagerHeader({
   onSearchChange = null, 
   searchPlaceholder = 'Tìm kiếm trong hệ thống quản trị...',
   showSearch = false,
-  userName = 'Hoàng Kim Anh',
+  userName = 'Quản Lý Youth Fashion',
   userRole = 'Quản Lý Cửa Hàng & Bán Hàng'
 }) {
   const { user } = useAuth();
@@ -114,7 +115,7 @@ export default function ManagerHeader({
 
       <div className="header-user-profile">
         <div className="user-avatar-circle">
-          <User size={18} color="#FFFFFF" strokeWidth={2.2} />
+          {getInitials(displayName)}
         </div>
         <div className="user-info-text">
           <span className="user-name">{displayName}</span>
