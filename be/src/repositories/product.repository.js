@@ -15,6 +15,7 @@ export const findProducts = async ({
   brand_ids,
   search_name,
   status,
+  stock_status,
   sort,
   size,
   min_price,
@@ -22,8 +23,17 @@ export const findProducts = async ({
 }) => {
   const where = {};
 
-  if (status) {
+  if (status && status !== 'all' && status !== 'ALL') {
     where.status = status;
+  }
+
+  if (stock_status === 'out_of_stock') {
+    where.variants = { every: { stock: { lte: 0 } } };
+  } else if (stock_status === 'low_stock') {
+    where.variants = {
+      some: { stock: { lte: 5, gt: 0 } },
+      none: { stock: { gt: 5 } },
+    };
   }
 
   if (category_id) {
@@ -40,9 +50,11 @@ export const findProducts = async ({
   }
 
   if (search_name) {
-    where.product_name = {
-      contains: search_name,
-    };
+    where.OR = [
+      { product_name: { contains: search_name } },
+      { description: { contains: search_name } },
+      { variants: { some: { sku: { contains: search_name } } } },
+    ];
   }
 
   const variantFilter = {};
@@ -57,14 +69,20 @@ export const findProducts = async ({
   }
 
   if (Object.keys(variantFilter).length > 0) {
-    where.variants = {
-      some: variantFilter,
-    };
+    if (where.variants) {
+      where.variants = { ...where.variants, some: variantFilter };
+    } else {
+      where.variants = {
+        some: variantFilter,
+      };
+    }
   }
 
   let orderBy = { created_at: 'desc' };
   if (sort === 'oldest') {
     orderBy = { created_at: 'asc' };
+  } else if (sort === 'updated' || sort === 'newest_update') {
+    orderBy = { updated_at: 'desc' };
   } else if (sort === 'name_asc') {
     orderBy = { product_name: 'asc' };
   } else if (sort === 'name_desc') {
@@ -315,4 +333,45 @@ export const findAllBrands = async () => {
     },
     orderBy: { brand_name: 'asc' },
   });
+};
+
+/**
+ * Lấy số lượng thống kê theo trạng thái và tồn kho cho Tab lọc
+ */
+export const getProductStatusCounts = async () => {
+  const allProducts = await prisma.product.findMany({
+    select: {
+      status: true,
+      variants: {
+        select: { stock: true },
+      },
+    },
+  });
+
+  let sellingCount = 0;
+  let lowStockCount = 0;
+  let outOfStockCount = 0;
+  let draftCount = 0;
+
+  allProducts.forEach((p) => {
+    const totalStock = p.variants ? p.variants.reduce((sum, v) => sum + (v.stock || 0), 0) : 0;
+    if (p.status === 'INACTIVE' || p.status === 'DRAFT') {
+      draftCount++;
+    } else if (p.status === 'ACTIVE') {
+      sellingCount++;
+    }
+    if (totalStock === 0) {
+      outOfStockCount++;
+    } else if (totalStock <= 5) {
+      lowStockCount++;
+    }
+  });
+
+  return {
+    all: allProducts.length,
+    selling: sellingCount,
+    low_stock: lowStockCount,
+    out_of_stock: outOfStockCount,
+    draft: draftCount,
+  };
 };

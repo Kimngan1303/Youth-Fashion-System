@@ -39,7 +39,7 @@ const formatProduct = (product) => {
 export const getProductsService = async (query) => {
   const page = Math.max(1, parseInt(query.page, 10) || 1);
   const limit = Math.max(1, parseInt(query.limit, 10) || 10);
-  const { category_id, brand_id, brand_ids, search, status, sort, size, min_price, max_price } = query;
+  const { category_id, brand_id, brand_ids, search, status, stock_status, sort, size, min_price, max_price } = query;
 
   const { items, total } = await productRepo.findProducts({
     page,
@@ -49,6 +49,7 @@ export const getProductsService = async (query) => {
     brand_ids,
     search_name: search,
     status,
+    stock_status,
     sort,
     size,
     min_price,
@@ -252,15 +253,17 @@ export const setPrimaryProductImageService = async (productId, imageId) => {
  * Lấy danh mục và thương hiệu cho bộ lọc Dropdown
  */
 export const getCategoriesAndBrandsService = async () => {
-  const [categories, brands] = await Promise.all([
+  const [categories, brands, statusCounts] = await Promise.all([
     productRepo.findAllCategories(),
     productRepo.findAllBrands(),
+    productRepo.getProductStatusCounts(),
   ]);
 
   const totalProducts = categories.reduce((sum, c) => sum + (c._count?.products || 0), 0);
 
   return {
     totalProducts,
+    statusCounts,
     categories: categories.map((c) => ({
       ...c,
       category_id: String(c.category_id),
