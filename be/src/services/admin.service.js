@@ -55,46 +55,39 @@ export const getAllUsersService = async ({ search = '', role = 'ALL', status = '
       user_code: emp.employee_code,
       full_name: emp.full_name,
       email: emp.email,
-      phone: emp.phone || '0988.000.111',
+      phone: emp.phone || 'Chưa cập nhật',
       avatar_url: null,
       role: isEmpAdmin ? 'ADMIN' : 'MANAGER',
       role_label: isEmpAdmin ? 'Quản Trị Viên (Admin)' : 'Manager',
-      sub_role: isEmpAdmin ? 'Quyền: Toàn quyền hệ thống' : 'Chi nhánh Saigon Flagship • Quản lý vận hành',
-      total_spending: isEmpAdmin ? 0 : 0,
+      sub_role: isEmpAdmin ? 'Toàn quyền hệ thống' : 'Quản lý vận hành',
+      total_spending: 0,
       spending_display: 'Nhân sự nội bộ',
       orders_count: 0,
-      orders_display: isEmpAdmin ? 'Quyền cao nhất' : 'Quản lý chi nhánh',
+      orders_display: isEmpAdmin ? 'Quản trị viên' : 'Quản lý',
       last_login: emp.last_login_at
         ? new Date(emp.last_login_at).toLocaleString('vi-VN')
-        : 'Vừa xong (POS Terminal #02)',
+        : 'Chưa đăng nhập',
       status: emp.status === 'ACTIVE' ? 'ACTIVE' : 'LOCKED',
       created_at: emp.created_at,
     };
   });
 
-  // 4. Chuẩn hóa danh sách Customers thành format thống nhất
-  const formattedCustomers = customers.map((c, idx) => {
-    // Phân loại cấp bậc VIP dựa vào ID hoặc số đơn
-    const totalSpent = c.orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-    const orderCount = c._count.orders;
+  // 4. Chuẩn hóa danh sách Customers thành format thống nhất (tính chi tiêu và đơn hàng thực tế)
+  const formattedCustomers = customers.map((c) => {
+    // Tính tổng chi tiêu thực tế từ các đơn hàng hợp lệ của account (không tính đơn đã hủy)
+    const validOrders = c.orders ? c.orders.filter((o) => o.order_status !== 'CANCELLED') : [];
+    const totalSpent = validOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const orderCount = validOrders.length;
 
     let role = 'CUSTOMER';
     let role_label = 'Khách Hàng';
-    let sub_role = null;
-
-    // Phân loại khách hàng: Khách Hàng hoặc Khách Hàng VIP
-    if (idx === 0 || c.email.includes('vip') || totalSpent > 20000000 || idx % 4 === 0) {
+    if (totalSpent >= 20000000 || orderCount >= 5) {
       role = 'VIP';
       role_label = 'Khách Hàng VIP';
     }
 
-    const displaySpending = totalSpent > 0 
-      ? `${totalSpent.toLocaleString('vi-VN')}đ` 
-      : (role === 'VIP' ? '32.800.000đ' : idx === 2 ? '8.450.000đ' : '0đ');
-    
-    const displayOrders = orderCount > 0 
-      ? `${orderCount} đơn thành công` 
-      : (role === 'VIP' ? '8 đơn thành công' : idx === 2 ? '3 đơn thành công' : '0 đơn hoàn tất');
+    const displaySpending = `${totalSpent.toLocaleString('vi-VN')}₫`;
+    const displayOrders = `${orderCount} đơn hàng`;
 
     return {
       id: c.customer_id.toString(),
@@ -102,18 +95,18 @@ export const getAllUsersService = async ({ search = '', role = 'ALL', status = '
       user_code: `CUST_${c.customer_id.toString().padStart(4, '0')}`,
       full_name: c.full_name,
       email: c.email,
-      phone: c.phone || '0905.776.442',
+      phone: c.phone || 'Chưa cập nhật',
       avatar_url: c.avatar_url,
       role,
       role_label,
-      sub_role,
+      sub_role: null,
       total_spending: totalSpent,
       spending_display: displaySpending,
       orders_count: orderCount,
       orders_display: displayOrders,
       last_login: c.last_login_at 
         ? new Date(c.last_login_at).toLocaleString('vi-VN')
-        : (idx === 0 ? '10 phút trước (iOS App • Q.1 TP.HCM)' : idx === 1 ? 'Hôm qua 18:24 (Web Safari • Hà Nội)' : '3 ngày trước (Android App • Đà Nẵng)'),
+        : 'Chưa đăng nhập',
       status: c.status === 'BLOCKED' ? 'LOCKED' : (c.status === 'ACTIVE' ? 'ACTIVE' : 'LOCKED'),
       created_at: c.created_at,
     };
@@ -172,12 +165,18 @@ export const getAdminMetricsService = async () => {
   const activeTotal = activeCustomers + totalEmployees;
   const lockedTotal = blockedCustomers;
 
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const newThisMonth = await prisma.customer.count({
+    where: { created_at: { gte: startOfMonth } },
+  });
+
   return {
     totalUsers,
     activeTotal,
     lockedTotal,
-    vipCount: Math.max(1, Math.round(totalCustomers * 0.15)),
-    newThisMonth: Math.max(5, Math.round(totalCustomers * 0.2)),
+    vipCount: 0,
+    newThisMonth,
     totalEmployees,
     adminEmployees,
     managerEmployees,

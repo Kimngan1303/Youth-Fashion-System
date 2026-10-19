@@ -899,28 +899,28 @@ export default function UserManagement() {
               </div>
             </div>
 
-            {/* Thẻ 2: Hội viên VIP & Privé */}
+            {/* Thẻ 2: Khách Hàng VIP */}
             <div className="um-metric-card">
               <div className="um-metric-head">
-                <span className="um-metric-title">HỘI VIÊN VIP & PRIVÉ</span>
+                <span className="um-metric-title">KHÁCH HÀNG VIP</span>
                 <div className="um-metric-icon-box gold">
                   <Star size={18} fill="#D97706" />
                 </div>
               </div>
               <div className="um-metric-value-row">
                 <span className="um-metric-value-num">
-                  {metrics?.vipCount ? metrics.vipCount.toLocaleString('vi-VN') : '1.840'}
+                  {counts.vip.toLocaleString('vi-VN')}
                 </span>
-                <span className="um-metric-value-unit">Hội viên cao cấp</span>
+                <span className="um-metric-value-unit">Tài khoản</span>
               </div>
               <div>
                 <div className="um-metric-subtext" style={{ color: '#D97706', fontWeight: 600 }}>
-                  <span>VIP Gold & Diamond</span>
+                  <span>Hội viên VIP</span>
                   <span style={{ margin: '0 4px', color: '#D1D5DB' }}>•</span>
-                  <span style={{ color: '#78716C', fontWeight: 400 }}>Đóng góp 64% DT</span>
+                  <span style={{ color: '#78716C', fontWeight: 400 }}>Tài khoản thân thiết</span>
                 </div>
                 <div className="um-progress-bar-wrap">
-                  <div className="um-progress-bar-fill" style={{ width: '64%', background: '#D97706' }} />
+                  <div className="um-progress-bar-fill" style={{ width: `${Math.min(100, Math.max(10, (counts.vip / (counts.all || 1)) * 100))}%`, background: '#D97706' }} />
                 </div>
               </div>
             </div>
@@ -935,16 +935,16 @@ export default function UserManagement() {
               </div>
               <div className="um-metric-value-row">
                 <span className="um-metric-value-num" style={{ color: '#16A34A' }}>
-                  +{metrics?.newThisMonth || '845'}
+                  +{metrics?.newThisMonth ?? counts.customers}
                 </span>
-                <span style={{ color: '#16A34A', fontSize: '13px', fontWeight: 600 }}>↑ +18.2%</span>
+                <span style={{ color: '#16A34A', fontSize: '13px', fontWeight: 600 }}>Tài khoản</span>
               </div>
               <div>
                 <div className="um-metric-subtext">
-                  <span>Tăng trưởng so với tháng trước (+128 TK)</span>
+                  <span>Gia nhập trong tháng {new Date().getMonth() + 1}/{new Date().getFullYear()}</span>
                 </div>
                 <div className="um-progress-bar-wrap">
-                  <div className="um-progress-bar-fill" style={{ width: '70%', background: '#16A34A' }} />
+                  <div className="um-progress-bar-fill" style={{ width: '100%', background: '#16A34A' }} />
                 </div>
               </div>
             </div>
@@ -959,17 +959,17 @@ export default function UserManagement() {
               </div>
               <div className="um-metric-value-row">
                 <span className="um-metric-value-num">
-                  {metrics?.totalEmployees || counts.employees}
+                  {counts.employees}
                 </span>
-                <span className="um-metric-value-unit">Nhân viên</span>
+                <span className="um-metric-value-unit">Nhân sự</span>
               </div>
               <div>
                 <div className="um-metric-subtext" style={{ color: '#4B5563', fontWeight: 500 }}>
                   <strong style={{ color: '#111111' }}>{metrics?.adminEmployees || 1} Admin</strong> •{' '}
-                  {metrics?.managerEmployees || 1} Manager • 20 CSKH
+                  {metrics?.managerEmployees || 0} Manager
                 </div>
                 <div className="um-progress-bar-wrap">
-                  <div className="um-progress-bar-fill" style={{ width: '90%', background: '#7C3AED' }} />
+                  <div className="um-progress-bar-fill" style={{ width: '100%', background: '#7C3AED' }} />
                 </div>
               </div>
             </div>
