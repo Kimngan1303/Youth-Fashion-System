@@ -17,6 +17,7 @@ import {
   Lock,
   Unlock,
   Loader2,
+  RefreshCw,
   X,
   CheckCircle,
   AlertCircle
@@ -609,6 +610,11 @@ const userStyles = `
     border-top: 1px solid #EDE8DE;
     background: #FAF9F6;
   }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
 `;
 
 // Helper sinh avatar màu dựa trên tên
@@ -770,14 +776,27 @@ export default function UserManagement() {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   };
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Đồng bộ thủ công toàn bộ dữ liệu tài khoản từ CSDL MySQL
+  const handleSyncData = async () => {
+    setIsSyncing(true);
+    try {
+      await fetchData();
+      showSuccess('Đã đồng bộ toàn bộ tài khoản từ database thành công!');
+    } catch (err) {
+      showError('Lỗi khi đồng bộ dữ liệu tài khoản');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Toggle nhanh trạng thái Khóa / Kích hoạt
   const handleToggleStatus = async (user) => {
     const nextStatus = user.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
     try {
       await adminService.updateUserStatus(user.type, user.id, nextStatus);
-      setUsers((prev) =>
-        prev.map((u) => (u.id === user.id && u.type === user.type ? { ...u, status: nextStatus } : u))
-      );
+      await fetchData();
       showSuccess(`Đã ${nextStatus === 'ACTIVE' ? 'mở khóa' : 'khóa'} tài khoản "${user.full_name}"`);
     } catch (err) {
       showError('Không thể cập nhật trạng thái tài khoản');
@@ -794,10 +813,8 @@ export default function UserManagement() {
     }
     try {
       await adminService.updateUserRole(roleModalUser.type, roleModalUser.id, selectedRole);
-      setUsers((prev) =>
-        prev.map((u) => (u.id === roleModalUser.id && u.type === roleModalUser.type ? { ...u, role: selectedRole } : u))
-      );
-      showSuccess(`Đã cập nhật vai trò cho "${roleModalUser.full_name}"`);
+      await fetchData();
+      showSuccess(`Đã cập nhật vai trò cho "${roleModalUser.full_name}" thành công!`);
       setRoleModalUser(null);
     } catch (err) {
       showError('Lỗi khi cập nhật vai trò');
@@ -808,7 +825,7 @@ export default function UserManagement() {
   const handleDeleteUser = async (user) => {
     try {
       await adminService.deleteUser(user.type, user.id);
-      setUsers((prev) => prev.filter((u) => !(u.id === user.id && u.type === user.type)));
+      await fetchData();
       setSelectedIds((prev) => prev.filter((id) => id !== user.id));
       showSuccess(`Đã xóa tài khoản "${user.full_name}" thành công`);
     } catch (err) {
@@ -861,6 +878,17 @@ export default function UserManagement() {
             </div>
 
             <div className="um-head-actions">
+              <button
+                type="button"
+                className="um-btn-pill-action"
+                onClick={handleSyncData}
+                disabled={isSyncing || loading}
+                title="Đồng bộ danh sách tài khoản từ database"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <RefreshCw size={14} style={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
+                <span>{isSyncing ? 'Đang đồng bộ...' : 'Đồng Bộ Database'}</span>
+              </button>
               <button type="button" className="um-btn-pill-action" onClick={handleExportCSV}>
                 <Download size={15} />
                 Xuất Danh Sách

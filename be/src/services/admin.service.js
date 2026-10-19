@@ -112,8 +112,16 @@ export const getAllUsersService = async ({ search = '', role = 'ALL', status = '
     };
   });
 
-  // Ghép chung danh sách
-  let combined = [...formattedEmployees, ...formattedCustomers];
+  // Ghép chung danh sách, loại bỏ trùng lặp nếu email đã là nhân sự đang hoạt động
+  const activeEmployeeEmails = new Set(
+    formattedEmployees
+      .filter((e) => e.status === 'ACTIVE')
+      .map((e) => (e.email || '').toLowerCase())
+  );
+  const dedupedCustomers = formattedCustomers.filter(
+    (c) => !activeEmployeeEmails.has((c.email || '').toLowerCase())
+  );
+  let combined = [...formattedEmployees, ...dedupedCustomers];
 
   // Lọc theo search
   if (normalizedSearch) {
@@ -258,21 +266,104 @@ export const updateUserStatusService = async ({ type, id, status }) => {
 };
 
 /**
- * Cập nhật vai trò / phân quyền người dùng
+ * Cập nhật vai trò / phân quyền người dùng (đồng bộ vào CSDL)
  */
 export const updateUserRoleService = async ({ type, id, role }) => {
   if (type === 'EMPLOYEE') {
-    // Không cho phép phân quyền thêm tài khoản Admin, chỉ gán MANAGER
-    const validRole = role === 'MANAGER' ? 'MANAGER' : 'MANAGER';
-    const updated = await prisma.employee.update({
+    const emp = await prisma.employee.findUnique({
       where: { employee_id: BigInt(id) },
-      data: { employee_role: validRole },
     });
-    return { id: updated.employee_id.toString(), role: updated.employee_role };
+    if (!emp) {
+      const error = new Error('Không tìm thấy tài khoản nhân sự trong CSDL');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (emp.employee_role === 'ADMIN' || emp.email === 'admin@gmail.com') {
+      const error = new Error('Tài khoản Quản trị viên (Admin) là cố định duy nhất, không thể thay đổi vai trò');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (role === 'MANAGER') {
+      const updated = await prisma.employee.update({
+        where: { employee_id: BigInt(id) },
+        data: { employee_role: 'MANAGER', status: 'ACTIVE' },
+      });
+      return { id: updated.employee_id.toString(), role: 'MANAGER' };
+    } else {
+      // Chuyển nhân sự thành Khách hàng (CUSTOMER / VIP): Khóa quyền nhân viên
+      await prisma.employee.update({
+        where: { employee_id: BigInt(id) },
+        data: { status: 'INACTIVE' },
+      });
+      // Đảm bảo khách hàng có mặt trong bảng customers
+      const existingCust = await prisma.customer.findUnique({
+        where: { email: emp.email },
+      });
+      if (!existingCust) {
+        await prisma.customer.create({
+          data: {
+            full_name: emp.full_name,
+            email: emp.email,
+            phone: emp.phone,
+            password_hash: emp.password_hash,
+            status: 'ACTIVE',
+          },
+        });
+      }
+      return { id, role: role === 'VIP' ? 'VIP' : 'CUSTOMER' };
+    }
   } else {
-    // Với khách hàng: CUSTOMER hoặc VIP
-    const validCustomerRole = role === 'VIP' ? 'VIP' : 'CUSTOMER';
-    return { id, role: validCustomerRole };
+    // type === 'CUSTOMER'
+    const customer = await prisma.customer.findUnique({
+      where: { customer_id: BigInt(id) },
+    });
+    if (!customer) {
+      const error = new Error('Không tìm thấy tài khoản khách hàng trong CSDL');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (role === 'MANAGER') {
+      // Đồng bộ nâng cấp khách hàng thành Manager trong bảng employees
+      const existingEmp = await prisma.employee.findUnique({
+        where: { email: customer.email },
+      });
+      if (existingEmp) {
+        await prisma.employee.update({
+          where: { employee_id: existingEmp.employee_id },
+          data: { employee_role: 'MANAGER', status: 'ACTIVE' },
+        });
+      } else {
+        const empCode = `EMP_${customer.customer_id.toString().padStart(4, '0')}`;
+        await prisma.employee.create({
+          data: {
+            employee_code: empCode,
+            full_name: customer.full_name,
+            email: customer.email,
+            phone: customer.phone,
+            password_hash: customer.password_hash,
+            employee_role: 'MANAGER',
+            status: 'ACTIVE',
+          },
+        });
+      }
+      return { id, role: 'MANAGER' };
+    } else {
+      // role === 'VIP' hoặc 'CUSTOMER'
+      // Nếu có tài khoản employee cùng email thì vô hiệu hóa quyền nhân sự
+      const existingEmp = await prisma.employee.findUnique({
+        where: { email: customer.email },
+      });
+      if (existingEmp && existingEmp.employee_role !== 'ADMIN') {
+        await prisma.employee.update({
+          where: { employee_id: existingEmp.employee_id },
+          data: { status: 'INACTIVE' },
+        });
+      }
+      return { id, role: role === 'VIP' ? 'VIP' : 'CUSTOMER' };
+    }
   }
 };
 
