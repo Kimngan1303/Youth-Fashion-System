@@ -14,7 +14,6 @@ import {
   Download,
   Trash2,
   Edit3,
-  Eye,
   Lock,
   Unlock,
   Loader2,
@@ -1269,14 +1268,6 @@ export default function UserManagement() {
                                 }}
                               >
                                 <Edit3 size={15} />
-                              </button>
-                              <button
-                                type="button"
-                                className="um-action-btn"
-                                title="Xem hồ sơ chi tiết"
-                                onClick={() => setDetailModalUser(u)}
-                              >
-                                <Eye size={15} />
                               </button>
                               <button
                                 type="button"

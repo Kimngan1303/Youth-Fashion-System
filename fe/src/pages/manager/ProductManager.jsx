@@ -20,7 +20,6 @@ import {
   Plus,
   Trash2,
   Edit,
-  Eye,
   Star,
   Upload,
   X,
