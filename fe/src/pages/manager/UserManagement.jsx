@@ -966,7 +966,7 @@ export default function UserManagement() {
               <div>
                 <div className="um-metric-subtext" style={{ color: '#4B5563', fontWeight: 500 }}>
                   <strong style={{ color: '#111111' }}>{metrics?.adminEmployees || 1} Admin</strong> •{' '}
-                  {metrics?.managerEmployees || 1} Store Manager • 20 CSKH
+                  {metrics?.managerEmployees || 1} Manager • 20 CSKH
                 </div>
                 <div className="um-progress-bar-wrap">
                   <div className="um-progress-bar-fill" style={{ width: '90%', background: '#7C3AED' }} />
@@ -1199,13 +1199,8 @@ export default function UserManagement() {
                                 <span>Khách Hàng VIP</span>
                               </div>
                             ) : u.role === 'MANAGER' ? (
-                              <div>
-                                <div className="um-role-badge manager">
-                                  <span>Store Manager (Manager)</span>
-                                </div>
-                                <div style={{ fontSize: '11px', color: '#78716C', marginTop: 2 }}>
-                                  Chi nhánh Saigon Flagship
-                                </div>
+                              <div className="um-role-badge manager">
+                                <span>Manager</span>
                               </div>
                             ) : u.role === 'ADMIN' ? (
                               <div>
@@ -1382,7 +1377,7 @@ export default function UserManagement() {
                 >
                   <option value="CUSTOMER">Khách Hàng</option>
                   <option value="VIP">Khách Hàng VIP</option>
-                  <option value="MANAGER">Manager (Store Manager)</option>
+                  <option value="MANAGER">Manager</option>
                 </select>
                 <div style={{ fontSize: '11.5px', color: '#A8A29E', marginTop: 6, lineHeight: 1.4 }}>
                   * Lưu ý: Tài khoản Quản trị viên (Admin) là cố định duy nhất, không thể cấp phát thêm.

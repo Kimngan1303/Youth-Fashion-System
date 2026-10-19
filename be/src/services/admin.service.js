@@ -58,7 +58,7 @@ export const getAllUsersService = async ({ search = '', role = 'ALL', status = '
       phone: emp.phone || '0988.000.111',
       avatar_url: null,
       role: isEmpAdmin ? 'ADMIN' : 'MANAGER',
-      role_label: isEmpAdmin ? 'Quản Trị Viên (Admin)' : 'Store Manager (Manager)',
+      role_label: isEmpAdmin ? 'Quản Trị Viên (Admin)' : 'Manager',
       sub_role: isEmpAdmin ? 'Quyền: Toàn quyền hệ thống' : 'Chi nhánh Saigon Flagship • Quản lý vận hành',
       total_spending: isEmpAdmin ? 0 : 0,
       spending_display: 'Nhân sự nội bộ',
