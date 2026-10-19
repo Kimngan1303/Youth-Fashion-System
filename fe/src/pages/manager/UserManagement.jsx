@@ -687,9 +687,9 @@ export default function UserManagement() {
   const counts = useMemo(() => {
     return {
       all: users.length,
-      customers: users.filter((u) => u.type === 'CUSTOMER').length,
-      vip: users.filter((u) => u.role.startsWith('VIP')).length,
-      employees: users.filter((u) => u.type === 'EMPLOYEE').length,
+      customers: users.filter((u) => u.type === 'CUSTOMER' && u.role !== 'VIP' && !u.role.startsWith('VIP')).length,
+      vip: users.filter((u) => u.role === 'VIP' || u.role.startsWith('VIP')).length,
+      employees: users.filter((u) => u.type === 'EMPLOYEE' || u.role === 'MANAGER' || u.role === 'ADMIN').length,
       locked: users.filter((u) => u.status === 'LOCKED').length,
     };
   }, [users]);
@@ -700,11 +700,11 @@ export default function UserManagement() {
 
     // Lọc theo Tab
     if (activeTab === 'CUSTOMERS') {
-      result = result.filter((u) => u.type === 'CUSTOMER');
+      result = result.filter((u) => u.type === 'CUSTOMER' && u.role !== 'VIP' && !u.role.startsWith('VIP'));
     } else if (activeTab === 'VIP') {
-      result = result.filter((u) => u.role.startsWith('VIP'));
+      result = result.filter((u) => u.role === 'VIP' || u.role.startsWith('VIP'));
     } else if (activeTab === 'EMPLOYEES') {
-      result = result.filter((u) => u.type === 'EMPLOYEE');
+      result = result.filter((u) => u.type === 'EMPLOYEE' || u.role === 'MANAGER' || u.role === 'ADMIN');
     } else if (activeTab === 'LOCKED') {
       result = result.filter((u) => u.status === 'LOCKED');
     }
@@ -724,7 +724,9 @@ export default function UserManagement() {
     // Lọc theo Dropdown Vai trò
     if (roleFilter !== 'ALL') {
       if (roleFilter === 'VIP') {
-        result = result.filter((u) => u.role.startsWith('VIP'));
+        result = result.filter((u) => u.role === 'VIP' || u.role.startsWith('VIP'));
+      } else if (roleFilter === 'CUSTOMER') {
+        result = result.filter((u) => u.role === 'CUSTOMER' || (!u.role.startsWith('VIP') && u.role !== 'MANAGER' && u.role !== 'ADMIN'));
       } else {
         result = result.filter((u) => u.role === roleFilter);
       }
@@ -786,6 +788,11 @@ export default function UserManagement() {
   // Cập nhật vai trò người dùng
   const handleSaveRole = async () => {
     if (!roleModalUser) return;
+    if (roleModalUser.role === 'ADMIN') {
+      showError('Tài khoản Quản trị viên (Admin) là cố định duy nhất, không thể thay đổi vai trò');
+      setRoleModalUser(null);
+      return;
+    }
     try {
       await adminService.updateUserRole(roleModalUser.type, roleModalUser.id, selectedRole);
       setUsers((prev) =>
@@ -991,7 +998,7 @@ export default function UserManagement() {
                     setCurrentPage(1);
                   }}
                 >
-                  Khách hàng & VIP ({counts.customers})
+                  Khách hàng ({counts.customers})
                 </button>
                 <button
                   type="button"
@@ -1001,7 +1008,7 @@ export default function UserManagement() {
                     setCurrentPage(1);
                   }}
                 >
-                  Hội viên Diamond / Gold ({counts.vip})
+                  Khách hàng VIP ({counts.vip})
                 </button>
                 <button
                   type="button"
@@ -1082,10 +1089,10 @@ export default function UserManagement() {
                 }}
               >
                 <option value="ALL">Tất cả vai trò</option>
-                <option value="VIP">Hội viên VIP (Gold & Diamond)</option>
                 <option value="CUSTOMER">Khách Hàng</option>
-                <option value="MANAGER">Store Manager</option>
-                <option value="ADMIN">Admin Quản Trị</option>
+                <option value="VIP">Khách Hàng VIP</option>
+                <option value="MANAGER">Manager</option>
+                <option value="ADMIN">Admin (Cố định)</option>
               </select>
 
               <select
@@ -1187,17 +1194,9 @@ export default function UserManagement() {
 
                           {/* Vai trò */}
                           <td>
-                            {u.role === 'VIP_DIAMOND' ? (
-                              <div className="um-role-badge diamond">
-                                <span>Khách Hàng VIP (VIP Diamond)</span>
-                              </div>
-                            ) : u.role === 'VIP_GOLD' ? (
+                            {u.role === 'VIP' || u.role.startsWith('VIP') ? (
                               <div className="um-role-badge gold">
-                                <span>Khách Hàng VIP (VIP Gold)</span>
-                              </div>
-                            ) : u.role === 'CUSTOMER_NEW' ? (
-                              <div className="um-role-badge new">
-                                <span>Khách Hàng (Mới)</span>
+                                <span>Khách Hàng VIP</span>
                               </div>
                             ) : u.role === 'MANAGER' ? (
                               <div>
@@ -1265,10 +1264,13 @@ export default function UserManagement() {
                               <button
                                 type="button"
                                 className="um-action-btn"
-                                title="Phân quyền / Đổi vai trò"
+                                title={u.role === 'ADMIN' ? 'Tài khoản Quản trị viên Admin cố định duy nhất' : 'Phân quyền / Đổi vai trò'}
+                                disabled={u.role === 'ADMIN'}
+                                style={u.role === 'ADMIN' ? { opacity: 0.35, cursor: 'not-allowed' } : {}}
                                 onClick={() => {
+                                  if (u.role === 'ADMIN') return;
                                   setRoleModalUser(u);
-                                  setSelectedRole(u.role);
+                                  setSelectedRole(u.role.startsWith('VIP') ? 'VIP' : u.role);
                                 }}
                               >
                                 <Edit3 size={15} />
@@ -1378,12 +1380,13 @@ export default function UserManagement() {
                   value={selectedRole}
                   onChange={(e) => setSelectedRole(e.target.value)}
                 >
-                  <option value="CUSTOMER">Khách Hàng Thường</option>
-                  <option value="VIP_GOLD">Khách Hàng VIP (Gold)</option>
-                  <option value="VIP_DIAMOND">Khách Hàng VIP (Diamond)</option>
-                  <option value="MANAGER">Store Manager (Quản lý cửa hàng)</option>
-                  <option value="ADMIN">Quản Trị Viên Tối Cao (Admin)</option>
+                  <option value="CUSTOMER">Khách Hàng</option>
+                  <option value="VIP">Khách Hàng VIP</option>
+                  <option value="MANAGER">Manager (Store Manager)</option>
                 </select>
+                <div style={{ fontSize: '11.5px', color: '#A8A29E', marginTop: 6, lineHeight: 1.4 }}>
+                  * Lưu ý: Tài khoản Quản trị viên (Admin) là cố định duy nhất, không thể cấp phát thêm.
+                </div>
               </div>
             </div>
 

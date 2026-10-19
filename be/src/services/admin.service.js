@@ -82,25 +82,19 @@ export const getAllUsersService = async ({ search = '', role = 'ALL', status = '
     let role_label = 'Khách Hàng';
     let sub_role = null;
 
-    // Giả lập phân hạng VIP cho khách hàng theo mẫu thiết kế
-    if (idx === 0 || c.email.includes('vip') || totalSpent > 50000000 || idx % 5 === 0) {
-      role = 'VIP_DIAMOND';
-      role_label = 'Khách Hàng VIP (VIP Diamond)';
-    } else if (idx === 1 || totalSpent > 20000000 || idx % 3 === 0) {
-      role = 'VIP_GOLD';
-      role_label = 'Khách Hàng VIP (VIP Gold)';
-    } else if (idx % 7 === 0) {
-      role = 'CUSTOMER_NEW';
-      role_label = 'Khách Hàng (Mới)';
+    // Phân loại khách hàng: Khách Hàng hoặc Khách Hàng VIP
+    if (idx === 0 || c.email.includes('vip') || totalSpent > 20000000 || idx % 4 === 0) {
+      role = 'VIP';
+      role_label = 'Khách Hàng VIP';
     }
 
     const displaySpending = totalSpent > 0 
       ? `${totalSpent.toLocaleString('vi-VN')}đ` 
-      : (role.includes('DIAMOND') ? '84.500.000đ' : role.includes('GOLD') ? '32.800.000đ' : idx === 2 ? '8.450.000đ' : '0đ');
+      : (role === 'VIP' ? '32.800.000đ' : idx === 2 ? '8.450.000đ' : '0đ');
     
     const displayOrders = orderCount > 0 
       ? `${orderCount} đơn thành công` 
-      : (role.includes('DIAMOND') ? '14 đơn thành công' : role.includes('GOLD') ? '7 đơn thành công' : idx === 2 ? '3 đơn thành công' : '0 đơn hoàn tất');
+      : (role === 'VIP' ? '8 đơn thành công' : idx === 2 ? '3 đơn thành công' : '0 đơn hoàn tất');
 
     return {
       id: c.customer_id.toString(),
@@ -269,15 +263,17 @@ export const updateUserStatusService = async ({ type, id, status }) => {
  */
 export const updateUserRoleService = async ({ type, id, role }) => {
   if (type === 'EMPLOYEE') {
-    const validRole = ['ADMIN', 'MANAGER'].includes(role) ? role : 'MANAGER';
+    // Không cho phép phân quyền thêm tài khoản Admin, chỉ gán MANAGER
+    const validRole = role === 'MANAGER' ? 'MANAGER' : 'MANAGER';
     const updated = await prisma.employee.update({
       where: { employee_id: BigInt(id) },
       data: { employee_role: validRole },
     });
     return { id: updated.employee_id.toString(), role: updated.employee_role };
   } else {
-    // Với khách hàng, cập nhật status hoặc ghi chú
-    return { id, role };
+    // Với khách hàng: CUSTOMER hoặc VIP
+    const validCustomerRole = role === 'VIP' ? 'VIP' : 'CUSTOMER';
+    return { id, role: validCustomerRole };
   }
 };
 
