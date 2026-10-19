@@ -1471,6 +1471,7 @@ export default function ProductManager() {
 
       if (selectedTab === "SELLING") {
         params.status = "ACTIVE";
+        params.stock_status = "selling";
       } else if (selectedTab === "LOW_STOCK") {
         params.stock_status = "low_stock";
       } else if (selectedTab === "OUT_OF_STOCK") {
@@ -2075,7 +2076,7 @@ export default function ProductManager() {
                   >
                     <span>Hết hàng</span>
                     <span className="tab-count tab-count-red">
-                      ({String(statusCounts.out_of_stock || 0).padStart(2, "0")})
+                      ({statusCounts.out_of_stock || 0})
                     </span>
                   </button>
 
