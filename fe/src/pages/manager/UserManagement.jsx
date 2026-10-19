@@ -12,7 +12,6 @@ import {
   Shield,
   Search,
   Download,
-  Sliders,
   Trash2,
   Edit3,
   Eye,
@@ -859,15 +858,6 @@ export default function UserManagement() {
               <button type="button" className="um-btn-pill-action" onClick={handleExportCSV}>
                 <Download size={15} />
                 Xuất Danh Sách
-              </button>
-              <button
-                type="button"
-                className="um-btn-pill-action"
-                style={{ background: '#111111', color: '#FFFFFF', borderColor: '#111111' }}
-                onClick={() => navigate('/manager/system-config')}
-              >
-                <Sliders size={15} />
-                Phân Quyền Vai Trò
               </button>
             </div>
           </div>
