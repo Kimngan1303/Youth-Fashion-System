@@ -12,13 +12,12 @@ import {
   Shield,
   Search,
   Download,
-  Sliders,
   Trash2,
   Edit3,
-  Eye,
   Lock,
   Unlock,
   Loader2,
+  RefreshCw,
   X,
   CheckCircle,
   AlertCircle
@@ -611,6 +610,11 @@ const userStyles = `
     border-top: 1px solid #EDE8DE;
     background: #FAF9F6;
   }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
 `;
 
 // Helper sinh avatar màu dựa trên tên
@@ -688,9 +692,9 @@ export default function UserManagement() {
   const counts = useMemo(() => {
     return {
       all: users.length,
-      customers: users.filter((u) => u.type === 'CUSTOMER').length,
-      vip: users.filter((u) => u.role.startsWith('VIP')).length,
-      employees: users.filter((u) => u.type === 'EMPLOYEE').length,
+      customers: users.filter((u) => u.type === 'CUSTOMER' && u.role !== 'VIP' && !u.role.startsWith('VIP')).length,
+      vip: users.filter((u) => u.role === 'VIP' || u.role.startsWith('VIP')).length,
+      employees: users.filter((u) => u.type === 'EMPLOYEE' || u.role === 'MANAGER' || u.role === 'ADMIN').length,
       locked: users.filter((u) => u.status === 'LOCKED').length,
     };
   }, [users]);
@@ -701,11 +705,11 @@ export default function UserManagement() {
 
     // Lọc theo Tab
     if (activeTab === 'CUSTOMERS') {
-      result = result.filter((u) => u.type === 'CUSTOMER');
+      result = result.filter((u) => u.type === 'CUSTOMER' && u.role !== 'VIP' && !u.role.startsWith('VIP'));
     } else if (activeTab === 'VIP') {
-      result = result.filter((u) => u.role.startsWith('VIP'));
+      result = result.filter((u) => u.role === 'VIP' || u.role.startsWith('VIP'));
     } else if (activeTab === 'EMPLOYEES') {
-      result = result.filter((u) => u.type === 'EMPLOYEE');
+      result = result.filter((u) => u.type === 'EMPLOYEE' || u.role === 'MANAGER' || u.role === 'ADMIN');
     } else if (activeTab === 'LOCKED') {
       result = result.filter((u) => u.status === 'LOCKED');
     }
@@ -725,7 +729,9 @@ export default function UserManagement() {
     // Lọc theo Dropdown Vai trò
     if (roleFilter !== 'ALL') {
       if (roleFilter === 'VIP') {
-        result = result.filter((u) => u.role.startsWith('VIP'));
+        result = result.filter((u) => u.role === 'VIP' || u.role.startsWith('VIP'));
+      } else if (roleFilter === 'CUSTOMER') {
+        result = result.filter((u) => u.role === 'CUSTOMER' || (!u.role.startsWith('VIP') && u.role !== 'MANAGER' && u.role !== 'ADMIN'));
       } else {
         result = result.filter((u) => u.role === roleFilter);
       }
@@ -770,14 +776,27 @@ export default function UserManagement() {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   };
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Đồng bộ thủ công toàn bộ dữ liệu tài khoản từ CSDL MySQL
+  const handleSyncData = async () => {
+    setIsSyncing(true);
+    try {
+      await fetchData();
+      showSuccess('Đã đồng bộ toàn bộ tài khoản từ database thành công!');
+    } catch (err) {
+      showError('Lỗi khi đồng bộ dữ liệu tài khoản');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Toggle nhanh trạng thái Khóa / Kích hoạt
   const handleToggleStatus = async (user) => {
     const nextStatus = user.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
     try {
       await adminService.updateUserStatus(user.type, user.id, nextStatus);
-      setUsers((prev) =>
-        prev.map((u) => (u.id === user.id && u.type === user.type ? { ...u, status: nextStatus } : u))
-      );
+      await fetchData();
       showSuccess(`Đã ${nextStatus === 'ACTIVE' ? 'mở khóa' : 'khóa'} tài khoản "${user.full_name}"`);
     } catch (err) {
       showError('Không thể cập nhật trạng thái tài khoản');
@@ -787,12 +806,15 @@ export default function UserManagement() {
   // Cập nhật vai trò người dùng
   const handleSaveRole = async () => {
     if (!roleModalUser) return;
+    if (roleModalUser.role === 'ADMIN') {
+      showError('Tài khoản Quản trị viên (Admin) là cố định duy nhất, không thể thay đổi vai trò');
+      setRoleModalUser(null);
+      return;
+    }
     try {
       await adminService.updateUserRole(roleModalUser.type, roleModalUser.id, selectedRole);
-      setUsers((prev) =>
-        prev.map((u) => (u.id === roleModalUser.id && u.type === roleModalUser.type ? { ...u, role: selectedRole } : u))
-      );
-      showSuccess(`Đã cập nhật vai trò cho "${roleModalUser.full_name}"`);
+      await fetchData();
+      showSuccess(`Đã cập nhật vai trò cho "${roleModalUser.full_name}" thành công!`);
       setRoleModalUser(null);
     } catch (err) {
       showError('Lỗi khi cập nhật vai trò');
@@ -803,7 +825,7 @@ export default function UserManagement() {
   const handleDeleteUser = async (user) => {
     try {
       await adminService.deleteUser(user.type, user.id);
-      setUsers((prev) => prev.filter((u) => !(u.id === user.id && u.type === user.type)));
+      await fetchData();
       setSelectedIds((prev) => prev.filter((id) => id !== user.id));
       showSuccess(`Đã xóa tài khoản "${user.full_name}" thành công`);
     } catch (err) {
@@ -856,18 +878,20 @@ export default function UserManagement() {
             </div>
 
             <div className="um-head-actions">
-              <button type="button" className="um-btn-pill-action" onClick={handleExportCSV}>
-                <Download size={15} />
-                Xuất Danh Sách
-              </button>
               <button
                 type="button"
                 className="um-btn-pill-action"
-                style={{ background: '#111111', color: '#FFFFFF', borderColor: '#111111' }}
-                onClick={() => navigate('/manager/system-config')}
+                onClick={handleSyncData}
+                disabled={isSyncing || loading}
+                title="Đồng bộ danh sách tài khoản từ database"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               >
-                <Sliders size={15} />
-                Phân Quyền Vai Trò
+                <RefreshCw size={14} style={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
+                <span>{isSyncing ? 'Đang đồng bộ...' : 'Đồng Bộ Database'}</span>
+              </button>
+              <button type="button" className="um-btn-pill-action" onClick={handleExportCSV}>
+                <Download size={15} />
+                Xuất Danh Sách
               </button>
             </div>
           </div>
@@ -902,28 +926,28 @@ export default function UserManagement() {
               </div>
             </div>
 
-            {/* Thẻ 2: Hội viên VIP & Privé */}
+            {/* Thẻ 2: Khách Hàng VIP */}
             <div className="um-metric-card">
               <div className="um-metric-head">
-                <span className="um-metric-title">HỘI VIÊN VIP & PRIVÉ</span>
+                <span className="um-metric-title">KHÁCH HÀNG VIP</span>
                 <div className="um-metric-icon-box gold">
                   <Star size={18} fill="#D97706" />
                 </div>
               </div>
               <div className="um-metric-value-row">
                 <span className="um-metric-value-num">
-                  {metrics?.vipCount ? metrics.vipCount.toLocaleString('vi-VN') : '1.840'}
+                  {counts.vip.toLocaleString('vi-VN')}
                 </span>
-                <span className="um-metric-value-unit">Hội viên cao cấp</span>
+                <span className="um-metric-value-unit">Tài khoản</span>
               </div>
               <div>
                 <div className="um-metric-subtext" style={{ color: '#D97706', fontWeight: 600 }}>
-                  <span>VIP Gold & Diamond</span>
+                  <span>Hội viên VIP</span>
                   <span style={{ margin: '0 4px', color: '#D1D5DB' }}>•</span>
-                  <span style={{ color: '#78716C', fontWeight: 400 }}>Đóng góp 64% DT</span>
+                  <span style={{ color: '#78716C', fontWeight: 400 }}>Tài khoản thân thiết</span>
                 </div>
                 <div className="um-progress-bar-wrap">
-                  <div className="um-progress-bar-fill" style={{ width: '64%', background: '#D97706' }} />
+                  <div className="um-progress-bar-fill" style={{ width: `${Math.min(100, Math.max(10, (counts.vip / (counts.all || 1)) * 100))}%`, background: '#D97706' }} />
                 </div>
               </div>
             </div>
@@ -938,16 +962,16 @@ export default function UserManagement() {
               </div>
               <div className="um-metric-value-row">
                 <span className="um-metric-value-num" style={{ color: '#16A34A' }}>
-                  +{metrics?.newThisMonth || '845'}
+                  +{metrics?.newThisMonth ?? counts.customers}
                 </span>
-                <span style={{ color: '#16A34A', fontSize: '13px', fontWeight: 600 }}>↑ +18.2%</span>
+                <span style={{ color: '#16A34A', fontSize: '13px', fontWeight: 600 }}>Tài khoản</span>
               </div>
               <div>
                 <div className="um-metric-subtext">
-                  <span>Tăng trưởng so với tháng trước (+128 TK)</span>
+                  <span>Gia nhập trong tháng {new Date().getMonth() + 1}/{new Date().getFullYear()}</span>
                 </div>
                 <div className="um-progress-bar-wrap">
-                  <div className="um-progress-bar-fill" style={{ width: '70%', background: '#16A34A' }} />
+                  <div className="um-progress-bar-fill" style={{ width: '100%', background: '#16A34A' }} />
                 </div>
               </div>
             </div>
@@ -962,17 +986,17 @@ export default function UserManagement() {
               </div>
               <div className="um-metric-value-row">
                 <span className="um-metric-value-num">
-                  {metrics?.totalEmployees || counts.employees}
+                  {counts.employees}
                 </span>
-                <span className="um-metric-value-unit">Nhân viên</span>
+                <span className="um-metric-value-unit">Nhân sự</span>
               </div>
               <div>
                 <div className="um-metric-subtext" style={{ color: '#4B5563', fontWeight: 500 }}>
                   <strong style={{ color: '#111111' }}>{metrics?.adminEmployees || 1} Admin</strong> •{' '}
-                  {metrics?.managerEmployees || 1} Store Manager • 20 CSKH
+                  {metrics?.managerEmployees || 0} Manager
                 </div>
                 <div className="um-progress-bar-wrap">
-                  <div className="um-progress-bar-fill" style={{ width: '90%', background: '#7C3AED' }} />
+                  <div className="um-progress-bar-fill" style={{ width: '100%', background: '#7C3AED' }} />
                 </div>
               </div>
             </div>
@@ -1001,7 +1025,7 @@ export default function UserManagement() {
                     setCurrentPage(1);
                   }}
                 >
-                  Khách hàng & VIP ({counts.customers})
+                  Khách hàng ({counts.customers})
                 </button>
                 <button
                   type="button"
@@ -1011,7 +1035,7 @@ export default function UserManagement() {
                     setCurrentPage(1);
                   }}
                 >
-                  Hội viên Diamond / Gold ({counts.vip})
+                  Khách hàng VIP ({counts.vip})
                 </button>
                 <button
                   type="button"
@@ -1092,10 +1116,10 @@ export default function UserManagement() {
                 }}
               >
                 <option value="ALL">Tất cả vai trò</option>
-                <option value="VIP">Hội viên VIP (Gold & Diamond)</option>
                 <option value="CUSTOMER">Khách Hàng</option>
-                <option value="MANAGER">Store Manager</option>
-                <option value="ADMIN">Admin Quản Trị</option>
+                <option value="VIP">Khách Hàng VIP</option>
+                <option value="MANAGER">Manager</option>
+                <option value="ADMIN">Admin (Cố định)</option>
               </select>
 
               <select
@@ -1197,26 +1221,13 @@ export default function UserManagement() {
 
                           {/* Vai trò */}
                           <td>
-                            {u.role === 'VIP_DIAMOND' ? (
-                              <div className="um-role-badge diamond">
-                                <span>Khách Hàng VIP (VIP Diamond)</span>
-                              </div>
-                            ) : u.role === 'VIP_GOLD' ? (
+                            {u.role === 'VIP' || u.role.startsWith('VIP') ? (
                               <div className="um-role-badge gold">
-                                <span>Khách Hàng VIP (VIP Gold)</span>
-                              </div>
-                            ) : u.role === 'CUSTOMER_NEW' ? (
-                              <div className="um-role-badge new">
-                                <span>Khách Hàng (Mới)</span>
+                                <span>Khách Hàng VIP</span>
                               </div>
                             ) : u.role === 'MANAGER' ? (
-                              <div>
-                                <div className="um-role-badge manager">
-                                  <span>Store Manager (Manager)</span>
-                                </div>
-                                <div style={{ fontSize: '11px', color: '#78716C', marginTop: 2 }}>
-                                  Chi nhánh Saigon Flagship
-                                </div>
+                              <div className="um-role-badge manager">
+                                <span>Manager</span>
                               </div>
                             ) : u.role === 'ADMIN' ? (
                               <div>
@@ -1275,21 +1286,16 @@ export default function UserManagement() {
                               <button
                                 type="button"
                                 className="um-action-btn"
-                                title="Phân quyền / Đổi vai trò"
+                                title={u.role === 'ADMIN' ? 'Tài khoản Quản trị viên Admin cố định duy nhất' : 'Phân quyền / Đổi vai trò'}
+                                disabled={u.role === 'ADMIN'}
+                                style={u.role === 'ADMIN' ? { opacity: 0.35, cursor: 'not-allowed' } : {}}
                                 onClick={() => {
+                                  if (u.role === 'ADMIN') return;
                                   setRoleModalUser(u);
-                                  setSelectedRole(u.role);
+                                  setSelectedRole(u.role.startsWith('VIP') ? 'VIP' : u.role);
                                 }}
                               >
                                 <Edit3 size={15} />
-                              </button>
-                              <button
-                                type="button"
-                                className="um-action-btn"
-                                title="Xem hồ sơ chi tiết"
-                                onClick={() => setDetailModalUser(u)}
-                              >
-                                <Eye size={15} />
                               </button>
                               <button
                                 type="button"
@@ -1388,12 +1394,13 @@ export default function UserManagement() {
                   value={selectedRole}
                   onChange={(e) => setSelectedRole(e.target.value)}
                 >
-                  <option value="CUSTOMER">Khách Hàng Thường</option>
-                  <option value="VIP_GOLD">Khách Hàng VIP (Gold)</option>
-                  <option value="VIP_DIAMOND">Khách Hàng VIP (Diamond)</option>
-                  <option value="MANAGER">Store Manager (Quản lý cửa hàng)</option>
-                  <option value="ADMIN">Quản Trị Viên Tối Cao (Admin)</option>
+                  <option value="CUSTOMER">Khách Hàng</option>
+                  <option value="VIP">Khách Hàng VIP</option>
+                  <option value="MANAGER">Manager</option>
                 </select>
+                <div style={{ fontSize: '11.5px', color: '#A8A29E', marginTop: 6, lineHeight: 1.4 }}>
+                  * Lưu ý: Tài khoản Quản trị viên (Admin) là cố định duy nhất, không thể cấp phát thêm.
+                </div>
               </div>
             </div>
 

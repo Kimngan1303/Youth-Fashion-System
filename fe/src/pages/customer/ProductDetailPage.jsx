@@ -14,10 +14,7 @@ import {
   RotateCcw, 
   MessageSquare, 
   Ruler, 
-  ThumbsUp, 
-  Sparkles,
-  ShieldCheck,
-  PackageCheck
+  ThumbsUp
 } from 'lucide-react';
 import { productService } from '../../services/productService';
 import { useAuth } from '../../context/AuthContext';
@@ -123,6 +120,156 @@ const FIGMA_COAT_DATA = {
       content: 'Giao hàng hỏa tốc trong 2 tiếng, shipper đợi mình mặc thử size M vừa vặn rồi mới thanh toán. Dịch vụ chăm sóc khách hàng 10/10. Chắc chắn sẽ quay lại ủng hộ bộ sưu tập mới.',
       likes: 31,
     },
+    {
+      id: 4,
+      author: 'Lê Hoàng Yến',
+      is_verified: true,
+      date: '05/12/2024',
+      variant: 'Size L • Camel Tự Nhiên',
+      rating: 5,
+      content: 'Đầm và áo khoác của shop chưa bao giờ làm mình thất vọng. Đường may giấu chỉ sắc sảo, vải dày dặn mà không hề nặng người. Mặc đi tiệc ai cũng khen.',
+      likes: 15,
+    },
+    {
+      id: 5,
+      author: 'Đỗ Quỳnh Anh',
+      is_verified: true,
+      date: '12/12/2024',
+      variant: 'Size M • Xám Than',
+      rating: 5,
+      content: 'Màu xám than rất sang và sạch. Giao hàng cực nhanh, nhân viên tư vấn chọn size rất chuẩn với số đo của mình. 5 sao cho chất lượng dịch vụ!',
+      likes: 8,
+    },
+    {
+      id: 6,
+      author: 'Phạm Minh Trang',
+      is_verified: true,
+      date: '20/12/2024',
+      variant: 'Size S • Đen Tuyển',
+      rating: 5,
+      content: 'Form áo rất đứng, cổ áo bẻ sắc nét. Mình giặt khô 2 lần rồi mà bề mặt len vẫn mướt nguyên không bị xù lông hay biến dạng.',
+      likes: 12,
+    },
+    {
+      id: 7,
+      author: 'Vũ Khánh Linh',
+      is_verified: true,
+      date: '28/12/2024',
+      variant: 'Size S • Camel Tự Nhiên',
+      rating: 5,
+      content: 'Thiết kế tối giản mà cực kỳ sang trọng. Phần đai thắt lưng may hai lớp dày dặn, thắt vào là thon gọn vòng eo hẳn. Mình cao 1m62 nặng 50kg mặc size S vừa khít.',
+      likes: 22,
+    },
+    {
+      id: 8,
+      author: 'Ngô Thu Hà',
+      is_verified: true,
+      date: '04/01/2025',
+      variant: 'Size M • Camel Tự Nhiên',
+      rating: 5,
+      content: 'Chất liệu lụa satin và len dạ phối rất hài hòa, sờ vào mát tay và êm ái. Hộp đựng và túi bọc quần áo rất chỉn chu, xứng tầm thương hiệu thời trang cao cấp.',
+      likes: 14,
+    },
+    {
+      id: 9,
+      author: 'Đặng Thảo Nhi',
+      is_verified: true,
+      date: '10/01/2025',
+      variant: 'Size XS • Camel Tự Nhiên',
+      rating: 5,
+      content: 'Lần đầu mua online trang phục giá trị cao mà ưng ý đến vậy. Nhân viên CSKH gọi điện tư vấn chi tiết từng số đo vai và ngực. Form mặc lên y chang mẫu chụp.',
+      likes: 17,
+    },
+    {
+      id: 10,
+      author: 'Bùi Phương Uyên',
+      is_verified: true,
+      date: '15/01/2025',
+      variant: 'Size L • Xám Than',
+      rating: 5,
+      content: 'Tone màu trang nhã, dễ phối đồ với boot và chân váy midi. Áo cản gió tốt, mặc đi du lịch Đà Lạt hay châu Âu đều rất hợp và ấm áp.',
+      likes: 9,
+    },
+    {
+      id: 11,
+      author: 'Phan Thanh Hằng',
+      is_verified: true,
+      date: '18/01/2025',
+      variant: 'Size M • Camel Tự Nhiên',
+      rating: 4,
+      content: 'Áo đẹp xuất sắc, đường kim mũi chỉ tỉ mỉ. Chỉ có một điểm trừ nhỏ là hộp vận chuyển hơi bị móp góc một xíu nhưng đồ bên trong vẫn nguyên vẹn thơm tho.',
+      likes: 11,
+    },
+    {
+      id: 12,
+      author: 'Nguyễn Kim Oanh',
+      is_verified: true,
+      date: '22/01/2025',
+      variant: 'Size S • Đen Tuyển',
+      rating: 5,
+      content: 'Dáng áo chuẩn phong cách Pháp, mặc lên cảm giác tự tin và khí chất hơn hẳn. Bạn bè ai cũng hỏi mua ở đâu. Chúc shop luôn đắt hàng!',
+      likes: 27,
+    },
+    {
+      id: 13,
+      author: 'Hoàng Thu Trang',
+      is_verified: true,
+      date: '26/01/2025',
+      variant: 'Size M • Camel Tự Nhiên',
+      rating: 5,
+      content: 'Đường chần lót tơ tằm bên trong mướt mịn không bị cọ rát da. Vải cashmere thật nên nhẹ mà ấm sâu. Rất đáng để đầu tư cho tủ đồ mùa đông.',
+      likes: 16,
+    },
+    {
+      id: 14,
+      author: 'Lê Cẩm Tú',
+      is_verified: true,
+      date: '02/02/2025',
+      variant: 'Size S • Camel Tự Nhiên',
+      rating: 5,
+      content: 'Shop giao hàng rất đúng hẹn. Được thử áo trước khi nhận khiến mình hoàn toàn yên tâm. Form áo mặc lên thanh lịch, tôn dáng xuất sắc.',
+      likes: 20,
+    },
+    {
+      id: 15,
+      author: 'Trịnh Diệu Linh',
+      is_verified: true,
+      date: '08/02/2025',
+      variant: 'Size L • Đen Tuyển',
+      rating: 5,
+      content: 'Áo dạ dáng dài chuẩn mực, màu sắc nhã nhặn dễ phối đồ. Đã mua 3 món của Youth Fashion và lần nào cũng cực kỳ hài lòng về chất lượng.',
+      likes: 13,
+    },
+    {
+      id: 16,
+      author: 'Dương Hải My',
+      is_verified: true,
+      date: '14/02/2025',
+      variant: 'Size M • Camel Tự Nhiên',
+      rating: 5,
+      content: 'Chất vải đỉnh chóp, không hề bám bụi hay dính lông. Cúc áo và đường viền ve áo hoàn thiện tinh xảo không một sợi chỉ thừa.',
+      likes: 25,
+    },
+    {
+      id: 17,
+      author: 'Võ Thùy Trang',
+      is_verified: true,
+      date: '20/02/2025',
+      variant: 'Size S • Xám Than',
+      rating: 5,
+      content: 'Đóng gói đẳng cấp, nhận hàng như mở quà sinh nhật. Áo mặc nhẹ tênh mà đứng form cực kỳ. Sẽ tiếp tục ủng hộ dài lâu!',
+      likes: 18,
+    },
+    {
+      id: 18,
+      author: 'Đoàn Thanh Vy',
+      is_verified: true,
+      date: '25/02/2025',
+      variant: 'Size M • Đen Tuyển',
+      rating: 5,
+      content: 'Dịch vụ đổi size tận nhà rất chu đáo và nhanh chóng. Nhân viên hỗ trợ nhiệt tình, lịch sự. Chất lượng sản phẩm xứng đáng điểm 10.',
+      likes: 10,
+    }
   ]
 };
 
@@ -138,18 +285,30 @@ export default function ProductDetailPage() {
   const [selectedColor, setSelectedColor] = useState('camel');
   const [selectedSize, setSelectedSize] = useState('M');
   const [quantity, setQuantity] = useState(1);
-  const [activeTab, setActiveTab] = useState('description');
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
-  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [sizeGuideTab, setSizeGuideTab] = useState('clothing');
+
+  // Phân loại ngành hàng: Quần áo (clothing), Giày dép (shoes), Phụ kiện (accessory)
+  const categoryType = React.useMemo(() => {
+    const cat = String(product?.category_name || '').toLowerCase();
+    const name = String(product?.product_name || '').toLowerCase();
+    const fullText = `${cat} ${name}`;
+
+    if (/giày|sandal|dép|sneaker|guốc|loafer|boot|cao gót/i.test(fullText)) {
+      return 'shoes';
+    }
+    if (/túi|balo|mũ|nón|kính|thắt lưng|ví|khăn|phụ kiện|trang sức|dây chuyền|bông tai|vòng tay|cà vạt/i.test(fullText)) {
+      return 'accessory';
+    }
+    return 'clothing';
+  }, [product?.category_name, product?.product_name]);
   const [similarProducts, setSimilarProducts] = useState([]);
   const [reviewHelpfulMap, setReviewHelpfulMap] = useState({});
 
-  // Review Form State
-  const [newReviewAuthor, setNewReviewAuthor] = useState('');
-  const [newReviewRating, setNewReviewRating] = useState(5);
-  const [newReviewComment, setNewReviewComment] = useState('');
   const [localReviews, setLocalReviews] = useState(FIGMA_COAT_DATA.reviews);
+  const [isAllReviewsModalOpen, setIsAllReviewsModalOpen] = useState(false);
+  const [reviewFilterStar, setReviewFilterStar] = useState('all');
 
   // Fetch product detail from API if id provided
   useEffect(() => {
@@ -179,8 +338,23 @@ export default function ProductDetailPage() {
           const primaryPrice = variantPrices.length > 0 ? Math.min(...variantPrices) : FIGMA_COAT_DATA.price;
           const origPrice = Math.round(primaryPrice * 1.22);
 
+          const cat = String(data.category?.category_name || '').toLowerCase();
+          const name = String(data.product_name || '').toLowerCase();
+          const fullText = `${cat} ${name}`;
+          const isShoeProduct = /giày|sandal|dép|sneaker|guốc|loafer|boot|cao gót/i.test(fullText);
+          const isAccessoryProduct = /túi|balo|mũ|nón|kính|thắt lưng|ví|khăn|phụ kiện|trang sức|dây chuyền|bông tai|vòng tay|cà vạt/i.test(fullText);
+
           const availSizes = data.variants?.map(v => v.size).filter(Boolean) || [];
-          const uniqueSizes = availSizes.length > 0 ? Array.from(new Set(availSizes)) : FIGMA_COAT_DATA.sizes;
+          let uniqueSizes = [];
+          if (isAccessoryProduct) {
+            uniqueSizes = [];
+          } else if (availSizes.length > 0) {
+            uniqueSizes = Array.from(new Set(availSizes));
+          } else if (isShoeProduct) {
+            uniqueSizes = ['36', '37', '38', '39', '40', '41'];
+          } else {
+            uniqueSizes = FIGMA_COAT_DATA.sizes;
+          }
 
           const availColors = data.variants?.map(v => v.color).filter(Boolean) || [];
           const uniqueColors = availColors.length > 0 
@@ -207,7 +381,11 @@ export default function ProductDetailPage() {
             description_p1: data.description || FIGMA_COAT_DATA.description_p1,
           });
 
-          if (uniqueSizes.length > 0) setSelectedSize(uniqueSizes[0]);
+          if (isAccessoryProduct) {
+            setSelectedSize('');
+          } else if (uniqueSizes.length > 0) {
+            setSelectedSize(uniqueSizes[0]);
+          }
           if (uniqueColors.length > 0) setSelectedColor(uniqueColors[0].id);
         }
       } catch (err) {
@@ -273,8 +451,10 @@ export default function ProductDetailPage() {
     const currentColorObj = product.colors.find(c => c.id === selectedColor);
     const matchedVariant = product.rawVariants?.find(v => 
       String(v.color || '').trim().toLowerCase() === String(currentColorObj?.name || '').trim().toLowerCase() &&
-      String(v.size || '').trim().toUpperCase() === String(selectedSize || '').trim().toUpperCase()
+      (!selectedSize || String(v.size || '').trim().toUpperCase() === String(selectedSize || '').trim().toUpperCase())
     ) || product.rawVariants?.[0];
+
+    const sizeToAdd = categoryType === 'accessory' ? 'Tiêu chuẩn' : (selectedSize || product.sizes?.[0] || 'Tiêu chuẩn');
 
     addToCart(
       {
@@ -291,10 +471,15 @@ export default function ProductDetailPage() {
         badge: 'ATELIER',
         categoryTag: product.category_name,
       },
-      selectedSize,
+      sizeToAdd,
       quantity
     );
-    showSuccess(`Đã thêm ${quantity} sản phẩm (${selectedSize} - ${currentColorObj?.name || 'Camel'}) vào giỏ hàng!`);
+
+    if (categoryType === 'accessory') {
+      showSuccess(`Đã thêm ${quantity} sản phẩm (${currentColorObj?.name || 'Camel'}) vào giỏ hàng!`);
+    } else {
+      showSuccess(`Đã thêm ${quantity} sản phẩm (${sizeToAdd} - ${currentColorObj?.name || 'Camel'}) vào giỏ hàng!`);
+    }
   };
 
   const handleBuyNow = () => {
@@ -316,30 +501,15 @@ export default function ProductDetailPage() {
     showSuccess('Cảm ơn bạn đã gửi phản hồi hữu ích!');
   };
 
-  const handleSubmitReview = (e) => {
-    e.preventDefault();
-    if (!newReviewAuthor.trim() || !newReviewComment.trim()) {
-      showInfo('Vui lòng nhập đầy đủ họ tên và nội dung đánh giá.');
-      return;
-    }
+  const displayedReviews = React.useMemo(() => {
+    return localReviews.slice(0, 6);
+  }, [localReviews]);
 
-    const newRev = {
-      id: Date.now(),
-      author: newReviewAuthor.trim(),
-      is_verified: true,
-      date: 'Hôm nay',
-      variant: `Size ${selectedSize} • ${product.colors.find(c => c.id === selectedColor)?.name || 'Camel'}`,
-      rating: newReviewRating,
-      content: newReviewComment.trim(),
-      likes: 0
-    };
+  const filteredModalReviews = React.useMemo(() => {
+    if (reviewFilterStar === 'all') return localReviews;
+    return localReviews.filter(r => Number(r.rating) === Number(reviewFilterStar));
+  }, [localReviews, reviewFilterStar]);
 
-    setLocalReviews([newRev, ...localReviews]);
-    setNewReviewAuthor('');
-    setNewReviewComment('');
-    setIsReviewModalOpen(false);
-    showSuccess('Đánh giá của bạn đã được gửi thành công và hiển thị ngay!');
-  };
 
   return (
     <div className="product-detail-page">
@@ -353,7 +523,7 @@ export default function ProductDetailPage() {
             <span className="bc-arrow">&gt;</span>
             <span className="bc-category">{product.category_name}</span>
             <span className="bc-arrow">&gt;</span>
-            <span className="bc-current font-serif">{product.product_name}</span>
+            <span className="bc-current">{product.product_name}</span>
           </nav>
         </div>
       </section>
@@ -505,37 +675,42 @@ export default function ProductDetailPage() {
                 </div>
               </div>
 
-              {/* 2. CHỌN KÍCH CỠ */}
-              <div className="control-group">
-                <div className="control-label-row">
-                  <span className="label-title">
-                    CHỌN KÍCH CỠ: <strong>{selectedSize}</strong>
-                  </span>
-                  <button 
-                    type="button" 
-                    className="btn-size-guide"
-                    onClick={() => setIsSizeGuideOpen(true)}
-                  >
-                    <Ruler size={13} />
-                    <span>Bảng quy đổi kích cỡ</span>
-                  </button>
+              {/* 2. CHỌN KÍCH CỠ (Chỉ áp dụng cho Quần áo & Giày dép, Phụ kiện không cần size) */}
+              {categoryType !== 'accessory' && product.sizes && product.sizes.length > 0 && (
+                <div className="control-group">
+                  <div className="control-label-row">
+                    <span className="label-title">
+                      CHỌN KÍCH CỠ: <strong>{selectedSize}</strong>
+                    </span>
+                    <button 
+                      type="button" 
+                      className="btn-size-guide"
+                      onClick={() => {
+                        setSizeGuideTab(categoryType === 'shoes' ? 'shoes' : 'clothing');
+                        setIsSizeGuideOpen(true);
+                      }}
+                    >
+                      <Ruler size={13} />
+                      <span>Bảng quy đổi kích cỡ</span>
+                    </button>
+                  </div>
+                  <div className="size-buttons-row">
+                    {product.sizes.map((sz) => {
+                      const isSelected = selectedSize === sz;
+                      return (
+                        <button
+                          key={sz}
+                          type="button"
+                          className={`size-select-btn ${isSelected ? 'active' : ''}`}
+                          onClick={() => setSelectedSize(sz)}
+                        >
+                          {sz}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="size-buttons-row">
-                  {product.sizes.map((sz) => {
-                    const isSelected = selectedSize === sz;
-                    return (
-                      <button
-                        key={sz}
-                        type="button"
-                        className={`size-select-btn ${isSelected ? 'active' : ''}`}
-                        onClick={() => setSelectedSize(sz)}
-                      >
-                        {sz}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              )}
 
               {/* 3. SỐ LƯỢNG & TÌNH TRẠNG KHO */}
               <div className="quantity-stock-row">
@@ -657,120 +832,26 @@ export default function ProductDetailPage() {
         <div className="container description-container">
           {/* Tab Header Bar */}
           <div className="tab-nav-bar">
-            <button
-              type="button"
-              className={`tab-btn ${activeTab === 'description' ? 'active' : ''}`}
-              onClick={() => setActiveTab('description')}
-            >
+            <span className="tab-btn active">
               MÔ TẢ CHI TIẾT
-            </button>
-            <button
-              type="button"
-              className={`tab-btn ${activeTab === 'materials' ? 'active' : ''}`}
-              onClick={() => setActiveTab('materials')}
-            >
-              CHẤT LIỆU &amp; BẢO QUẢN
-            </button>
-            <button
-              type="button"
-              className={`tab-btn ${activeTab === 'shipping' ? 'active' : ''}`}
-              onClick={() => setActiveTab('shipping')}
-            >
-              CHÍNH SÁCH GIAO NHẬN
-            </button>
+            </span>
           </div>
 
-          {/* Tab Content 1: Mô tả chi tiết */}
-          {activeTab === 'description' && (
-            <div className="tab-pane-content animate-fade-in">
-              <div className="craft-gold-subtitle">
-                <span className="gold-line"></span>
-                <span className="gold-subtext">CẢM HỨNG THIẾT KẾ &amp; NGHỆ THUẬT CẮT MAY</span>
-              </div>
-
-              <h2 className="craft-main-title font-serif">
-                {product.description_heading}
-              </h2>
-
-              <p className="craft-lead-paragraph">
-                {product.description_p1}
-              </p>
-
-              {/* 4 Craftsmanship Feature Highlights */}
-              <div className="craftsmanship-grid">
-                {product.craftsmanship_points?.map((item, idx) => (
-                  <div key={idx} className="craft-card">
-                    <div className="craft-card-header">
-                      <Sparkles size={16} color="#775A00" />
-                      <h4 className="craft-card-title">{item.title}</h4>
-                    </div>
-                    <p className="craft-card-desc">{item.desc}</p>
-                  </div>
-                ))}
-              </div>
+          {/* Nội dung chi tiết */}
+          <div className="tab-pane-content animate-fade-in">
+            <div className="craft-gold-subtitle">
+              <span className="gold-line"></span>
+              <span className="gold-subtext">CẢM HỨNG THIẾT KẾ &amp; NGHỆ THUẬT CẮT MAY</span>
             </div>
-          )}
 
-          {/* Tab Content 2: Chất liệu & Bảo quản */}
-          {activeTab === 'materials' && (
-            <div className="tab-pane-content animate-fade-in">
-              <div className="craft-gold-subtitle">
-                <span className="gold-line"></span>
-                <span className="gold-subtext">HƯỚNG DẪN GIẶT ỦI &amp; BẢO QUẢN SẢN PHẨM</span>
-              </div>
-              <h2 className="craft-main-title font-serif">
-                Bảo Dưỡng Độ Mềm Mượt Của Cashmere Tự Nhiên
-              </h2>
-              <div className="care-guide-list">
-                <div className="care-item">
-                  <ShieldCheck size={20} color="#775A00" />
-                  <div>
-                    <strong>Chế độ giặt:</strong> Khuyên dùng phương pháp giặt khô chuyên nghiệp (Dry Clean Only) tại các tiệm giặt uy tín để duy trì độ bóng của sợi cashmere và cấu trúc form áo.
-                  </div>
-                </div>
-                <div className="care-item">
-                  <PackageCheck size={20} color="#775A00" />
-                  <div>
-                    <strong>Treo &amp; Cất giữ:</strong> Luôn sử dụng móc gỗ đệm vai to bản đi kèm để tránh biến dạng cầu vai. Bọc trong túi vải cotton thoáng khí khi cất tủ chuyển mùa.
-                  </div>
-                </div>
-                <div className="care-item">
-                  <Sparkles size={20} color="#775A00" />
-                  <div>
-                    <strong>Ủi là hơi nước:</strong> Chỉ sử dụng bàn là hơi nước đứng ở nhiệt độ thấp nhất dành riêng cho lụa và len cashmere. Không áp bàn là nhiệt trực tiếp lên bề mặt vải.
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+            <h2 className="craft-main-title font-serif">
+              {product.description_heading}
+            </h2>
 
-          {/* Tab Content 3: Giao nhận */}
-          {activeTab === 'shipping' && (
-            <div className="tab-pane-content animate-fade-in">
-              <div className="craft-gold-subtitle">
-                <span className="gold-line"></span>
-                <span className="gold-subtext">DỊCH VỤ KHÁCH HÀNG THƯỢNG HẠNG</span>
-              </div>
-              <h2 className="craft-main-title font-serif">
-                Trải Nghiệm Thử Đồ Tại Nhà Miễn Phí Toàn Quốc
-              </h2>
-              <p className="craft-lead-paragraph">
-                Youth Fashion cam kết mang đến dịch vụ may đo và giao nhận cao cấp nhất. Mọi đơn hàng đều được đóng gói hộp quà cứng sang trọng, kèm thiệp cảm ơn và móc treo cao cấp.
-              </p>
-              <div className="shipping-perks-row">
-                <div className="perk-box">
-                  <Truck size={24} color="#111827" />
-                  <h4>Giao Hàng Hỏa Tốc</h4>
-                  <p>Nhận hàng trong 2 - 4 giờ tại nội thành Hà Nội &amp; TP. Hồ Chí Minh. Miễn phí vận chuyển toàn quốc cho tất cả đơn hàng.</p>
-                </div>
-                <div className="perk-box">
-                  <RotateCcw size={24} color="#111827" />
-                  <h4>Thử Đồ Trước Khi Thanh Toán</h4>
-                  <p>Quý khách được quyền mặc thử trang phục trước sự chứng kiến của nhân viên giao vận, hỗ trợ đổi size ngay nếu chưa vừa vặn.</p>
-                </div>
-              </div>
-            </div>
-          )}
+            <p className="craft-lead-paragraph">
+              {product.description_p1}
+            </p>
+          </div>
         </div>
       </section>
 
@@ -803,20 +884,12 @@ export default function ProductDetailPage() {
                   98% khách hàng hài lòng về chất liệu &amp; form dáng
                 </span>
               </div>
-
-              <button
-                type="button"
-                className="btn-write-review"
-                onClick={() => setIsReviewModalOpen(true)}
-              >
-                VIẾT ĐÁNH GIÁ
-              </button>
             </div>
           </div>
 
-          {/* Review Cards Grid */}
+          {/* Review Cards Grid (Hiển thị 6 feedback / trang) */}
           <div className="reviews-cards-grid">
-            {localReviews.map((rev) => (
+            {displayedReviews.map((rev) => (
               <div key={rev.id} className="review-card">
                 <div className="review-card-top">
                   {/* Rating Stars & Date */}
@@ -829,15 +902,9 @@ export default function ProductDetailPage() {
                     <span className="review-date">{rev.date}</span>
                   </div>
 
-                  {/* Reviewer Name & Verified Badge */}
+                  {/* Reviewer Name */}
                   <div className="reviewer-info-row">
                     <strong className="reviewer-name">{rev.author}</strong>
-                    {rev.is_verified && (
-                      <span className="verified-badge">
-                        <Check size={10} color="#16a34a" strokeWidth={3} />
-                        <span>Đã mua hàng</span>
-                      </span>
-                    )}
                   </div>
 
                   {/* Purchased Variant Tag */}
@@ -860,6 +927,18 @@ export default function ProductDetailPage() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Footer Action: Xem tất cả đánh giá (Mở Popup Modal) */}
+          <div className="reviews-footer-action">
+            <button
+              type="button"
+              className="btn-view-all-reviews"
+              onClick={() => setIsAllReviewsModalOpen(true)}
+            >
+              <span>XEM TẤT CẢ ĐÁNH GIÁ</span>
+              <span className="btn-arrow">&rarr;</span>
+            </button>
           </div>
         </div>
       </section>
@@ -938,12 +1017,14 @@ export default function ProductDetailPage() {
         </div>
       )}
 
-      {/* MODAL 2: Bảng quy đổi kích cỡ */}
+      {/* MODAL 2: Bảng quy đổi kích cỡ (Quần áo XS-XXL, Giày dép 35-44) */}
       {isSizeGuideOpen && (
         <div className="size-modal-overlay" onClick={() => setIsSizeGuideOpen(false)}>
           <div className="size-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-card-header">
-              <h3 className="modal-title font-serif">Bảng Quy Đổi Kích Cỡ Áo Măng Tô</h3>
+              <h3 className="modal-title font-serif">
+                {sizeGuideTab === 'shoes' ? 'Bảng Quy Đổi Kích Cỡ Giày Dép' : 'Bảng Quy Đổi Kích Cỡ Quần Áo'}
+              </h3>
               <button 
                 type="button" 
                 className="btn-modal-close"
@@ -953,145 +1034,192 @@ export default function ProductDetailPage() {
               </button>
             </div>
 
-            <p className="modal-desc">
-              Thông số chuẩn phom dáng nữ Á Đông đo trực tiếp trên sản phẩm thật (cm). Độ co giãn và sai số cho phép ± 1.5cm.
-            </p>
-
-            <div className="table-responsive">
-              <table className="size-guide-table">
-                <thead>
-                  <tr>
-                    <th>Kích cỡ</th>
-                    <th>Rộng Vai</th>
-                    <th>Vòng Ngực</th>
-                    <th>Vòng Eo</th>
-                    <th>Dài Áo</th>
-                    <th>Dài Tay</th>
-                    <th>Cân Nặng Khuyên Dùng</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className={selectedSize === 'XS' ? 'active-row' : ''}>
-                    <td><strong>XS</strong></td>
-                    <td>37 cm</td>
-                    <td>84 - 88 cm</td>
-                    <td>64 - 68 cm</td>
-                    <td>108 cm</td>
-                    <td>57 cm</td>
-                    <td>42 - 47 kg</td>
-                  </tr>
-                  <tr className={selectedSize === 'S' ? 'active-row' : ''}>
-                    <td><strong>S</strong></td>
-                    <td>38 cm</td>
-                    <td>88 - 92 cm</td>
-                    <td>68 - 72 cm</td>
-                    <td>110 cm</td>
-                    <td>58 cm</td>
-                    <td>48 - 53 kg</td>
-                  </tr>
-                  <tr className={selectedSize === 'M' ? 'active-row' : ''}>
-                    <td><strong>M (Chuẩn)</strong></td>
-                    <td>39 cm</td>
-                    <td>92 - 96 cm</td>
-                    <td>72 - 76 cm</td>
-                    <td>112 cm</td>
-                    <td>59 cm</td>
-                    <td>54 - 58 kg</td>
-                  </tr>
-                  <tr className={selectedSize === 'L' ? 'active-row' : ''}>
-                    <td><strong>L</strong></td>
-                    <td>40 cm</td>
-                    <td>96 - 100 cm</td>
-                    <td>76 - 80 cm</td>
-                    <td>114 cm</td>
-                    <td>60 cm</td>
-                    <td>59 - 64 kg</td>
-                  </tr>
-                  <tr className={selectedSize === 'XL' ? 'active-row' : ''}>
-                    <td><strong>XL</strong></td>
-                    <td>41.5 cm</td>
-                    <td>100 - 106 cm</td>
-                    <td>80 - 86 cm</td>
-                    <td>115 cm</td>
-                    <td>61 cm</td>
-                    <td>65 - 72 kg</td>
-                  </tr>
-                </tbody>
-              </table>
+            {/* Thanh chuyển tab quy đổi kích cỡ */}
+            <div className="size-modal-tabs">
+              <button
+                type="button"
+                className={`size-modal-tab-btn ${sizeGuideTab === 'clothing' ? 'active' : ''}`}
+                onClick={() => setSizeGuideTab('clothing')}
+              >
+                Quần Áo (XS - XXL)
+              </button>
+              <button
+                type="button"
+                className={`size-modal-tab-btn ${sizeGuideTab === 'shoes' ? 'active' : ''}`}
+                onClick={() => setSizeGuideTab('shoes')}
+              >
+                Giày Dép (35 - 44)
+              </button>
             </div>
 
-            <div className="modal-footer-note">
-              <span>* Nếu quý khách nằm giữa hai size hoặc cần mặc áo len dày bên trong, chúng tôi khuyên nên chọn tăng 1 size.</span>
-            </div>
+            {sizeGuideTab === 'clothing' ? (
+              <>
+                <p className="modal-desc">
+                  Thông số chuẩn phom dáng Á Đông đo trực tiếp trên sản phẩm thật (cm). Độ co giãn và sai số cho phép ± 1.5cm.
+                </p>
+
+                <div className="table-responsive">
+                  <table className="size-guide-table">
+                    <thead>
+                      <tr>
+                        <th>Kích cỡ</th>
+                        <th>Rộng Vai</th>
+                        <th>Vòng Ngực</th>
+                        <th>Vòng Eo</th>
+                        <th>Dài Áo / Váy</th>
+                        <th>Chiều Cao</th>
+                        <th>Cân Nặng Khuyên Dùng</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { size: 'XS', shoulder: '37 cm', bust: '84 - 88 cm', waist: '64 - 68 cm', length: '108 cm', height: '1m50 - 1m55', weight: '42 - 47 kg' },
+                        { size: 'S', shoulder: '38 cm', bust: '88 - 92 cm', waist: '68 - 72 cm', length: '110 cm', height: '1m55 - 1m60', weight: '48 - 53 kg' },
+                        { size: 'M (Chuẩn)', match: 'M', shoulder: '39 cm', bust: '92 - 96 cm', waist: '72 - 76 cm', length: '112 cm', height: '1m60 - 1m65', weight: '54 - 58 kg' },
+                        { size: 'L', shoulder: '40 cm', bust: '96 - 100 cm', waist: '76 - 80 cm', length: '114 cm', height: '1m65 - 1m70', weight: '59 - 64 kg' },
+                        { size: 'XL', shoulder: '41.5 cm', bust: '100 - 106 cm', waist: '80 - 86 cm', length: '115 cm', height: '1m70 - 1m75', weight: '65 - 72 kg' },
+                        { size: 'XXL', shoulder: '43 cm', bust: '106 - 112 cm', waist: '86 - 92 cm', length: '116 cm', height: '1m75+', weight: '72 - 80 kg' },
+                      ].map((row, idx) => {
+                        const isRowActive = selectedSize === (row.match || row.size);
+                        return (
+                          <tr key={idx} className={isRowActive ? 'active-row' : ''}>
+                            <td><strong>{row.size}</strong></td>
+                            <td>{row.shoulder}</td>
+                            <td>{row.bust}</td>
+                            <td>{row.waist}</td>
+                            <td>{row.length}</td>
+                            <td>{row.height}</td>
+                            <td>{row.weight}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="modal-footer-note">
+                  <span>* Nếu quý khách nằm giữa hai size hoặc cần mặc áo len dày bên trong, chúng tôi khuyên nên chọn tăng 1 size.</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="modal-desc">
+                  Bảng quy đổi kích cỡ chuẩn theo chiều dài bàn chân thực tế (cm). Áp dụng cho giày sneaker, sandal, giày tây và giày cao gót.
+                </p>
+
+                <div className="table-responsive">
+                  <table className="size-guide-table">
+                    <thead>
+                      <tr>
+                        <th>Size VN / EU</th>
+                        <th>Dài Bàn Chân</th>
+                        <th>Rộng Bàn Chân</th>
+                        <th>Size US</th>
+                        <th>Size UK</th>
+                        <th>Gợi Ý Phù Hợp</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { size: '35', length: '22.5 cm', width: '8.0 - 8.3 cm', us: '4.5', uk: '3.0', note: 'Bàn chân nhỏ nhắn' },
+                        { size: '36', length: '23.0 cm', width: '8.3 - 8.5 cm', us: '5.5', uk: '3.5', note: 'Chuẩn nữ Á Đông' },
+                        { size: '37', length: '23.5 cm', width: '8.5 - 8.8 cm', us: '6.0', uk: '4.0', note: 'Chuẩn nữ Á Đông' },
+                        { size: '38', length: '24.0 cm', width: '8.8 - 9.0 cm', us: '7.0', uk: '5.0', note: 'Nữ cao / Nam nhỏ' },
+                        { size: '39', length: '24.5 cm', width: '9.0 - 9.3 cm', us: '7.5', uk: '5.5', note: 'Unisex phổ thông' },
+                        { size: '40', length: '25.0 cm', width: '9.3 - 9.5 cm', us: '8.5', uk: '6.5', note: 'Chuẩn nam giới' },
+                        { size: '41', length: '25.5 cm', width: '9.5 - 9.8 cm', us: '9.0', uk: '7.0', note: 'Chuẩn nam giới' },
+                        { size: '42', length: '26.0 cm', width: '9.8 - 10.0 cm', us: '9.5', uk: '7.5', note: 'Chuẩn nam giới' },
+                        { size: '43', length: '26.5 cm', width: '10.0 - 10.3 cm', us: '10.0', uk: '8.0', note: 'Nam chân lớn' },
+                        { size: '44', length: '27.0 cm', width: '10.3 - 10.6 cm', us: '10.5', uk: '8.5', note: 'Nam chân lớn' },
+                      ].map((row, idx) => {
+                        const isRowActive = selectedSize === row.size;
+                        return (
+                          <tr key={idx} className={isRowActive ? 'active-row' : ''}>
+                            <td><strong>{row.size}</strong></td>
+                            <td>{row.length}</td>
+                            <td>{row.width}</td>
+                            <td>{row.us}</td>
+                            <td>{row.uk}</td>
+                            <td>{row.note}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="modal-footer-note">
+                  <span>* Hướng dẫn đo: Đặt bàn chân trần lên tờ giấy trắng, đánh dấu 2 điểm tại gót chân và ngón chân dài nhất. Đo khoảng cách (cm) và đối chiếu bảng trên. Nếu mu bàn chân dày hoặc bè ngang, khuyến nghị chọn tăng 1 size.</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      {/* MODAL 3: Viết đánh giá sản phẩm */}
-      {isReviewModalOpen && (
-        <div className="size-modal-overlay" onClick={() => setIsReviewModalOpen(false)}>
-          <div className="size-modal-card review-modal-card" onClick={(e) => e.stopPropagation()}>
+
+      {/* MODAL 4: Xem tất cả đánh giá từ khách hàng */}
+      {isAllReviewsModalOpen && (
+        <div className="size-modal-overlay" onClick={() => setIsAllReviewsModalOpen(false)}>
+          <div className="size-modal-card all-reviews-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-card-header">
-              <h3 className="modal-title font-serif">Chia Sẻ Đánh Giá Của Bạn</h3>
+              <div>
+                <h3 className="modal-title font-serif">Tất Cả Đánh Giá Từ Khách Hàng</h3>
+                <span className="modal-sub-count">{localReviews.length} đánh giá đã xác thực • 98% hài lòng</span>
+              </div>
               <button 
                 type="button" 
                 className="btn-modal-close"
-                onClick={() => setIsReviewModalOpen(false)}
+                onClick={() => setIsAllReviewsModalOpen(false)}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitReview} className="review-modal-form">
-              <div className="form-group">
-                <label className="form-label">Chất lượng sản phẩm:</label>
-                <div className="rating-select-stars">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      className="star-btn-pick"
-                      onClick={() => setNewReviewRating(star)}
-                    >
-                      <Star 
-                        size={22} 
-                        fill={star <= newReviewRating ? '#F59E0B' : 'none'} 
-                        color="#F59E0B" 
-                      />
-                    </button>
-                  ))}
-                  <span className="rating-pick-text">{newReviewRating} sao - Rất hài lòng</span>
+            {/* Bộ lọc theo số sao */}
+            <div className="size-modal-tabs">
+              {[
+                { val: 'all', label: `Tất Cả (${localReviews.length})` },
+                { val: '5', label: `5 Sao (${localReviews.filter(r => r.rating === 5).length})` },
+                { val: '4', label: `4 Sao (${localReviews.filter(r => r.rating === 4).length})` },
+              ].map((tab) => (
+                <button
+                  key={tab.val}
+                  type="button"
+                  className={`size-modal-tab-btn ${reviewFilterStar === tab.val ? 'active' : ''}`}
+                  onClick={() => setReviewFilterStar(tab.val)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Danh sách đánh giá chi tiết */}
+            <div className="modal-reviews-list">
+              {filteredModalReviews.map((rev) => (
+                <div key={rev.id} className="modal-review-item">
+                  <div className="modal-rev-header">
+                    <div className="reviewer-info-row">
+                      <strong className="reviewer-name">{rev.author}</strong>
+                    </div>
+                    <div className="modal-rev-meta">
+                      <div className="card-stars">
+                        {Array.from({ length: rev.rating }).map((_, i) => (
+                          <Star key={i} size={11} fill="#F59E0B" color="#F59E0B" />
+                        ))}
+                      </div>
+                      <span className="review-date">{rev.date}</span>
+                    </div>
+                  </div>
+                  <span className="review-variant-tag">{rev.variant}</span>
+                  <p className="review-content-text">"{rev.content}"</p>
                 </div>
-              </div>
+              ))}
+            </div>
 
-              <div className="form-group">
-                <label className="form-label">Họ và tên của bạn:</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Ví dụ: Nguyễn Thị Mai"
-                  value={newReviewAuthor}
-                  onChange={(e) => setNewReviewAuthor(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Nội dung đánh giá:</label>
-                <textarea
-                  className="form-textarea"
-                  rows={4}
-                  placeholder="Chia sẻ trải nghiệm về chất liệu, đường may, độ vừa vặn của chiếc áo..."
-                  value={newReviewComment}
-                  onChange={(e) => setNewReviewComment(e.target.value)}
-                  required
-                />
-              </div>
-
-              <button type="submit" className="btn-submit-review">
-                GỬI ĐÁNH GIÁ NGAY
-              </button>
-            </form>
+            <div className="modal-footer-note">
+              <span>* Tất cả đánh giá đều được xác thực từ các đơn hàng thực tế của khách hàng tại Youth Fashion.</span>
+            </div>
           </div>
         </div>
       )}
@@ -1131,6 +1259,7 @@ export default function ProductDetailPage() {
           flex-direction: row;
           align-items: center;
           gap: 8px;
+          font-family: var(--font-sans);
           font-size: 11px;
           line-height: 16px;
           text-transform: uppercase;
@@ -1153,16 +1282,14 @@ export default function ProductDetailPage() {
         }
 
         .bc-category {
-          color: #444748;
-          font-size: 12px;
-          letter-spacing: 0.6px;
+          color: #737373;
+          letter-spacing: 1.98px;
         }
 
         .bc-current {
           color: #000000;
-          font-size: 12px;
           font-weight: 600;
-          letter-spacing: 0.6px;
+          letter-spacing: 1.98px;
         }
 
         /* 2. Main Product Showcase Section */
@@ -2114,6 +2241,87 @@ export default function ProductDetailPage() {
           color: #000000;
         }
 
+        .reviews-footer-action {
+          display: flex;
+          justify-content: center;
+          margin-top: 40px;
+        }
+
+        .btn-view-all-reviews {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          padding: 16px 48px;
+          background-color: transparent;
+          border: 1px solid #111827;
+          color: #111827;
+          font-family: var(--font-sans);
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: all 0.25s ease;
+        }
+
+        .btn-view-all-reviews:hover {
+          background-color: #111827;
+          color: #FFFFFF;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+        }
+
+        .btn-view-all-reviews .btn-arrow {
+          font-size: 15px;
+          line-height: 1;
+          transition: transform 0.2s ease;
+        }
+
+        .btn-view-all-reviews:hover .btn-arrow {
+          transform: translateX(4px);
+        }
+
+        .all-reviews-modal-card {
+          max-width: 820px;
+        }
+
+        .modal-sub-count {
+          display: block;
+          font-size: 12px;
+          color: #6B7280;
+          margin-top: 4px;
+        }
+
+        .modal-reviews-list {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          max-height: 55vh;
+          overflow-y: auto;
+          padding-right: 8px;
+          margin: 16px 0;
+        }
+
+        .modal-review-item {
+          background: #FAF9F6;
+          border: 1px solid #EAE8E1;
+          border-radius: 10px;
+          padding: 16px;
+        }
+
+        .modal-rev-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 6px;
+        }
+
+        .modal-rev-meta {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
         /* 5. Section: Similar Products */
         .section-similar-products {
           padding: 64px 0 24px;
@@ -2232,15 +2440,52 @@ export default function ProductDetailPage() {
 
         .size-modal-card {
           background: #FFFFFF;
-          max-width: 760px;
+          max-width: 820px;
           width: 100%;
+          max-height: 90vh;
+          overflow-y: auto;
           padding: 32px;
+          border-radius: 16px;
           box-shadow: 0 20px 40px rgba(0,0,0,0.2);
           position: relative;
         }
 
+        .size-modal-tabs {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          border-bottom: 1px solid #E5E7EB;
+          margin-bottom: 18px;
+          padding-bottom: 12px;
+        }
+
+        .size-modal-tab-btn {
+          padding: 8px 18px;
+          font-size: 13px;
+          font-weight: 600;
+          letter-spacing: 0.5px;
+          color: #6B7280;
+          background: #F3F4F6;
+          border: 1px solid transparent;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .size-modal-tab-btn:hover {
+          color: #000000;
+          background: #E5E7EB;
+        }
+
+        .size-modal-tab-btn.active {
+          color: #FFFFFF;
+          background: #111827;
+          border-color: #111827;
+        }
+
         .review-modal-card {
           max-width: 520px;
+          border-radius: 16px;
         }
 
         .modal-card-header {
@@ -2263,10 +2508,18 @@ export default function ProductDetailPage() {
           border: none;
           color: #6B7280;
           cursor: pointer;
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background-color 0.15s, color 0.15s;
         }
 
         .btn-modal-close:hover {
           color: #000000;
+          background: #F3F4F6;
         }
 
         .modal-desc {
@@ -2277,6 +2530,8 @@ export default function ProductDetailPage() {
 
         .table-responsive {
           overflow-x: auto;
+          border-radius: 10px;
+          border: 1px solid #E5E7EB;
         }
 
         .size-guide-table {

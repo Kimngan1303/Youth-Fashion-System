@@ -20,12 +20,12 @@ import {
   Plus,
   Trash2,
   Edit,
-  Eye,
   Star,
   Upload,
   X,
   Loader2,
   AlertCircle,
+  ChevronDown,
 } from "lucide-react";
 
 const productManagerStyles = `
@@ -412,138 +412,527 @@ const productManagerStyles = `
     overflow: hidden;
   }
 
-  .table-filter-bar {
+  /* --- BỘ LỌC TRẠNG THÁI VÀ BULK ACTION --- */
+  .card-top-filters-wrapper {
+    padding: 20px 20px 16px 20px;
     display: flex;
     flex-direction: column;
-    padding: 20px;
     gap: 16px;
-    border-bottom: 1px solid #F0EEE9;
+    background: #FFFFFF;
   }
 
-  .filter-controls-row {
+  .status-tabs-bulk-row {
     display: flex;
+    align-items: center;
     justify-content: space-between;
+    width: 100%;
+    margin-bottom: 0px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .status-tabs-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .status-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #4B5563;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .status-tab-btn:hover:not(.active) {
+    background: #F3F4F6;
+    color: #111827;
+  }
+
+  .status-tab-btn.active {
+    background: #18181B;
+    color: #FFFFFF;
+    font-weight: 600;
+  }
+
+  .status-tab-btn.active .tab-count {
+    color: rgba(255, 255, 255, 0.75) !important;
+  }
+
+  .tab-count {
+    font-size: 12.5px;
+  }
+
+  .tab-count-green { color: #16A34A; font-weight: 600; }
+  .tab-count-yellow,
+  .tab-count-orange { color: #CA8A04; font-weight: 600; }
+  .tab-count-red { color: #EF4444; font-weight: 600; }
+  .tab-count-gray { color: #6B7280; font-weight: 500; }
+
+  .bulk-actions-group {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .selected-count-label {
+    font-size: 13px;
+    color: #6B7280;
+  }
+
+  .selected-count-label strong {
+    color: #111827;
+  }
+
+  .btn-bulk-delete {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    color: #DC2626;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-bulk-delete:hover:not(:disabled) {
+    background: #FEE2E2;
+  }
+
+  .btn-bulk-delete:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* --- THANH TÌM KIẾM, DANH MỤC VÀ SẮP XẾP --- */
+  .table-controls-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 0px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .left-filter-group {
+    display: flex;
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
   }
 
-  .search-filter-input {
+  .search-filter-box {
     display: flex;
     align-items: center;
-    background: #F7F6F3;
-    border: 1px solid #E2DFD7;
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
     border-radius: 8px;
     padding: 8px 14px;
-    width: 300px;
+    width: 280px;
     gap: 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
   }
 
-  .search-filter-input input {
+  .search-filter-box input {
     border: none;
     background: transparent;
     outline: none;
     font-size: 13px;
     width: 100%;
-    color: #1C1917;
+    color: #111827;
   }
 
-  .filter-select {
-    padding: 8px 12px;
-    border: 1px solid #E2DFD7;
-    border-radius: 8px;
-    font-size: 12.5px;
-    color: #404040;
+  .category-filter-select {
+    padding: 8px 14px;
     background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #374151;
     outline: none;
     cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  }
+
+  .right-sort-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sort-label {
+    font-size: 13px;
+    color: #6B7280;
+  }
+
+  .sort-select {
+    padding: 8px 14px;
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #111827;
+    outline: none;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  }
+
+  /* --- BẢNG DỮ LIỆU SẢN PHẨM --- */
+  .product-table-card {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 12px;
+    overflow: hidden;
+    width: 100%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    box-sizing: border-box;
   }
 
   .product-data-table {
     width: 100%;
     border-collapse: collapse;
     text-align: left;
-    font-size: 13.5px;
+    font-size: 13px;
   }
 
   .product-data-table th {
-    background: #FAF9F6;
-    padding: 14px 18px;
+    background: #FAFAFA;
+    padding: 12px 16px;
     font-weight: 700;
-    font-size: 11.5px;
-    letter-spacing: 0.6px;
+    font-size: 11px;
+    letter-spacing: 0.5px;
     text-transform: uppercase;
-    color: #78716C;
-    border-bottom: 1px solid #EAE7DF;
+    color: #6B7280;
+    border-top: 1px solid #E5E7EB;
+    border-bottom: 1px solid #E5E7EB;
+    vertical-align: middle;
   }
 
   .product-data-table td {
-    padding: 16px 18px;
-    border-bottom: 1px solid #F2EEE8;
-    color: #1C1917;
+    padding: 14px 16px;
+    border-bottom: 1px solid #F3F4F6;
+    color: #111827;
+    vertical-align: middle;
+    transition: background 0.1s ease;
+  }
+
+  .product-data-table tr:hover td {
+    background: #FAFAFA;
+  }
+
+  .product-data-table tr.row-selected td {
+    background: #F8FAFC;
+  }
+
+  .custom-checkbox {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    accent-color: #18181B;
     vertical-align: middle;
   }
 
   .product-info-cell {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
   }
 
   .product-thumb {
     width: 48px;
     height: 48px;
-    border-radius: 6px;
+    border-radius: 8px;
     object-fit: cover;
-    background: #F2EFE9;
-    border: 1px solid #E2DFD7;
+    background: #F3F4F6;
+    border: 1px solid #E5E7EB;
+    flex-shrink: 0;
   }
 
   .product-name-title {
     font-weight: 600;
-    color: #111111;
+    color: #111827;
     font-size: 13.5px;
+    line-height: 1.35;
+    transition: color 0.15s ease;
   }
 
-  .price-cell-main {
-    font-weight: 700;
-    font-size: 13.5px;
-    color: #111111;
+  .product-name-title:hover {
+    color: #0284C7;
   }
 
-  .stock-total-bold {
-    font-weight: 700;
-    font-size: 13.5px;
-    color: #111111;
+  .product-sub-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
   }
 
-  .stock-sizes-subtext {
+  .product-sku-text {
     font-size: 11.5px;
-    color: #78716C;
+    color: #6B7280;
+    font-weight: 500;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  .tag-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    background: #F3F4F6;
+    color: #4B5563;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .category-cell-text {
+    font-size: 13px;
+    color: #4B5563;
+    font-weight: 500;
+  }
+
+  .price-current-bold {
+    font-weight: 700;
+    font-size: 14px;
+    color: #111827;
+    line-height: 1.2;
+  }
+
+  .price-original-strikethrough {
+    font-size: 11.5px;
+    color: #9CA3AF;
+    text-decoration: line-through;
+    margin-top: 2px;
+  }
+
+  .stock-count-normal {
+    font-weight: 600;
+    font-size: 13px;
+    color: #111827;
+  }
+
+  .stock-count-low {
+    font-weight: 600;
+    font-size: 13px;
+    color: #EA580C;
+  }
+
+  .stock-count-out {
+    font-weight: 600;
+    font-size: 13px;
+    color: #DC2626;
+  }
+
+  .stock-sizes-text {
+    font-size: 11px;
+    color: #6B7280;
     margin-left: 8px;
   }
 
-  .status-pill-green {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 12px;
-    background: #DCFCE7;
-    color: #15803D;
-    border-radius: 9999px;
-    font-size: 11.5px;
-    font-weight: 600;
+  .stock-note-out {
+    font-size: 11px;
+    color: #9CA3AF;
+    margin-left: 8px;
   }
 
-  .status-pill-orange {
+  .stock-bar-track {
+    width: 130px;
+    height: 5px;
+    background: #E5E7EB;
+    border-radius: 9999px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+
+  /* Thanh đo tồn kho theo đúng yêu cầu:
+     - Hết hàng: đỏ
+     - Gần hết hàng: vàng
+     - Đang bán / Còn hàng: màu xanh lá (User: "đang bán là màu xanh lá")
+     - Tạm ẩn: màu xám nhạt */
+  .stock-bar-fill-green,
+  .stock-bar-fill-orange {
+    height: 100%;
+    background: #10B981;
+    border-radius: 9999px;
+    transition: width 0.3s ease;
+  }
+
+  .stock-bar-fill-yellow {
+    height: 100%;
+    background: #EAB308;
+    border-radius: 9999px;
+    transition: width 0.3s ease;
+  }
+
+  .stock-bar-fill-red {
+    height: 100%;
+    background: #EF4444;
+    border-radius: 9999px;
+    transition: width 0.3s ease;
+  }
+
+  .stock-bar-fill-gray {
+    height: 100%;
+    background: #D1D5DB;
+    border-radius: 9999px;
+    transition: width 0.3s ease;
+  }
+
+  .stock-count-selling {
+    font-weight: 600;
+    font-size: 13px;
+    color: #047857;
+  }
+
+  .stock-count-low {
+    font-weight: 600;
+    font-size: 13px;
+    color: #A16207;
+  }
+
+  .stock-count-out {
+    font-weight: 600;
+    font-size: 13px;
+    color: #DC2626;
+  }
+
+  .stock-count-hidden {
+    font-weight: 600;
+    font-size: 13px;
+    color: #6B7280;
+  }
+
+  /* --- CỘT TRẠNG THÁI: NÚT BẤM ĐỔI TRẠNG THÁI & DROPDOWN --- */
+  .status-dropdown-container {
+    position: relative;
+    display: inline-block;
+  }
+
+  .status-interactive-pill {
     display: inline-flex;
     align-items: center;
-    padding: 4px 12px;
-    background: #FEF3C7;
-    color: #B45309;
+    gap: 6px;
+    padding: 5px 12px;
     border-radius: 9999px;
     font-size: 11.5px;
     font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    user-select: none;
   }
+
+  .status-interactive-pill:hover {
+    filter: brightness(0.96);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    transform: translateY(-0.5px);
+  }
+
+  /* 4 kiểu nút trạng thái */
+  .status-pill-selling {
+    background: #DCFCE7;
+    color: #15803D;
+    border-color: #BBF7D0;
+  }
+
+  .status-pill-low {
+    background: #FEF9C3;
+    color: #A16207;
+    border-color: #FDE047;
+  }
+
+  .status-pill-out {
+    background: #FEE2E2;
+    color: #DC2626;
+    border-color: #FECACA;
+  }
+
+  .status-pill-hidden {
+    background: #F3F4F6;
+    color: #6B7280;
+    border-color: #E5E7EB;
+  }
+
+  /* Popover Menu khi bấm vào pill trạng thái */
+  .status-menu-popover {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+    z-index: 1000;
+    min-width: 145px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    animation: popoverFadeIn 0.15s ease-out;
+  }
+
+  @keyframes popoverFadeIn {
+    from { opacity: 0; transform: translate(-50%, -4px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+  }
+
+  .status-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #374151;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.1s ease;
+  }
+
+  .status-menu-item:hover {
+    background: #F3F4F6;
+    color: #111827;
+  }
+
+  .status-menu-item.active {
+    font-weight: 600;
+    background: #F8FAFC;
+  }
+
+  .status-dot-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    flex-shrink: 0;
+  }
+
+  .dot-selling { background: #16A34A; }
+  .dot-low { background: #EAB308; }
+  .dot-out { background: #EF4444; }
+  .dot-hidden { background: #9CA3AF; }
 
   .action-buttons-cell {
     display: flex;
@@ -561,13 +950,11 @@ const productManagerStyles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.15s ease;
+    transition: all 0.15s ease;
   }
 
-  .action-btn-item.edit { color: #44403C; }
-  .action-btn-item.edit:hover { background: #F5F4EF; color: #111111; }
-  .action-btn-item.view { color: #44403C; }
-  .action-btn-item.view:hover { background: #F5F4EF; color: #111111; }
+  .action-btn-item.edit { color: #6B7280; }
+  .action-btn-item.edit:hover { background: #F3F4F6; color: #111827; }
   .action-btn-item.delete { color: #EF4444; }
   .action-btn-item.delete:hover { background: #FEF2F2; color: #DC2626; }
 
@@ -989,12 +1376,24 @@ export default function ProductManager() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  // Filter & Search & Pagination (5 sản phẩm 1 trang)
+  // Filter & Search & Pagination (6 sản phẩm 1 trang chuẩn giao diện mẫu)
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedTab, setSelectedTab] = useState("ALL"); // 'ALL' | 'SELLING' | 'LOW_STOCK' | 'OUT_OF_STOCK' | 'DRAFT'
+  const [sortBy, setSortBy] = useState("newest_update");
+  const [selectedProductIds, setSelectedProductIds] = useState([]);
+  const [activeStatusMenuId, setActiveStatusMenuId] = useState(null);
+  const [statusCounts, setStatusCounts] = useState({
+    all: 0,
+    selling: 0,
+    low_stock: 0,
+    out_of_stock: 0,
+    draft: 0,
+  });
+
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 5,
+    limit: 6,
     total: 0,
     totalPages: 1,
   });
@@ -1056,17 +1455,31 @@ export default function ProductManager() {
     }
   };
 
-  // Lấy dữ liệu sản phẩm từ MySQL
+  // Lấy dữ liệu sản phẩm từ MySQL với các bộ lọc Tab, Danh mục, Tìm kiếm và Sắp xếp
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const res = await productService.getProducts({
+      const params = {
         page: pagination.page,
         limit: pagination.limit,
         search: searchTerm,
         category_id: selectedCategory,
-      });
+        sort: sortBy,
+      };
+
+      if (selectedTab === "SELLING") {
+        params.status = "ACTIVE";
+        params.stock_status = "selling";
+      } else if (selectedTab === "LOW_STOCK") {
+        params.stock_status = "low_stock";
+      } else if (selectedTab === "OUT_OF_STOCK") {
+        params.stock_status = "out_of_stock";
+      } else if (selectedTab === "DRAFT") {
+        params.status = "INACTIVE";
+      }
+
+      const res = await productService.getProducts(params);
 
       if (res.status && res.data) {
         setProducts(res.data.products || []);
@@ -1083,7 +1496,7 @@ export default function ProductManager() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, searchTerm, selectedCategory]);
+  }, [pagination.page, pagination.limit, searchTerm, selectedCategory, selectedTab, sortBy]);
 
   const fetchMeta = async () => {
     try {
@@ -1091,9 +1504,177 @@ export default function ProductManager() {
       if (res.status && res.data) {
         setCategories(res.data.categories || []);
         setBrands(res.data.brands || []);
+        if (res.data.statusCounts) {
+          setStatusCounts(res.data.statusCounts);
+        }
       }
     } catch (err) {
       console.error("Lỗi lấy danh mục/thương hiệu:", err);
+    }
+  };
+
+  // Logic chọn checkbox hàng loạt
+  const isAllSelected =
+    products.length > 0 &&
+    products.every((p) => selectedProductIds.includes(p.product_id));
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedProductIds((prev) =>
+        prev.filter((id) => !products.some((p) => p.product_id === id)),
+      );
+    } else {
+      const currentPageIds = products.map((p) => p.product_id);
+      setSelectedProductIds((prev) => Array.from(new Set([...prev, ...currentPageIds])));
+    }
+  };
+
+  const handleToggleSelectProduct = (productId) => {
+    setSelectedProductIds((prev) =>
+      prev.includes(productId)
+        ? prev.filter((id) => id !== productId)
+        : [...prev, productId],
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedProductIds.length === 0) return;
+    if (
+      !window.confirm(
+        `Bạn có chắc chắn muốn xóa ${selectedProductIds.length} sản phẩm đã chọn khỏi hệ thống?`,
+      )
+    ) {
+      return;
+    }
+    setLoading(true);
+    try {
+      for (const id of selectedProductIds) {
+        await productService.deleteProduct(id);
+      }
+      showSuccess(`Đã xóa thành công ${selectedProductIds.length} sản phẩm`);
+      setSelectedProductIds([]);
+      fetchMeta();
+      fetchProducts();
+    } catch (err) {
+      showError("Có lỗi xảy ra khi xóa sản phẩm");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Lắng nghe click ngoài màn hình để đóng popover menu trạng thái
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest(".status-dropdown-container")) {
+        setActiveStatusMenuId(null);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  // Helper tính trạng thái và tồn kho theo đúng quy tắc người dùng yêu cầu:
+  // - Nếu tồn kho <= 5: tự động hiện Gần hết hàng
+  // - Nếu tồn kho === 0: tự động hiện Hết hàng
+  // - Có thể đổi thủ công: Đang bán, Gần hết hàng, Hết hàng, Tạm ẩn
+  const getProductStateInfo = (product) => {
+    const totalStock =
+      product.variants?.reduce(
+        (sum, v) => sum + (Number(v.stock) || 0),
+        0,
+      ) || 0;
+
+    // 1. Nếu người dùng vừa chủ động chọn trạng thái bằng menu dropdown:
+    if (product.custom_status) {
+      if (product.custom_status === "HIDDEN") {
+        return { key: "HIDDEN", label: "Tạm ẩn", totalStock };
+      }
+      if (product.custom_status === "OUT_OF_STOCK") {
+        return { key: "OUT_OF_STOCK", label: "Hết hàng", totalStock };
+      }
+      if (product.custom_status === "LOW_STOCK") {
+        if (totalStock <= 5) {
+          return { key: "LOW_STOCK", label: "Gần hết hàng", totalStock };
+        }
+      }
+      if (product.custom_status === "SELLING") {
+        return { key: "SELLING", label: "Đang bán", totalStock };
+      }
+    }
+
+    // 2. Logic tự động theo CSDL và số lượng tồn kho:
+    if (product.status === "INACTIVE") {
+      return { key: "HIDDEN", label: "Tạm ẩn", totalStock };
+    }
+    if (product.status === "OUT_OF_STOCK" || totalStock === 0) {
+      return { key: "OUT_OF_STOCK", label: "Hết hàng", totalStock };
+    }
+    if (totalStock <= 5) {
+      return { key: "LOW_STOCK", label: "Gần hết hàng", totalStock };
+    }
+
+    return { key: "SELLING", label: "Đang bán", totalStock };
+  };
+
+  // Hàm xử lý đổi nhanh trạng thái khi bấm vào các nút trong menu
+  const handleQuickChangeStatus = async (product, newKey) => {
+    setActiveStatusMenuId(null);
+
+    const totalStock =
+      product.variants?.reduce(
+        (sum, v) => sum + (Number(v.stock) || 0),
+        0,
+      ) || 0;
+
+    // Kiểm tra điều kiện: Chỉ cho phép đổi sang "Gần hết hàng" nếu số lượng sản phẩm <= 5
+    if (newKey === "LOW_STOCK" && totalStock > 5) {
+      showError(
+        `Không thể đổi trạng thái! Chỉ có thể chuyển sang "Gần hết hàng" khi số lượng sản phẩm ≤ 5 (Hiện tại: ${totalStock} sản phẩm).`
+      );
+      return;
+    }
+
+    let dbStatus = "ACTIVE";
+    let statusLabel = "Đang bán";
+
+    if (newKey === "HIDDEN") {
+      dbStatus = "INACTIVE";
+      statusLabel = "Tạm ẩn";
+    } else if (newKey === "OUT_OF_STOCK") {
+      dbStatus = "OUT_OF_STOCK";
+      statusLabel = "Hết hàng";
+    } else if (newKey === "LOW_STOCK") {
+      dbStatus = "ACTIVE";
+      statusLabel = "Gần hết hàng";
+    } else {
+      dbStatus = "ACTIVE";
+      statusLabel = "Đang bán";
+    }
+
+    // Cập nhật ngay local state để UI phản hồi mượt mà không độ trễ
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.product_id === product.product_id
+          ? {
+              ...p,
+              status: dbStatus,
+              custom_status: newKey,
+            }
+          : p,
+      ),
+    );
+
+    showSuccess(`Đã chuyển trạng thái sang "${statusLabel}"`);
+
+    try {
+      await productService.updateProduct(product.product_id, {
+        status: dbStatus,
+      });
+      fetchMeta();
+    } catch (err) {
+      console.error("Lỗi cập nhật trạng thái:", err);
+      showError("Không thể lưu trạng thái mới vào CSDL");
+      fetchProducts();
     }
   };
 
@@ -1436,45 +2017,136 @@ export default function ProductManager() {
             </div>
           </div>
 
-          {/* Product Data Table */}
-          <div className="table-section-card">
-            <div className="table-filter-bar">
-              <div className="filter-controls-row">
-                <div className="search-filter-input">
-                  <svg
-                    width="14"
-                    height="14"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="#A8A29E"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                  <input
-                    placeholder="Lọc theo tên..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
+          {/* Main Table Card (Bọc toàn bộ từ phần tabs, bộ lọc đến bảng sản phẩm) */}
+          <div className="product-table-card">
+            <div className="card-top-filters-wrapper">
+              {/* Top Status Filter Tabs & Bulk Actions Row */}
+              <div className="status-tabs-bulk-row">
+                <div className="status-tabs-group">
+                  <button
+                    type="button"
+                    className={`status-tab-btn ${selectedTab === "ALL" ? "active" : ""}`}
+                    onClick={() => {
+                      setSelectedTab("ALL");
                       setPagination((prev) => ({ ...prev, page: 1 }));
                     }}
-                  />
+                  >
+                    <span>Tất cả</span>
+                    <span className="tab-count tab-count-gray">
+                      ({statusCounts.all || pagination.total})
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`status-tab-btn ${selectedTab === "SELLING" ? "active" : ""}`}
+                    onClick={() => {
+                      setSelectedTab("SELLING");
+                      setPagination((prev) => ({ ...prev, page: 1 }));
+                    }}
+                  >
+                    <span>Đang bán</span>
+                    <span className="tab-count tab-count-green">
+                      ({statusCounts.selling})
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`status-tab-btn ${selectedTab === "LOW_STOCK" ? "active" : ""}`}
+                    onClick={() => {
+                      setSelectedTab("LOW_STOCK");
+                      setPagination((prev) => ({ ...prev, page: 1 }));
+                    }}
+                  >
+                    <span>Gần hết hàng</span>
+                    <span className="tab-count tab-count-yellow">
+                      ({statusCounts.low_stock})
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`status-tab-btn ${selectedTab === "OUT_OF_STOCK" ? "active" : ""}`}
+                    onClick={() => {
+                      setSelectedTab("OUT_OF_STOCK");
+                      setPagination((prev) => ({ ...prev, page: 1 }));
+                    }}
+                  >
+                    <span>Hết hàng</span>
+                    <span className="tab-count tab-count-red">
+                      ({statusCounts.out_of_stock || 0})
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`status-tab-btn ${selectedTab === "DRAFT" ? "active" : ""}`}
+                    onClick={() => {
+                      setSelectedTab("DRAFT");
+                      setPagination((prev) => ({ ...prev, page: 1 }));
+                    }}
+                  >
+                    <span>Bản nháp / Tạm ẩn</span>
+                    <span className="tab-count tab-count-gray">
+                      ({statusCounts.draft || 0})
+                    </span>
+                  </button>
                 </div>
 
-                <div style={{ display: "flex", gap: "8px" }}>
+                <div className="bulk-actions-group">
+                  <span className="selected-count-label">
+                    Đã chọn: <strong>{selectedProductIds.length}</strong> mục
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-bulk-delete"
+                    disabled={selectedProductIds.length === 0}
+                    onClick={handleBulkDelete}
+                  >
+                    <Trash2 size={14} />
+                    <span>Xóa các mục đã chọn</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Search, Filter & Sort Row */}
+              <div className="table-controls-bar">
+                <div className="left-filter-group">
+                  <div className="search-filter-box">
+                    <svg
+                      width="15"
+                      height="15"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="#9CA3AF"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                    <input
+                      placeholder="Lọc theo tên hoặc SKU..."
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setPagination((prev) => ({ ...prev, page: 1 }));
+                      }}
+                    />
+                  </div>
+
                   <select
-                    className="filter-select"
+                    className="category-filter-select"
                     value={selectedCategory}
                     onChange={(e) => {
                       setSelectedCategory(e.target.value);
                       setPagination((prev) => ({ ...prev, page: 1 }));
                     }}
                   >
-                    <option value="">Danh mục: Tất cả</option>
+                    <option value="">Tất cả danh mục</option>
                     {categories.map((c) => (
                       <option key={c.category_id} value={c.category_id}>
                         {c.category_name}
@@ -1482,9 +2154,26 @@ export default function ProductManager() {
                     ))}
                   </select>
                 </div>
+
+                <div className="right-sort-group">
+                  <span className="sort-label">Sắp xếp:</span>
+                  <select
+                    className="sort-select"
+                    value={sortBy}
+                    onChange={(e) => {
+                      setSortBy(e.target.value);
+                      setPagination((prev) => ({ ...prev, page: 1 }));
+                    }}
+                  >
+                    <option value="newest_update">Mới cập nhật nhất</option>
+                    <option value="newest">Mới nhất (Ngày tạo)</option>
+                    <option value="oldest">Cũ nhất</option>
+                    <option value="name_asc">Tên: A - Z</option>
+                    <option value="name_desc">Tên: Z - A</option>
+                  </select>
+                </div>
               </div>
             </div>
-
             {loading ? (
               <div
                 style={{
@@ -1527,10 +2216,18 @@ export default function ProductManager() {
                 <table className="product-data-table">
                   <thead>
                     <tr>
-                      <th>SẢN PHẨM & ẢNH ĐẠI DIỆN</th>
-                      <th>DANH MỤC / BRAND</th>
-                      <th>GIÁ BÁN</th>
-                      <th>TỒN KHO & BIẾN THỂ</th>
+                      <th style={{ width: "48px", textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          className="custom-checkbox"
+                          checked={isAllSelected}
+                          onChange={handleToggleSelectAll}
+                        />
+                      </th>
+                      <th>SẢN PHẨM</th>
+                      <th>DANH MỤC</th>
+                      <th>GIÁ BÁN / GỐC</th>
+                      <th>TỒN KHO (TỔNG &amp; SIZE)</th>
                       <th style={{ textAlign: "center" }}>TRẠNG THÁI</th>
                       <th style={{ textAlign: "right", paddingRight: "24px" }}>
                         THAO TÁC
@@ -1539,17 +2236,44 @@ export default function ProductManager() {
                   </thead>
                   <tbody>
                     {products.map((p) => {
+                      const isSelected = selectedProductIds.includes(p.product_id);
                       const primaryImg =
-                        p.images?.find((img) => img.is_primary) ||
-                        p.images?.[0];
+                        p.images?.find((img) => img.is_primary) || p.images?.[0];
                       const minPrice =
                         p.variants?.length > 0
-                          ? Math.min(...p.variants.map((v) => v.price))
+                          ? Math.min(...p.variants.map((v) => Number(v.price)))
                           : 0;
-                      const totalStock = calculateStock(p.variants);
+                      const originalPrice = Math.round((minPrice * 1.15) / 10000) * 10000;
+                      const totalStock =
+                        p.variants?.reduce(
+                          (sum, v) => sum + (Number(v.stock) || 0),
+                          0,
+                        ) || 0;
+                      const sku =
+                        p.variants?.[0]?.sku ||
+                        `AT-${p.product_name.slice(0, 3).toUpperCase()}-${String(p.product_id).padStart(3, "0")}`;
+                      const brandTag = p.brand?.brand_name
+                        ? p.brand.brand_name.toUpperCase()
+                        : "READY-TO-WEAR";
+
+                      const sizesText =
+                        p.variants && p.variants.length > 0
+                          ? p.variants.map((v) => `${v.size}:${v.stock}`).join(" • ")
+                          : "";
 
                       return (
-                        <tr key={p.product_id}>
+                        <tr
+                          key={p.product_id}
+                          className={isSelected ? "row-selected" : ""}
+                        >
+                          <td style={{ textAlign: "center" }}>
+                            <input
+                              type="checkbox"
+                              className="custom-checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleSelectProduct(p.product_id)}
+                            />
+                          </td>
                           <td>
                             <div className="product-info-cell">
                               <img
@@ -1559,78 +2283,231 @@ export default function ProductManager() {
                                 }
                                 alt={p.product_name}
                                 className="product-thumb"
+                                onClick={() => handleOpenProductDrawer(p)}
+                                style={{ cursor: "pointer" }}
                               />
                               <div>
-                                <div className="product-name-title">
+                                <div
+                                  className="product-name-title"
+                                  onClick={() => handleOpenProductDrawer(p)}
+                                  style={{ cursor: "pointer" }}
+                                >
                                   {p.product_name}
                                 </div>
-                                <div
-                                  style={{ fontSize: "11px", color: "#78716C" }}
-                                >
-                                  #{p.product_id} • {p.images?.length || 0} ảnh
-                                  trong bộ sưu tập
+                                <div className="product-sub-info">
+                                  <span className="product-sku-text">
+                                    SKU: {sku}
+                                  </span>
+                                  <span className="tag-badge">{brandTag}</span>
                                 </div>
                               </div>
                             </div>
                           </td>
                           <td>
-                            <div style={{ fontWeight: 600 }}>
+                            <span className="category-cell-text">
                               {p.category?.category_name || "N/A"}
-                            </div>
-                            <div style={{ fontSize: "11px", color: "#78716C" }}>
-                              {p.brand?.brand_name || "N/A"}
-                            </div>
+                            </span>
                           </td>
                           <td>
-                            <div className="price-cell-main">
-                              {formatPrice(minPrice)}
+                            <div className="price-current-bold">
+                              {minPrice > 0
+                                ? `${minPrice.toLocaleString("vi-VN")}₫`
+                                : "Liên hệ"}
                             </div>
+                            {minPrice > 0 && originalPrice > minPrice && (
+                              <div className="price-original-strikethrough">
+                                {originalPrice.toLocaleString("vi-VN")}₫
+                              </div>
+                            )}
                           </td>
                           <td>
-                            <span className="stock-total-bold">
-                              {totalStock} chiếc
-                            </span>
-                            <span className="stock-sizes-subtext">
-                              (
-                              {p.variants
-                                ?.map((v) => `${v.size}/${v.color}:${v.stock}`)
-                                .join(", ")}
-                              )
-                            </span>
+                            {(() => {
+                              const stateInfo = getProductStateInfo(p);
+                              const { key } = stateInfo;
+
+                              if (key === "OUT_OF_STOCK") {
+                                return (
+                                  <div>
+                                    <div>
+                                      <span className="stock-count-out">
+                                        0 chiếc (Hết hàng)
+                                      </span>
+                                      <span className="stock-note-out">Cần nhập thêm</span>
+                                    </div>
+                                    <div className="stock-bar-track">
+                                      <div
+                                        className="stock-bar-fill-red"
+                                        style={{ width: "0%" }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              if (key === "LOW_STOCK") {
+                                return (
+                                  <div>
+                                    <div>
+                                      <span className="stock-count-low">
+                                        {String(totalStock).padStart(2, "0")} chiếc (Gần hết hàng)
+                                      </span>
+                                      {sizesText && (
+                                        <span className="stock-sizes-text">
+                                          {sizesText}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="stock-bar-track">
+                                      <div
+                                        className="stock-bar-fill-yellow"
+                                        style={{
+                                          width: `${Math.min(30, Math.max(14, (totalStock / 10) * 100))}%`,
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              if (key === "HIDDEN") {
+                                return (
+                                  <div>
+                                    <div>
+                                      <span className="stock-count-hidden">
+                                        {totalStock} chiếc (Tạm ẩn)
+                                      </span>
+                                      {sizesText && (
+                                        <span className="stock-sizes-text">
+                                          {sizesText}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="stock-bar-track">
+                                      <div
+                                        className="stock-bar-fill-gray"
+                                        style={{
+                                          width: totalStock === 0
+                                            ? "0%"
+                                            : `${Math.min(50, Math.max(20, (totalStock / 80) * 100))}%`,
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              // key === "SELLING" (Đang bán: màu xanh lá, độ dài theo số lượng)
+                              return (
+                                <div>
+                                  <div>
+                                    <span className="stock-count-selling">
+                                      {totalStock} chiếc (Đang bán)
+                                    </span>
+                                    {sizesText && (
+                                      <span className="stock-sizes-text">
+                                        {sizesText}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="stock-bar-track">
+                                    <div
+                                      className="stock-bar-fill-green"
+                                      style={{
+                                        width: `${Math.min(100, Math.max(25, (totalStock / 80) * 100))}%`,
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td style={{ textAlign: "center" }}>
-                            <span
-                              className={
-                                p.status === "ACTIVE"
-                                  ? "status-pill-green"
-                                  : "status-pill-orange"
-                              }
-                            >
-                              {p.status === "ACTIVE" ? "Đang bán" : "Ẩn"}
-                            </span>
+                            {(() => {
+                              const stateInfo = getProductStateInfo(p);
+                              const pillClass =
+                                stateInfo.key === "SELLING"
+                                  ? "status-pill-selling"
+                                  : stateInfo.key === "LOW_STOCK"
+                                  ? "status-pill-low"
+                                  : stateInfo.key === "OUT_OF_STOCK"
+                                  ? "status-pill-out"
+                                  : "status-pill-hidden";
+
+                              return (
+                                <div className="status-dropdown-container">
+                                  <button
+                                    type="button"
+                                    className={`status-interactive-pill ${pillClass}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveStatusMenuId(
+                                        activeStatusMenuId === p.product_id ? null : p.product_id,
+                                      );
+                                    }}
+                                    title="Bấm để thay đổi trạng thái"
+                                  >
+                                    <span>{stateInfo.label}</span>
+                                    <ChevronDown size={11} />
+                                  </button>
+
+                                  {activeStatusMenuId === p.product_id && (
+                                    <div
+                                      className="status-menu-popover"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <button
+                                        type="button"
+                                        className={`status-menu-item ${stateInfo.key === "SELLING" ? "active" : ""}`}
+                                        onClick={() => handleQuickChangeStatus(p, "SELLING")}
+                                      >
+                                        <span className="status-dot-indicator dot-selling" />
+                                        <span>Đang bán</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={`status-menu-item ${stateInfo.key === "LOW_STOCK" ? "active" : ""}`}
+                                        onClick={() => handleQuickChangeStatus(p, "LOW_STOCK")}
+                                        title={
+                                          totalStock > 5
+                                            ? `Tồn kho hiện có ${totalStock} sản phẩm (> 5), không thể chọn "Gần hết hàng"`
+                                            : "Chuyển sang Gần hết hàng"
+                                        }
+                                      >
+                                        <span className="status-dot-indicator dot-low" />
+                                        <span>Gần hết hàng</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={`status-menu-item ${stateInfo.key === "OUT_OF_STOCK" ? "active" : ""}`}
+                                        onClick={() => handleQuickChangeStatus(p, "OUT_OF_STOCK")}
+                                      >
+                                        <span className="status-dot-indicator dot-out" />
+                                        <span>Hết hàng</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={`status-menu-item ${stateInfo.key === "HIDDEN" ? "active" : ""}`}
+                                        onClick={() => handleQuickChangeStatus(p, "HIDDEN")}
+                                      >
+                                        <span className="status-dot-indicator dot-hidden" />
+                                        <span>Tạm ẩn</span>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
-                          <td
-                            style={{ textAlign: "right", paddingRight: "20px" }}
-                          >
+                          <td style={{ textAlign: "right", paddingRight: "20px" }}>
                             <div className="action-buttons-cell">
                               <button
                                 type="button"
                                 className="action-btn-item edit"
-                                title="Chỉnh sửa & Quản lý ảnh"
+                                title="Chỉnh sửa sản phẩm"
                                 onClick={() => handleOpenEditDrawer(p, "edit")}
                               >
                                 <Edit size={16} />
                               </button>
-
-                              <button
-                                type="button"
-                                className="action-btn-item view"
-                                title="Xem chi tiết"
-                                onClick={() => handleOpenEditDrawer(p, "view")}
-                              >
-                                <Eye size={16} />
-                              </button>
-
                               <button
                                 type="button"
                                 className="action-btn-item delete"
@@ -1648,85 +2525,83 @@ export default function ProductManager() {
                 </table>
 
                 {/* Pagination Controls */}
-                {pagination.totalPages > 1 && (
-                  <div className="product-pagination-row">
-                    <div className="pagination-info-text">
-                      Hiển thị{" "}
-                      <strong>
-                        {products.length > 0
-                          ? (pagination.page - 1) * pagination.limit + 1
-                          : 0}{" "}
-                        -{" "}
-                        {Math.min(
-                          pagination.page * pagination.limit,
-                          pagination.total,
-                        )}
-                      </strong>{" "}
-                      trong tổng số <strong>{pagination.total}</strong> sản phẩm
-                    </div>
-
-                    <div className="pagination-buttons-group">
-                      <button
-                        type="button"
-                        className="btn-page-nav"
-                        disabled={pagination.page <= 1 || loading}
-                        onClick={() =>
-                          setPagination((prev) => ({
-                            ...prev,
-                            page: Math.max(1, prev.page - 1),
-                          }))
-                        }
-                      >
-                        &lt; Trang trước
-                      </button>
-
-                      {getPaginationPages(
-                        pagination.page,
-                        pagination.totalPages,
-                      ).map((p, idx) => {
-                        if (p === "...") {
-                          return (
-                            <span
-                              key={`ellipsis-${idx}`}
-                              className="btn-page-ellipsis"
-                            >
-                              ...
-                            </span>
-                          );
-                        }
-                        return (
-                          <button
-                            key={p}
-                            type="button"
-                            className={`btn-page-num ${pagination.page === p ? "active" : ""}`}
-                            disabled={loading}
-                            onClick={() =>
-                              setPagination((prev) => ({ ...prev, page: p }))
-                            }
-                          >
-                            {p}
-                          </button>
-                        );
-                      })}
-
-                      <button
-                        type="button"
-                        className="btn-page-nav"
-                        disabled={
-                          pagination.page >= pagination.totalPages || loading
-                        }
-                        onClick={() =>
-                          setPagination((prev) => ({
-                            ...prev,
-                            page: Math.min(prev.totalPages, prev.page + 1),
-                          }))
-                        }
-                      >
-                        Trang sau &gt;
-                      </button>
-                    </div>
+                <div className="product-pagination-row">
+                  <div className="pagination-info-text">
+                    Hiển thị{" "}
+                    <strong>
+                      {products.length > 0
+                        ? (pagination.page - 1) * pagination.limit + 1
+                        : 0}{" "}
+                      -{" "}
+                      {Math.min(
+                        pagination.page * pagination.limit,
+                        pagination.total,
+                      )}
+                    </strong>{" "}
+                    trong tổng số <strong>{pagination.total}</strong> sản phẩm
                   </div>
-                )}
+
+                  <div className="pagination-buttons-group">
+                    <button
+                      type="button"
+                      className="btn-page-nav"
+                      disabled={pagination.page <= 1 || loading}
+                      onClick={() =>
+                        setPagination((prev) => ({
+                          ...prev,
+                          page: Math.max(1, prev.page - 1),
+                        }))
+                      }
+                    >
+                      &lt; Trang trước
+                    </button>
+
+                    {getPaginationPages(
+                      pagination.page,
+                      pagination.totalPages,
+                    ).map((p, idx) => {
+                      if (p === "...") {
+                        return (
+                          <span
+                            key={`ellipsis-${idx}`}
+                            className="btn-page-ellipsis"
+                          >
+                            ...
+                          </span>
+                        );
+                      }
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          className={`btn-page-num ${pagination.page === p ? "active" : ""}`}
+                          disabled={loading}
+                          onClick={() =>
+                            setPagination((prev) => ({ ...prev, page: p }))
+                          }
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      className="btn-page-nav"
+                      disabled={
+                        pagination.page >= pagination.totalPages || loading
+                      }
+                      onClick={() =>
+                        setPagination((prev) => ({
+                          ...prev,
+                          page: Math.min(prev.totalPages, prev.page + 1),
+                        }))
+                      }
+                    >
+                      Trang sau &gt;
+                    </button>
+                  </div>
+                </div>
               </>
             )}
           </div>

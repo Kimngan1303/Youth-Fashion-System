@@ -207,6 +207,11 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
   const { confirmModal } = useConfirmModal();
 
   const isAdmin = user?.role === 'ADMIN' || user?.employee_role === 'ADMIN';
+  const isManagerOrAdmin =
+    isAdmin ||
+    user?.role === 'MANAGER' ||
+    user?.employee_role === 'MANAGER' ||
+    user?.user_type === 'EMPLOYEE';
 
   const handleLogout = async () => {
     const confirmed = await confirmModal({
@@ -253,8 +258,8 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
             </div>
           </button>
 
-          {/* 1.1. Quản Lý Người Dùng (Chỉ tài khoản Admin mới có) */}
-          {isAdmin && (
+          {/* 1.1. Quản Lý Tài Khoản (Dành cho Quản lý & Admin) */}
+          {isManagerOrAdmin && (
             <button
               type="button"
               className={`nav-menu-link ${activeMenu === 'users' ? 'active' : ''}`}
@@ -262,7 +267,7 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
             >
               <div className="nav-item-inner">
                 <Users size={16} />
-                <span>Quản Lý Người Dùng</span>
+                <span>Quản Lý Tài Khoản</span>
               </div>
             </button>
           )}
