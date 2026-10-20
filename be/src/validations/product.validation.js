@@ -17,8 +17,8 @@ export const createProductSchema = z.object({
     .string({ required_error: 'Thương hiệu sản phẩm là bắt buộc' })
     .or(z.number())
     .transform((val) => Number(val)),
-  status: z.enum(['ACTIVE', 'INACTIVE'], {
-    invalid_type_error: 'Trạng thái phải là ACTIVE hoặc INACTIVE',
+  status: z.enum(['ACTIVE', 'INACTIVE', 'OUT_OF_STOCK'], {
+    invalid_type_error: 'Trạng thái phải là ACTIVE, INACTIVE hoặc OUT_OF_STOCK',
   }).optional().default('ACTIVE'),
 });
 
@@ -27,7 +27,7 @@ export const updateProductSchema = z.object({
   description: z.string().optional(),
   category_id: z.string().or(z.number()).transform((val) => Number(val)).optional(),
   brand_id: z.string().or(z.number()).transform((val) => Number(val)).optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'OUT_OF_STOCK']).optional(),
 });
 
 /**

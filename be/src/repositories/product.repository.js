@@ -15,34 +15,65 @@ export const findProducts = async ({
   brand_ids,
   search_name,
   status,
+  stock_status,
   sort,
   size,
   min_price,
   max_price,
 }) => {
   const where = {};
+  const andList = [];
 
-  if (status) {
-    where.status = status;
+  if (status && status !== 'all' && status !== 'ALL') {
+    andList.push({ status });
+  }
+
+  if (stock_status === 'out_of_stock') {
+    andList.push({
+      status: { not: 'INACTIVE' },
+      OR: [
+        { status: 'OUT_OF_STOCK' },
+        { variants: { none: { stock: { gt: 0 } } } },
+      ],
+    });
+  } else if (stock_status === 'low_stock') {
+    andList.push({
+      status: 'ACTIVE',
+      variants: {
+        some: { stock: { lte: 5, gt: 0 } },
+        none: { stock: { gt: 5 } },
+      },
+    });
+  } else if (stock_status === 'selling') {
+    andList.push({
+      status: 'ACTIVE',
+      variants: {
+        some: { stock: { gt: 5 } },
+      },
+    });
   }
 
   if (category_id) {
-    where.category_id = BigInt(category_id);
+    andList.push({ category_id: BigInt(category_id) });
   }
 
   if (brand_ids && (Array.isArray(brand_ids) ? brand_ids.length > 0 : brand_ids)) {
     const list = Array.isArray(brand_ids) ? brand_ids : String(brand_ids).split(',').filter(Boolean);
     if (list.length > 0) {
-      where.brand_id = { in: list.map((id) => BigInt(id)) };
+      andList.push({ brand_id: { in: list.map((id) => BigInt(id)) } });
     }
   } else if (brand_id) {
-    where.brand_id = BigInt(brand_id);
+    andList.push({ brand_id: BigInt(brand_id) });
   }
 
   if (search_name) {
-    where.product_name = {
-      contains: search_name,
-    };
+    andList.push({
+      OR: [
+        { product_name: { contains: search_name } },
+        { description: { contains: search_name } },
+        { variants: { some: { sku: { contains: search_name } } } },
+      ],
+    });
   }
 
   const variantFilter = {};
@@ -57,14 +88,22 @@ export const findProducts = async ({
   }
 
   if (Object.keys(variantFilter).length > 0) {
-    where.variants = {
-      some: variantFilter,
-    };
+    andList.push({
+      variants: {
+        some: variantFilter,
+      },
+    });
+  }
+
+  if (andList.length > 0) {
+    where.AND = andList;
   }
 
   let orderBy = { created_at: 'desc' };
   if (sort === 'oldest') {
     orderBy = { created_at: 'asc' };
+  } else if (sort === 'updated' || sort === 'newest_update') {
+    orderBy = { updated_at: 'desc' };
   } else if (sort === 'name_asc') {
     orderBy = { product_name: 'asc' };
   } else if (sort === 'name_desc') {
@@ -315,4 +354,44 @@ export const findAllBrands = async () => {
     },
     orderBy: { brand_name: 'asc' },
   });
+};
+
+/**
+ * Lấy số lượng thống kê theo trạng thái và tồn kho cho Tab lọc
+ */
+export const getProductStatusCounts = async () => {
+  const allProducts = await prisma.product.findMany({
+    select: {
+      status: true,
+      variants: {
+        select: { stock: true },
+      },
+    },
+  });
+
+  let sellingCount = 0;
+  let lowStockCount = 0;
+  let outOfStockCount = 0;
+  let draftCount = 0;
+
+  allProducts.forEach((p) => {
+    const totalStock = p.variants ? p.variants.reduce((sum, v) => sum + (v.stock || 0), 0) : 0;
+    if (p.status === 'INACTIVE' || p.status === 'DRAFT') {
+      draftCount++;
+    } else if (p.status === 'OUT_OF_STOCK' || totalStock === 0) {
+      outOfStockCount++;
+    } else if (totalStock <= 5) {
+      lowStockCount++;
+    } else {
+      sellingCount++;
+    }
+  });
+
+  return {
+    all: allProducts.length,
+    selling: sellingCount,
+    low_stock: lowStockCount,
+    out_of_stock: outOfStockCount,
+    draft: draftCount,
+  };
 };
