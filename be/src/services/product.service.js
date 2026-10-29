@@ -95,6 +95,24 @@ export const createProductService = async (body, files = []) => {
     throw error;
   }
 
+  // Kiểm tra bắt buộc phải có ít nhất 1 ảnh khi tạo mới sản phẩm
+  let parsedUrls = [];
+  if (body.image_urls) {
+    try {
+      parsedUrls = typeof body.image_urls === 'string' ? JSON.parse(body.image_urls) : body.image_urls;
+    } catch (e) {
+      parsedUrls = [];
+    }
+  }
+  const hasFiles = files && Array.isArray(files) && files.length > 0;
+  const hasUrls = Array.isArray(parsedUrls) && parsedUrls.length > 0;
+
+  if (!hasFiles && !hasUrls) {
+    const error = new Error('Vui lòng chọn hoặc tải lên ít nhất 1 hình ảnh cho sản phẩm mới');
+    error.statusCode = 400;
+    throw error;
+  }
+
   // Parse variants từ string JSON (khi gửi qua multipart/form-data) hoặc object
   let variants = [];
   if (body.variants) {

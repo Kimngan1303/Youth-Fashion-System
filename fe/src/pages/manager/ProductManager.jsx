@@ -1887,6 +1887,15 @@ export default function ProductManager() {
   // Submit Form Tạo/Sửa Sản phẩm
   const handleSubmitProductForm = async (e) => {
     e.preventDefault();
+
+    const isCreate = drawerMode === "create";
+
+    // Kiểm tra bắt buộc chọn ít nhất 1 ảnh khi tạo sản phẩm mới
+    if (isCreate && (!selectedFiles || selectedFiles.length === 0)) {
+      showError("Vui lòng chọn ít nhất 1 hình ảnh từ máy tính cho sản phẩm mới");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const data = new FormData();
@@ -1902,7 +1911,6 @@ export default function ProductManager() {
         data.append("images", selectedFiles[i]);
       }
 
-      const isCreate = drawerMode === "create";
       if (isCreate) {
         await productService.createProduct(data);
       } else if (drawerMode === "edit" && currentProduct) {
@@ -2276,16 +2284,34 @@ export default function ProductManager() {
                           </td>
                           <td>
                             <div className="product-info-cell">
-                              <img
-                                src={
-                                  primaryImg?.image_url ||
-                                  "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=150"
-                                }
-                                alt={p.product_name}
-                                className="product-thumb"
-                                onClick={() => handleOpenProductDrawer(p)}
-                                style={{ cursor: "pointer" }}
-                              />
+                              {primaryImg?.image_url ? (
+                                <img
+                                  src={primaryImg.image_url}
+                                  alt={p.product_name}
+                                  className="product-thumb"
+                                  onClick={() => handleOpenProductDrawer(p)}
+                                  style={{ cursor: "pointer" }}
+                                />
+                              ) : (
+                                <div
+                                  className="product-thumb"
+                                  onClick={() => handleOpenProductDrawer(p)}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: "10.5px",
+                                    color: "#A8A29E",
+                                    background: "#F5F5F4",
+                                    cursor: "pointer",
+                                    border: "1px dashed #D6D3D1",
+                                    textAlign: "center",
+                                  }}
+                                  title="Sản phẩm chưa có ảnh"
+                                >
+                                  Không ảnh
+                                </div>
+                              )}
                               <div>
                                 <div
                                   className="product-name-title"
@@ -2857,7 +2883,12 @@ export default function ProductManager() {
               {/* 6. CHỌN ẢNH TẢI LÊN TỪ MÁY TÍNH */}
               <div className="form-group">
                 <label className="form-label">
-                  Chọn ảnh từ máy tính (Up được nhiều ảnh)
+                  Chọn ảnh từ máy tính (Up được nhiều ảnh){" "}
+                  {drawerMode === "create" ? (
+                    <span style={{ color: "#DC2626", fontWeight: 700 }}>* (Bắt buộc chọn ít nhất 1 ảnh)</span>
+                  ) : (
+                    <span style={{ color: "#78716C", fontWeight: 400 }}>(Tùy chọn tải thêm)</span>
+                  )}
                 </label>
                 <input
                   type="file"
