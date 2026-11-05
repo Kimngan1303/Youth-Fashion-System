@@ -649,7 +649,7 @@ export default function CheckoutPage() {
                     <span className="payment-name font-semibold">Thanh Toán Khi Nhận Hàng (COD)</span>
                   </div>
                   <p className="payment-desc">
-                    Đồng kiểm tra chất vải dạ Cashmere &amp; Tweed, thử phom dáng 15 phút trước khi quyết định.
+                    Thanh toán ngay tại thời điểm nhận hàng.
                   </p>
                 </div>
               </div>
