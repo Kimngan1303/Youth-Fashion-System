@@ -749,9 +749,9 @@ export default function CheckoutPage() {
               </div>
             ) : (
               <div className="voucher-empty-select-banner">
-                <div className="flex items-center gap-2">
-                  <Ticket size={16} className="text-amber-800" />
-                  <span className="text-xs font-semibold uppercase text-stone-700">MÃ VOUCHER</span>
+                <div className="voucher-empty-left">
+                  <Ticket size={17} className="voucher-empty-icon" />
+                  <span className="voucher-empty-title">MÃ VOUCHER</span>
                 </div>
                 <button
                   type="button"
@@ -1613,11 +1613,30 @@ export default function CheckoutPage() {
           background-color: #f5f4ef;
           border: 1px dashed #d6d3d1;
           border-radius: 8px;
-          padding: 12px 18px;
+          padding: 13px 20px;
           display: flex;
           align-items: center;
           justify-content: space-between;
           margin-bottom: 18px;
+        }
+
+        .voucher-empty-left {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .voucher-empty-icon {
+          color: #92400e;
+          flex-shrink: 0;
+        }
+
+        .voucher-empty-title {
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #44403c;
         }
 
         .btn-open-wallet-link {
