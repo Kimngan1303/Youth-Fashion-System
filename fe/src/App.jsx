@@ -11,6 +11,8 @@ import ProductListPage from './pages/customer/ProductListPage';
 import ProductDetailPage from './pages/customer/ProductDetailPage';
 import WishlistPage from './pages/customer/WishlistPage';
 import CartPage from './pages/customer/CartPage';
+import CheckoutPage from './pages/customer/CheckoutPage';
+import OrderSuccessPage from './pages/customer/OrderSuccessPage';
 import ProfilePage from './pages/ProfilePage';
 import ContactPage from './pages/ContactPage';
 import LookbookPage from './pages/LookbookPage';
@@ -99,6 +101,18 @@ function AppContent() {
                 <ProfilePage />
               </ProtectedRoute>
             } 
+          />
+          <Route 
+            path="/checkout" 
+            element={
+              <ProtectedRoute>
+                <CheckoutPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/order-success" 
+            element={<OrderSuccessPage />} 
           />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/chat" element={<ChatPage />} />

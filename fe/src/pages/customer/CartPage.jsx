@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Heart, Trash2, ShoppingBag, RotateCw, ArrowLeft, ShieldCheck, 
   RefreshCw, MessageSquare, Info, Check, Ticket, Tag, ChevronDown, X, AlertCircle, CheckCircle 
@@ -23,6 +23,7 @@ export default function CartPage() {
     toggleWishlist 
   } = useAuth();
   const { showSuccess, showInfo, showError } = useToast();
+  const navigate = useNavigate();
 
   const [similarProducts, setSimilarProducts] = useState([]);
   const [voucherCode, setVoucherCode] = useState('');
@@ -161,7 +162,22 @@ export default function CartPage() {
       showError('Vui lòng chọn ít nhất 1 sản phẩm để tiến hành thanh toán.');
       return;
     }
-    showSuccess('Đang chuyển hướng tới cổng thanh toán an toàn...');
+    try {
+      if (appliedVoucher) {
+        sessionStorage.setItem('yf_checkout_voucher', JSON.stringify(appliedVoucher));
+      } else {
+        sessionStorage.removeItem('yf_checkout_voucher');
+      }
+      sessionStorage.setItem('yf_checkout_note', orderNote || '');
+    } catch (e) {}
+
+    showSuccess('Đang chuyển hướng tới trang thanh toán...');
+    navigate('/checkout', {
+      state: {
+        appliedVoucher,
+        orderNote,
+      },
+    });
   };
 
   // Calculations
