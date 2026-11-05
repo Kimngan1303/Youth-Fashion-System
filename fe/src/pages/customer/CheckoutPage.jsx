@@ -751,7 +751,7 @@ export default function CheckoutPage() {
               <div className="voucher-empty-select-banner">
                 <div className="flex items-center gap-2">
                   <Ticket size={16} className="text-amber-800" />
-                  <span className="text-xs font-semibold uppercase text-stone-700">MÃ GIẢM GIÁ / VOUCHER</span>
+                  <span className="text-xs font-semibold uppercase text-stone-700">MÃ VOUCHER</span>
                 </div>
                 <button
                   type="button"
