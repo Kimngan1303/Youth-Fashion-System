@@ -46,6 +46,15 @@ export const getAllUsersService = async ({ search = '', role = 'ALL', status = '
     orderBy: { created_at: 'desc' },
   });
 
+  // 2b. Lấy customer_tier bằng raw SQL (vì field này chưa trong Prisma generated client)
+  const tierRows = await prisma.$queryRaw`SELECT customer_id, customer_tier FROM customers WHERE customer_tier IS NOT NULL`;
+  const tierMap = {};
+  for (const row of tierRows) {
+    tierMap[row.customer_id.toString()] = row.customer_tier;
+  }
+  // Gắn customer_tier vào mỗi customer object
+  customers.forEach((c) => { c.customer_tier = tierMap[c.customer_id.toString()] || null; });
+
   // 3. Chuẩn hóa danh sách Employees thành format thống nhất
   const formattedEmployees = employees.map((emp) => {
     const isEmpAdmin = emp.employee_role === 'ADMIN';
@@ -79,9 +88,17 @@ export const getAllUsersService = async ({ search = '', role = 'ALL', status = '
     const totalSpent = validOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
     const orderCount = validOrders.length;
 
+    // Ưu tiên customer_tier được gán thủ công bởi admin/manager.
+    // Nếu không có tier thủ công thì tự động tính từ chi tiêu/đơn hàng.
     let role = 'CUSTOMER';
     let role_label = 'Khách Hàng';
-    if (totalSpent >= 20000000 || orderCount >= 5) {
+    if (c.customer_tier === 'VIP') {
+      role = 'VIP';
+      role_label = 'Khách Hàng VIP';
+    } else if (c.customer_tier === 'CUSTOMER') {
+      role = 'CUSTOMER';
+      role_label = 'Khách Hàng';
+    } else if (totalSpent >= 20000000 || orderCount >= 5) {
       role = 'VIP';
       role_label = 'Khách Hàng VIP';
     }
@@ -352,6 +369,9 @@ export const updateUserRoleService = async ({ type, id, role }) => {
       return { id, role: 'MANAGER' };
     } else {
       // role === 'VIP' hoặc 'CUSTOMER'
+      // Lưu tier thủ công vào cột customer_tier trong DB (raw SQL tránh cần prisma generate)
+      const tierValue = role === 'VIP' ? 'VIP' : 'CUSTOMER';
+      await prisma.$executeRaw`UPDATE customers SET customer_tier = ${tierValue} WHERE customer_id = ${BigInt(id)}`;
       // Nếu có tài khoản employee cùng email thì vô hiệu hóa quyền nhân sự
       const existingEmp = await prisma.employee.findUnique({
         where: { email: customer.email },
