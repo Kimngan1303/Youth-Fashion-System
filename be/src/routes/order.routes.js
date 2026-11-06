@@ -21,6 +21,9 @@ const optionalAuth = (req, res, next) => {
 // Tạo đơn hàng mới (hỗ trợ cả khách đăng nhập và khách mua nhanh)
 router.post('/', optionalAuth, orderController.createOrder);
 
+// Lấy danh sách đơn hàng của khách hàng hiện tại
+router.get('/my-orders', optionalAuth, orderController.getMyOrders);
+
 // Tra cứu thông tin đơn hàng theo mã đơn
 router.get('/:orderNumber', optionalAuth, orderController.getOrderByNumber);
 

@@ -440,6 +440,39 @@ export default function CheckoutPage() {
         };
         try {
           sessionStorage.setItem('yf_last_completed_order', JSON.stringify(orderSummary));
+          const existingOrders = JSON.parse(localStorage.getItem('yf_customer_orders') || '[]');
+          const nowStr = new Date().toLocaleDateString('vi-VN');
+          const newOrderEntry = {
+            order_id: String(orderCode),
+            order_code: `YF - ${orderCode}`,
+            created_at: nowStr,
+            payment_method: paymentMethod === 'PAYOS' ? 'Thanh toán: Chuyển khoản VietQR' : 'Thanh toán: Tiền mặt khi nhận hàng (COD)',
+            status: paymentMethod === 'PAYOS' ? 'SHIPPING' : 'DELIVERING',
+            status_label: paymentMethod === 'PAYOS' ? 'ĐANG GIAO HÀNG HỎA TỐC' : 'CHỜ GIAO HÀNG',
+            total_amount: finalTotal,
+            items: checkoutItems.map(item => ({
+              id: item.id || item.variant_id,
+              name: item.title || item.product_name,
+              image: item.image,
+              size: item.size || 'Size M',
+              color: item.colorName || item.color || 'Tiêu chuẩn',
+              quantity: Number(item.quantity || 1),
+              price: Number(item.price || 0),
+              collection_tag: 'FALL/WINTER COUTURE ATELIER',
+            })),
+            stepper: {
+              estimated_delivery: 'Dự kiến: Hôm nay, trong 2-4 giờ',
+              tracking_code: `GHN-VFP-${orderCode}`,
+              driver_name: 'Lê Hoàng Nam (Hotline: 0906 234 567)',
+              steps: [
+                { id: 1, name: 'Xác nhận', time: `${nowStr} Vừa xong`, status: 'completed' },
+                { id: 2, name: 'Đóng gói', time: 'Đang chuẩn bị', status: 'completed' },
+                { id: 3, name: 'Vận chuyển hỏa tốc', time: 'Đang điều phối', status: 'active' },
+                { id: 4, name: 'Nhận hàng', time: 'Dự kiến hôm nay', status: 'pending' },
+              ]
+            }
+          };
+          localStorage.setItem('yf_customer_orders', JSON.stringify([newOrderEntry, ...existingOrders]));
         } catch (e) {}
 
         // Lưu thông tin người nhận & địa chỉ vào hồ sơ người dùng để dùng cho những lần đặt sau

@@ -415,7 +415,7 @@ export default function OrderSuccessPage() {
               <span>QUAY VỀ MUA SẮM TIẾP</span>
             </Link>
 
-            <Link to="/profile" className="btn-action-secondary">
+            <Link to="/profile?tab=orders" className="btn-action-secondary">
               <span>XEM LỊCH SỬ ĐƠN HÀNG</span>
               <ArrowRight size={17} />
             </Link>

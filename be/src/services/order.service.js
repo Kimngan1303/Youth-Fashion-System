@@ -153,6 +153,13 @@ export const createOrderService = async ({
 };
 
 /**
+ * Lấy danh sách đơn hàng của khách hàng theo customerId
+ */
+export const getMyOrdersService = async (customerId) => {
+  return await orderRepo.findOrdersByCustomerId(customerId);
+};
+
+/**
  * Lấy thông tin đơn hàng theo order_number
  */
 export const getOrderByNumberService = async (orderNumber) => {

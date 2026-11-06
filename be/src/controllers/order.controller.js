@@ -45,6 +45,19 @@ export const createOrder = async (req, res, next) => {
   }
 };
 
+export const getMyOrders = async (req, res, next) => {
+  try {
+    const customerId = req.user?.id;
+    if (!customerId) {
+      return BaseResponse.success(res, 'Lấy danh sách đơn hàng thành công', []);
+    }
+    const orders = await orderService.getMyOrdersService(customerId);
+    return BaseResponse.success(res, 'Lấy danh sách đơn hàng thành công', orders);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getOrderByNumber = async (req, res, next) => {
   try {
     const { orderNumber } = req.params;

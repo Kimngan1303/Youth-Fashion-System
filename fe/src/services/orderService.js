@@ -26,6 +26,18 @@ export const orderService = {
   },
 
   /**
+   * Lấy danh sách lịch sử đơn hàng của tài khoản hiện tại
+   */
+  getMyOrders: async () => {
+    try {
+      const res = await axiosClient.get('/orders/my-orders');
+      return res.data;
+    } catch (error) {
+      return { status: false, data: [] };
+    }
+  },
+
+  /**
    * Kiểm tra trạng thái thanh toán PayOS theo mã orderCode
    */
   checkPayosStatus: async (orderCode) => {
