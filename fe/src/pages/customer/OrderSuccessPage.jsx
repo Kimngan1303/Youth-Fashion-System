@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { orderService } from '../../services/orderService';
 import { useAuth } from '../../context/AuthContext';
+import { resolveOrderItemImage } from '../../utils/productImageUtils';
 
 export default function OrderSuccessPage() {
   const [searchParams] = useSearchParams();
@@ -323,19 +324,16 @@ export default function OrderSuccessPage() {
 
               <div className="items-rows-wrap">
                 {order.order_items.map((item, idx) => {
-                  const itemImg =
-                    item.image ||
-                    item.variant?.product?.images?.[0]?.image_url ||
-                    'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800';
+                  const itemImg = resolveOrderItemImage(item);
                   return (
                     <div key={item.order_item_id || idx} className="order-item-detail-row">
                       <img
                         src={itemImg}
-                        alt={item.product_name}
+                        alt={item.product_name || item.name}
                         className="item-detail-img"
                         onError={(e) => {
-                          e.target.src =
-                            'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800';
+                          e.target.onerror = null;
+                          e.target.src = resolveOrderItemImage(item);
                         }}
                       />
                       <div className="item-detail-meta">

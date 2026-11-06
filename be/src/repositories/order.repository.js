@@ -78,7 +78,24 @@ export const createOrderTransaction = async ({
         }
       }
 
-      // Bước 2.3: Fallback an toàn tuyệt đối
+      // Bước 2.3: Nếu chưa tìm thấy, tìm theo tên sản phẩm
+      if (!resolvedVariantId && item.product_name) {
+        try {
+          const prodMatch = await tx.product.findFirst({
+            where: {
+              product_name: {
+                contains: String(item.product_name).trim().slice(0, 30),
+              },
+            },
+            include: { variants: true },
+          });
+          if (prodMatch?.variants?.length > 0) {
+            resolvedVariantId = prodMatch.variants[0].variant_id;
+          }
+        } catch (e) {}
+      }
+
+      // Bước 2.4: Fallback an toàn tuyệt đối
       if (!resolvedVariantId) {
         resolvedVariantId = defaultVariant?.variant_id;
       }

@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import ProductCard from '../components/ProductCard';
 import { voucherService } from '../services/voucherService';
 import { orderService } from '../services/orderService';
+import { resolveOrderItemImage } from '../utils/productImageUtils';
 
 // Chuẩn hóa ngày hiển thị sang dạng DD/MM/YYYY
 const normalizeDobToVn = (dob) => {
@@ -134,7 +135,14 @@ const ProfilePage = () => {
         const g = localStorage.getItem('yf_customer_orders');
         if (g) saved = JSON.parse(g);
       }
-      return purgeMockOrders(saved);
+      const cleaned = purgeMockOrders(saved);
+      return cleaned.map(order => ({
+        ...order,
+        items: (order.items || []).map(item => ({
+          ...item,
+          image: resolveOrderItemImage(item),
+        }))
+      }));
     } catch (e) {
       return [];
     }
@@ -170,7 +178,13 @@ const ProfilePage = () => {
         const gSaved = localStorage.getItem('yf_customer_orders');
         if (gSaved) local = JSON.parse(gSaved);
       }
-      local = purgeMockOrders(local);
+      local = purgeMockOrders(local).map(order => ({
+        ...order,
+        items: (order.items || []).map(item => ({
+          ...item,
+          image: resolveOrderItemImage(item),
+        }))
+      }));
       if (userKey) localStorage.setItem(userKey, JSON.stringify(local));
       localStorage.setItem('yf_customer_orders', JSON.stringify(local));
     } catch (e) {}
@@ -207,7 +221,7 @@ const ProfilePage = () => {
                 color: `Màu ${i.color || 'Tiêu chuẩn'}`,
                 quantity: Number(i.quantity || 1),
                 price: Number(i.unit_price || 0),
-                image: i.variant?.product?.images?.[0]?.url || 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=500',
+                image: resolveOrderItemImage(i),
                 collection_tag: i.variant?.product?.category?.category_name || 'THỜI TRANG CAO CẤP',
               })),
               stepper: isShipping || String(apiOrd.order_status).toUpperCase() === 'PENDING' ? {
@@ -231,10 +245,25 @@ const ProfilePage = () => {
               String(m.order_code).replace(/\D/g, '') === String(item.order_code || item.order_id).replace(/\D/g, '')
             );
             if (!exists) {
-              merged.push(item);
+              merged.push({
+                ...item,
+                items: (item.items || []).map(it => ({
+                  ...it,
+                  image: resolveOrderItemImage(it),
+                }))
+              });
             }
           }
-          setCustomerOrders(purgeMockOrders(merged));
+          const finalOrders = purgeMockOrders(merged).map(ord => ({
+            ...ord,
+            items: (ord.items || []).map(it => ({
+              ...it,
+              image: resolveOrderItemImage(it),
+            }))
+          }));
+          setCustomerOrders(finalOrders);
+          if (userKey) localStorage.setItem(userKey, JSON.stringify(finalOrders));
+          localStorage.setItem('yf_customer_orders', JSON.stringify(finalOrders));
         } else {
           setCustomerOrders(purgeMockOrders(local || []));
         }
@@ -1167,17 +1196,19 @@ const ProfilePage = () => {
 
                           {/* Items List */}
                           <div className="order-items-wrapper">
-                            {ord.items.map((item, idx) => (
-                              <div key={item.id || idx} className="order-product-row">
-                                <img
-                                  src={item.image || 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=500'}
-                                  alt={item.name}
-                                  className="item-thumb"
-                                  onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.src = 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=500';
-                                  }}
-                                />
+                            {ord.items.map((item, idx) => {
+                              const itemImg = resolveOrderItemImage(item);
+                              return (
+                                <div key={item.id || idx} className="order-product-row">
+                                  <img
+                                    src={itemImg}
+                                    alt={item.name}
+                                    className="item-thumb"
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src = resolveOrderItemImage(item);
+                                    }}
+                                  />
                                 <div className="item-details">
                                   {item.collection_tag && (
                                     <span className="item-collection-tag">{item.collection_tag}</span>
@@ -1212,8 +1243,9 @@ const ProfilePage = () => {
                                   )}
                                 </div>
                               </div>
-                            ))}
-                          </div>
+                            );
+                          })}
+                        </div>
 
                           {/* Tiến trình đơn hàng Stepper (Dành cho đơn đang xử lý hoặc vận chuyển) */}
                           {ord.stepper && (
@@ -1640,9 +1672,13 @@ const ProfilePage = () => {
 
             <div className="review-product-preview">
               <img
-                src={reviewModalOrder.items?.[0]?.image || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=500'}
+                src={resolveOrderItemImage(reviewModalOrder.items?.[0])}
                 alt=""
                 className="review-thumb"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = resolveOrderItemImage(reviewModalOrder.items?.[0]);
+                }}
               />
               <div>
                 <h4 className="review-prod-title font-serif">{reviewModalOrder.items?.[0]?.name}</h4>

@@ -9,6 +9,7 @@ import { useToast } from '../../context/ToastContext';
 import { voucherService } from '../../services/voucherService';
 import { orderService } from '../../services/orderService';
 import { cartService } from '../../services/cartService';
+import { resolveOrderItemImage } from '../../utils/productImageUtils';
 
 const VIETNAM_PROVINCES = [
   {
@@ -400,7 +401,7 @@ export default function CheckoutPage() {
           color: item.colorName || item.color || 'Màu tiêu chuẩn',
           unit_price: Number(item.price || 0),
           quantity: Number(item.quantity || 1),
-          image: item.image,
+          image: resolveOrderItemImage(item),
         })),
         voucherCode: appliedVoucher?.code || null,
         discountAmount: voucherDiscount,
@@ -436,7 +437,7 @@ export default function CheckoutPage() {
             unit_price: Number(item.price || 0),
             quantity: Number(item.quantity || 1),
             subtotal: Number(item.price || 0) * Number(item.quantity || 1),
-            image: item.image,
+            image: resolveOrderItemImage(item),
           })),
         };
         try {
@@ -455,7 +456,7 @@ export default function CheckoutPage() {
             items: checkoutItems.map(item => ({
               id: item.id || item.variant_id,
               name: item.title || item.product_name,
-              image: item.image,
+              image: resolveOrderItemImage(item),
               size: item.size || 'Size M',
               color: item.colorName || item.color || 'Tiêu chuẩn',
               quantity: Number(item.quantity || 1),
@@ -949,9 +950,13 @@ export default function CheckoutPage() {
                   <div key={item.id || idx} className="product-item-card">
                     <div className="p-item-thumb-box">
                       <img
-                        src={item.image || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800'}
+                        src={resolveOrderItemImage(item)}
                         alt={item.title}
                         className="p-item-thumb-img"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = resolveOrderItemImage(item);
+                        }}
                       />
                     </div>
                     <div className="p-item-details-content">
