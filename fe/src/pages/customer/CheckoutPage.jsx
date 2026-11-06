@@ -9,35 +9,7 @@ import { useToast } from '../../context/ToastContext';
 import { voucherService } from '../../services/voucherService';
 import { orderService } from '../../services/orderService';
 import { cartService } from '../../services/cartService';
-
-const VIETNAM_PROVINCES = [
-  {
-    name: 'Hà Nội',
-    districts: [
-      { name: 'Quận Hoàn Kiếm', wards: ['Phường Tràng Tiền', 'Phường Hàng Bạc', 'Phường Hàng Trống', 'Phường Cửa Đông'] },
-      { name: 'Quận Ba Đình', wards: ['Phường Điện Biên', 'Phường Đội Cấn', 'Phường Liễu Giai', 'Phường Kim Mã'] },
-      { name: 'Quận Cầu Giấy', wards: ['Phường Dịch Vọng', 'Phường Yên Hòa', 'Phường Trung Hòa', 'Phường Mai Dịch'] },
-      { name: 'Quận Đống Đa', wards: ['Phường Láng Hạ', 'Phường Ô Chợ Dừa', 'Phường Nam Đồng', 'Phường Cát Linh'] },
-      { name: 'Quận Hai Bà Trưng', wards: ['Phường Lê Đại Hành', 'Phường Bách Khoa', 'Phường Phố Huế'] },
-    ],
-  },
-  {
-    name: 'TP. Hồ Chí Minh',
-    districts: [
-      { name: 'Quận 1', wards: ['Phường Bến Nghé', 'Phường Bến Thành', 'Phường Đa Kao', 'Phường Tân Định'] },
-      { name: 'Quận 3', wards: ['Phường Võ Thị Sáu', 'Phường 1', 'Phường 2', 'Phường 3'] },
-      { name: 'TP. Thủ Đức', wards: ['Phường Thảo Điền', 'Phường An Phú', 'Phường Hiệp Phú', 'Phường Linh Chiểu'] },
-      { name: 'Quận 7', wards: ['Phường Tân Phong', 'Phường Phú Mỹ', 'Phường Tân Phú'] },
-    ],
-  },
-  {
-    name: 'Đà Nẵng',
-    districts: [
-      { name: 'Quận Hải Châu', wards: ['Phường Hải Châu I', 'Phường Thạch Thang', 'Phường Nam Dương'] },
-      { name: 'Quận Sơn Trà', wards: ['Phường An Hải Bắc', 'Phường Phước Mỹ'] },
-    ],
-  },
-];
+import VIETNAM_PROVINCES from '../../data/vietnamAddresses.json';
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -162,7 +134,11 @@ export default function CheckoutPage() {
   // Cập nhật danh sách quận/huyện theo tỉnh/thành
   const currentProvinceData = useMemo(() => {
     if (!selectedProvince) return null;
-    return VIETNAM_PROVINCES.find((p) => p.name === selectedProvince) || null;
+    return (
+      VIETNAM_PROVINCES.find(
+        (p) => p.name === selectedProvince || p.fullName === selectedProvince
+      ) || null
+    );
   }, [selectedProvince]);
 
   const currentDistricts = useMemo(() => {
