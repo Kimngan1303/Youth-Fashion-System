@@ -8,6 +8,7 @@ import conversationRoutes from './conversation.routes.js';
 import adminRoutes from './admin.routes.js';
 import voucherRoutes from './voucher.routes.js';
 import cartRoutes from './cart.routes.js';
+import orderRoutes from './order.routes.js';
 
 const router = Router();
 
@@ -38,8 +39,10 @@ router.use('/vouchers', voucherRoutes);
 // Cart Routes
 router.use('/cart', cartRoutes);
 
+// Order & Payment Routes (Hỗ trợ COD và PayOS)
+router.use('/orders', orderRoutes);
+
 // Admin Routes (Users & System Configuration)
 router.use('/admin', adminRoutes);
 
 export default router;
-
