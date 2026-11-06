@@ -35,6 +35,14 @@ export const createOrderService = async ({
     throw error;
   }
 
+  const cleanPhone = recipientPhone.replace(/[\s.\-()]/g, '');
+  const vnPhoneRegex = /^(?:(?:\+84|84|0))(3[2-9]|5[25689]|7[06-9]|8[1-9]|9[0-9])\d{7}$/;
+  if (!vnPhoneRegex.test(cleanPhone)) {
+    const error = new Error('Số điện thoại nhận hàng không hợp lệ (yêu cầu 10 số thuộc các mạng di động Việt Nam)');
+    error.statusCode = 400;
+    throw error;
+  }
+
   // 1. Tính toán giá trị đơn hàng
   const itemsData = items.map((item) => {
     const unitPrice = Number(item.price || item.unit_price || 0);

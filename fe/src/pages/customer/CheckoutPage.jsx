@@ -42,7 +42,7 @@ const VIETNAM_PROVINCES = [
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, cart, setCart } = useAuth();
+  const { user, cart, setCart, updateUserProfile } = useAuth();
   const { showSuccess, showError, showInfo } = useToast();
 
   // 1. Lấy sản phẩm được chọn từ giỏ hàng
@@ -69,18 +69,27 @@ export default function CheckoutPage() {
   const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
 
   // Form Thông tin Người nhận
-  const [fullName, setFullName] = useState(() => user?.full_name || 'Hoàng Kim Anh');
-  const [phone, setPhone] = useState(() => user?.phone || '0918 223 999');
-  const [email, setEmail] = useState(() => user?.email || 'kimanh.hoang@atelier-couture.vn');
+  const [fullName, setFullName] = useState(() => user?.full_name || '');
+  const [phone, setPhone] = useState(() => (user?.phone && user.phone !== '0988777666' ? user.phone : ''));
+  const [email, setEmail] = useState(() => user?.email || '');
   const [notifySchedule, setNotifySchedule] = useState(true);
 
-  // Form Địa chỉ
-  const [selectedProvince, setSelectedProvince] = useState('Hà Nội');
-  const [selectedDistrict, setSelectedDistrict] = useState('Quận Hoàn Kiếm');
-  const [selectedWard, setSelectedWard] = useState('Phường Tràng Tiền');
-  const [addressDetail, setAddressDetail] = useState(
-    'Căn Hộ Penthouse 1802, Tòa Nhà Heritage Plaza, 15 Tràng Tiền'
-  );
+  // Form Địa chỉ: Để trống ban đầu cho người dùng chọn và nhập, khi đặt đơn hàng mới lưu lại
+  const savedAddress = (() => {
+    if (user?.address?.province || user?.address?.detail) return user.address;
+    try {
+      const key = user ? `user_address_${user.customer_id || user.id || user.email}` : 'guest_saved_address';
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  })();
+
+  const [selectedProvince, setSelectedProvince] = useState(() => savedAddress?.province || '');
+  const [selectedDistrict, setSelectedDistrict] = useState(() => savedAddress?.district || '');
+  const [selectedWard, setSelectedWard] = useState(() => savedAddress?.ward || '');
+  const [addressDetail, setAddressDetail] = useState(() => savedAddress?.detail || '');
   const [orderNote, setOrderNote] = useState(() => {
     return (
       location.state?.orderNote ||
@@ -89,6 +98,62 @@ export default function CheckoutPage() {
     );
   });
 
+  // State thông báo lỗi cho từng trường
+  const [fullNameError, setFullNameError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [provinceError, setProvinceError] = useState('');
+  const [districtError, setDistrictError] = useState('');
+  const [wardError, setWardError] = useState('');
+  const [addressDetailError, setAddressDetailError] = useState('');
+
+  // Đồng bộ thông tin nếu user context load sau
+  useEffect(() => {
+    if (user) {
+      if (!fullName && user.full_name) setFullName(user.full_name);
+      if (!phone && user.phone && user.phone !== '0988777666') setPhone(user.phone);
+      if (!email && user.email) setEmail(user.email);
+      if (user.address) {
+        if (!selectedProvince && user.address.province) setSelectedProvince(user.address.province);
+        if (!selectedDistrict && user.address.district) setSelectedDistrict(user.address.district);
+        if (!selectedWard && user.address.ward) setSelectedWard(user.address.ward);
+        if (!addressDetail && user.address.detail) setAddressDetail(user.address.detail);
+      }
+    }
+  }, [user]);
+
+  // Các hàm validate trường nhập liệu
+  const validateFullName = (name) => {
+    if (!name || !name.trim()) return 'Họ và tên không được để trống';
+    if (name.trim().length < 2) return 'Họ và tên phải có tối thiểu 2 ký tự';
+    return '';
+  };
+
+  const validatePhone = (phoneNumber) => {
+    if (!phoneNumber || !phoneNumber.toString().trim()) {
+      return 'Số điện thoại không được để trống';
+    }
+    const cleaned = phoneNumber.toString().replace(/[\s.\-()]/g, '');
+    const vnPhoneRegex = /^(?:(?:\+84|84|0))(3[2-9]|5[25689]|7[06-9]|8[1-9]|9[0-9])\d{7}$/;
+    if (!vnPhoneRegex.test(cleaned)) {
+      return 'Số điện thoại không hợp lệ (gồm 10 số thuộc các mạng di động VN: 03x, 05x, 07x, 08x, 09x)';
+    }
+    return '';
+  };
+
+  const validateEmail = (val) => {
+    if (!val || !val.trim()) return 'Địa chỉ email không được để trống';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(val.trim())) return 'Địa chỉ email không đúng định dạng (VD: example@domain.com)';
+    return '';
+  };
+
+  const validateAddressDetail = (val) => {
+    if (!val || !val.trim()) return 'Địa chỉ chi tiết không được để trống';
+    if (val.trim().length < 4) return 'Vui lòng nhập địa chỉ chi tiết cụ thể hơn (số nhà, tên đường...)';
+    return '';
+  };
+
   // Phương thức vận chuyển & Thanh toán
   const [shippingMethod, setShippingMethod] = useState('EXPRESS'); // 'EXPRESS' | 'STANDARD'
   const [paymentMethod, setPaymentMethod] = useState('COD'); // 'COD' | 'PAYOS'
@@ -96,28 +161,33 @@ export default function CheckoutPage() {
 
   // Cập nhật danh sách quận/huyện theo tỉnh/thành
   const currentProvinceData = useMemo(() => {
-    return VIETNAM_PROVINCES.find((p) => p.name === selectedProvince) || VIETNAM_PROVINCES[0];
+    if (!selectedProvince) return null;
+    return VIETNAM_PROVINCES.find((p) => p.name === selectedProvince) || null;
   }, [selectedProvince]);
 
-  const currentDistricts = currentProvinceData.districts;
+  const currentDistricts = useMemo(() => {
+    return currentProvinceData ? currentProvinceData.districts : [];
+  }, [currentProvinceData]);
+
   const currentWards = useMemo(() => {
+    if (!selectedDistrict) return [];
     const d = currentDistricts.find((item) => item.name === selectedDistrict);
-    return d ? d.wards : (currentDistricts[0]?.wards || []);
+    return d ? d.wards : [];
   }, [currentDistricts, selectedDistrict]);
 
   const handleProvinceChange = (e) => {
     const newProv = e.target.value;
     setSelectedProvince(newProv);
-    const pData = VIETNAM_PROVINCES.find((p) => p.name === newProv) || VIETNAM_PROVINCES[0];
-    setSelectedDistrict(pData.districts[0]?.name || '');
-    setSelectedWard(pData.districts[0]?.wards[0] || '');
+    setSelectedDistrict('');
+    setSelectedWard('');
+    if (newProv) setProvinceError('');
   };
 
   const handleDistrictChange = (e) => {
     const newDist = e.target.value;
     setSelectedDistrict(newDist);
-    const dData = currentDistricts.find((item) => item.name === newDist);
-    setSelectedWard(dData?.wards[0] || '');
+    setSelectedWard('');
+    if (newDist) setDistrictError('');
   };
 
   // Tính toán Tổng giá trị đơn hàng
@@ -246,10 +316,65 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!fullName.trim() || !phone.trim() || !addressDetail.trim()) {
-      showError('Vui lòng điền đầy đủ họ tên, số điện thoại và địa chỉ nhận hàng.');
+    // 1. Kiểm tra Họ và tên
+    const nameErr = validateFullName(fullName);
+    if (nameErr) {
+      setFullNameError(nameErr);
+      showError(nameErr);
       return;
     }
+    setFullNameError('');
+
+    // 2. Kiểm tra Số điện thoại
+    const pErr = validatePhone(phone);
+    if (pErr) {
+      setPhoneError(pErr);
+      showError(pErr);
+      return;
+    }
+    setPhoneError('');
+
+    // 3. Kiểm tra Email
+    const emErr = validateEmail(email);
+    if (emErr) {
+      setEmailError(emErr);
+      showError(emErr);
+      return;
+    }
+    setEmailError('');
+
+    // 4. Kiểm tra Tỉnh / Thành phố
+    if (!selectedProvince) {
+      setProvinceError('Vui lòng chọn Tỉnh / Thành phố');
+      showError('Vui lòng chọn Tỉnh / Thành phố nhận hàng');
+      return;
+    }
+    setProvinceError('');
+
+    // 5. Kiểm tra Quận / Huyện
+    if (!selectedDistrict) {
+      setDistrictError('Vui lòng chọn Quận / Huyện');
+      showError('Vui lòng chọn Quận / Huyện nhận hàng');
+      return;
+    }
+    setDistrictError('');
+
+    // 6. Kiểm tra Phường / Xã
+    if (!selectedWard) {
+      setWardError('Vui lòng chọn Phường / Xã');
+      showError('Vui lòng chọn Phường / Xã nhận hàng');
+      return;
+    }
+    setWardError('');
+
+    // 7. Kiểm tra Địa chỉ chi tiết
+    const addrErr = validateAddressDetail(addressDetail);
+    if (addrErr) {
+      setAddressDetailError(addrErr);
+      showError(addrErr);
+      return;
+    }
+    setAddressDetailError('');
 
     setIsSubmitting(true);
 
@@ -315,6 +440,28 @@ export default function CheckoutPage() {
         };
         try {
           sessionStorage.setItem('yf_last_completed_order', JSON.stringify(orderSummary));
+        } catch (e) {}
+
+        // Lưu thông tin người nhận & địa chỉ vào hồ sơ người dùng để dùng cho những lần đặt sau
+        if (user && updateUserProfile) {
+          updateUserProfile({
+            phone: phone.trim(),
+            address: {
+              province: selectedProvince,
+              district: selectedDistrict,
+              ward: selectedWard,
+              detail: addressDetail.trim(),
+            },
+          }).catch(() => {});
+        }
+        try {
+          const addrKey = user ? `user_address_${user.customer_id || user.id || user.email}` : 'guest_saved_address';
+          localStorage.setItem(addrKey, JSON.stringify({
+            province: selectedProvince,
+            district: selectedDistrict,
+            ward: selectedWard,
+            detail: addressDetail.trim(),
+          }));
         } catch (e) {}
 
         if (paymentMethod === 'PAYOS') {
@@ -436,35 +583,72 @@ export default function CheckoutPage() {
             <div className="form-fields-wrap">
               <div className="input-row-2col">
                 <div className="field-group">
-                  <label className="field-label">HỌ VÀ TÊN</label>
+                  <label className="field-label">
+                    HỌ VÀ TÊN <span className="field-required">*</span>
+                  </label>
                   <input
                     type="text"
-                    className="field-input"
+                    className={`field-input ${fullNameError ? 'input-error' : ''}`}
                     value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
+                    onChange={(e) => {
+                      setFullName(e.target.value);
+                      if (fullNameError) setFullNameError(validateFullName(e.target.value));
+                    }}
+                    onBlur={() => setFullNameError(validateFullName(fullName))}
+                    placeholder="Nhập họ và tên người nhận"
                   />
+                  {fullNameError && (
+                    <div className="field-error-text">
+                      <AlertCircle size={12} />
+                      <span>{fullNameError}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="field-group">
-                  <label className="field-label">SỐ ĐIỆN THOẠI</label>
+                  <label className="field-label">
+                    SỐ ĐIỆN THOẠI <span className="field-required">*</span>
+                  </label>
                   <input
                     type="tel"
-                    className="field-input"
+                    className={`field-input ${phoneError ? 'input-error' : ''}`}
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (phoneError) setPhoneError(validatePhone(e.target.value));
+                    }}
+                    onBlur={() => setPhoneError(validatePhone(phone))}
+                    placeholder="VD: 0908 123 456"
                   />
+                  {phoneError && (
+                    <div className="field-error-text">
+                      <AlertCircle size={12} />
+                      <span>{phoneError}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="field-group mt-14">
-                <label className="field-label">ĐỊA CHỈ EMAIL</label>
+                <label className="field-label">
+                  ĐỊA CHỈ EMAIL <span className="field-required">*</span>
+                </label>
                 <input
                   type="email"
-                  className="field-input"
+                  className={`field-input ${emailError ? 'input-error' : ''}`}
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (emailError) setEmailError(validateEmail(e.target.value));
+                  }}
+                  onBlur={() => setEmailError(validateEmail(email))}
+                  placeholder="email@example.com"
                 />
+                {emailError && (
+                  <div className="field-error-text">
+                    <AlertCircle size={12} />
+                    <span>{emailError}</span>
+                  </div>
+                )}
               </div>
 
               <label className="checkbox-field-wrap">
@@ -491,13 +675,16 @@ export default function CheckoutPage() {
             <div className="form-fields-wrap">
               <div className="input-row-3col">
                 <div className="field-group">
-                  <label className="field-label">TỈNH / THÀNH PHỐ</label>
+                  <label className="field-label">
+                    TỈNH / THÀNH PHỐ <span className="field-required">*</span>
+                  </label>
                   <div className="select-wrapper">
                     <select
-                      className="field-select"
+                      className={`field-select ${provinceError ? 'input-error' : ''}`}
                       value={selectedProvince}
                       onChange={handleProvinceChange}
                     >
+                      <option value="">-- Chọn Tỉnh / Thành phố --</option>
                       {VIETNAM_PROVINCES.map((prov) => (
                         <option key={prov.name} value={prov.name}>
                           {prov.name}
@@ -506,16 +693,28 @@ export default function CheckoutPage() {
                     </select>
                     <ChevronDown size={14} className="select-arrow" />
                   </div>
+                  {provinceError && (
+                    <div className="field-error-text">
+                      <AlertCircle size={12} />
+                      <span>{provinceError}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="field-group">
-                  <label className="field-label">QUẬN / HUYỆN</label>
+                  <label className="field-label">
+                    QUẬN / HUYỆN <span className="field-required">*</span>
+                  </label>
                   <div className="select-wrapper">
                     <select
-                      className="field-select"
+                      className={`field-select ${districtError ? 'input-error' : ''}`}
                       value={selectedDistrict}
                       onChange={handleDistrictChange}
+                      disabled={!selectedProvince}
                     >
+                      <option value="">
+                        {selectedProvince ? '-- Chọn Quận / Huyện --' : '-- Chọn Tỉnh/Thành trước --'}
+                      </option>
                       {currentDistricts.map((dist) => (
                         <option key={dist.name} value={dist.name}>
                           {dist.name}
@@ -524,16 +723,31 @@ export default function CheckoutPage() {
                     </select>
                     <ChevronDown size={14} className="select-arrow" />
                   </div>
+                  {districtError && (
+                    <div className="field-error-text">
+                      <AlertCircle size={12} />
+                      <span>{districtError}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="field-group">
-                  <label className="field-label">PHƯỜNG / XÃ</label>
+                  <label className="field-label">
+                    PHƯỜNG / XÃ <span className="field-required">*</span>
+                  </label>
                   <div className="select-wrapper">
                     <select
-                      className="field-select"
+                      className={`field-select ${wardError ? 'input-error' : ''}`}
                       value={selectedWard}
-                      onChange={(e) => setSelectedWard(e.target.value)}
+                      onChange={(e) => {
+                        setSelectedWard(e.target.value);
+                        if (e.target.value) setWardError('');
+                      }}
+                      disabled={!selectedDistrict}
                     >
+                      <option value="">
+                        {selectedDistrict ? '-- Chọn Phường / Xã --' : '-- Chọn Quận/Huyện trước --'}
+                      </option>
                       {currentWards.map((w) => (
                         <option key={w} value={w}>
                           {w}
@@ -542,19 +756,35 @@ export default function CheckoutPage() {
                     </select>
                     <ChevronDown size={14} className="select-arrow" />
                   </div>
+                  {wardError && (
+                    <div className="field-error-text">
+                      <AlertCircle size={12} />
+                      <span>{wardError}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="field-group mt-14">
-                <label className="field-label">ĐỊA CHỈ CHI TIẾT (TÒA NHÀ, SỐ NHÀ, TÊN PHỐ)</label>
+                <label className="field-label">
+                  ĐỊA CHỈ CHI TIẾT (TÒA NHÀ, SỐ NHÀ, TÊN PHỐ) <span className="field-required">*</span>
+                </label>
                 <input
                   type="text"
-                  className="field-input"
+                  className={`field-input ${addressDetailError ? 'input-error' : ''}`}
                   value={addressDetail}
-                  onChange={(e) => setAddressDetail(e.target.value)}
+                  onChange={(e) => {
+                    setAddressDetail(e.target.value);
+                    if (e.target.value.trim()) setAddressDetailError('');
+                  }}
                   placeholder="Ví dụ: Căn Hộ Penthouse 1802, Tòa Nhà Heritage Plaza, 15 Tràng Tiền"
-                  required
                 />
+                {addressDetailError && (
+                  <div className="field-error-text">
+                    <AlertCircle size={12} />
+                    <span>{addressDetailError}</span>
+                  </div>
+                )}
               </div>
 
               <div className="field-group mt-14">
@@ -1204,6 +1434,27 @@ export default function CheckoutPage() {
         .field-input:focus, .field-select:focus {
           background-color: #ffffff;
           border-color: #111827;
+        }
+
+        .field-required {
+          color: #ef4444;
+          margin-left: 3px;
+          font-weight: bold;
+        }
+
+        .field-input.input-error, .field-select.input-error {
+          border-color: #ef4444 !important;
+          background-color: #fef2f2 !important;
+        }
+
+        .field-error-text {
+          color: #ef4444;
+          font-size: 11.5px;
+          margin-top: 4px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          font-weight: 500;
         }
 
         .select-wrapper {

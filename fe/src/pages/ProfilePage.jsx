@@ -219,7 +219,7 @@ const ProfilePage = () => {
     return '';
   };
 
-  // Hàm kiểm tra định dạng số điện thoại di động Việt Nam chuẩn
+  // Hàm kiểm tra định dạng số điện thoại di động Việt Nam chuẩn (Bắt buộc điền)
   const validatePhone = (phoneNumber) => {
     if (!phoneNumber || !phoneNumber.toString().trim()) {
       return 'Số điện thoại không được để trống';
@@ -408,7 +408,7 @@ const ProfilePage = () => {
 
     const res = await updateUserProfile({
       full_name: formData.full_name.trim(),
-      phone: formData.phone.trim(),
+      phone: formData.phone ? formData.phone.trim() : '',
       avatar_url: formData.avatar_url,
       gender: formData.gender,
       dob: formData.dob.trim(),
