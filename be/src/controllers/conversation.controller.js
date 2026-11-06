@@ -85,7 +85,7 @@ export const sendMessageController = async (req, res, next) => {
     let sender_customer_id = null;
     let sender_employee_id = null;
 
-    if (userRole === 'MANAGER' || userRole === 'ADMIN' || userType === 'EMPLOYEE') {
+    if (userRole === 'MANAGER' || userRole === 'ADMIN' ) {
       sender_employee_id = userId;
     } else {
       sender_customer_id = userId;

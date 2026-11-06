@@ -25,3 +25,11 @@ pnpm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Reports & Documentation
+ai-log.md
+README.md
+ReadmeN.md
+SWP391_AI_Usage_Report_YouthFashion.docx
+Template4_AI-Usage-Report.docx
+
