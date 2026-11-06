@@ -190,15 +190,46 @@ export const findOrderByNumber = async (orderNumber) => {
   });
 };
 
-export const findOrdersByCustomerId = async (customerId) => {
+export const findOrdersByCustomer = async ({ customerId, email } = {}) => {
+  const conditions = [];
+  if (customerId && !isNaN(Number(customerId))) {
+    try {
+      conditions.push({ customer_id: BigInt(customerId) });
+    } catch (e) {}
+  }
+  if (email && typeof email === 'string' && email.trim()) {
+    conditions.push({ recipient_email: email.trim() });
+  }
+
+  if (conditions.length === 0) return [];
+
   return await prisma.order.findMany({
-    where: { customer_id: BigInt(customerId) },
+    where: {
+      OR: conditions,
+    },
     orderBy: { created_at: 'desc' },
     include: {
-      order_items: true,
+      order_items: {
+        include: {
+          variant: {
+            include: {
+              product: {
+                include: {
+                  images: true,
+                  category: true,
+                },
+              },
+            },
+          },
+        },
+      },
       payments: true,
     },
   });
+};
+
+export const findOrdersByCustomerId = async (customerId) => {
+  return await findOrdersByCustomer({ customerId });
 };
 
 export const updateOrderStatus = async (orderId, status) => {

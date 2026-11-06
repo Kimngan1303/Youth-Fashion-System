@@ -380,6 +380,7 @@ export default function CheckoutPage() {
 
     try {
       const orderPayload = {
+        customerId: user?.customer_id || user?.id || null,
         recipientName: fullName.trim(),
         recipientPhone: phone.trim(),
         recipientEmail: email.trim() || null,
@@ -440,7 +441,8 @@ export default function CheckoutPage() {
         };
         try {
           sessionStorage.setItem('yf_last_completed_order', JSON.stringify(orderSummary));
-          const existingOrders = JSON.parse(localStorage.getItem('yf_customer_orders') || '[]');
+          const userOrderKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : 'yf_customer_orders';
+          const existingOrders = JSON.parse(localStorage.getItem(userOrderKey) || localStorage.getItem('yf_customer_orders') || '[]');
           const nowStr = new Date().toLocaleDateString('vi-VN');
           const newOrderEntry = {
             order_id: String(orderCode),
@@ -461,17 +463,18 @@ export default function CheckoutPage() {
               collection_tag: 'FALL/WINTER COUTURE ATELIER',
             })),
             stepper: {
-              estimated_delivery: 'Dự kiến: Hôm nay, trong 2-4 giờ',
+              estimated_delivery: 'Dự kiến: Trong 24-48 giờ tới',
               tracking_code: `GHN-VFP-${orderCode}`,
               driver_name: 'Lê Hoàng Nam (Hotline: 0906 234 567)',
               steps: [
                 { id: 1, name: 'Xác nhận', time: `${nowStr} Vừa xong`, status: 'completed' },
                 { id: 2, name: 'Đóng gói', time: 'Đang chuẩn bị', status: 'completed' },
                 { id: 3, name: 'Vận chuyển hỏa tốc', time: 'Đang điều phối', status: 'active' },
-                { id: 4, name: 'Nhận hàng', time: 'Dự kiến hôm nay', status: 'pending' },
+                { id: 4, name: 'Nhận hàng', time: 'Dự kiến 1-2 ngày', status: 'pending' },
               ]
             }
           };
+          localStorage.setItem(userOrderKey, JSON.stringify([newOrderEntry, ...existingOrders]));
           localStorage.setItem('yf_customer_orders', JSON.stringify([newOrderEntry, ...existingOrders]));
         } catch (e) {}
 

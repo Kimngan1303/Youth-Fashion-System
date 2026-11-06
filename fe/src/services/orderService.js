@@ -28,9 +28,10 @@ export const orderService = {
   /**
    * Lấy danh sách lịch sử đơn hàng của tài khoản hiện tại
    */
-  getMyOrders: async () => {
+  getMyOrders: async (email) => {
     try {
-      const res = await axiosClient.get('/orders/my-orders');
+      const url = email ? `/orders/my-orders?email=${encodeURIComponent(email)}` : '/orders/my-orders';
+      const res = await axiosClient.get(url);
       return res.data;
     } catch (error) {
       return { status: false, data: [] };

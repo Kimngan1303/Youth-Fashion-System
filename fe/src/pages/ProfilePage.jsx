@@ -84,137 +84,12 @@ const validateDob = (dobStr) => {
   return '';
 };
 
-// 5 Đơn hàng chuẩn theo giao diện Luxury Haute Couture Youth Fashion
-const INITIAL_SAMPLE_ORDERS = [
-  {
-    order_id: '88210',
-    order_code: 'YF - 88210',
-    created_at: '24/10/2025',
-    payment_method: 'Thanh toán: Chuyển khoản',
-    status: 'SHIPPING',
-    status_label: 'ĐANG GIAO HÀNG HỎA TỐC',
-    total_amount: 14850000,
-    items: [
-      {
-        id: 1,
-        name: 'Áo Măng Tô Dạ Camel Cashmere Nguyên Bản',
-        collection_tag: 'FALL/WINTER COUTURE ATELIER',
-        size: 'Size M',
-        color: 'Camel Sand',
-        service_note: 'Dịch vụ kèm: ★ May gấp, & Chỉnh ve áo theo số đo riêng',
-        quantity: 1,
-        price: 14850000,
-        original_price: 16500000,
-        discount_text: 'Đã áp dụng VIP Gold -10% (-1.650.000₫)',
-        image: 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=500'
-      }
-    ],
-    stepper: {
-      estimated_delivery: 'Hôm nay, 14:00 - 17:30',
-      tracking_code: 'GHN-VFP-494124',
-      driver_name: 'Lê Hoàng Nam (Hotline: 0906 234 567)',
-      steps: [
-        { id: 1, name: 'Xác nhận', time: '24/10 09:15', status: 'completed' },
-        { id: 2, name: 'Đóng gói', time: '24/10 11:20', status: 'completed' },
-        { id: 3, name: 'Vận chuyển hỏa tốc', time: 'Đang điều phối', status: 'active' },
-        { id: 4, name: 'Nhận hàng', time: 'Dự kiến: Hôm nay 24/10', status: 'pending' }
-      ]
-    }
-  },
-  {
-    order_id: '85420',
-    order_code: 'YF - 85420',
-    created_at: '12/09/2025',
-    payment_method: 'Phương thức: Visa ending in 8199',
-    status: 'COMPLETED',
-    status_label: 'GIAO THÀNH CÔNG (14/09/2025)',
-    delivered_date: '14/09/2025',
-    total_amount: 4630000,
-    items: [
-      {
-        id: 2,
-        name: 'Áo Tweed Cropped Đính Khuy Kim Loại Vàng',
-        size: 'Size S',
-        color: 'Màu Trắng Kem Ivory',
-        warranty_tag: 'Bảo hành trọn đời',
-        quantity: 1,
-        price: 2680000,
-        image: 'https://images.unsplash.com/photo-1544441893-675973e31985?w=500'
-      },
-      {
-        id: 3,
-        name: 'Quần Tây Ống Rộng Lụa Satin Cao Cấp',
-        size: 'Size M',
-        color: 'Màu Đen Noir',
-        service_note: 'Chỉnh sửa chiều dài ống quần: Chuẩn 100cm',
-        quantity: 1,
-        price: 1950000,
-        image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=500'
-      }
-    ]
-  },
-  {
-    order_id: '79114',
-    order_code: 'YF - 79114',
-    created_at: '18/07/2025',
-    payment_method: 'Thanh toán: Chuyển khoản VietQR',
-    status: 'COMPLETED',
-    status_label: 'GIAO THÀNH CÔNG',
-    total_amount: 5400000,
-    items: [
-      {
-        id: 4,
-        name: 'Đầm Dạ Hội Lụa Tơ Tằm Tự Nhiên Xếp Ly Thủ Công',
-        size: 'Size M',
-        color: 'Màu Emerald Green',
-        quantity: 1,
-        price: 5400000,
-        image: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=500'
-      }
-    ]
-  },
-  {
-    order_id: '72015',
-    order_code: 'YF - 72015',
-    created_at: '05/05/2025',
-    payment_method: 'Thanh toán: Tiền mặt khi nhận hàng (COD)',
-    status: 'COMPLETED',
-    status_label: 'GIAO THÀNH CÔNG',
-    total_amount: 6890000,
-    items: [
-      {
-        id: 5,
-        name: 'Set Veston Nữ May Đo Cao Cấp Signature',
-        size: 'Size S',
-        color: 'Màu Midnight Navy',
-        quantity: 1,
-        price: 6890000,
-        image: 'https://images.unsplash.com/photo-1585487000160-6ebcfceb0d03?w=500'
-      }
-    ]
-  },
-  {
-    order_id: '68192',
-    order_code: 'YF - 68192',
-    created_at: '15/03/2025',
-    payment_method: 'Thanh toán: Chuyển khoản VietQR',
-    status: 'CANCELLED',
-    status_label: 'ĐÃ HỦY',
-    cancel_reason: 'Khách hàng đổi sang trang phục thiết kế khác',
-    total_amount: 2150000,
-    items: [
-      {
-        id: 6,
-        name: 'Áo Sơ Mi Lụa Cổ Nơ Điệu Đà Haute Couture',
-        size: 'Size M',
-        color: 'Màu Pure Pearl',
-        quantity: 1,
-        price: 2150000,
-        image: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=500'
-      }
-    ]
-  }
-];
+// Hàm hỗ trợ lọc bỏ dữ liệu mẫu cũ nếu còn lưu trong bộ nhớ
+const purgeMockOrders = (list) => {
+  if (!Array.isArray(list)) return [];
+  const mockIds = new Set(['88210', '85420', '79114', '72015', '68192']);
+  return list.filter(o => !mockIds.has(String(o.order_id)) && !mockIds.has(String(o.order_code || '').replace(/\D/g, '')));
+};
 
 const ProfilePage = () => {
   const { user, updateUserProfile, changePassword, orders, wishlist, logout, addToCart } = useAuth();
@@ -246,19 +121,22 @@ const ProfilePage = () => {
   const [orderCurrentPage, setOrderCurrentPage] = useState(1);
   const ordersPerPage = 3;
 
-  // Lịch sử đơn hàng: kết hợp dữ liệu lưu trữ local, mẫu hiển thị, và backend
+  // Lịch sử đơn hàng: Chỉ tải các đơn hàng thực tế mà người dùng đã đặt thành công
   const [customerOrders, setCustomerOrders] = useState(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem('yf_customer_orders') || '[]');
-      const combined = [...saved];
-      for (const sample of INITIAL_SAMPLE_ORDERS) {
-        if (!combined.some(o => (o.order_code || o.order_id) === (sample.order_code || sample.order_id))) {
-          combined.push(sample);
-        }
+      const userKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : null;
+      let saved = [];
+      if (userKey) {
+        const u = localStorage.getItem(userKey);
+        if (u) saved = JSON.parse(u);
       }
-      return combined;
+      if (!saved || saved.length === 0) {
+        const g = localStorage.getItem('yf_customer_orders');
+        if (g) saved = JSON.parse(g);
+      }
+      return purgeMockOrders(saved);
     } catch (e) {
-      return INITIAL_SAMPLE_ORDERS;
+      return [];
     }
   });
 
@@ -279,58 +157,91 @@ const ProfilePage = () => {
     }
   }, [searchParams]);
 
-  // Đồng bộ đơn hàng từ backend nếu có
+  // Đồng bộ đơn hàng từ database backend & localStorage thực tế
   useEffect(() => {
-    orderService.getMyOrders()
-      .then((res) => {
-        if (res?.status && Array.isArray(res.data) && res.data.length > 0) {
-          const apiFormatted = res.data.map((apiOrd) => ({
-            order_id: String(apiOrd.order_id || apiOrd.order_number),
-            order_code: apiOrd.order_number ? `#${apiOrd.order_number}` : `YF - ${apiOrd.order_id}`,
-            created_at: new Date(apiOrd.created_at).toLocaleDateString('vi-VN'),
-            payment_method: apiOrd.payments?.[0]?.payment_method === 'PAYOS'
-              ? 'Thanh toán: Chuyển khoản VietQR'
-              : 'Thanh toán: Tiền mặt khi nhận hàng (COD)',
-            status: apiOrd.order_status,
-            status_label: apiOrd.order_status === 'COMPLETED'
-              ? 'GIAO THÀNH CÔNG'
-              : (apiOrd.order_status === 'PENDING' ? 'CHỜ GIAO HÀNG' : 'ĐANG GIAO HÀNG HỎA TỐC'),
-            total_amount: Number(apiOrd.total_amount || 0),
-            items: (apiOrd.order_items || []).map((i) => ({
-              id: i.order_item_id || i.variant_id,
-              name: i.product_name,
-              size: `Size ${i.size || 'M'}`,
-              color: `Màu ${i.color || 'Tiêu chuẩn'}`,
-              quantity: Number(i.quantity || 1),
-              price: Number(i.unit_price || 0),
-              image: i.variant?.product?.images?.[0]?.url || 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=500',
-              collection_tag: 'FALL/WINTER COUTURE ATELIER',
-            })),
-            stepper: {
-              estimated_delivery: 'Dự kiến: Trong 24h tới',
-              tracking_code: `GHN-VFP-${apiOrd.order_id}`,
-              driver_name: 'Lê Hoàng Nam (Hotline: 0906 234 567)',
-              steps: [
-                { id: 1, name: 'Xác nhận', time: 'Đã hoàn tất', status: 'completed' },
-                { id: 2, name: 'Đóng gói', time: 'Đã hoàn tất', status: 'completed' },
-                { id: 3, name: 'Vận chuyển hỏa tốc', time: 'Đang điều phối', status: 'active' },
-                { id: 4, name: 'Nhận hàng', time: 'Dự kiến hôm nay', status: 'pending' },
-              ]
-            }
-          }));
+    const userKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : null;
+    let local = [];
+    try {
+      if (userKey) {
+        const uSaved = localStorage.getItem(userKey);
+        if (uSaved) local = JSON.parse(uSaved);
+      }
+      if (!local || local.length === 0) {
+        const gSaved = localStorage.getItem('yf_customer_orders');
+        if (gSaved) local = JSON.parse(gSaved);
+      }
+      local = purgeMockOrders(local);
+      if (userKey) localStorage.setItem(userKey, JSON.stringify(local));
+      localStorage.setItem('yf_customer_orders', JSON.stringify(local));
+    } catch (e) {}
 
-          setCustomerOrders((prev) => {
-            const merged = [...apiFormatted];
-            for (const item of prev) {
-              if (!merged.some((m) => m.order_code === item.order_code || m.order_id === item.order_id)) {
-                merged.push(item);
-              }
-            }
-            return merged;
+    // Gọi API lấy các đơn hàng thực tế đã lưu trong MySQL
+    orderService.getMyOrders(user?.email)
+      .then((res) => {
+        if (res?.status && Array.isArray(res.data)) {
+          const apiFormatted = res.data.map((apiOrd) => {
+            const isCompleted = ['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(String(apiOrd.order_status).toUpperCase());
+            const isShipping = ['SHIPPING', 'PROCESSING', 'PREPARING'].includes(String(apiOrd.order_status).toUpperCase());
+            const isCancelled = ['CANCELLED', 'RETURNED', 'FAILED'].includes(String(apiOrd.order_status).toUpperCase());
+            const orderDateStr = new Date(apiOrd.created_at).toLocaleDateString('vi-VN');
+
+            return {
+              order_id: String(apiOrd.order_id || apiOrd.order_number),
+              order_code: apiOrd.order_number ? (apiOrd.order_number.startsWith('YF') ? apiOrd.order_number : `YF - ${apiOrd.order_number}`) : `YF - ${apiOrd.order_id}`,
+              created_at: orderDateStr,
+              payment_method: apiOrd.payments?.[0]?.payment_method === 'PAYOS'
+                ? 'Thanh toán: Chuyển khoản VietQR'
+                : 'Thanh toán: Tiền mặt khi nhận hàng (COD)',
+              status: apiOrd.order_status,
+              status_label: isCompleted
+                ? `GIAO THÀNH CÔNG (${orderDateStr})`
+                : (isShipping
+                  ? 'ĐANG GIAO HÀNG HỎA TỐC'
+                  : (isCancelled ? 'ĐÃ HỦY' : 'CHỜ GIAO HÀNG')),
+              delivered_date: isCompleted ? orderDateStr : null,
+              total_amount: Number(apiOrd.total_amount || 0),
+              items: (apiOrd.order_items || []).map((i) => ({
+                id: i.order_item_id || i.variant_id,
+                name: i.product_name,
+                size: `Size ${i.size || 'M'}`,
+                color: `Màu ${i.color || 'Tiêu chuẩn'}`,
+                quantity: Number(i.quantity || 1),
+                price: Number(i.unit_price || 0),
+                image: i.variant?.product?.images?.[0]?.url || 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=500',
+                collection_tag: i.variant?.product?.category?.category_name || 'THỜI TRANG CAO CẤP',
+              })),
+              stepper: isShipping || String(apiOrd.order_status).toUpperCase() === 'PENDING' ? {
+                estimated_delivery: 'Dự kiến: Trong 24-48 giờ tới',
+                tracking_code: `GHN-VFP-${apiOrd.order_id}`,
+                driver_name: 'Lê Hoàng Nam (Hotline: 0906 234 567)',
+                steps: [
+                  { id: 1, name: 'Xác nhận', time: `${orderDateStr} Hoàn tất`, status: 'completed' },
+                  { id: 2, name: 'Đóng gói', time: isShipping ? 'Đã đóng gói' : 'Đang chuẩn bị', status: isShipping ? 'completed' : 'active' },
+                  { id: 3, name: 'Vận chuyển hỏa tốc', time: isShipping ? 'Đang điều phối' : 'Chờ lấy hàng', status: isShipping ? 'active' : 'pending' },
+                  { id: 4, name: 'Nhận hàng', time: 'Dự kiến 1-2 ngày', status: 'pending' },
+                ]
+              } : null
+            };
           });
+
+          // Hợp nhất đơn hàng từ backend và local (chỉ giữ đơn hàng thật)
+          const merged = [...apiFormatted];
+          for (const item of (local || [])) {
+            const exists = merged.some(m =>
+              String(m.order_code).replace(/\D/g, '') === String(item.order_code || item.order_id).replace(/\D/g, '')
+            );
+            if (!exists) {
+              merged.push(item);
+            }
+          }
+          setCustomerOrders(purgeMockOrders(merged));
+        } else {
+          setCustomerOrders(purgeMockOrders(local || []));
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setCustomerOrders(purgeMockOrders(local || []));
+      });
   }, [user]);
   const DEFAULT_AVATAR = '/logo-white.png';
 
@@ -865,8 +776,16 @@ const ProfilePage = () => {
             <div className="stats-box">
               <div className="stat-col">
                 <span className="stat-label">TỔNG CHI TIÊU</span>
-                <span className="stat-value">{user?.total_spent || '34.5tr'}</span>
-                <span className="stat-sub gold-sub">{user?.discount || `Chốt chẵn ${String(orderCounts.ALL).padStart(2, '0')} đơn đặt`}</span>
+                <span className="stat-value">
+                  {user?.total_spent || (customerOrders.length > 0
+                    ? (customerOrders.reduce((sum, ord) => sum + Number(ord.total_amount || 0), 0) >= 1000000
+                      ? `${(customerOrders.reduce((sum, ord) => sum + Number(ord.total_amount || 0), 0) / 1000000).toFixed(1).replace('.0', '')}tr`
+                      : `${customerOrders.reduce((sum, ord) => sum + Number(ord.total_amount || 0), 0).toLocaleString('vi-VN')}₫`)
+                    : '0₫')}
+                </span>
+                <span className="stat-sub gold-sub">
+                  {user?.discount || (customerOrders.length > 0 ? `Chốt chẵn ${String(orderCounts.ALL).padStart(2, '0')} đơn đặt` : 'Chưa có đơn đặt')}
+                </span>
               </div>
             </div>
           </div>
@@ -900,7 +819,7 @@ const ProfilePage = () => {
                   <span>LỊCH SỬ ĐƠN HÀNG</span>
                 </div>
                 <span className="nav-badge-pill grey-badge">
-                  {String(orderCounts.ALL).padStart(2, '0')}
+                  {customerOrders.length > 0 ? String(orderCounts.ALL).padStart(2, '0') : '0'}
                 </span>
               </button>
 
@@ -1376,29 +1295,18 @@ const ProfilePage = () => {
 
                               {statusCat === 'COMPLETED' && (
                                 <>
-                                  {ord.order_id === '79114' && (
-                                    <button
-                                      className="btn-order-action btn-neutral-outline"
-                                      onClick={() => setWarrantyModalOpen(true)}
-                                    >
-                                      Yêu Cầu Hỗ Trợ Bảo Hành
-                                    </button>
-                                  )}
-                                  {ord.order_id === '79114' ? (
-                                    <button
-                                      className="btn-order-action btn-neutral-outline"
-                                      onClick={() => setReviewModalOrder(ord)}
-                                    >
-                                      Xem Đánh Giá Của Bạn
-                                    </button>
-                                  ) : (
-                                    <button
-                                      className="btn-order-action btn-gold-outline"
-                                      onClick={() => setReviewModalOrder(ord)}
-                                    >
-                                      ★ Viết Đánh Giá (+100 Điểm)
-                                    </button>
-                                  )}
+                                  <button
+                                    className="btn-order-action btn-gold-outline"
+                                    onClick={() => setReviewModalOrder(ord)}
+                                  >
+                                    ★ Viết Đánh Giá (+100 Điểm)
+                                  </button>
+                                  <button
+                                    className="btn-order-action btn-neutral-outline"
+                                    onClick={() => setWarrantyModalOpen(true)}
+                                  >
+                                    Yêu Cầu Hỗ Trợ Bảo Hành
+                                  </button>
                                   <button
                                     className="btn-order-action btn-dark-outline"
                                     onClick={() => handleReorder(ord)}

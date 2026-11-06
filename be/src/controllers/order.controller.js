@@ -48,10 +48,11 @@ export const createOrder = async (req, res, next) => {
 export const getMyOrders = async (req, res, next) => {
   try {
     const customerId = req.user?.id;
-    if (!customerId) {
+    const email = req.user?.email || req.query?.email;
+    if (!customerId && !email) {
       return BaseResponse.success(res, 'Lấy danh sách đơn hàng thành công', []);
     }
-    const orders = await orderService.getMyOrdersService(customerId);
+    const orders = await orderService.getMyOrdersService({ customerId, email });
     return BaseResponse.success(res, 'Lấy danh sách đơn hàng thành công', orders);
   } catch (error) {
     next(error);

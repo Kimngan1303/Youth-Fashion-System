@@ -153,10 +153,13 @@ export const createOrderService = async ({
 };
 
 /**
- * Lấy danh sách đơn hàng của khách hàng theo customerId
+ * Lấy danh sách đơn hàng thực tế của khách hàng theo customerId hoặc email
  */
-export const getMyOrdersService = async (customerId) => {
-  return await orderRepo.findOrdersByCustomerId(customerId);
+export const getMyOrdersService = async (params) => {
+  if (typeof params === 'object' && params !== null) {
+    return await orderRepo.findOrdersByCustomer(params);
+  }
+  return await orderRepo.findOrdersByCustomer({ customerId: params });
 };
 
 /**
