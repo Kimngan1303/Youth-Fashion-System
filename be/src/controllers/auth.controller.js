@@ -136,13 +136,14 @@ export const refreshController = async (req, res, next) => {
 export const updateProfileController = async (req, res, next) => {
   try {
     const customer_id = req.user?.id || req.body.customer_id || req.body.id;
+    const user_type = req.user?.user_type || req.user?.role;
     const { full_name, phone, avatar_url, gender, dob } = req.body;
 
     if (!customer_id) {
       return BaseResponse.error(res, 'Không tìm thấy ID người dùng', [], 400);
     }
 
-    const result = await updateProfileService({ customer_id, full_name, phone, avatar_url, gender, dob });
+    const result = await updateProfileService({ customer_id, user_type, full_name, phone, avatar_url, gender, dob });
 
     return BaseResponse.success(res, 'Cập nhật thông tin hồ sơ thành công', result, 200);
   } catch (error) {

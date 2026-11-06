@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/auth.service';
 import { cartService } from '../services/cartService';
+import { wishlistService } from '../services/wishlistService';
 import { getColorHex } from '../utils/colorUtils';
 
 export const AuthContext = createContext(null);
@@ -25,6 +26,12 @@ export function AuthProvider({ children }) {
         if (!isValidAvatarUrl(parsed.avatar_url)) {
           const savedAvatar = (parsed.email && localStorage.getItem(`avatar_url_${parsed.email}`)) || localStorage.getItem('user_avatar_url');
           if (isValidAvatarUrl(savedAvatar)) parsed.avatar_url = savedAvatar;
+        }
+        if (parsed.phone === '0988777666') {
+          parsed.phone = '';
+          try {
+            localStorage.setItem('user', JSON.stringify(parsed));
+          } catch (e) {}
         }
         return parsed;
       } catch (e) {
@@ -148,6 +155,20 @@ export function AuthProvider({ children }) {
         setWishlist([]);
       }
     }
+
+    // Đồng bộ trực tiếp danh sách yêu thích từ Database MySQL qua API /api/wishlist
+    wishlistService.getWishlist()
+      .then((res) => {
+        if (res?.status && res?.data?.items) {
+          setWishlist(res.data.items);
+          if (wishlistKey) {
+            localStorage.setItem(wishlistKey, JSON.stringify(res.data.items));
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('Chưa thể đồng bộ yêu thích từ server, sử dụng bộ nhớ đệm:', err.message);
+      });
   }, [user?.customer_id, user?.id, user?.email]);
 
   useEffect(() => {
@@ -226,6 +247,15 @@ export function AuthProvider({ children }) {
           console.error('Lỗi khi lưu wishlist vào localStorage:', err);
         }
       }
+
+      // Gọi API backend đồng bộ vào Database
+      const targetIdToSync = typeof product === 'object' ? (product.id || product.product_id) : product;
+      if (targetIdToSync) {
+        wishlistService.toggleWishlist(targetIdToSync).catch(err => {
+          console.warn('Lỗi khi đồng bộ toggleWishlist lên backend:', err.message);
+        });
+      }
+
       return next;
     });
     return { success: true, wasAdded };
@@ -243,6 +273,13 @@ export function AuthProvider({ children }) {
       }
       return next;
     });
+
+    // Gọi API backend xóa khỏi Database
+    if (targetId) {
+      wishlistService.removeFromWishlist(targetId).catch(err => {
+        console.warn('Lỗi khi xóa sản phẩm khỏi wishlist trên backend:', err.message);
+      });
+    }
   };
 
   const clearWishlist = () => {
@@ -254,6 +291,11 @@ export function AuthProvider({ children }) {
         localStorage.removeItem(wishlistKey);
       } catch (err) {}
     }
+
+    // Gọi API backend làm trống Database
+    wishlistService.clearWishlist().catch(err => {
+      console.warn('Lỗi khi xóa sạch wishlist trên backend:', err.message);
+    });
   };
 
   const addToCart = async (product, selectedSize = 'M', quantity = 1) => {
@@ -457,11 +499,11 @@ export function AuthProvider({ children }) {
     try {
       const payload = {
         customer_id: user?.customer_id || user?.id || 1,
-        full_name: updatedData.full_name || user?.full_name,
-        phone: updatedData.phone || user?.phone,
-        avatar_url: updatedData.avatar_url || user?.avatar_url,
-        gender: updatedData.gender || user?.gender,
-        dob: updatedData.dob || user?.dob,
+        full_name: updatedData.full_name !== undefined ? updatedData.full_name : user?.full_name,
+        phone: updatedData.phone !== undefined ? updatedData.phone : (user?.phone || ''),
+        avatar_url: updatedData.avatar_url !== undefined ? updatedData.avatar_url : user?.avatar_url,
+        gender: updatedData.gender !== undefined ? updatedData.gender : user?.gender,
+        dob: updatedData.dob !== undefined ? updatedData.dob : user?.dob,
         ...updatedData
       };
       const result = await authService.updateProfile(payload);

@@ -36,16 +36,18 @@ export const updateProfileSchema = z.object({
     .min(1, { message: 'Họ và tên không được để trống' })
     .optional(),
   phone: z
-    .string({ required_error: 'Số điện thoại là bắt buộc' })
-    .min(1, { message: 'Số điện thoại không được để trống' })
+    .string()
+    .trim()
     .refine(
       (val) => {
+        if (!val) return true; // Cho phép để trống, khi nào người dùng nhập mới kiểm tra
         const cleaned = val.replace(/[\s.\-()]/g, '');
         return /^(?:(?:\+84|84|0))(3[2-9]|5[25689]|7[06-9]|8[1-9]|9[0-9])\d{7}$/.test(cleaned);
       },
       { message: 'Số điện thoại không đúng định dạng mạng di động Việt Nam (gồm 10 số: 032-039, 05x, 07x, 08x, 09x)' }
     )
-    .optional(),
+    .optional()
+    .nullable(),
   avatar_url: z.string().optional().nullable(),
   gender: z.string().optional().nullable(),
   dob: z.string().optional().nullable(),

@@ -407,15 +407,60 @@ export const refreshAccessTokenService = async (refreshToken) => {
 };
 
 /**
- * Xử lý cập nhật hồ sơ cá nhân của Khách hàng vào CSDL
+ * Xử lý cập nhật hồ sơ cá nhân của Khách hàng hoặc Quản trị viên/Nhân viên vào CSDL
  */
-export const updateProfileService = async ({ customer_id, full_name, phone, avatar_url, gender, dob }) => {
-  let cleanPhone = phone !== undefined ? (phone ? phone.toString().replace(/[\s.\-()]/g, '') : null) : undefined;
-  if (cleanPhone) {
-    const existingPhone = await findCustomerByPhone(cleanPhone);
-    if (existingPhone && existingPhone.customer_id.toString() !== customer_id.toString()) {
-      throw { statusCode: 400, message: 'Số điện thoại này đã được sử dụng bởi tài khoản khác' };
+export const updateProfileService = async ({ customer_id, user_type, full_name, phone, avatar_url, gender, dob }) => {
+  let cleanPhone = phone !== undefined ? (phone && phone.toString().trim() ? phone.toString().replace(/[\s.\-()]/g, '') : null) : undefined;
+
+  const isEmployee = user_type === 'EMPLOYEE' || user_type === 'ADMIN' || user_type === 'MANAGER';
+  let employee = null;
+  let customer = null;
+
+  if (isEmployee) {
+    employee = await prisma.employee.findUnique({ where: { employee_id: BigInt(customer_id) } });
+  } else {
+    customer = await findCustomerById(customer_id);
+    if (!customer) {
+      employee = await prisma.employee.findUnique({ where: { employee_id: BigInt(customer_id) } });
     }
+  }
+
+  if (cleanPhone) {
+    if (customer) {
+      const existingPhone = await findCustomerByPhone(cleanPhone);
+      if (existingPhone && existingPhone.customer_id.toString() !== customer.customer_id.toString()) {
+        throw { statusCode: 400, message: 'Số điện thoại này đã được sử dụng bởi tài khoản khác' };
+      }
+    } else if (employee) {
+      const existingPhone = await prisma.employee.findFirst({
+        where: { phone: cleanPhone, NOT: { employee_id: employee.employee_id } },
+      });
+      if (existingPhone) {
+        throw { statusCode: 400, message: 'Số điện thoại này đã được sử dụng bởi tài khoản khác' };
+      }
+    }
+  }
+
+  if (employee) {
+    const empData = {};
+    if (full_name !== undefined) empData.full_name = full_name;
+    if (cleanPhone !== undefined) empData.phone = cleanPhone;
+    const updated = await prisma.employee.update({
+      where: { employee_id: employee.employee_id },
+      data: empData,
+    });
+    return {
+      id: updated.employee_id.toString(),
+      customer_id: updated.employee_id.toString(),
+      email: updated.email,
+      full_name: updated.full_name,
+      phone: updated.phone || '',
+      avatar_url: avatar_url || null,
+      gender: gender || null,
+      dob: dob || null,
+      role: updated.employee_role,
+      user_type: 'EMPLOYEE',
+    };
   }
 
   const updateData = { full_name, avatar_url, gender, dob };
@@ -423,16 +468,19 @@ export const updateProfileService = async ({ customer_id, full_name, phone, avat
     updateData.phone = cleanPhone;
   }
 
-  const updatedCustomer = await updateCustomerProfile(customer_id, updateData);
+  const updatedCustomer = await updateCustomerProfile(customer.customer_id, updateData);
 
   return {
+    id: updatedCustomer.customer_id.toString(),
     customer_id: updatedCustomer.customer_id.toString(),
     email: updatedCustomer.email,
     full_name: updatedCustomer.full_name,
-    phone: updatedCustomer.phone,
+    phone: updatedCustomer.phone || '',
     avatar_url: updatedCustomer.avatar_url,
     gender: updatedCustomer.gender,
     dob: updatedCustomer.dob,
+    role: 'CUSTOMER',
+    user_type: 'CUSTOMER',
   };
 };
 

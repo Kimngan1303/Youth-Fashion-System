@@ -113,7 +113,7 @@ const HomePage = ({ onOpenAISearch }) => {
         const items = res?.data?.products || res?.products || [];
         if (items.length > 0) {
           const mapped = items.map(p => {
-            const primaryImg = p.images?.find(i => i.is_primary)?.image_url || p.images?.[0]?.image_url || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800';
+            const primaryImg = p.images?.find(i => i.is_primary)?.image_url || p.images?.[0]?.image_url;
             const priceVal = p.variants?.[0]?.price ? Number(p.variants[0].price) : 0;
             return {
               id: p.product_id,
