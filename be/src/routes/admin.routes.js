@@ -4,9 +4,9 @@ import { authenticateToken, authorizeRoles } from '../middlewares/auth.middlewar
 
 const router = Router();
 
-// Yêu cầu xác thực đăng nhập và quyền hạn ADMIN hoặc MANAGER
+// Yêu cầu xác thực đăng nhập và quyền hạn ADMIN duy nhất
 router.use(authenticateToken);
-router.use(authorizeRoles('ADMIN', 'MANAGER'));
+router.use(authorizeRoles('ADMIN'));
 
 // Lấy danh sách toàn bộ người dùng
 router.get('/users', adminController.getAllUsers);

@@ -39,13 +39,10 @@ function ProtectedRoute({ children }) {
 function AdminRoute({ children }) {
   const { user, isAuthenticated } = useContext(AuthContext);
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  const hasAccess =
-    user?.role === 'ADMIN' ||
-    user?.employee_role === 'ADMIN' ||
-    user?.role === 'MANAGER' ||
-    user?.employee_role === 'MANAGER' ||
-    user?.user_type === 'EMPLOYEE';
-  return hasAccess ? children : <Navigate to="/manager" replace />;
+  const isAdmin =
+    String(user?.role || '').toUpperCase() === 'ADMIN' ||
+    String(user?.employee_role || '').toUpperCase() === 'ADMIN';
+  return isAdmin ? children : <Navigate to="/manager" replace />;
 }
 
 function AppContent() {

@@ -40,9 +40,10 @@ export const authorizeRoles = (...allowedRoles) => {
       return next();
     }
 
-    // Nếu người dùng đăng nhập là nhân viên/quản trị viên hệ thống (EMPLOYEE)
+    // Nếu người dùng đăng nhập là nhân viên/quản trị viên hệ thống (EMPLOYEE) nhưng chưa có userRole cụ thể
     if (
       String(req.user.user_type).toUpperCase() === 'EMPLOYEE' &&
+      !userRole &&
       (normalizedAllowed.includes('MANAGER') || normalizedAllowed.includes('ADMIN'))
     ) {
       return next();

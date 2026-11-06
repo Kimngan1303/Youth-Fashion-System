@@ -7,7 +7,6 @@ import ManagerSidebar from '../../components/ManagerSidebar';
 import ManagerHeader from '../../components/ManagerHeader';
 import {
   Award,
-  Star,
   UserPlus,
   Shield,
   Search,
@@ -108,10 +107,10 @@ const userStyles = `
     border-color: #D1D5DB;
   }
 
-  /* 4 Metric Cards Grid */
+  /* 3 Metric Cards Grid */
   .um-metrics-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 16px;
     width: 100%;
   }
@@ -644,13 +643,17 @@ const ITEMS_PER_PAGE = 6;
 export default function UserManagement() {
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin =
+    String(user?.role || '').toUpperCase() === 'ADMIN' ||
+    String(user?.employee_role || '').toUpperCase() === 'ADMIN';
 
   const [users, setUsers] = useState([]);
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Filters
-  const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'CUSTOMERS' | 'VIP' | 'EMPLOYEES' | 'LOCKED'
+  const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'CUSTOMERS' | 'EMPLOYEES' | 'LOCKED'
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -685,15 +688,19 @@ export default function UserManagement() {
   }, [showError]);
 
   useEffect(() => {
+    if (user && !isAdmin) {
+      showError('Chỉ tài khoản Admin mới có quyền truy cập Quản lý người dùng.');
+      navigate('/manager', { replace: true });
+      return;
+    }
     fetchData();
-  }, [fetchData]);
+  }, [user, isAdmin, navigate, showError, fetchData]);
 
   // Tab counts
   const counts = useMemo(() => {
     return {
       all: users.length,
-      customers: users.filter((u) => u.type === 'CUSTOMER' && u.role !== 'VIP' && !u.role.startsWith('VIP')).length,
-      vip: users.filter((u) => u.role === 'VIP' || u.role.startsWith('VIP')).length,
+      customers: users.filter((u) => u.type === 'CUSTOMER' || u.role === 'CUSTOMER').length,
       employees: users.filter((u) => u.type === 'EMPLOYEE' || u.role === 'MANAGER' || u.role === 'ADMIN').length,
       locked: users.filter((u) => u.status === 'LOCKED').length,
     };
@@ -705,9 +712,7 @@ export default function UserManagement() {
 
     // Lọc theo Tab
     if (activeTab === 'CUSTOMERS') {
-      result = result.filter((u) => u.type === 'CUSTOMER' && u.role !== 'VIP' && !u.role.startsWith('VIP'));
-    } else if (activeTab === 'VIP') {
-      result = result.filter((u) => u.role === 'VIP' || u.role.startsWith('VIP'));
+      result = result.filter((u) => u.type === 'CUSTOMER' || u.role === 'CUSTOMER');
     } else if (activeTab === 'EMPLOYEES') {
       result = result.filter((u) => u.type === 'EMPLOYEE' || u.role === 'MANAGER' || u.role === 'ADMIN');
     } else if (activeTab === 'LOCKED') {
@@ -728,10 +733,10 @@ export default function UserManagement() {
 
     // Lọc theo Dropdown Vai trò
     if (roleFilter !== 'ALL') {
-      if (roleFilter === 'VIP') {
-        result = result.filter((u) => u.role === 'VIP' || u.role.startsWith('VIP'));
-      } else if (roleFilter === 'CUSTOMER') {
-        result = result.filter((u) => u.role === 'CUSTOMER' || (!u.role.startsWith('VIP') && u.role !== 'MANAGER' && u.role !== 'ADMIN'));
+      if (roleFilter === 'CUSTOMER') {
+        result = result.filter((u) => u.role === 'CUSTOMER' || u.type === 'CUSTOMER');
+      } else if (roleFilter === 'MANAGER') {
+        result = result.filter((u) => u.role === 'MANAGER');
       } else {
         result = result.filter((u) => u.role === roleFilter);
       }
@@ -751,6 +756,13 @@ export default function UserManagement() {
       result.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'vi'));
     }
 
+    // Luôn ưu tiên đưa tài khoản Quản trị viên (Admin) lên vị trí đầu tiên của bảng
+    result.sort((a, b) => {
+      const aIsAdmin = a.role === 'ADMIN' ? 1 : 0;
+      const bIsAdmin = b.role === 'ADMIN' ? 1 : 0;
+      return bIsAdmin - aIsAdmin;
+    });
+
     return result;
   }, [users, activeTab, searchQuery, roleFilter, statusFilter, sortBy]);
 
@@ -760,19 +772,22 @@ export default function UserManagement() {
   const startIndex = (validCurrentPage - 1) * ITEMS_PER_PAGE;
   const currentItems = filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  // Checkbox select
-  const isAllCurrentSelected = currentItems.length > 0 && currentItems.every((u) => selectedIds.includes(u.id));
+  // Checkbox select (Không cho phép chọn tài khoản Admin)
+  const selectableItems = currentItems.filter((u) => u.role !== 'ADMIN');
+  const isAllCurrentSelected = selectableItems.length > 0 && selectableItems.every((u) => selectedIds.includes(u.id));
 
   const handleSelectAll = () => {
     if (isAllCurrentSelected) {
-      setSelectedIds((prev) => prev.filter((id) => !currentItems.some((u) => u.id === id)));
+      setSelectedIds((prev) => prev.filter((id) => !selectableItems.some((u) => u.id === id)));
     } else {
-      const newIds = currentItems.map((u) => u.id);
+      const newIds = selectableItems.map((u) => u.id);
       setSelectedIds((prev) => Array.from(new Set([...prev, ...newIds])));
     }
   };
 
   const handleToggleSelectOne = (id) => {
+    const userObj = users.find((u) => u.id === id);
+    if (userObj?.role === 'ADMIN') return;
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   };
 
@@ -793,6 +808,10 @@ export default function UserManagement() {
 
   // Toggle nhanh trạng thái Khóa / Kích hoạt
   const handleToggleStatus = async (user) => {
+    if (user.role === 'ADMIN') {
+      showError('Tài khoản Quản trị viên (Admin) là cố định duy nhất, không thể khóa!');
+      return;
+    }
     const nextStatus = user.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
     try {
       await adminService.updateUserStatus(user.type, user.id, nextStatus);
@@ -821,8 +840,14 @@ export default function UserManagement() {
     }
   };
 
-  // Xóa tài khoản
+  // Xóa tài khoản (Tuyệt đối không xóa tài khoản Admin)
   const handleDeleteUser = async (user) => {
+    if (user.role === 'ADMIN') {
+      showError('Tài khoản Quản trị viên (Admin) là cố định duy nhất, không thể xóa!');
+      return;
+    }
+    const confirmed = window.confirm(`Bạn có chắc chắn muốn xóa tài khoản "${user.full_name}" không?`);
+    if (!confirmed) return;
     try {
       await adminService.deleteUser(user.type, user.id);
       await fetchData();
@@ -873,7 +898,7 @@ export default function UserManagement() {
             <div>
               <h1 className="um-title-heading">Quản Lý Tài Khoản & Phân Quyền Người Dùng</h1>
               <p className="um-title-sub">
-                Quản lý danh sách hội viên VIP, khách hàng, nhân viên bán hàng và kiểm soát quyền truy cập hệ thống YouthFashion.
+                Quản lý danh sách khách hàng, quản lý cửa hàng (Manager) và kiểm soát quyền truy cập hệ thống YouthFashion.
               </p>
             </div>
 
@@ -896,7 +921,7 @@ export default function UserManagement() {
             </div>
           </div>
 
-          {/* 4 THẺ METRICS KPI CHUẨN XÁC THEO HÌNH */}
+          {/* 3 THẺ METRICS KPI */}
           <div className="um-metrics-grid">
             {/* Thẻ 1: Tổng người dùng */}
             <div className="um-metric-card">
@@ -926,33 +951,7 @@ export default function UserManagement() {
               </div>
             </div>
 
-            {/* Thẻ 2: Khách Hàng VIP */}
-            <div className="um-metric-card">
-              <div className="um-metric-head">
-                <span className="um-metric-title">KHÁCH HÀNG VIP</span>
-                <div className="um-metric-icon-box gold">
-                  <Star size={18} fill="#D97706" />
-                </div>
-              </div>
-              <div className="um-metric-value-row">
-                <span className="um-metric-value-num">
-                  {counts.vip.toLocaleString('vi-VN')}
-                </span>
-                <span className="um-metric-value-unit">Tài khoản</span>
-              </div>
-              <div>
-                <div className="um-metric-subtext" style={{ color: '#D97706', fontWeight: 600 }}>
-                  <span>Hội viên VIP</span>
-                  <span style={{ margin: '0 4px', color: '#D1D5DB' }}>•</span>
-                  <span style={{ color: '#78716C', fontWeight: 400 }}>Tài khoản thân thiết</span>
-                </div>
-                <div className="um-progress-bar-wrap">
-                  <div className="um-progress-bar-fill" style={{ width: `${Math.min(100, Math.max(10, (counts.vip / (counts.all || 1)) * 100))}%`, background: '#D97706' }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Thẻ 3: Tài khoản mới tháng này */}
+            {/* Thẻ 2: Tài khoản mới tháng này */}
             <div className="um-metric-card">
               <div className="um-metric-head">
                 <span className="um-metric-title">TÀI KHOẢN MỚI THÁNG NÀY</span>
@@ -976,7 +975,7 @@ export default function UserManagement() {
               </div>
             </div>
 
-            {/* Thẻ 4: Nhân sự vận hành */}
+            {/* Thẻ 3: Nhân sự vận hành */}
             <div className="um-metric-card">
               <div className="um-metric-head">
                 <span className="um-metric-title">NHÂN SỰ VẬN HÀNH</span>
@@ -1029,23 +1028,13 @@ export default function UserManagement() {
                 </button>
                 <button
                   type="button"
-                  className={`um-tab-btn ${activeTab === 'VIP' ? 'active' : ''}`}
-                  onClick={() => {
-                    setActiveTab('VIP');
-                    setCurrentPage(1);
-                  }}
-                >
-                  Khách hàng VIP ({counts.vip})
-                </button>
-                <button
-                  type="button"
                   className={`um-tab-btn ${activeTab === 'EMPLOYEES' ? 'active' : ''}`}
                   onClick={() => {
                     setActiveTab('EMPLOYEES');
                     setCurrentPage(1);
                   }}
                 >
-                  Nhân sự nội bộ ({counts.employees})
+                  Manager & Quản lý ({counts.employees})
                 </button>
                 <button
                   type="button"
@@ -1068,11 +1057,27 @@ export default function UserManagement() {
                   type="button"
                   className="um-btn-pill-delete"
                   disabled={selectedIds.length === 0}
-                  onClick={() => {
-                    if (window.confirm(`Bạn có chắc muốn xóa ${selectedIds.length} tài khoản đã chọn?`)) {
-                      setUsers((prev) => prev.filter((u) => !selectedIds.includes(u.id)));
-                      setSelectedIds([]);
-                      showSuccess('Đã xóa các tài khoản được chọn');
+                  onClick={async () => {
+                    const nonAdminSelectedIds = selectedIds.filter((id) => {
+                      const u = users.find((user) => user.id === id);
+                      return u?.role !== 'ADMIN';
+                    });
+                    if (nonAdminSelectedIds.length === 0) {
+                      showError('Không thể xóa tài khoản Quản trị viên (Admin)');
+                      return;
+                    }
+                    if (window.confirm(`Bạn có chắc muốn xóa ${nonAdminSelectedIds.length} tài khoản đã chọn?`)) {
+                      try {
+                        for (const id of nonAdminSelectedIds) {
+                          const u = users.find((user) => user.id === id);
+                          if (u) await adminService.deleteUser(u.type, u.id);
+                        }
+                        await fetchData();
+                        setSelectedIds([]);
+                        showSuccess(`Đã xóa ${nonAdminSelectedIds.length} tài khoản thành công`);
+                      } catch (err) {
+                        showError(err.response?.data?.message || 'Có lỗi xảy ra khi xóa tài khoản');
+                      }
                     }
                   }}
                 >
@@ -1117,9 +1122,7 @@ export default function UserManagement() {
               >
                 <option value="ALL">Tất cả vai trò</option>
                 <option value="CUSTOMER">Khách Hàng</option>
-                <option value="VIP">Khách Hàng VIP</option>
                 <option value="MANAGER">Manager</option>
-                <option value="ADMIN">Admin (Cố định)</option>
               </select>
 
               <select
@@ -1161,25 +1164,24 @@ export default function UserManagement() {
                         onChange={handleSelectAll}
                       />
                     </th>
-                    <th style={{ width: '28%' }}>NGƯỜI DÙNG & LIÊN HỆ</th>
-                    <th style={{ width: '18%' }}>VAI TRÒ</th>
-                    <th style={{ width: '16%' }}>TỔNG CHI TIÊU / ĐƠN HÀNG</th>
-                    <th style={{ width: '18%' }}>ĐĂNG NHẬP GẦN NHẤT</th>
-                    <th style={{ width: '10%', textAlign: 'center' }}>TRẠNG THÁI</th>
-                    <th style={{ width: '10%', textAlign: 'center' }}>THAO TÁC</th>
+                    <th style={{ width: '32%' }}>NGƯỜI DÙNG & LIÊN HỆ</th>
+                    <th style={{ width: '22%' }}>VAI TRÒ</th>
+                    <th style={{ width: '22%' }}>TỔNG CHI TIÊU / ĐƠN HÀNG</th>
+                    <th style={{ width: '12%', textAlign: 'center' }}>TRẠNG THÁI</th>
+                    <th style={{ width: '12%', textAlign: 'center' }}>THAO TÁC</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '60px', color: '#78716C' }}>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '60px', color: '#78716C' }}>
                         <Loader2 size={26} className="animate-spin" style={{ margin: '0 auto 10px' }} />
                         <span>Đang tải danh sách người dùng hệ thống...</span>
                       </td>
                     </tr>
                   ) : currentItems.length === 0 ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '60px', color: '#78716C' }}>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '60px', color: '#78716C' }}>
                         <p style={{ margin: 0, fontWeight: 600 }}>Không tìm thấy người dùng nào phù hợp.</p>
                       </td>
                     </tr>
@@ -1196,6 +1198,9 @@ export default function UserManagement() {
                               type="checkbox"
                               className="um-checkbox"
                               checked={isChecked}
+                              disabled={u.role === 'ADMIN'}
+                              style={u.role === 'ADMIN' ? { opacity: 0.35, cursor: 'not-allowed' } : {}}
+                              title={u.role === 'ADMIN' ? 'Không thể thao tác trên tài khoản Admin' : undefined}
                               onChange={() => handleToggleSelectOne(u.id)}
                             />
                           </td>
@@ -1221,15 +1226,7 @@ export default function UserManagement() {
 
                           {/* Vai trò */}
                           <td>
-                            {u.role === 'VIP' || u.role.startsWith('VIP') ? (
-                              <div className="um-role-badge gold">
-                                <span>Khách Hàng VIP</span>
-                              </div>
-                            ) : u.role === 'MANAGER' ? (
-                              <div className="um-role-badge manager">
-                                <span>Manager</span>
-                              </div>
-                            ) : u.role === 'ADMIN' ? (
+                            {u.role === 'ADMIN' ? (
                               <div>
                                 <div className="um-role-badge admin">
                                   <span>Quản Trị Viên (Admin)</span>
@@ -1237,6 +1234,10 @@ export default function UserManagement() {
                                 <div style={{ fontSize: '11px', color: '#78716C', marginTop: 2 }}>
                                   Toàn quyền hệ thống
                                 </div>
+                              </div>
+                            ) : u.role === 'MANAGER' ? (
+                              <div className="um-role-badge manager">
+                                <span>Manager</span>
                               </div>
                             ) : (
                               <div className="um-role-badge customer">
@@ -1255,25 +1256,18 @@ export default function UserManagement() {
                             </div>
                           </td>
 
-                          {/* Đăng nhập gần nhất */}
-                          <td>
-                            <div style={{ fontSize: '13px', color: '#111111', fontWeight: 600 }}>
-                              {u.last_login.split('(')[0]}
-                            </div>
-                            {u.last_login.includes('(') && (
-                              <div style={{ fontSize: '11.5px', color: '#78716C', marginTop: 2 }}>
-                                {u.last_login.split('(')[1].replace(')', '')}
-                              </div>
-                            )}
-                          </td>
-
                           {/* Trạng thái */}
                           <td style={{ textAlign: 'center' }}>
                             <button
                               type="button"
                               className={`um-status-pill ${u.status === 'ACTIVE' ? 'active' : 'locked'}`}
-                              onClick={() => handleToggleStatus(u)}
-                              title="Nhấp để chuyển đổi trạng thái Hoạt động / Tạm khóa"
+                              disabled={u.role === 'ADMIN'}
+                              style={u.role === 'ADMIN' ? { cursor: 'default' } : {}}
+                              onClick={() => {
+                                if (u.role === 'ADMIN') return;
+                                handleToggleStatus(u);
+                              }}
+                              title={u.role === 'ADMIN' ? 'Tài khoản Quản trị viên luôn hoạt động' : 'Nhấp để chuyển đổi trạng thái Hoạt động / Tạm khóa'}
                             >
                               <span style={{ fontSize: '9px' }}>●</span>
                               {u.status === 'ACTIVE' ? 'Hoạt động' : 'Tạm khóa'}
@@ -1292,7 +1286,7 @@ export default function UserManagement() {
                                 onClick={() => {
                                   if (u.role === 'ADMIN') return;
                                   setRoleModalUser(u);
-                                  setSelectedRole(u.role.startsWith('VIP') ? 'VIP' : u.role);
+                                  setSelectedRole(u.role === 'MANAGER' ? 'MANAGER' : 'CUSTOMER');
                                 }}
                               >
                                 <Edit3 size={15} />
@@ -1300,11 +1294,36 @@ export default function UserManagement() {
                               <button
                                 type="button"
                                 className={`um-action-btn ${u.status === 'ACTIVE' ? '' : 'danger'}`}
-                                title={u.status === 'ACTIVE' ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
-                                onClick={() => handleToggleStatus(u)}
+                                title={u.role === 'ADMIN' ? 'Tài khoản Admin hệ thống cố định, không thể khóa' : (u.status === 'ACTIVE' ? 'Khóa tài khoản' : 'Mở khóa tài khoản')}
+                                disabled={u.role === 'ADMIN'}
+                                style={u.role === 'ADMIN' ? { opacity: 0.35, cursor: 'not-allowed' } : {}}
+                                onClick={() => {
+                                  if (u.role === 'ADMIN') return;
+                                  handleToggleStatus(u);
+                                }}
                               >
                                 {u.status === 'ACTIVE' ? <Lock size={15} /> : <Unlock size={15} />}
                               </button>
+                              {u.role === 'ADMIN' ? (
+                                <button
+                                  type="button"
+                                  className="um-action-btn"
+                                  title="Tài khoản Quản trị viên Admin cố định duy nhất, không thể xóa"
+                                  disabled
+                                  style={{ opacity: 0.35, cursor: 'not-allowed' }}
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="um-action-btn danger"
+                                  title={`Xóa tài khoản "${u.full_name}"`}
+                                  onClick={() => handleDeleteUser(u)}
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1395,7 +1414,6 @@ export default function UserManagement() {
                   onChange={(e) => setSelectedRole(e.target.value)}
                 >
                   <option value="CUSTOMER">Khách Hàng</option>
-                  <option value="VIP">Khách Hàng VIP</option>
                   <option value="MANAGER">Manager</option>
                 </select>
                 <div style={{ fontSize: '11.5px', color: '#A8A29E', marginTop: 6, lineHeight: 1.4 }}>
