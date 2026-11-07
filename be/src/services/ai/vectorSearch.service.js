@@ -1,10 +1,11 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { getProductsForIndexing } from './productSearch.service.js';
 import { createImageEmbedding, cosineSimilarity } from './embedding.service.js';
 import { prisma } from '../../repositories/prisma.js';
 
-const STORAGE_PATH = path.resolve('src/data/product_embeddings.json');
+const STORAGE_PATH = fileURLToPath(new URL('../../data/product_embeddings.json', import.meta.url));
 
 /**
  * Service quản lý lưu trữ Vector và Tìm kiếm Độ tương đồng (Vector Similarity Search)
