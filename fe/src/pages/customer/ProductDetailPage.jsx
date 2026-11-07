@@ -315,7 +315,7 @@ export default function ProductDetailPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     const fetchProduct = async () => {
-      if (!id || id === 'camel-coat' || id === '1' || id === 'default') {
+      if (!id || id === 'camel-coat' || id === 'default') {
         setProduct(FIGMA_COAT_DATA);
         return;
       }

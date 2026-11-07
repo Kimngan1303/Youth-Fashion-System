@@ -337,14 +337,14 @@ async function main() {
     "brand_name": "Urban Streetwear",
     "images": [
       {
-        "url": "https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=800",
+        "url": "https://images.unsplash.com/photo-1570570134010-818fa41ebfeb?w=800",
         "is_primary": true,
         "alt": "Áo Hoodie Nỉ Trơn Màu Đen"
       },
       {
-        "url": "https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=800",
+        "url": "https://images.unsplash.com/photo-1570570134010-818fa41ebfeb?w=800",
         "is_primary": false,
-        "alt": "Áo hoodie streetwear đen"
+        "alt": "Áo Hoodie Nỉ Trơn Màu Đen"
       }
     ],
     "variants": [
@@ -371,7 +371,7 @@ async function main() {
     "brand_name": "Atelier Elegance",
     "images": [
       {
-        "url": "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=800",
+        "url": "https://images.unsplash.com/photo-1579000915039-b91be9e0cbe4?w=800",
         "is_primary": true,
         "alt": "Áo Măng Tô Dạ Dáng Dài Màu Nâu"
       },
@@ -1266,36 +1266,36 @@ async function main() {
     ]
   },
   {
-    "product_name": "Áo Khoác Dạ Dáng Dài Màu Nâu",
-    "description": "Áo măng tô dạ màu nâu cổ bẻ dáng dài, chất liệu len pha dạ ấm áp, thanh lịch cho mùa đông.",
+    "product_name": "Áo Măng Tô Dạ Dáng Dài Màu Xanh",
+    "description": "Áo măng tô dạ dáng dài màu xanh pastel trang nhã thanh lịch, chất dạ cao cấp giữ ấm chuẩn phong cách Châu Âu.",
     "category_name": "Áo khoác & Jacket",
     "brand_name": "Atelier Elegance",
     "images": [
       {
         "url": "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=1000",
         "is_primary": true,
-        "alt": "Áo Khoác Dạ Dáng Dài Màu Nâu"
+        "alt": "Áo Măng Tô Dạ Dáng Dài Màu Xanh"
       }
     ],
     "variants": [
       {
         "sku": "MT-CAMEL-01-S",
         "size": "S",
-        "color": "Nâu",
+        "color": "Xanh",
         "price": 3850000,
         "stock": 20
       },
       {
         "sku": "MT-CAMEL-01-M",
         "size": "M",
-        "color": "Nâu",
+        "color": "Xanh",
         "price": 3850000,
         "stock": 25
       },
       {
         "sku": "MT-CAMEL-01-L",
         "size": "L",
-        "color": "Nâu",
+        "color": "Xanh",
         "price": 3850000,
         "stock": 15
       }
@@ -1308,7 +1308,7 @@ async function main() {
     "brand_name": "Nordic Pure",
     "images": [
       {
-        "url": "https://images.unsplash.com/photo-1576871337632-b9aef4c17ab9?auto=format&fit=crop&q=80&w=800",
+        "url": "https://images.unsplash.com/photo-1584273143981-41c073dfe8f8?w=800",
         "is_primary": true,
         "alt": "Áo Len Cổ Lọ Dệt Kim Màu Trắng"
       }

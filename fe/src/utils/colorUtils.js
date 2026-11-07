@@ -37,6 +37,7 @@ const FASHION_COLOR_PALETTE = {
   'silver': '#E5E7EB',
 
   // Các sắc độ Xanh dương / Xanh biển
+  'xanh': '#2563EB',
   'xanh bien': '#2563EB',
   'xanh duong': '#2563EB',
   'blue': '#2563EB',

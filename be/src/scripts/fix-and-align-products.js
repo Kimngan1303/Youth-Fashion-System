@@ -60,7 +60,7 @@ const PRODUCT_CORRECTIONS = [
     name: 'Áo Hoodie Nỉ Trơn Màu Đen',
     cat: 'Áo Hoodie & Sweater',
     desc: 'Áo hoodie màu đen chất liệu nỉ bông ấm áp, phom rộng cá tính dạo phố phong cách đường phố.',
-    image: 'https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=800',
+    image: 'https://images.unsplash.com/photo-1570570134010-818fa41ebfeb?w=800',
     color: 'Đen',
   },
   {
@@ -68,7 +68,7 @@ const PRODUCT_CORRECTIONS = [
     name: 'Áo Măng Tô Dạ Dáng Dài Màu Nâu',
     cat: 'Áo khoác & Jacket',
     desc: 'Áo măng tô dạ màu nâu dáng dài sang trọng, giữ ấm mùa đông tuyệt đối, đường may tinh xảo chuẩn phong cách Hàn Quốc.',
-    image: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=800',
+    image: 'https://images.unsplash.com/photo-1579000915039-b91be9e0cbe4?w=800',
     color: 'Nâu',
   },
   {
@@ -321,18 +321,18 @@ const PRODUCT_CORRECTIONS = [
   },
   {
     id: 43,
-    name: 'Áo Khoác Dạ Dáng Dài Màu Nâu',
+    name: 'Áo Măng Tô Dạ Dáng Dài Màu Xanh',
     cat: 'Áo khoác & Jacket',
-    desc: 'Áo măng tô dạ màu nâu cổ bẻ dáng dài, chất liệu len pha dạ ấm áp, thanh lịch cho mùa đông.',
+    desc: 'Áo măng tô dạ dáng dài màu xanh pastel trang nhã thanh lịch, chất dạ cao cấp giữ ấm chuẩn phong cách Châu Âu.',
     image: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=1000',
-    color: 'Nâu',
+    color: 'Xanh',
   },
   {
     id: 44,
     name: 'Áo Len Cổ Lọ Dệt Kim Màu Trắng',
     cat: 'Đồ Đông & Áo Len',
     desc: 'Áo len dệt kim màu trắng kem cổ lọ cao, giữ ấm tuyệt đối và dễ phối cùng chân váy hay quần tây.',
-    image: 'https://images.unsplash.com/photo-1576871337632-b9aef4c17ab9?auto=format&fit=crop&q=80&w=800',
+    image: 'https://images.unsplash.com/photo-1584273143981-41c073dfe8f8?w=800',
     color: 'Trắng',
   },
   {
