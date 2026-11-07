@@ -7,6 +7,7 @@ import { prisma } from './repositories/prisma.js';
 import connectDB from './config/connectDB.js';
 import routes from './routes/index.js';
 import { autoCancelExpiredOrders } from './config/paymentExpiration.job.js';
+import { vectorSearchService } from './services/ai/vectorSearch.service.js';
 
 dotenv.config();
 
@@ -85,6 +86,9 @@ app.use((err, req, res, next) => {
 // Start Server and Jobs
 const startServer = async () => {
   await connectDB();
+
+  // Nạp 48 vector sản phẩm vào bộ nhớ RAM cho AI Search
+  vectorSearchService.loadVectors();
 
   autoCancelExpiredOrders();
 

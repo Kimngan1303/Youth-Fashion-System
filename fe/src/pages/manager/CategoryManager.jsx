@@ -630,7 +630,7 @@ export default function CategoryManager() {
     setDrawerMode("create");
   };
 
-  // Open Drawer Edit / View
+  /////////////////// Open Drawer Edit / View
   const handleOpenEditDrawer = (cat, mode = "edit") => {
     setCurrentCategory(cat);
     setFormData({
