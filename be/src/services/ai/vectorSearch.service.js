@@ -1,10 +1,11 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { getProductsForIndexing } from './productSearch.service.js';
 import { createImageEmbedding, cosineSimilarity } from './embedding.service.js';
 import { prisma } from '../../repositories/prisma.js';
 
-const STORAGE_PATH = path.resolve('src/data/product_embeddings.json');
+const STORAGE_PATH = fileURLToPath(new URL('../../data/product_embeddings.json', import.meta.url));
 
 /**
  * Service quản lý lưu trữ Vector và Tìm kiếm Độ tương đồng (Vector Similarity Search)
@@ -113,8 +114,14 @@ class VectorSearchService {
 
       const existing = existingMap.get(p.product_id);
 
-      // Nếu đã có vector và ảnh chưa bị thay đổi -> Giữ nguyên, không tốn tài nguyên tính lại
+      // Nếu đã có vector và ảnh chưa bị thay đổi -> Giữ nguyên vector, cập nhật lại thông tin mới nhất từ MySQL
       if (existing && existing.image_url === p.image_url && existing.embedding?.length === 512) {
+        existing.product_name = p.product_name;
+        existing.category_name = p.category_name;
+        existing.brand_name = p.brand_name;
+        existing.price = p.price;
+        existing.colors = p.colors;
+        existing.updated_at = new Date().toISOString();
         updatedVectors.push(existing);
         skippedCount++;
         continue;
