@@ -277,3 +277,10 @@ export const handlePayosWebhookService = async (webhookBody) => {
 
   return { success: true };
 };
+
+/**
+ * Hủy đơn hàng và lưu lý do hủy
+ */
+export const cancelOrderService = async (orderIdOrNumber, reason) => {
+  return await orderRepo.cancelOrder(orderIdOrNumber, reason);
+};

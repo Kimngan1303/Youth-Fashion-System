@@ -256,6 +256,38 @@ export const updateOrderStatus = async (orderId, status) => {
   });
 };
 
+export const cancelOrder = async (orderIdOrNumber, reason = 'Khách hàng yêu cầu hủy đơn') => {
+  const isNumeric = !isNaN(Number(orderIdOrNumber));
+  if (isNumeric) {
+    try {
+      return await prisma.order.update({
+        where: { order_id: BigInt(orderIdOrNumber) },
+        data: {
+          order_status: 'CANCELLED',
+          note: reason ? String(reason) : undefined,
+        },
+      });
+    } catch (e) {}
+  }
+
+  const rawStr = String(orderIdOrNumber || '').trim();
+  const digitsOnly = rawStr.replace(/\D/g, '');
+  const variants = [rawStr, `YF-${rawStr}`, `YF - ${rawStr}`];
+  if (digitsOnly) {
+    variants.push(digitsOnly, `YF-${digitsOnly}`, `YF - ${digitsOnly}`);
+  }
+
+  return await prisma.order.updateMany({
+    where: {
+      order_number: { in: variants },
+    },
+    data: {
+      order_status: 'CANCELLED',
+      note: reason ? String(reason) : undefined,
+    },
+  });
+};
+
 export const updatePaymentStatus = async (orderId, paymentStatus, extra = {}) => {
   return await prisma.payment.updateMany({
     where: { order_id: BigInt(orderId) },

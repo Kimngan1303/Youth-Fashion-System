@@ -24,6 +24,10 @@ router.post('/', optionalAuth, orderController.createOrder);
 // Lấy danh sách đơn hàng của khách hàng hiện tại
 router.get('/my-orders', optionalAuth, orderController.getMyOrders);
 
+// Hủy đơn hàng
+router.patch('/:id/cancel', optionalAuth, orderController.cancelOrder);
+router.post('/:id/cancel', optionalAuth, orderController.cancelOrder);
+
 // Tra cứu thông tin đơn hàng theo mã đơn
 router.get('/:orderNumber', optionalAuth, orderController.getOrderByNumber);
 

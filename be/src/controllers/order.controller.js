@@ -89,3 +89,14 @@ export const payosWebhook = async (req, res, next) => {
   }
 };
 
+export const cancelOrder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+    const result = await orderService.cancelOrderService(id, reason);
+    return BaseResponse.success(res, 'Hủy đơn hàng thành công', result);
+  } catch (error) {
+    next(error);
+  }
+};
+

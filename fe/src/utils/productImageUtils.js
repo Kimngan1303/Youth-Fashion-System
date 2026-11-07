@@ -198,3 +198,4 @@ export const resolveOrderItemImage = (item) => {
 
   return PRODUCT_IMAGE_FALLBACKS.tshirt;
 };
+

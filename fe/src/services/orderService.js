@@ -49,5 +49,22 @@ export const orderService = {
       throw error;
     }
   },
+
+  /**
+   * Hủy đơn hàng trực tuyến
+   */
+  cancelOrder: async (orderIdOrNumber, reason) => {
+    try {
+      const res = await axiosClient.patch(`/orders/${orderIdOrNumber}/cancel`, { reason });
+      return res.data;
+    } catch (error) {
+      try {
+        const res = await axiosClient.post(`/orders/${orderIdOrNumber}/cancel`, { reason });
+        return res.data;
+      } catch (err) {
+        return { status: false };
+      }
+    }
+  },
 };
 
