@@ -9,35 +9,8 @@ import { useToast } from '../../context/ToastContext';
 import { voucherService } from '../../services/voucherService';
 import { orderService } from '../../services/orderService';
 import { cartService } from '../../services/cartService';
-
-const VIETNAM_PROVINCES = [
-  {
-    name: 'Hà Nội',
-    districts: [
-      { name: 'Quận Hoàn Kiếm', wards: ['Phường Tràng Tiền', 'Phường Hàng Bạc', 'Phường Hàng Trống', 'Phường Cửa Đông'] },
-      { name: 'Quận Ba Đình', wards: ['Phường Điện Biên', 'Phường Đội Cấn', 'Phường Liễu Giai', 'Phường Kim Mã'] },
-      { name: 'Quận Cầu Giấy', wards: ['Phường Dịch Vọng', 'Phường Yên Hòa', 'Phường Trung Hòa', 'Phường Mai Dịch'] },
-      { name: 'Quận Đống Đa', wards: ['Phường Láng Hạ', 'Phường Ô Chợ Dừa', 'Phường Nam Đồng', 'Phường Cát Linh'] },
-      { name: 'Quận Hai Bà Trưng', wards: ['Phường Lê Đại Hành', 'Phường Bách Khoa', 'Phường Phố Huế'] },
-    ],
-  },
-  {
-    name: 'TP. Hồ Chí Minh',
-    districts: [
-      { name: 'Quận 1', wards: ['Phường Bến Nghé', 'Phường Bến Thành', 'Phường Đa Kao', 'Phường Tân Định'] },
-      { name: 'Quận 3', wards: ['Phường Võ Thị Sáu', 'Phường 1', 'Phường 2', 'Phường 3'] },
-      { name: 'TP. Thủ Đức', wards: ['Phường Thảo Điền', 'Phường An Phú', 'Phường Hiệp Phú', 'Phường Linh Chiểu'] },
-      { name: 'Quận 7', wards: ['Phường Tân Phong', 'Phường Phú Mỹ', 'Phường Tân Phú'] },
-    ],
-  },
-  {
-    name: 'Đà Nẵng',
-    districts: [
-      { name: 'Quận Hải Châu', wards: ['Phường Hải Châu I', 'Phường Thạch Thang', 'Phường Nam Dương'] },
-      { name: 'Quận Sơn Trà', wards: ['Phường An Hải Bắc', 'Phường Phước Mỹ'] },
-    ],
-  },
-];
+import VIETNAM_PROVINCES from '../../data/vietnamAddresses.json';
+import CustomSelect from '../../components/CustomSelect';
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -162,7 +135,11 @@ export default function CheckoutPage() {
   // Cập nhật danh sách quận/huyện theo tỉnh/thành
   const currentProvinceData = useMemo(() => {
     if (!selectedProvince) return null;
-    return VIETNAM_PROVINCES.find((p) => p.name === selectedProvince) || null;
+    return (
+      VIETNAM_PROVINCES.find(
+        (p) => p.name === selectedProvince || p.fullName === selectedProvince
+      ) || null
+    );
   }, [selectedProvince]);
 
   const currentDistricts = useMemo(() => {
@@ -678,21 +655,14 @@ export default function CheckoutPage() {
                   <label className="field-label">
                     TỈNH / THÀNH PHỐ <span className="field-required">*</span>
                   </label>
-                  <div className="select-wrapper">
-                    <select
-                      className={`field-select ${provinceError ? 'input-error' : ''}`}
-                      value={selectedProvince}
-                      onChange={handleProvinceChange}
-                    >
-                      <option value="">-- Chọn Tỉnh / Thành phố --</option>
-                      {VIETNAM_PROVINCES.map((prov) => (
-                        <option key={prov.name} value={prov.name}>
-                          {prov.name}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown size={14} className="select-arrow" />
-                  </div>
+                  <CustomSelect
+                    value={selectedProvince}
+                    options={VIETNAM_PROVINCES.map((p) => p.name)}
+                    onChange={(val) => handleProvinceChange({ target: { value: val } })}
+                    placeholder="-- Chọn Tỉnh / Thành phố --"
+                    searchPlaceholder="Tìm kiếm tỉnh thành..."
+                    error={Boolean(provinceError)}
+                  />
                   {provinceError && (
                     <div className="field-error-text">
                       <AlertCircle size={12} />
@@ -705,24 +675,15 @@ export default function CheckoutPage() {
                   <label className="field-label">
                     QUẬN / HUYỆN <span className="field-required">*</span>
                   </label>
-                  <div className="select-wrapper">
-                    <select
-                      className={`field-select ${districtError ? 'input-error' : ''}`}
-                      value={selectedDistrict}
-                      onChange={handleDistrictChange}
-                      disabled={!selectedProvince}
-                    >
-                      <option value="">
-                        {selectedProvince ? '-- Chọn Quận / Huyện --' : '-- Chọn Tỉnh/Thành trước --'}
-                      </option>
-                      {currentDistricts.map((dist) => (
-                        <option key={dist.name} value={dist.name}>
-                          {dist.name}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown size={14} className="select-arrow" />
-                  </div>
+                  <CustomSelect
+                    value={selectedDistrict}
+                    options={currentDistricts.map((d) => d.name)}
+                    onChange={(val) => handleDistrictChange({ target: { value: val } })}
+                    placeholder={selectedProvince ? '-- Chọn Quận / Huyện --' : '-- Chọn Tỉnh/Thành trước --'}
+                    searchPlaceholder="Tìm kiếm quận huyện..."
+                    disabled={!selectedProvince}
+                    error={Boolean(districtError)}
+                  />
                   {districtError && (
                     <div className="field-error-text">
                       <AlertCircle size={12} />
@@ -735,27 +696,18 @@ export default function CheckoutPage() {
                   <label className="field-label">
                     PHƯỜNG / XÃ <span className="field-required">*</span>
                   </label>
-                  <div className="select-wrapper">
-                    <select
-                      className={`field-select ${wardError ? 'input-error' : ''}`}
-                      value={selectedWard}
-                      onChange={(e) => {
-                        setSelectedWard(e.target.value);
-                        if (e.target.value) setWardError('');
-                      }}
-                      disabled={!selectedDistrict}
-                    >
-                      <option value="">
-                        {selectedDistrict ? '-- Chọn Phường / Xã --' : '-- Chọn Quận/Huyện trước --'}
-                      </option>
-                      {currentWards.map((w) => (
-                        <option key={w} value={w}>
-                          {w}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown size={14} className="select-arrow" />
-                  </div>
+                  <CustomSelect
+                    value={selectedWard}
+                    options={currentWards}
+                    onChange={(val) => {
+                      setSelectedWard(val);
+                      if (val) setWardError('');
+                    }}
+                    placeholder={selectedDistrict ? '-- Chọn Phường / Xã --' : '-- Chọn Quận/Huyện trước --'}
+                    searchPlaceholder="Tìm kiếm phường xã..."
+                    disabled={!selectedDistrict}
+                    error={Boolean(wardError)}
+                  />
                   {wardError && (
                     <div className="field-error-text">
                       <AlertCircle size={12} />
@@ -1473,6 +1425,191 @@ export default function CheckoutPage() {
           top: 50%;
           transform: translateY(-50%);
           pointer-events: none;
+          color: #78716c;
+        }
+
+        /* Custom Dropdown Styling (Opens DOWNWARDS, no overflow) */
+        .custom-select-container {
+          position: relative;
+          width: 100%;
+        }
+
+        .custom-select-container.disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          pointer-events: none;
+        }
+
+        .custom-select-trigger {
+          width: 100%;
+          height: 42px;
+          padding: 0 14px;
+          background-color: #f7f6f2;
+          border: 1px solid #e7e5e0;
+          border-radius: 8px;
+          font-size: 13.5px;
+          color: #1c1917;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          cursor: pointer;
+          user-select: none;
+          transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+        }
+
+        .custom-select-trigger:focus,
+        .custom-select-trigger.open {
+          background-color: #ffffff;
+          border-color: #111827;
+          outline: none;
+          box-shadow: 0 0 0 1px #111827;
+        }
+
+        .custom-select-trigger.input-error {
+          border-color: #ef4444 !important;
+          background-color: #fef2f2 !important;
+        }
+
+        .trigger-text {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .trigger-text.placeholder {
+          color: #78716c;
+        }
+
+        .select-chevron {
+          color: #78716c;
+          transition: transform 0.2s ease;
+          flex-shrink: 0;
+          margin-left: 8px;
+        }
+
+        .select-chevron.rotate {
+          transform: rotate(180deg);
+        }
+
+        /* Menu xổ xuống LUÔN Ở PHÍA DƯỚI, max-height 220px chống tràn màn hình */
+        .custom-select-dropdown {
+          position: absolute;
+          top: calc(100% + 4px);
+          left: 0;
+          right: 0;
+          background-color: #ffffff;
+          border: 1px solid #e7e5e0;
+          border-radius: 8px;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+          z-index: 1000;
+          overflow: hidden;
+          animation: fadeInDown 0.15s ease-out;
+        }
+
+        @keyframes fadeInDown {
+          from {
+            opacity: 0;
+            transform: translateY(-4px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .select-search-box {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border-bottom: 1px solid #f0eee6;
+          background-color: #faf9f6;
+        }
+
+        .select-search-box .search-icon {
+          color: #a8a29e;
+          flex-shrink: 0;
+        }
+
+        .select-search-input {
+          width: 100%;
+          border: none;
+          background: transparent;
+          outline: none;
+          font-size: 12.5px;
+          color: #1c1917;
+        }
+
+        .clear-search-btn {
+          background: none;
+          border: none;
+          padding: 2px;
+          color: #a8a29e;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+        }
+
+        .clear-search-btn:hover {
+          color: #111827;
+        }
+
+        .select-options-list {
+          max-height: 220px;
+          overflow-y: auto;
+          padding: 4px;
+        }
+
+        .select-options-list::-webkit-scrollbar {
+          width: 5px;
+        }
+
+        .select-options-list::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 4px;
+        }
+
+        .select-options-list::-webkit-scrollbar-thumb {
+          background: #d1d5db;
+          border-radius: 4px;
+        }
+
+        .select-options-list::-webkit-scrollbar-thumb:hover {
+          background: #9ca3af;
+        }
+
+        .select-option-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 12px;
+          font-size: 13px;
+          color: #374151;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: background-color 0.12s;
+        }
+
+        .select-option-item:hover {
+          background-color: #f5f5f4;
+          color: #111827;
+        }
+
+        .select-option-item.selected {
+          background-color: #f4f3ef;
+          font-weight: 600;
+          color: #111827;
+        }
+
+        .select-option-item .check-icon {
+          color: #111827;
+          flex-shrink: 0;
+        }
+
+        .no-options-found {
+          padding: 14px 12px;
+          text-align: center;
+          font-size: 12.5px;
           color: #78716c;
         }
 
