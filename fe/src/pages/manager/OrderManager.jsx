@@ -3766,7 +3766,27 @@ export default function OrderManager() {
           background: #FFFFFF;
           font-family: 'Inter', sans-serif;
           box-sizing: border-box;
-          overflow-x: hidden;
+        }
+
+        .left-sidebar {
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          align-items: flex-start;
+          padding: 0px;
+          width: 268px;
+          min-width: 268px;
+          height: 100vh;
+          position: sticky;
+          top: 0;
+          left: 0;
+          align-self: stretch;
+          flex-shrink: 0;
+          background: #FFFFFF;
+          border-right: 1px solid #E8E6E1;
+          overflow-y: auto;
+          z-index: 100;
         }
 
         .main-content-area {
