@@ -341,11 +341,14 @@ const applyStatusOverrides = (ordersList) => {
         }
 
         const cleanNote = (ov?.note && !ov.note.includes('Khách hủy đơn:')) ? ov.note : (ord.note && !ord.note.includes('Khách hủy đơn:') ? ord.note : '');
+        const isCodOrd = !ord.payment_method || ord.payment_method === 'COD' || String(ord.payment_method || '').toUpperCase().includes('COD');
         return {
           ...ord,
           order_status: 'RETURNED',
           status: 'RETURNED',
           status_label: bestLabel,
+          payment_status: isCodOrd ? 'PAID' : (ord.payment_status || 'PAID'),
+          payment_label: isCodOrd ? 'COD - Đã thanh toán' : (ord.payment_label || 'COD - Đã thanh toán'),
           refund_decision: ov?.refund_decision || ord.refund_decision || (bestLabel === 'Đã hoàn tiền' ? 'APPROVED' : (bestLabel === 'Từ chối hoàn' ? 'REJECTED' : 'PENDING')),
           refund_reason: ov?.refund_reason || ord.refund_reason,
           refund_bank: ov?.refund_bank || ord.refund_bank,
@@ -405,7 +408,7 @@ const applyStatusOverrides = (ordersList) => {
         const ovRank = STATUS_RANK[ovStatus] || 0;
 
         if (ovRank >= curRank) {
-          const isComp = ov.status === 'COMPLETED' || curStatus === 'COMPLETED';
+          const isCompOrRet = ['COMPLETED', 'RETURNED'].includes(ov.status) || ['COMPLETED', 'RETURNED'].includes(curStatus);
           const isCodOrd = !ord.payment_method || ord.payment_method === 'COD' || String(ord.payment_method || '').toUpperCase().includes('COD');
           return {
             ...ord,
@@ -413,8 +416,8 @@ const applyStatusOverrides = (ordersList) => {
             status: ov.status,
             status_label: ov.status_label_manager || ov.status_label || ord.status_label,
             delivered_date: ov.delivered_date || ord.delivered_date,
-            payment_status: (isCodOrd && isComp) ? 'PAID' : (ov.payment_status || ord.payment_status),
-            payment_label: (isCodOrd && isComp) ? 'COD - Đã thanh toán' : (ov.payment_label || ord.payment_label),
+            payment_status: (isCodOrd && isCompOrRet) ? 'PAID' : (ov.payment_status || ord.payment_status),
+            payment_label: (isCodOrd && isCompOrRet) ? 'COD - Đã thanh toán' : (ov.payment_label || ord.payment_label),
             note: ov.note || ord.note,
           };
         }
@@ -547,7 +550,7 @@ export default function OrderManager() {
             const isPayos = ord.payments?.[0]?.payment_method === 'PAYOS' || String(ord.payment_method || '').includes('PAYOS') || String(ord.payment_method || '').includes('VietQR');
             const isDirect = ord.payments?.[0]?.payment_method === 'DIRECT' || String(ord.payment_method || '').includes('DIRECT');
             const isCod = !isPayos && !isDirect;
-            const isCompleted = s === 'COMPLETED' || ['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(String(ord.order_status || ord.status || '').toUpperCase());
+            const isCompleted = s === 'COMPLETED' || s === 'RETURNED' || ['COMPLETED', 'RETURNED', 'DELIVERED', 'SUCCESS', 'REFUNDED'].includes(String(ord.order_status || ord.status || '').toUpperCase());
             const isCodPaid = isCod && (isCompleted || ord.payments?.[0]?.payment_status === 'SUCCESS');
             const payStatus = (isPayos && ord.payments?.[0]?.payment_status === 'SUCCESS') || isCodPaid ? 'PAID' : (ord.payments?.[0]?.payment_status === 'SUCCESS' ? 'PAID' : 'PENDING');
             let payLabel = isPayos
@@ -702,12 +705,13 @@ export default function OrderManager() {
               const s = String(co.status || co.order_status || 'PENDING').toUpperCase();
               let statusLabel = 'Chờ xác nhận';
               const isComp = ['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s);
+              const isRet = ['RETURNED', 'REFUNDED'].includes(s) || isOrderReturned(s, co.status_label, co.note, co);
               if (isComp) statusLabel = 'Đã giao';
               else if (['SHIPPING', 'IN_TRANSIT', 'DELIVERING'].includes(s)) statusLabel = 'Đang vận chuyển';
               else if (['CANCELLED', 'FAILED'].includes(s)) statusLabel = 'Đã hủy';
-              else if (['RETURNED', 'REFUNDED'].includes(s)) statusLabel = 'Đổi trả';
+              else if (isRet) statusLabel = 'Đổi trả';
 
-              const isPaid = co.payment_status === 'PAID' || (isCod && isComp);
+              const isPaid = co.payment_status === 'PAID' || (isCod && (isComp || isRet));
               let payLabel = isPayos
                 ? 'PayOS - Đã thanh toán'
                 : (isDirect ? 'Thanh toán trực tiếp' : (isPaid ? 'COD - Đã thanh toán' : 'COD - Chưa thanh toán'));
@@ -2693,7 +2697,7 @@ export default function OrderManager() {
                               {ord.payment_method === 'DIRECT' ? (
                                 <span className="payment-pill pill-direct">Thanh toán trực tiếp</span>
                               ) : (ord.payment_method === 'COD' || !ord.payment_method || String(ord.payment_method || '').toUpperCase().includes('COD')) ? (
-                                (cat === 'COMPLETED' || ord.order_status === 'COMPLETED' || ord.status === 'COMPLETED' || ord.payment_status === 'PAID') ? (
+                                (cat === 'COMPLETED' || cat === 'RETURNED' || ord.order_status === 'COMPLETED' || ord.order_status === 'RETURNED' || ord.status === 'COMPLETED' || ord.status === 'RETURNED' || ord.payment_status === 'PAID') ? (
                                   <span className="payment-pill pill-cod-paid">COD - Đã thanh toán</span>
                                 ) : (
                                   <span className="payment-pill pill-cod">COD - Chưa thanh toán</span>
