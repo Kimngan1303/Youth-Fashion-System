@@ -2414,7 +2414,7 @@ export default function OrderManager() {
         phone: newOrderForm.recipient_phone,
         is_vip: false,
         email: newOrderForm.recipient_email,
-        address: newOrderForm.address || 'Giao tại cửa hàng Flagship Boutique'
+        address: newOrderForm.address || 'Giao tại địa chỉ khách hàng'
       },
       items: [
         {
@@ -2617,7 +2617,6 @@ export default function OrderManager() {
                 <option value="ALL">Phương thức thanh toán (Tất cả)</option>
                 <option value="PAYOS">PayOS - Chuyển khoản VietQR</option>
                 <option value="COD">Tiền mặt khi nhận hàng (COD)</option>
-                <option value="DIRECT">Thanh toán trực tiếp tại Flagship</option>
               </select>
 
               <select
@@ -2938,7 +2937,7 @@ export default function OrderManager() {
                     </div>
                     <div className="info-field" style={{ gridColumn: 'span 2' }}>
                       <span className="field-label">Địa chỉ giao:</span>
-                      <span className="field-value">{editingOrder.customer?.address || 'Tại Flagship Store'}</span>
+                      <span className="field-value">{editingOrder.customer?.address || 'Theo địa chỉ nhận hàng'}</span>
                     </div>
                     {realDeliveryNote && (
                       <div className="info-field" style={{ gridColumn: 'span 2' }}>
@@ -3553,7 +3552,6 @@ export default function OrderManager() {
                     >
                       <option value="PAYOS">PayOS - Chuyển khoản VietQR</option>
                       <option value="COD">Tiền mặt khi nhận hàng (COD)</option>
-                      <option value="DIRECT">Thanh toán trực tiếp tại Flagship</option>
                     </select>
                   </div>
 
