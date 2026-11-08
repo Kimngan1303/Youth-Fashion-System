@@ -3,12 +3,18 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   User, Package, Lock, Heart, LogOut, CheckCircle,
   Camera, MapPin, Calendar, Clock, CreditCard, ChevronRight, AlertCircle, Tag, Copy, LayoutDashboard, Eye, EyeOff,
-  Search, Truck, Check, X, Star, RefreshCw, FileText, ShieldCheck, ChevronLeft, ArrowRight, Phone, RotateCcw
+  Search, Truck, Check, X, Star, RefreshCw, FileText, ShieldCheck, ChevronLeft, ArrowRight, Phone, RotateCcw, Bell
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ProductCard from '../components/ProductCard';
 import { voucherService } from '../services/voucherService';
 import { orderService } from '../services/orderService';
+import {
+  getNotificationsForUser,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  clearAllNotifications
+} from '../services/notificationService';
 import { resolveOrderItemImage } from '../utils/productImageUtils';
 
 // Chuẩn hóa ngày hiển thị sang dạng DD/MM/YYYY
@@ -797,6 +803,60 @@ const ProfilePage = () => {
   const [selectedReviewTags, setSelectedReviewTags] = useState(['Chất liệu thượng hạng', 'Đường may tinh xảo']);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewSubmittedAlert, setReviewSubmittedAlert] = useState('');
+
+  // Thông báo đơn hàng thời gian thực cho người dùng
+  const [notifications, setNotifications] = useState([]);
+  const [notifFilter, setNotifFilter] = useState('ALL');
+
+  const refreshCustomerNotifications = useCallback(() => {
+    const list = getNotificationsForUser(user);
+    setNotifications(list);
+  }, [user]);
+
+  useEffect(() => {
+    refreshCustomerNotifications();
+    const handleNotifAdded = () => refreshCustomerNotifications();
+    const handleNotifUpdated = () => refreshCustomerNotifications();
+    const handleStorageChange = (e) => {
+      if (
+        e.key === 'yf_customer_notifications' ||
+        e.key === 'yf_last_notification_event' ||
+        e.key === 'yf_last_status_event' ||
+        (e.key && e.key.startsWith('yf_notifications_'))
+      ) {
+        refreshCustomerNotifications();
+      }
+    };
+
+    window.addEventListener('yf_notification_added', handleNotifAdded);
+    window.addEventListener('yf_notifications_updated', handleNotifUpdated);
+    window.addEventListener('yf_order_status_changed', handleNotifAdded);
+    window.addEventListener('order_status_updated', handleNotifAdded);
+    window.addEventListener('storage', handleStorageChange);
+
+    let bc = null;
+    try {
+      bc = new BroadcastChannel('yf_orders_sync_channel');
+      bc.onmessage = (event) => {
+        if (event.data?.type === 'NEW_NOTIFICATION' || event.data?.status || event.data?.orderId) {
+          refreshCustomerNotifications();
+        }
+      };
+    } catch (e) {}
+
+    return () => {
+      window.removeEventListener('yf_notification_added', handleNotifAdded);
+      window.removeEventListener('yf_notifications_updated', handleNotifUpdated);
+      window.removeEventListener('yf_order_status_changed', handleNotifAdded);
+      window.removeEventListener('order_status_updated', handleNotifAdded);
+      window.removeEventListener('storage', handleStorageChange);
+      if (bc) {
+        try { bc.close(); } catch (e) {}
+      }
+    };
+  }, [refreshCustomerNotifications]);
+
+  const unreadNotifCount = (notifications || []).filter(n => !n.is_read).length;
 
   // Tự động chuyển tab khi URL thay đổi (VD: chuyển từ Đặt hàng thành công sang /profile?tab=orders)
   useEffect(() => {
@@ -2431,6 +2491,26 @@ const ProfilePage = () => {
                 </span>
               </button>
 
+              {/* Menu Item: Thông Báo Trạng Thái Đơn Hàng */}
+              <button
+                className={`nav-item-btn ${activeTab === 'notifications' ? 'active' : ''}`}
+                onClick={() => setActiveTab('notifications')}
+              >
+                <div className="nav-item-left">
+                  <Bell size={18} />
+                  <span>THÔNG BÁO</span>
+                </div>
+                {unreadNotifCount > 0 ? (
+                  <span className="nav-badge-pill gold-badge">
+                    {unreadNotifCount} MỚI
+                  </span>
+                ) : (
+                  <span className="nav-badge-pill grey-badge">
+                    {notifications.length}
+                  </span>
+                )}
+              </button>
+
               {/* Menu Item 3: Voucher & Mã Ưu Đãi */}
               <button
                 className={`nav-item-btn ${activeTab === 'vouchers' ? 'active' : ''}`}
@@ -3135,6 +3215,212 @@ const ProfilePage = () => {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* TAB: Thông Báo Đơn Hàng */}
+            {activeTab === 'notifications' && (
+              <div className="content-inner animate-fade-in">
+                <div className="content-title-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+                  <div>
+                    <h2 className="content-main-heading font-serif">Thông Báo Đơn Hàng</h2>
+                    <p className="content-sub-heading">Cập nhật tiến trình xác nhận, đóng gói, giao hàng và hoàn tiền theo thời gian thực.</p>
+                  </div>
+                  {notifications.length > 0 && (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {unreadNotifCount > 0 && (
+                        <button
+                          type="button"
+                          className="status-filter-btn"
+                          style={{ fontSize: '12px', padding: '6px 14px', borderRadius: '8px', border: '1px solid #D97706', color: '#B45309', background: '#FFFBEB', fontWeight: 600, cursor: 'pointer' }}
+                          onClick={() => {
+                            markAllNotificationsAsRead(user);
+                            refreshCustomerNotifications();
+                          }}
+                        >
+                          <Check size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                          Đã đọc tất cả
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="status-filter-btn"
+                        style={{ fontSize: '12px', padding: '6px 14px', borderRadius: '8px', border: '1px solid #E5E7EB', color: '#6B7280', background: '#FFFFFF', fontWeight: 600, cursor: 'pointer' }}
+                        onClick={() => {
+                          if (window.confirm('Bạn có chắc chắn muốn xóa tất cả thông báo không?')) {
+                            clearAllNotifications(user);
+                            refreshCustomerNotifications();
+                          }
+                        }}
+                      >
+                        <X size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                        Xóa tất cả
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Filter pills */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid #F3F4F6', paddingBottom: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setNotifFilter('ALL')}
+                    style={{
+                      padding: '6px 16px',
+                      borderRadius: '20px',
+                      fontSize: '12.5px',
+                      fontWeight: 600,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: notifFilter === 'ALL' ? '#111827' : '#F3F4F6',
+                      color: notifFilter === 'ALL' ? '#FFFFFF' : '#4B5563',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Tất cả ({notifications.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNotifFilter('UNREAD')}
+                    style={{
+                      padding: '6px 16px',
+                      borderRadius: '20px',
+                      fontSize: '12.5px',
+                      fontWeight: 600,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: notifFilter === 'UNREAD' ? '#B45309' : '#FEF3C7',
+                      color: notifFilter === 'UNREAD' ? '#FFFFFF' : '#B45309',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Chưa đọc ({unreadNotifCount})
+                  </button>
+                </div>
+
+                {/* Notifications list */}
+                {(() => {
+                  const filtered = notifFilter === 'UNREAD'
+                    ? notifications.filter(n => !n.is_read)
+                    : notifications;
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="empty-order-state" style={{ padding: '60px 20px', textAlign: 'center', background: '#FAFAF9', borderRadius: '16px', border: '1px dashed #E7E5E4' }}>
+                        <Bell size={44} style={{ color: '#D6D3D1', margin: '0 auto 16px', strokeWidth: 1.5 }} />
+                        <h4 style={{ fontSize: '16px', fontWeight: 600, color: '#1C1917', marginBottom: '6px' }}>
+                          {notifFilter === 'UNREAD' ? 'Không có thông báo chưa đọc' : 'Chưa có thông báo nào'}
+                        </h4>
+                        <p style={{ fontSize: '13px', color: '#78716C', maxWidth: '420px', margin: '0 auto', lineHeight: '20px' }}>
+                          Khi quản lý cửa hàng thay đổi trạng thái đơn hàng (xác nhận, vận chuyển, giao hàng, hủy đơn hoặc đổi trả), thông báo mới sẽ tự động hiển thị tại đây.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      {filtered.map((item, idx) => {
+                        const isUnread = !item.is_read;
+                        return (
+                          <div
+                            key={item.id || idx}
+                            style={{
+                              background: isUnread ? '#FFFDF5' : '#FFFFFF',
+                              border: isUnread ? '1.5px solid #FDE68A' : '1px solid #E5E7EB',
+                              borderRadius: '12px',
+                              padding: '18px 20px',
+                              boxShadow: isUnread ? '0 4px 12px rgba(245, 158, 11, 0.08)' : '0 2px 4px rgba(0, 0, 0, 0.02)',
+                              position: 'relative',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                {item.badge && (
+                                  <span style={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    padding: '3px 10px',
+                                    borderRadius: '6px',
+                                    backgroundColor: item.badgeBg || '#F3F4F6',
+                                    color: item.badgeColor || '#374151',
+                                    letterSpacing: '0.4px',
+                                  }}>
+                                    {item.badge}
+                                  </span>
+                                )}
+                                {item.order_number && (
+                                  <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#6B7280' }}>
+                                    Mã đơn: #{item.order_number}
+                                  </span>
+                                )}
+                              </div>
+                              <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
+                                {item.time}
+                              </span>
+                            </div>
+
+                            <h4 style={{ fontSize: '15px', fontWeight: isUnread ? 700 : 600, color: '#111827', marginBottom: '6px' }}>
+                              {item.title}
+                            </h4>
+                            <p style={{ fontSize: '13.5px', color: '#4B5563', lineHeight: '21px', margin: '0 0 14px 0' }}>
+                              {item.message}
+                            </p>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px', paddingTop: '10px', borderTop: '1px solid #F3F4F6' }}>
+                              {isUnread && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    markNotificationAsRead(item.id, user);
+                                    refreshCustomerNotifications();
+                                  }}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#6B7280',
+                                    fontSize: '12px',
+                                    cursor: 'pointer',
+                                    textDecoration: 'underline'
+                                  }}
+                                >
+                                  Đánh dấu đã đọc
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  markNotificationAsRead(item.id, user);
+                                  refreshCustomerNotifications();
+                                  setActiveTab('orders');
+                                  if (item.order_digits) {
+                                    setOrderSearchQuery(item.order_digits);
+                                  }
+                                }}
+                                style={{
+                                  background: '#111827',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  padding: '7px 16px',
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px'
+                                }}
+                              >
+                                Xem chi tiết đơn hàng &rarr;
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 

@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import ManagerSidebar from '../../components/ManagerSidebar';
 import ManagerHeader from '../../components/ManagerHeader';
 import { orderService } from '../../services/orderService';
+import { sendOrderStatusNotification } from '../../services/notificationService';
 import { resolveOrderItemImage } from '../../utils/productImageUtils';
 import {
   ShoppingBag,
@@ -1295,6 +1296,13 @@ export default function OrderManager() {
     window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: statusPayload }));
     window.dispatchEvent(new Event('order_status_updated'));
 
+    // Gửi thông báo đến tài khoản người mua đơn hàng
+    try {
+      sendOrderStatusNotification(targetOrder, newStatus, { newStatusLabel });
+    } catch (err) {
+      console.error('Lỗi gửi thông báo cho người mua:', err);
+    }
+
     showSuccess(`Đã chuyển trạng thái đơn hàng #${tNum || tId} sang "${newStatusLabel}" thành công!`);
   };
 
@@ -1420,6 +1428,18 @@ export default function OrderManager() {
 
     window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: statusPayload }));
     window.dispatchEvent(new Event('order_status_updated'));
+
+    // Gửi thông báo hủy đơn đến tài khoản người mua đơn hàng
+    try {
+      sendOrderStatusNotification(targetOrder, 'CANCELLED', {
+        reason,
+        cancelledBy,
+        isShopCancelled: cancelledBy === 'SHOP',
+        newStatusLabel: 'Đã hủy'
+      });
+    } catch (err) {
+      console.error('Lỗi gửi thông báo hủy cho người mua:', err);
+    }
 
     // Cập nhật lại editingOrder nếu đang mở
     setEditingOrder(prev => {
@@ -2003,6 +2023,17 @@ export default function OrderManager() {
     window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: statusPayload }));
     window.dispatchEvent(new Event('order_status_updated'));
 
+    // Gửi thông báo hoàn tiền đến tài khoản người mua đơn hàng
+    try {
+      sendOrderStatusNotification(targetOrder, 'APPROVED', {
+        newStatusLabel: 'Đã hoàn tiền',
+        refundBank: bankInfo,
+        refundAmount: refundAmt
+      });
+    } catch (err) {
+      console.error('Lỗi gửi thông báo hoàn tiền cho người mua:', err);
+    }
+
     // Cập nhật lại editingOrder & Đóng modal nếu đang mở
     setEditingOrder(prev => prev ? {
       ...prev,
@@ -2126,6 +2157,16 @@ export default function OrderManager() {
     window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: statusPayload }));
     window.dispatchEvent(new Event('order_status_updated'));
 
+    // Gửi thông báo từ chối hoàn đến tài khoản người mua đơn hàng
+    try {
+      sendOrderStatusNotification(targetOrder, 'REJECTED', {
+        newStatusLabel: 'Từ chối hoàn',
+        rejectReason
+      });
+    } catch (err) {
+      console.error('Lỗi gửi thông báo từ chối hoàn cho người mua:', err);
+    }
+
     // Cập nhật lại editingOrder
     setEditingOrder(prev => prev ? {
       ...prev,
@@ -2244,6 +2285,16 @@ export default function OrderManager() {
 
     window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: statusPayload }));
     window.dispatchEvent(new Event('order_status_updated'));
+
+    // Gửi thông báo từ chối hoàn đến tài khoản người mua đơn hàng
+    try {
+      sendOrderStatusNotification(targetOrder, 'REJECTED', {
+        newStatusLabel: 'Từ chối hoàn',
+        rejectReason
+      });
+    } catch (err) {
+      console.error('Lỗi gửi thông báo từ chối hoàn cho người mua:', err);
+    }
 
     // Cập nhật lại editingOrder hiện tại
     setEditingOrder(prev => prev ? {

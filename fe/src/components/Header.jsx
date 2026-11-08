@@ -1,9 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, Heart, ShoppingBag, User, Bell, MessageSquare, Globe, Sun, Star } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirmModal } from '../context/ConfirmModalContext';
+import {
+  getNotificationsForUser,
+  markAllNotificationsAsRead,
+  markNotificationAsRead
+} from '../services/notificationService';
 
 const Header = ({ onOpenAISearch }) => {
   const location = useLocation();
@@ -28,6 +33,60 @@ const Header = ({ onOpenAISearch }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const userMenuRef = useRef(null);
   const notificationsRef = useRef(null);
+
+  // Tải và đồng bộ thông báo thời gian thực cho người dùng
+  const refreshNotifications = useCallback(() => {
+    const list = getNotificationsForUser(user);
+    setNotifications(list);
+  }, [user]);
+
+  useEffect(() => {
+    refreshNotifications();
+
+    const handleNotifAdded = () => refreshNotifications();
+    const handleNotifUpdated = () => refreshNotifications();
+    const handleStorageChange = (e) => {
+      if (
+        e.key === 'yf_customer_notifications' ||
+        e.key === 'yf_last_notification_event' ||
+        e.key === 'yf_last_status_event' ||
+        (e.key && e.key.startsWith('yf_notifications_'))
+      ) {
+        refreshNotifications();
+      }
+    };
+
+    window.addEventListener('yf_notification_added', handleNotifAdded);
+    window.addEventListener('yf_notifications_updated', handleNotifUpdated);
+    window.addEventListener('yf_order_status_changed', handleNotifAdded);
+    window.addEventListener('order_status_updated', handleNotifAdded);
+    window.addEventListener('storage', handleStorageChange);
+
+    let bc = null;
+    try {
+      bc = new BroadcastChannel('yf_orders_sync_channel');
+      bc.onmessage = (event) => {
+        if (event.data?.type === 'NEW_NOTIFICATION' || event.data?.status || event.data?.orderId) {
+          refreshNotifications();
+        }
+      };
+    } catch (e) {}
+
+    return () => {
+      window.removeEventListener('yf_notification_added', handleNotifAdded);
+      window.removeEventListener('yf_notifications_updated', handleNotifUpdated);
+      window.removeEventListener('yf_order_status_changed', handleNotifAdded);
+      window.removeEventListener('order_status_updated', handleNotifAdded);
+      window.removeEventListener('storage', handleStorageChange);
+      if (bc) {
+        try { bc.close(); } catch (e) {}
+      }
+    };
+  }, [refreshNotifications]);
+
+  const unreadCount = useMemo(() => {
+    return (notifications || []).filter(item => !item.is_read).length;
+  }, [notifications]);
 
   // Đóng dropdown khi click ra ngoài vùng menu tài khoản hoặc thông báo
   useEffect(() => {
@@ -183,43 +242,163 @@ const Header = ({ onOpenAISearch }) => {
               onClick={() => setShowNotifications((prev) => !prev)}
             >
               <Bell size={18} />
-              {notifications && notifications.length > 0 && (
-                <span className="badge">{notifications.length}</span>
+              {unreadCount > 0 && (
+                <span className="badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
               )}
             </button>
 
             {showNotifications && (
               <div className="notifications-dropdown animate-fade-in">
                 <div className="notifications-header">
-                  <span>THÔNG BÁO</span>
-                  {notifications && notifications.length > 0 && (
-                    <span className="notifications-count">{notifications.length} mới</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>THÔNG BÁO</span>
+                    {unreadCount > 0 && (
+                      <span className="notifications-count" style={{
+                        background: '#FEF3C7',
+                        color: '#B45309',
+                        padding: '2px 7px',
+                        borderRadius: '10px',
+                        fontSize: '10px',
+                        fontWeight: 700
+                      }}>
+                        {unreadCount} mới
+                      </span>
+                    )}
+                  </div>
+                  {unreadCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markAllNotificationsAsRead(user);
+                        refreshNotifications();
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#D97706',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        padding: '2px 4px',
+                        borderRadius: '4px',
+                      }}
+                      title="Đánh dấu tất cả đã đọc"
+                    >
+                      Đã đọc tất cả
+                    </button>
                   )}
                 </div>
-                <div className="notification-list">
+
+                <div className="notification-list" style={{ maxHeight: '360px', overflowY: 'auto' }}>
                   {notifications && notifications.length > 0 ? (
-                    notifications.map((item, idx) => (
-                      <div key={idx} className="notification-card">
-                        <span className="notif-title">{item.title}</span>
-                        <span className="notif-desc">{item.message}</span>
-                        <span className="notif-time">{item.time}</span>
-                      </div>
-                    ))
+                    notifications.map((item, idx) => {
+                      const isUnread = !item.is_read;
+                      return (
+                        <div
+                          key={item.id || idx}
+                          className={`notification-card ${isUnread ? 'is-unread' : ''}`}
+                          onClick={() => {
+                            markNotificationAsRead(item.id, user);
+                            refreshNotifications();
+                            setShowNotifications(false);
+                            if (item.link) {
+                              navigate(item.link);
+                            } else {
+                              navigate('/profile?tab=orders');
+                            }
+                          }}
+                          style={{
+                            cursor: 'pointer',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            marginBottom: '6px',
+                            background: isUnread ? '#FFFBEB' : '#FFFFFF',
+                            border: isUnread ? '1px solid #FDE68A' : '1px solid #F5F4F0',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#D97706';
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = isUnread ? '#FDE68A' : '#F5F4F0';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '5px' }}>
+                            {item.badge && (
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                padding: '2px 7px',
+                                borderRadius: '4px',
+                                backgroundColor: item.badgeBg || '#F3F4F6',
+                                color: item.badgeColor || '#4B5563',
+                                letterSpacing: '0.3px',
+                                display: 'inline-block'
+                              }}>
+                                {item.badge}
+                              </span>
+                            )}
+                            <span className="notif-time" style={{ fontSize: '11px', color: '#9CA3AF', marginLeft: 'auto' }}>
+                              {item.time}
+                            </span>
+                          </div>
+                          <div className="notif-title" style={{ fontSize: '12.5px', fontWeight: isUnread ? 700 : 600, color: '#1C1917', marginBottom: '3px', lineHeight: '17px' }}>
+                            {item.title}
+                          </div>
+                          <div className="notif-desc" style={{ fontSize: '11.5px', color: '#4B5563', lineHeight: '16px' }}>
+                            {item.message}
+                          </div>
+                        </div>
+                      );
+                    })
                   ) : (
                     <div
                       className="notification-empty"
                       style={{
-                        padding: '18px 8px',
+                        padding: '24px 8px',
                         textAlign: 'center',
                         color: '#78716C',
                         fontSize: '12.5px',
                         lineHeight: '18px',
                       }}
                     >
+                      <Bell size={24} style={{ color: '#D6D3D1', margin: '0 auto 8px', display: 'block' }} />
                       Hiện tại quý khách chưa có thông báo mới.
                     </div>
                   )}
                 </div>
+
+                {notifications && notifications.length > 0 && (
+                  <div style={{
+                    marginTop: '8px',
+                    paddingTop: '8px',
+                    borderTop: '1px solid #F5F4F0',
+                    textAlign: 'center'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowNotifications(false);
+                        navigate('/profile?tab=notifications');
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#B45309',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        padding: '4px 8px',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Xem tất cả trong Trung tâm thông báo &rarr;
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -630,7 +809,8 @@ const Header = ({ onOpenAISearch }) => {
           position: absolute;
           top: calc(100% + 10px);
           right: -20px;
-          width: 300px;
+          width: 360px;
+          max-width: 90vw;
           background: #FFFFFF;
           border: 1px solid #ECE7E1;
           border-radius: 12px;
