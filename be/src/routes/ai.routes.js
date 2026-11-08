@@ -4,6 +4,8 @@ import {
   searchByImageController,
   searchHybridController,
   getRecommendationsController,
+  getSearchHistoryController,
+  clearSearchHistoryController,
   getZeroResultsAnalyticsController,
 } from '../controllers/ai.controller.js';
 import { uploadAiImage } from '../middlewares/upload.middleware.js';
@@ -33,10 +35,14 @@ router.post(
   searchHybridController
 );
 
-// 4. Gợi ý sản phẩm thông minh (AI Recommendations)
+// 4. Lịch sử tìm kiếm người dùng (Get & Clear)
+router.get('/search/history', optionalAuthenticateToken, getSearchHistoryController);
+router.delete('/search/history', optionalAuthenticateToken, clearSearchHistoryController);
+
+// 5. Gợi ý sản phẩm thông minh (AI Recommendations)
 router.get('/recommendations', optionalAuthenticateToken, getRecommendationsController);
 
-// 5. Thống kê từ khóa 0 kết quả (Dành cho Quản lý / Admin)
+// 6. Thống kê từ khóa 0 kết quả (Dành cho Quản lý / Admin)
 router.get(
   '/analytics/zero-results',
   authenticateToken,

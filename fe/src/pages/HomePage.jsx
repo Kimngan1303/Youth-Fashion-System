@@ -153,9 +153,9 @@ const HomePage = ({ onOpenAISearch }) => {
                 <Link to="/products" className="btn-black">
                   KHÁM PHÁ DANH MỤC &rarr;
                 </Link>
-                <button className="btn-outline-search" onClick={onOpenAISearch}>
+                <Link to="/search" className="btn-outline-search">
                   <Search size={15} /> TÌM KIẾM
-                </button>
+                </Link>
               </div>
             </div>
           </div>

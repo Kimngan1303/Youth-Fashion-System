@@ -1,8 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Search, Filter, Grid, ChevronLeft, ChevronRight, SlidersHorizontal, Tag, Folder, ShoppingBag, ChevronDown, Check } from 'lucide-react';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import {
+  Search,
+  Filter,
+  Grid,
+  ChevronLeft,
+  ChevronRight,
+  SlidersHorizontal,
+  Tag,
+  Folder,
+  ShoppingBag,
+  ChevronDown,
+  Check,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import ProductCard from '../../components/ProductCard';
 import { productService } from '../../services/productService';
+import { aiService } from '../../services/aiService';
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
@@ -14,6 +29,7 @@ const PRICE_RANGES = [
 ];
 
 export default function ProductListPage({ onOpenAISearch }) {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [products, setProducts] = useState([]);
@@ -21,6 +37,18 @@ export default function ProductListPage({ onOpenAISearch }) {
   const [brands, setBrands] = useState([]);
   const [metaTotal, setMetaTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Search & AI Mode state
+  const initialSearch = searchParams.get('search') || '';
+  const initialAIMode =
+    searchParams.get('ai') === 'true' ||
+    searchParams.get('ai') === '1' ||
+    (!searchParams.has('ai') && initialSearch.length > 0);
+
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [isAIMode, setIsAIMode] = useState(initialAIMode);
+  const [suggestedQuery, setSuggestedQuery] = useState(null);
+  const [wasCorrected, setWasCorrected] = useState(false);
 
   // Pagination state
   const [page, setPage] = useState(parseInt(searchParams.get('page') || '1', 10));
@@ -52,6 +80,17 @@ export default function ProductListPage({ onOpenAISearch }) {
     price_range: searchParams.get('price_range') || '',
   });
 
+  // Đồng bộ URL searchParams với component state
+  useEffect(() => {
+    const s = searchParams.get('search') || '';
+    const ai =
+      searchParams.get('ai') === 'true' ||
+      searchParams.get('ai') === '1' ||
+      (!searchParams.has('ai') && s.length > 0);
+    setSearchQuery(s);
+    setIsAIMode(ai);
+  }, [searchParams]);
+
   // Load Meta (Categories & Brands)
   useEffect(() => {
     const fetchMeta = async () => {
@@ -69,36 +108,61 @@ export default function ProductListPage({ onOpenAISearch }) {
     fetchMeta();
   }, []);
 
-  // Fetch Products based on page & applied filters & sort
+  // Fetch Products based on page & applied filters & sort & AI search
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const currentPriceRange = PRICE_RANGES.find((r) => r.id === appliedFilters.price_range);
+      const activeSearch = (searchParams.get('search') || '').trim();
+      const isAIActive = isAIMode && activeSearch.length > 0;
 
-      const res = await productService.getProducts({
-        page,
-        limit: 12, // 12 sản phẩm / trang
-        category_id: appliedFilters.category_id || undefined,
-        brand_ids: appliedFilters.brand_ids.length > 0 ? appliedFilters.brand_ids.join(',') : undefined,
-        size: appliedFilters.size || undefined,
-        min_price: currentPriceRange ? currentPriceRange.min : undefined,
-        max_price: currentPriceRange && currentPriceRange.max ? currentPriceRange.max : undefined,
-        sort: sortBy || undefined,
-      });
+      if (isAIActive) {
+        // 1. Chế độ Tìm kiếm Thông minh bằng AI (Vietnamese Hybrid CLIP Text Search)
+        const res = await aiService.searchByText(activeSearch, 24);
+        const items = res.data?.products || [];
 
-      const responseData = res.data || res;
-      const items = responseData.products || [];
-      const pagination = responseData.pagination || { totalPages: 1, total: items.length };
+        setProducts(items);
+        setTotalPages(1);
+        setTotalItems(res.data?.total || items.length);
 
-      setProducts(items);
-      setTotalPages(pagination.totalPages || 1);
-      setTotalItems(pagination.total || items.length);
+        if (res.data?.was_corrected && res.data?.suggested_query) {
+          setSuggestedQuery(res.data.suggested_query);
+          setWasCorrected(true);
+        } else {
+          setSuggestedQuery(null);
+          setWasCorrected(false);
+        }
+      } else {
+        // 2. Chế độ Truy vấn Catalog thông thường với Filter SQL & Phân trang
+        const currentPriceRange = PRICE_RANGES.find((r) => r.id === appliedFilters.price_range);
+
+        const res = await productService.getProducts({
+          page,
+          limit: 12, // 12 sản phẩm / trang
+          search: activeSearch || undefined,
+          category_id: appliedFilters.category_id || undefined,
+          brand_ids: appliedFilters.brand_ids.length > 0 ? appliedFilters.brand_ids.join(',') : undefined,
+          size: appliedFilters.size || undefined,
+          min_price: currentPriceRange ? currentPriceRange.min : undefined,
+          max_price: currentPriceRange && currentPriceRange.max ? currentPriceRange.max : undefined,
+          sort: sortBy || undefined,
+        });
+
+        const responseData = res.data || res;
+        const items = responseData.products || [];
+        const pagination = responseData.pagination || { totalPages: 1, total: items.length };
+
+        setProducts(items);
+        setTotalPages(pagination.totalPages || 1);
+        setTotalItems(pagination.total || items.length);
+        setSuggestedQuery(null);
+        setWasCorrected(false);
+      }
     } catch (err) {
       console.error('Lỗi khi tải danh sách sản phẩm:', err);
     } finally {
       setLoading(false);
     }
-  }, [page, appliedFilters, sortBy]);
+  }, [page, appliedFilters, sortBy, searchParams, isAIMode]);
 
   useEffect(() => {
     fetchProducts();
@@ -128,6 +192,56 @@ export default function ProductListPage({ onOpenAISearch }) {
     setSelectedPriceRange((prev) => (prev === rangeId ? '' : rangeId));
   };
 
+  // Search actions
+  const handleSearchSubmit = (e) => {
+    if (e) e.preventDefault();
+    const newParams = new URLSearchParams(searchParams);
+    if (searchQuery.trim()) {
+      newParams.set('search', searchQuery.trim());
+      newParams.set('ai', isAIMode ? 'true' : 'false');
+    } else {
+      newParams.delete('search');
+      newParams.delete('ai');
+    }
+    newParams.set('page', '1');
+    setSearchParams(newParams);
+    setPage(1);
+  };
+
+  const handleToggleAIMode = () => {
+    const nextMode = !isAIMode;
+    setIsAIMode(nextMode);
+    if (searchQuery.trim()) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('ai', nextMode ? 'true' : 'false');
+      newParams.set('page', '1');
+      setSearchParams(newParams);
+      setPage(1);
+    }
+  };
+
+  const handleApplySuggestion = (suggestion) => {
+    setSearchQuery(suggestion);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('search', suggestion);
+    newParams.set('ai', 'true');
+    newParams.set('page', '1');
+    setSearchParams(newParams);
+    setPage(1);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('search');
+    newParams.delete('ai');
+    newParams.set('page', '1');
+    setSearchParams(newParams);
+    setPage(1);
+    setSuggestedQuery(null);
+    setWasCorrected(false);
+  };
+
   // Explicitly apply filters only when user clicks "ÁP DỤNG BỘ LỌC"
   const handleApplyFilters = () => {
     setAppliedFilters({
@@ -152,7 +266,7 @@ export default function ProductListPage({ onOpenAISearch }) {
       price_range: '',
     });
     setSortBy('newest');
-    setPage(1);
+    handleClearSearch();
   };
 
   return (
@@ -298,10 +412,23 @@ export default function ProductListPage({ onOpenAISearch }) {
 
         {/* Right Content Area */}
         <main className="catalog-content">
-          {/* Top Bar Status & Sort */}
+          {/* Top Bar Status & Sort & AI Search */}
           <div className="catalog-topbar">
             <div className="result-count">
               Hiển thị <strong>{products.length}</strong> trên tổng số <strong>{totalItems}</strong> sản phẩm
+              {searchParams.get('search') && (
+                <span className="active-tag-pill search-pill">
+                  Tìm kiếm: "{searchParams.get('search')}"
+                  <button type="button" onClick={handleClearSearch} title="Bỏ lọc tìm kiếm">
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
+              {searchParams.get('search') && isAIMode && (
+                <span className="ai-active-pill">
+                  <Sparkles size={12} /> AI Semantic Hybrid
+                </span>
+              )}
               {appliedFilters.category_id && categories.find((c) => String(c.category_id) === String(appliedFilters.category_id)) && (
                 <span className="active-tag-pill">
                   Danh mục: {categories.find((c) => String(c.category_id) === String(appliedFilters.category_id))?.category_name}
@@ -314,25 +441,37 @@ export default function ProductListPage({ onOpenAISearch }) {
               )}
             </div>
 
-            <div className="sort-group">
-              <span className="sort-label">SẮP XẾP:</span>
-              <div className="sort-select-wrapper">
-                <select
-                  id="catalog-sort-select"
-                  className="sort-select"
-                  value={sortBy}
-                  onChange={(e) => {
-                    setSortBy(e.target.value);
-                    setPage(1);
-                  }}
-                >
-                  <option value="newest">Mới nhất</option>
-                  <option value="oldest">Cũ nhất</option>
-                  <option value="name_asc">Tên: A - Z</option>
-                  <option value="name_desc">Tên: Z - A</option>
-                </select>
-                <ChevronDown size={14} className="sort-caret" />
+            <div className="catalog-topbar-right">
+              <div className="sort-group">
+                <span className="sort-label">SẮP XẾP:</span>
+                <div className="sort-select-wrapper">
+                  <select
+                    id="catalog-sort-select"
+                    className="sort-select"
+                    value={sortBy}
+                    onChange={(e) => {
+                      setSortBy(e.target.value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="newest">Mới nhất</option>
+                    <option value="oldest">Cũ nhất</option>
+                    <option value="name_asc">Tên: A - Z</option>
+                    <option value="name_desc">Tên: Z - A</option>
+                  </select>
+                  <ChevronDown size={14} className="sort-caret" />
+                </div>
               </div>
+
+              <button
+                type="button"
+                className="btn-nav-ai-search"
+                onClick={() => navigate('/search')}
+                title="Chuyển đến trang tìm kiếm thông minh AI"
+              >
+                <Sparkles size={14} className="sparkle-gold-icon" />
+                <span>Tìm kiếm AI</span>
+              </button>
             </div>
           </div>
 
@@ -354,13 +493,22 @@ export default function ProductListPage({ onOpenAISearch }) {
           ) : (
             <div className="products-grid-4">
               {products.map((p) => {
-                const primaryImg = p.images?.find((i) => i.is_primary)?.image_url || p.images?.[0]?.image_url || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800';
-                const priceVal = p.variants?.[0]?.price ? Number(p.variants[0].price) : 0;
+                const primaryImg =
+                  p.images?.find((i) => i.is_primary)?.image_url ||
+                  p.images?.[0]?.image_url ||
+                  p.image_url ||
+                  'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800';
+                const priceVal = p.variants?.[0]?.price
+                  ? Number(p.variants[0].price)
+                  : (p.price ? Number(p.price) : 0);
+                const tagLabel = p.similarity_percent
+                  ? `${p.similarity_percent} Khớp`
+                  : (p.is_featured ? 'NỔI BẬT' : 'MỚI');
                 const formattedProduct = {
                   id: p.product_id,
                   name: p.product_name,
                   price: priceVal > 0 ? priceVal.toLocaleString('vi-VN') + 'đ' : 'Liên hệ',
-                  tag: 'MỚI',
+                  tag: tagLabel,
                   image: primaryImg,
                 };
                 return <ProductCard key={p.product_id} product={formattedProduct} />;
@@ -704,6 +852,74 @@ export default function ProductListPage({ onOpenAISearch }) {
           color: #111827;
         }
 
+        .catalog-topbar-right {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .btn-nav-ai-search {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          background-color: #111827;
+          color: #ffffff;
+          border: 1px solid #111827;
+          border-radius: 6px;
+          padding: 8px 16px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          letter-spacing: 0.3px;
+          white-space: nowrap;
+        }
+
+        .btn-nav-ai-search:hover {
+          background-color: #000000;
+          border-color: #000000;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+          transform: translateY(-1px);
+        }
+
+        .sparkle-gold-icon {
+          color: #fbbf24;
+        }
+
+        .search-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .search-pill button {
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 0;
+          display: flex;
+          align-items: center;
+          color: #6b7280;
+        }
+
+        .search-pill button:hover {
+          color: #111827;
+        }
+
+        .ai-active-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          background: #ede9fe;
+          border: 1px solid #ddd6fe;
+          color: #6d28d9;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 600;
+          margin-left: 6px;
+        }
+
         .catalog-topbar {
           display: flex;
           align-items: center;
@@ -907,6 +1123,15 @@ export default function ProductListPage({ onOpenAISearch }) {
         }
 
         @media (max-width: 640px) {
+          .catalog-topbar {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+          }
+          .catalog-topbar-right {
+            width: 100%;
+            justify-content: space-between;
+          }
           .products-grid-4 {
             grid-template-columns: repeat(2, 1fr);
           }

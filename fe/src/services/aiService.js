@@ -60,11 +60,37 @@ export const aiService = {
   },
 
   /**
-   * Lấy danh sách sản phẩm gợi ý thông minh cho trang chủ
+   * Lấy danh sách sản phẩm gợi ý thông minh dựa trên lịch sử tìm kiếm & catalog
    * @param {number} limit - Số lượng sản phẩm
+   * @param {string[]} keywords - Danh sách từ khóa (dành cho guest từ localStorage)
    */
-  getRecommendations: async (limit = 8) => {
-    const response = await axiosClient.get(`/ai/recommendations?limit=${limit}`);
+  getRecommendations: async (limit = 8, keywords = []) => {
+    let url = `/ai/recommendations?limit=${limit}`;
+    if (keywords && keywords.length > 0) {
+      const encoded = keywords.map((k) => encodeURIComponent(k)).join(',');
+      url += `&keywords=${encoded}`;
+    }
+    const response = await axiosClient.get(url);
+    return response.data;
+  },
+
+  /**
+   * Lấy lịch sử tìm kiếm người dùng (đã đăng nhập)
+   * @param {number} limit - Số lượng từ khóa gần nhất
+   */
+  getSearchHistory: async (limit = 15) => {
+    const response = await axiosClient.get(`/ai/search/history?limit=${limit}`);
+    return response.data;
+  },
+
+  /**
+   * Xóa toàn bộ hoặc 1 từ khóa lịch sử tìm kiếm
+   * @param {string|null} query - Từ khóa cần xóa (null để xóa tất cả)
+   */
+  clearSearchHistory: async (query = null) => {
+    const response = await axiosClient.delete('/ai/search/history', {
+      data: { query },
+    });
     return response.data;
   },
 };

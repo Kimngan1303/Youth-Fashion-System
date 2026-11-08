@@ -3,6 +3,8 @@ import {
   searchByImageService,
   searchHybridService,
   getPersonalizedRecommendationsService,
+  getUserSearchHistoryService,
+  clearUserSearchHistoryService,
   getZeroResultAnalyticsService,
 } from '../services/ai/aiSearch.service.js';
 import { BaseResponse } from '../utils/baseResponse.js';
@@ -72,8 +74,12 @@ export async function searchHybridController(req, res, next) {
       topK: top_k ? parseInt(top_k, 10) : 10,
       minThreshold: threshold ? parseFloat(threshold) : 0.10,
       customerId,
-      imgWeight: image_weight ? parseFloat(image_weight) : 0.7,
-      txtWeight: text_weight ? parseFloat(text_weight) : 0.3,
+      imgWeight: image_weight !== undefined && image_weight !== null && !isNaN(parseFloat(image_weight))
+        ? parseFloat(image_weight)
+        : 0.7,
+      txtWeight: text_weight !== undefined && text_weight !== null && !isNaN(parseFloat(text_weight))
+        ? parseFloat(text_weight)
+        : 0.3,
     });
 
     return BaseResponse.success(res, 'Tìm kiếm kết hợp thành công', data);
@@ -84,19 +90,62 @@ export async function searchHybridController(req, res, next) {
 
 /**
  * GET /api/ai/recommendations
- * Gợi ý sản phẩm cho Homepage Feed
+ * Gợi ý sản phẩm thông minh dựa trên lịch sử tìm kiếm & catalog
  */
 export async function getRecommendationsController(req, res, next) {
   try {
     const customerId = req.user?.id || null;
     const limit = req.query.limit ? parseInt(req.query.limit, 10) : 8;
+    const clientKeywords = req.query.keywords
+      ? req.query.keywords
+          .split(',')
+          .map((k) => decodeURIComponent(k.trim()))
+          .filter(Boolean)
+      : [];
 
     const data = await getPersonalizedRecommendationsService({
       customerId,
+      clientKeywords,
       limit,
     });
 
     return BaseResponse.success(res, 'Lấy danh sách gợi ý thành công', data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/ai/search/history
+ * Lấy lịch sử tìm kiếm người dùng (đã đăng nhập)
+ */
+export async function getSearchHistoryController(req, res, next) {
+  try {
+    const customerId = req.user?.id || null;
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 15;
+
+    const data = await getUserSearchHistoryService({ customerId, limit });
+    return BaseResponse.success(res, 'Lấy lịch sử tìm kiếm thành công', data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * DELETE /api/ai/search/history
+ * Xóa toàn bộ hoặc 1 từ khóa lịch sử tìm kiếm
+ */
+export async function clearSearchHistoryController(req, res, next) {
+  try {
+    const customerId = req.user?.id || null;
+    const { query } = req.body || {};
+
+    if (!customerId) {
+      return BaseResponse.success(res, 'Đã xóa lịch sử guest', { deleted: true, count: 0 });
+    }
+
+    const data = await clearUserSearchHistoryService({ customerId, queryText: query });
+    return BaseResponse.success(res, 'Xóa lịch sử tìm kiếm thành công', data);
   } catch (err) {
     next(err);
   }
