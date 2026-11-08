@@ -8,6 +8,7 @@ import connectDB from './config/connectDB.js';
 import routes from './routes/index.js';
 import { autoCancelExpiredOrders } from './config/paymentExpiration.job.js';
 import { vectorSearchService } from './services/ai/vectorSearch.service.js';
+import { fashionClipService } from './services/ai/fashionClip.service.js';
 
 dotenv.config();
 
@@ -51,7 +52,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check endpoint với trạng thái CSDL Prisma
+// Health check endpoint với trạng thái CSDL Prisma và AI Search
 app.get('/healthz', async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -59,6 +60,12 @@ app.get('/healthz', async (req, res) => {
       success: true,
       message: 'Server and Database are healthy',
       databaseState: 'Connected',
+      aiState: {
+        modelReady: fashionClipService.isReady,
+        modelLoading: fashionClipService.isLoading,
+        vectorIndexLoaded: vectorSearchService.isLoaded,
+        indexedVectors: vectorSearchService.vectorsCache.length,
+      },
     });
   } catch (err) {
     return res.status(500).json({
@@ -87,13 +94,25 @@ app.use((err, req, res, next) => {
 const startServer = async () => {
   await connectDB();
 
-  // Nạp 48 vector sản phẩm vào bộ nhớ RAM cho AI Search
+  // 1. Nạp 48 vector sản phẩm vào bộ nhớ RAM cho AI Search
   vectorSearchService.loadVectors();
 
+  // 2. Chạy cronjob tự động hủy đơn hết hạn
   autoCancelExpiredOrders();
 
+  // 3. Khởi động HTTP Server lắng nghe request
   server.listen(port, () => {
     console.log(`Server is running on port ${port}`);
+
+    // 4. Pre-warming mô hình CLIP ngay khi server bật để loại bỏ Cold-start
+    fashionClipService
+      .init()
+      .then(() => {
+        console.log('🚀 [AI Engine] Pre-warming hoàn tất: AI Search đã sẵn sàng phục vụ với độ trễ tối thiểu!');
+      })
+      .catch((err) => {
+        console.warn('⚠️ [AI Engine] Pre-warming thất bại (AI Search sẽ tự động thử lại khi có request):', err.message);
+      });
   });
 };
 

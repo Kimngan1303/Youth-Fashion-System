@@ -1416,7 +1416,7 @@ async function main() {
     "brand_name": "Atelier Elegance",
     "images": [
       {
-        "url": "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&q=80&w=800",
+        "url": "https://images.unsplash.com/photo-1622626426572-c268eb006092?auto=format&fit=crop&q=80&w=800",
         "is_primary": true,
         "alt": "Áo Sơ Mi Oxford Nam Màu Xanh"
       }
@@ -1670,7 +1670,7 @@ async function main() {
       type: 'look',
       look_code: 'LOOK 01',
       section_role: 'Khối Look 01 (Áo Măng Tô Belted & Nổi Bật Trang Chủ)',
-      title: 'Áo Măng Tô Belted Dạ Camel Cashmere Quý Phái Thời Đại',
+      title: 'Set Áo Măng Tô Dạ Dáng Dài Màu Xanh Pastel Châu Âu',
       code: 'LB - LOOK01',
       season: 'PHONG CÁCH THU ĐÔNG',
       badge: 'SIGNATURE',
@@ -1684,9 +1684,9 @@ async function main() {
       cta_text: 'Mua Trọn Bộ Phối Đồ (Tiết Kiệm 10%) • 5.445.000₫',
       conversion_rate: '36%',
       products: [
-        buildTaggedProduct('Áo Măng Tô Dạ Camel Cashmere'),
-        buildTaggedProduct('Áo Len Cổ Lọ Cream Knitwear'),
-        buildTaggedProduct('Quần Âu Ống Suông Wool Tencel'),
+        buildTaggedProduct('Áo Măng Tô Dạ Dáng Dài Màu Xanh'),
+        buildTaggedProduct('Áo Len Cổ Lọ Dệt Kim Màu Trắng'),
+        buildTaggedProduct('Quần Âu Nam Ống Suông Màu Xám'),
       ].filter(Boolean),
       hotspots: [
         { top: '38%', left: '46%', label: 'Áo Măng Tô Dạ Camel — 3.850.000₫' },
@@ -1697,7 +1697,7 @@ async function main() {
       type: 'look',
       look_code: 'LOOK 02',
       section_role: 'Khối Look 02 (Đầm Dạ Tiệc & Haute Couture)',
-      title: 'Đầm Xếp Ly Emerald Lộng Lẫy Tơ Tằm Cao Cấp',
+      title: 'Đầm Lụa Dạ Hội Xếp Ly Màu Đỏ Quý Phái & Quyến Rũ',
       code: 'LB - LOOK02',
       season: 'DẠ TIỆC & HAUTE COUTURE',
       badge: 'PHIÊN BẢN GIỚI HẠN',
@@ -1712,14 +1712,14 @@ async function main() {
       cta_text: 'ĐẶT MUA NGAY',
       conversion_rate: '28%',
       products: [
-        buildTaggedProduct('Đầm Lụa Emerald Pleated Gown'),
+        buildTaggedProduct('Đầm Lụa Dạ Hội Xếp Ly Màu Đỏ'),
       ].filter(Boolean),
     },
     {
       type: 'look',
       look_code: 'LOOK 03',
       section_role: 'Khối Look 03 (Cột 1 Lưới: Set Parisian Chic)',
-      title: 'Set Áo Tweed Ivory & Quần Âu Cắt May Cổ Điển',
+      title: 'Set Áo Sơ Mi Oxford Nam Màu Xanh & Quần Tây Đen Lịch Lãm',
       code: 'LB - LOOK03',
       season: 'PARISIAN CHIC',
       badge: 'BÁN CHẠY',
@@ -1732,15 +1732,15 @@ async function main() {
       cta_text: 'Mua Ngay',
       conversion_rate: '24%',
       products: [
-        buildTaggedProduct('Áo Khoác Tweed Ivory Cropped'),
-        buildTaggedProduct('Quần Tây Slim Fit Black'),
+        buildTaggedProduct('Áo Sơ Mi Oxford Nam Màu Xanh'),
+        buildTaggedProduct('Quần Tây Công Sở Nam Màu Đen'),
       ].filter(Boolean),
     },
     {
       type: 'look',
       look_code: 'LOOK 04',
       section_role: 'Khối Look 04 (Cột 2 Lưới: Modern Tailoring)',
-      title: 'Oversized Charcoal Blazer & Minimalist Shirt',
+      title: 'Set Bộ Đồ Nỉ Hoodie Thể Thao Màu Vàng Năng Động Trẻ Trung',
       code: 'LB - LOOK04',
       season: 'MODERN TAILORING',
       badge: 'TRENDING',
@@ -1753,8 +1753,8 @@ async function main() {
       cta_text: 'Mua Ngay',
       conversion_rate: '21%',
       products: [
-        buildTaggedProduct('Áo Blazer Kẻ Sọc Pinstripe'),
-        buildTaggedProduct('Sơ Mi Poplin Cotton Trắng'),
+        buildTaggedProduct('Bộ Đồ Nỉ Hoodie Thể Thao Màu Vàng'),
+        buildTaggedProduct('Giày Sneaker Cổ Điển Màu Trắng'),
       ].filter(Boolean),
     },
   ];

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Upload, Sparkles, Search, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { aiService } from '../services/aiService';
@@ -12,11 +12,34 @@ const AISearchModal = ({ isOpen, onClose }) => {
   const [searchResults, setSearchResults] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Thu hồi Object URL khi component unmount hoặc khi imagePreview thay đổi để chống Memory Leak
+  useEffect(() => {
+    return () => {
+      if (imagePreview && typeof imagePreview === 'string' && imagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
+
   if (!isOpen) return null;
+
+  const handleClose = () => {
+    if (imagePreview && typeof imagePreview === 'string' && imagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setSelectedImage(null);
+    setImagePreview(null);
+    setSearchResults(null);
+    setErrorMessage('');
+    onClose();
+  };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      if (imagePreview && typeof imagePreview === 'string' && imagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview);
+      }
       setSelectedImage(file);
       setImagePreview(URL.createObjectURL(file));
       setErrorMessage('');
@@ -31,6 +54,9 @@ const AISearchModal = ({ isOpen, onClose }) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('image/')) {
+      if (imagePreview && typeof imagePreview === 'string' && imagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview);
+      }
       setSelectedImage(file);
       setImagePreview(URL.createObjectURL(file));
       setErrorMessage('');
@@ -38,6 +64,9 @@ const AISearchModal = ({ isOpen, onClose }) => {
   };
 
   const removeImage = () => {
+    if (imagePreview && typeof imagePreview === 'string' && imagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview);
+    }
     setSelectedImage(null);
     setImagePreview(null);
   };
@@ -83,11 +112,11 @@ const AISearchModal = ({ isOpen, onClose }) => {
 
   const handleProductClick = (productId) => {
     navigate(`/products/${productId}`);
-    onClose();
+    handleClose();
   };
 
   return (
-    <div className="modal-overlay animate-fade-in" onClick={onClose}>
+    <div className="modal-overlay animate-fade-in" onClick={handleClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div className="header-title-group">
@@ -101,7 +130,7 @@ const AISearchModal = ({ isOpen, onClose }) => {
               </p>
             </div>
           </div>
-          <button className="close-btn" onClick={onClose} title="Đóng">
+          <button className="close-btn" onClick={handleClose} title="Đóng">
             <X size={20} />
           </button>
         </div>
