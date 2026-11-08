@@ -16,7 +16,6 @@ import {
   Lock,
   Unlock,
   Loader2,
-  RefreshCw,
   X,
   CheckCircle,
   AlertCircle
@@ -791,21 +790,6 @@ export default function UserManagement() {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   };
 
-  const [isSyncing, setIsSyncing] = useState(false);
-
-  // Đồng bộ thủ công toàn bộ dữ liệu tài khoản từ CSDL MySQL
-  const handleSyncData = async () => {
-    setIsSyncing(true);
-    try {
-      await fetchData();
-      showSuccess('Đã đồng bộ toàn bộ tài khoản từ database thành công!');
-    } catch (err) {
-      showError('Lỗi khi đồng bộ dữ liệu tài khoản');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
   // Toggle nhanh trạng thái Khóa / Kích hoạt
   const handleToggleStatus = async (user) => {
     if (user.role === 'ADMIN') {
@@ -903,17 +887,6 @@ export default function UserManagement() {
             </div>
 
             <div className="um-head-actions">
-              <button
-                type="button"
-                className="um-btn-pill-action"
-                onClick={handleSyncData}
-                disabled={isSyncing || loading}
-                title="Đồng bộ danh sách tài khoản từ database"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-              >
-                <RefreshCw size={14} style={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
-                <span>{isSyncing ? 'Đang đồng bộ...' : 'Đồng Bộ Database'}</span>
-              </button>
               <button type="button" className="um-btn-pill-action" onClick={handleExportCSV}>
                 <Download size={15} />
                 Xuất Danh Sách
