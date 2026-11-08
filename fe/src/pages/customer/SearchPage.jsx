@@ -17,7 +17,6 @@ import {
   ShoppingBag,
   ArrowRight,
   TrendingUp,
-  Eye,
 } from "lucide-react";
 import ProductCard from "../../components/ProductCard";
 import { aiService } from "../../services/aiService";
@@ -26,7 +25,6 @@ import { useConfirmModal } from "../../context/ConfirmModalContext";
 import { useToast } from "../../context/ToastContext";
 
 const SEARCH_HISTORY_KEY = "youthfashion_search_history";
-const RECENTLY_VIEWED_KEY = "youthfashion_recently_viewed";
 
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -55,7 +53,6 @@ export default function SearchPage() {
   // History & Recommendations
   const [searchHistory, setSearchHistory] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
-  const [recentlyViewed, setRecentlyViewed] = useState([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
   // 1. Cleanup image preview blob URL to prevent memory leaks
@@ -71,21 +68,7 @@ export default function SearchPage() {
     };
   }, [imagePreview]);
 
-  // 2. Load Recently Viewed from localStorage
-  useEffect(() => {
-    try {
-      const storedViews = JSON.parse(
-        localStorage.getItem(RECENTLY_VIEWED_KEY) || "[]",
-      );
-      if (Array.isArray(storedViews)) {
-        setRecentlyViewed(storedViews.slice(0, 8));
-      }
-    } catch (e) {
-      setRecentlyViewed([]);
-    }
-  }, []);
-
-  // 3. Load Search History (from API for logged in, from localStorage for guest)
+  // 2. Load Search History (from API for logged in, from localStorage for guest)
   const fetchSearchHistory = async () => {
     let localItems = [];
     try {
@@ -746,42 +729,6 @@ export default function SearchPage() {
         </div>
       </section>
 
-      {/* 5. Khu vực: Sản phẩm vừa xem (Recently Viewed) - nếu có */}
-      {recentlyViewed.length > 0 && (
-        <section className="search-recently-viewed-section">
-          <div className="container">
-            <div className="recently-viewed-header">
-              <div className="recently-title-box">
-                <Eye size={16} className="text-gray-600" />
-                <h3 className="recently-title font-serif">
-                  Sản Phẩm Bạn Vừa Xem
-                </h3>
-              </div>
-            </div>
-            <div className="products-grid-4">
-              {recentlyViewed.slice(0, 4).map((p) => {
-                const priceVal = p.price ? Number(p.price) : 0;
-                const formattedProduct = {
-                  id: p.product_id,
-                  name: p.product_name,
-                  price:
-                    priceVal > 0
-                      ? priceVal.toLocaleString("vi-VN") + "đ"
-                      : "Liên hệ",
-                  tag: "VỪA XEM",
-                  image:
-                    p.image_url ||
-                    "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800",
-                };
-                return (
-                  <ProductCard key={p.product_id} product={formattedProduct} />
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* Page Styles */}
       <style>{`
         .search-page-container {
@@ -1353,28 +1300,6 @@ export default function SearchPage() {
           color: #9ca3af;
           padding: 24px;
           font-size: 13px;
-        }
-
-        /* 5. Recently Viewed Section */
-        .search-recently-viewed-section {
-          padding: 20px 0 10px;
-        }
-
-        .recently-viewed-header {
-          margin-bottom: 18px;
-        }
-
-        .recently-title-box {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .recently-title {
-          font-size: 18px;
-          font-weight: 700;
-          color: #111827;
-          margin: 0;
         }
 
         /* Responsive */
