@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Upload, Sparkles, Search, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import {
+  X,
+  Upload,
+  Sparkles,
+  Search,
+  ArrowRight,
+  Loader2,
+  AlertCircle,
+  SlidersHorizontal,
+  Layers,
+  Image as ImageIcon,
+  Type,
+} from 'lucide-react';
 import { aiService } from '../services/aiService';
 
 const AISearchModal = ({ isOpen, onClose }) => {
@@ -11,6 +23,10 @@ const AISearchModal = ({ isOpen, onClose }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [suggestedQuery, setSuggestedQuery] = useState(null);
+  const [wasCorrected, setWasCorrected] = useState(false);
+  const [hybridWeightMode, setHybridWeightMode] = useState('image_priority');
+  const [activeSearchMeta, setActiveSearchMeta] = useState(null);
 
   // Thu hồi Object URL khi component unmount hoặc khi imagePreview thay đổi để chống Memory Leak
   useEffect(() => {
@@ -31,6 +47,10 @@ const AISearchModal = ({ isOpen, onClose }) => {
     setImagePreview(null);
     setSearchResults(null);
     setErrorMessage('');
+    setSuggestedQuery(null);
+    setWasCorrected(false);
+    setActiveSearchMeta(null);
+    setHybridWeightMode('image_priority');
     onClose();
   };
 
@@ -71,21 +91,32 @@ const AISearchModal = ({ isOpen, onClose }) => {
     setImagePreview(null);
   };
 
-  const handlePerformSearch = async (e) => {
-    e.preventDefault();
-    if (!queryText.trim() && !selectedImage) return;
+  const executeSearch = async (targetQuery = null) => {
+    const textToSearch = (targetQuery !== null ? targetQuery : queryText).trim();
+    if (!textToSearch && !selectedImage) return;
 
     setIsSearching(true);
     setSearchResults(null);
     setErrorMessage('');
 
+    // Tính toán trọng số cho Multimodal Search
+    let imgWeight = 0.7;
+    let txtWeight = 0.3;
+    if (hybridWeightMode === 'balanced') {
+      imgWeight = 0.5;
+      txtWeight = 0.5;
+    } else if (hybridWeightMode === 'text_priority') {
+      imgWeight = 0.3;
+      txtWeight = 0.7;
+    }
+
     try {
       let response;
       const topK = 10;
 
-      // 1. Chế độ 3: Kết hợp cả Ảnh và Text (Hybrid Search)
-      if (selectedImage && queryText.trim()) {
-        response = await aiService.searchHybrid(selectedImage, queryText.trim(), topK);
+      // 1. Chế độ 3: Kết hợp cả Ảnh và Text (Hybrid Multimodal Search)
+      if (selectedImage && textToSearch) {
+        response = await aiService.searchHybrid(selectedImage, textToSearch, topK, imgWeight, txtWeight);
       }
       // 2. Chế độ 1: Tìm bằng Ảnh (Visual Search)
       else if (selectedImage) {
@@ -93,11 +124,28 @@ const AISearchModal = ({ isOpen, onClose }) => {
       }
       // 3. Chế độ 2: Tìm bằng Text ngữ nghĩa (Semantic Text Search)
       else {
-        response = await aiService.searchByText(queryText.trim(), topK);
+        response = await aiService.searchByText(textToSearch, topK);
       }
 
       if (response && response.status) {
         setSearchResults(response.data?.products || []);
+        const actualType =
+          response.data?.search_type ||
+          (selectedImage && textToSearch ? 'HYBRID' : selectedImage ? 'IMAGE' : 'TEXT');
+
+        setActiveSearchMeta({
+          searchType: actualType,
+          weights: response.data?.weights || { image: imgWeight, text: txtWeight },
+          query: textToSearch,
+        });
+
+        if (response.data?.was_corrected && response.data?.suggested_query) {
+          setSuggestedQuery(response.data.suggested_query);
+          setWasCorrected(true);
+        } else {
+          setSuggestedQuery(null);
+          setWasCorrected(false);
+        }
       } else {
         setErrorMessage(response?.message || 'Có lỗi xảy ra trong quá trình tìm kiếm.');
       }
@@ -108,6 +156,16 @@ const AISearchModal = ({ isOpen, onClose }) => {
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const handlePerformSearch = (e) => {
+    if (e) e.preventDefault();
+    executeSearch();
+  };
+
+  const handleApplySuggestion = (suggestion) => {
+    setQueryText(suggestion);
+    executeSearch(suggestion);
   };
 
   const handleProductClick = (productId) => {
@@ -188,6 +246,61 @@ const AISearchModal = ({ isOpen, onClose }) => {
             </button>
           </div>
 
+          {/* Multimodal Weight Controls (chỉ hiện khi có cả Ảnh và Text) */}
+          {selectedImage && queryText.trim() && (
+            <div className="multimodal-weight-control animate-fade-in">
+              <div className="weight-control-label">
+                <SlidersHorizontal size={14} className="weight-icon" />
+                <span>Trọng số hòa trộn CLIP:</span>
+              </div>
+              <div className="weight-presets">
+                <button
+                  type="button"
+                  className={`weight-preset-btn ${hybridWeightMode === 'image_priority' ? 'active' : ''}`}
+                  onClick={() => setHybridWeightMode('image_priority')}
+                  title="70% đặc trưng từ ảnh + 30% từ khóa mô tả"
+                >
+                  Ưu tiên ảnh (70/30)
+                </button>
+                <button
+                  type="button"
+                  className={`weight-preset-btn ${hybridWeightMode === 'balanced' ? 'active' : ''}`}
+                  onClick={() => setHybridWeightMode('balanced')}
+                  title="50% đặc trưng ảnh + 50% từ khóa mô tả"
+                >
+                  Cân bằng (50/50)
+                </button>
+                <button
+                  type="button"
+                  className={`weight-preset-btn ${hybridWeightMode === 'text_priority' ? 'active' : ''}`}
+                  onClick={() => setHybridWeightMode('text_priority')}
+                  title="30% đặc trưng ảnh + 70% từ khóa mô tả"
+                >
+                  Ưu tiên mô tả (30/70)
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Spell Correction Suggestion Banner */}
+          {suggestedQuery && (
+            <div className="spell-suggestion-banner animate-fade-in">
+              <Sparkles size={16} className="sparkle-hint-icon" />
+              <span>
+                Ý bạn là:{' '}
+                <button
+                  type="button"
+                  className="spell-suggestion-btn"
+                  onClick={() => handleApplySuggestion(suggestedQuery)}
+                  title={`Tìm kiếm lại với "${suggestedQuery}"`}
+                >
+                  {suggestedQuery}
+                </button>
+                ?
+              </span>
+            </div>
+          )}
+
           {/* Error Message */}
           {errorMessage && (
             <div className="error-alert">
@@ -201,9 +314,33 @@ const AISearchModal = ({ isOpen, onClose }) => {
         {searchResults !== null && (
           <div className="results-container">
             <div className="results-header">
-              <h4 className="results-title font-serif">
-                Kết Quả Tương Đồng ({searchResults.length} sản phẩm)
-              </h4>
+              <div className="results-header-left">
+                <h4 className="results-title font-serif">
+                  Kết Quả Tương Đồng ({searchResults.length} sản phẩm)
+                </h4>
+                {activeSearchMeta && (
+                  <span className={`search-mode-badge ${activeSearchMeta.searchType.toLowerCase()}`}>
+                    {activeSearchMeta.searchType === 'HYBRID' && (
+                      <>
+                        <Layers size={12} />
+                        Đa phương thức (Ảnh {Math.round((activeSearchMeta.weights?.image ?? 0.7) * 100)}% + Text {Math.round((activeSearchMeta.weights?.text ?? 0.3) * 100)}%)
+                      </>
+                    )}
+                    {activeSearchMeta.searchType === 'IMAGE' && (
+                      <>
+                        <ImageIcon size={12} />
+                        Tìm bằng ảnh
+                      </>
+                    )}
+                    {activeSearchMeta.searchType === 'TEXT' && (
+                      <>
+                        <Type size={12} />
+                        Tìm bằng văn bản
+                      </>
+                    )}
+                  </span>
+                )}
+              </div>
               <span className="results-note">Xếp hạng theo độ tương đồng Vector Cosine</span>
             </div>
 
@@ -461,6 +598,93 @@ const AISearchModal = ({ isOpen, onClose }) => {
           cursor: not-allowed;
         }
 
+        .multimodal-weight-control {
+          background-color: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          padding: 8px 12px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .weight-control-label {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #475569;
+        }
+
+        .weight-icon {
+          color: #7c3aed;
+        }
+
+        .weight-presets {
+          display: flex;
+          gap: 6px;
+        }
+
+        .weight-preset-btn {
+          background-color: #ffffff;
+          border: 1px solid #cbd5e1;
+          color: #64748b;
+          font-size: 11.5px;
+          font-weight: 600;
+          padding: 5px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .weight-preset-btn:hover {
+          border-color: #94a3b8;
+          color: #0f172a;
+        }
+
+        .weight-preset-btn.active {
+          background-color: #7c3aed;
+          border-color: #7c3aed;
+          color: #ffffff;
+          box-shadow: 0 2px 4px rgba(124, 58, 237, 0.25);
+        }
+
+        .spell-suggestion-banner {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background-color: #f0fdf4;
+          border: 1px solid #bbf7d0;
+          color: #166534;
+          padding: 10px 14px;
+          border-radius: 8px;
+          font-size: 13px;
+        }
+
+        .sparkle-hint-icon {
+          color: #16a34a;
+          flex-shrink: 0;
+        }
+
+        .spell-suggestion-btn {
+          background: none;
+          border: none;
+          padding: 0 3px;
+          font-weight: 700;
+          color: #047857;
+          text-decoration: underline;
+          cursor: pointer;
+          font-size: 13px;
+          transition: color 0.15s ease;
+        }
+
+        .spell-suggestion-btn:hover {
+          color: #065f46;
+        }
+
         .error-alert {
           display: flex;
           align-items: center;
@@ -482,8 +706,45 @@ const AISearchModal = ({ isOpen, onClose }) => {
         .results-header {
           display: flex;
           justify-content: space-between;
-          align-items: baseline;
+          align-items: center;
           margin-bottom: 14px;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .results-header-left {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .search-mode-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 3px 9px;
+          border-radius: 20px;
+        }
+
+        .search-mode-badge.hybrid {
+          background-color: #f5f3ff;
+          color: #7c3aed;
+          border: 1px solid #ddd6fe;
+        }
+
+        .search-mode-badge.image {
+          background-color: #ecfdf5;
+          color: #059669;
+          border: 1px solid #a7f3d0;
+        }
+
+        .search-mode-badge.text {
+          background-color: #eff6ff;
+          color: #2563eb;
+          border: 1px solid #bfdbfe;
         }
 
         .results-title {
