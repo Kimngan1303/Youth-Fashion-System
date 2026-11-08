@@ -313,6 +313,85 @@ class VectorSearchService {
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, clampedTopK);
   }
+
+  /**
+   * Đồng bộ tự động vector cho 1 sản phẩm khi tạo mới hoặc cập nhật
+   * @param {string|number|BigInt} productId
+   */
+  async syncSingleProductEmbedding(productId) {
+    if (!this.isLoaded) {
+      this.loadVectors();
+    }
+    try {
+      const pid = BigInt(productId);
+      const p = await prisma.product.findUnique({
+        where: { product_id: pid },
+        include: {
+          category: { select: { category_name: true } },
+          brand: { select: { brand_name: true } },
+          images: {
+            orderBy: [{ is_primary: 'desc' }, { display_order: 'asc' }],
+            take: 1,
+          },
+          variants: {
+            select: { color: true, price: true },
+          },
+        },
+      });
+
+      if (!p || p.status !== 'ACTIVE' || !p.images || p.images.length === 0) {
+        this.removeProduct(productId);
+        return null;
+      }
+
+      const primaryImage = p.images[0].image_url;
+      const primaryImageId = p.images[0].image_id;
+      const uniqueColors = [...new Set(p.variants.map((v) => v.color).filter(Boolean))];
+      const prices = p.variants.map((v) => Number(v.price)).filter((price) => !isNaN(price));
+      const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+
+      const embedding = await createImageEmbedding(primaryImage);
+
+      const record = {
+        product_id: String(p.product_id),
+        image_id: primaryImageId ? String(primaryImageId) : null,
+        image_url: primaryImage,
+        product_name: p.product_name,
+        category_name: p.category?.category_name || 'Thời trang',
+        brand_name: p.brand?.brand_name || 'YouthFashion',
+        price: minPrice,
+        colors: uniqueColors,
+        embedding,
+        updated_at: new Date().toISOString(),
+      };
+
+      const existingIndex = this.vectorsCache.findIndex((item) => String(item.product_id) === String(productId));
+      if (existingIndex >= 0) {
+        this.vectorsCache[existingIndex] = record;
+      } else {
+        this.vectorsCache.push(record);
+      }
+
+      this.saveVectors();
+      console.log(`[VectorSearch] Đã tự động cập nhật Vector cho SP ${p.product_id} (${p.product_name})`);
+      return record;
+    } catch (err) {
+      console.warn(`[VectorSearch] Không thể tự động đồng bộ vector cho SP ${productId}:`, err.message);
+      return null;
+    }
+  }
+
+  /**
+   * Xóa sản phẩm khỏi RAM và file JSON khi bị xóa trong database
+   */
+  removeProduct(productId) {
+    const beforeCount = this.vectorsCache.length;
+    this.vectorsCache = this.vectorsCache.filter((item) => String(item.product_id) !== String(productId));
+    if (this.vectorsCache.length !== beforeCount) {
+      this.saveVectors();
+      console.log(`[VectorSearch] Đã xóa Vector của SP ${productId} khỏi RAM và file cache.`);
+    }
+  }
 }
 
 export const vectorSearchService = new VectorSearchService();

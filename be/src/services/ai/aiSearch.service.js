@@ -4,6 +4,7 @@ import { vietnameseHybridSearchService } from './vietnameseHybridSearch.service.
 import { correctVietnameseQuery } from './vietnameseSpellCorrector.js';
 import { parseVietnameseQuery } from './vietnameseQueryParser.js';
 import { getCategoryRelationship } from './categoryHierarchy.js';
+import { extractDominantColor, classifyGarmentType } from './visualAnalyzer.js';
 import { prisma } from '../../repositories/prisma.js';
 import { uploadToCloudinary } from '../../config/cloudinary.js';
 
@@ -25,7 +26,95 @@ export async function searchByTextService({ queryText, topK = 10, minThreshold =
 }
 
 /**
- * 2. Tìm kiếm bằng hình ảnh (Visual Search)
+ * Helper kiểm tra sản phẩm có thuộc nhóm ngành hàng lớn (TOPS, BOTTOMS, DRESSES, ...) hay không
+ */
+function isMatchingBroadCategory(broadCategory, categoryName, productName) {
+  if (!broadCategory) return true;
+  const cat = (categoryName || '').toLowerCase();
+  const name = (productName || '').toLowerCase();
+
+  if (broadCategory === 'TOPS') {
+    return (
+      cat.includes('áo') ||
+      cat.includes('sweater') ||
+      cat.includes('hoodie') ||
+      cat.includes('blazer') ||
+      cat.includes('jacket') ||
+      cat.includes('vest') ||
+      cat.includes('polo') ||
+      cat.includes('len') ||
+      cat.includes('gilet') ||
+      cat.includes('thể thao') ||
+      name.includes('áo')
+    );
+  }
+  if (broadCategory === 'BOTTOMS') {
+    return (
+      cat.includes('quần') ||
+      cat.includes('jean') ||
+      cat.includes('short') ||
+      cat.includes('jogger') ||
+      cat.includes('kaki') ||
+      cat.includes('chino') ||
+      cat.includes('trouser') ||
+      name.includes('quần')
+    );
+  }
+  if (broadCategory === 'DRESSES_SKIRTS') {
+    return (
+      cat.includes('váy') ||
+      cat.includes('đầm') ||
+      cat.includes('dạ hội') ||
+      name.includes('váy') ||
+      name.includes('đầm')
+    );
+  }
+  if (broadCategory === 'HEADWEAR') {
+    return cat.includes('mũ') || cat.includes('nón') || name.includes('mũ') || name.includes('nón');
+  }
+  if (broadCategory === 'FOOTWEAR') {
+    return (
+      cat.includes('giày') ||
+      cat.includes('sandal') ||
+      cat.includes('dép') ||
+      cat.includes('sneaker') ||
+      name.includes('giày')
+    );
+  }
+  if (broadCategory === 'BAGS') {
+    return cat.includes('túi') || cat.includes('balo') || name.includes('túi') || name.includes('balo');
+  }
+  return true;
+}
+
+/**
+ * Helper tính toán hệ số thưởng/phạt màu sắc
+ */
+function calculateColorMultiplier(targetColor, itemColors, productName, matchBonus = 1.05, mismatchPenalty = 0.70) {
+  if (!targetColor || targetColor === 'Khác') return 1.0;
+  const target = targetColor.toLowerCase();
+  const hasKnownColors = Array.isArray(itemColors) && itemColors.filter(Boolean).length > 0;
+  const prodName = (productName || '').toLowerCase();
+
+  if (hasKnownColors) {
+    const hasColor = itemColors.some((c) => {
+      const cl = (c || '').toLowerCase();
+      return cl === target || cl.includes(target) || target.includes(cl);
+    });
+
+    if (hasColor || prodName.includes(target)) {
+      return matchBonus; // Thưởng khi khớp màu
+    } else {
+      return mismatchPenalty; // Phạt khi lệch màu
+    }
+  } else if (prodName.includes(target)) {
+    return matchBonus;
+  }
+  return 0.90;
+}
+
+/**
+ * 2. Tìm kiếm bằng hình ảnh (Visual Search) kèm Phân tích Thị giác & Tái xếp hạng
  */
 export async function searchByImageService({ imageBuffer, topK = 10, minThreshold = 0.10, customerId = null }) {
   if (!imageBuffer) {
@@ -34,9 +123,63 @@ export async function searchByImageService({ imageBuffer, topK = 10, minThreshol
     throw error;
   }
 
-  // 1. Tạo Image Embedding từ Buffer ảnh
-  const imageVec = await createImageEmbedding(imageBuffer);
-  const results = vectorSearchService.searchSimilar(imageVec, topK, minThreshold);
+  // 1. Tạo Image Embedding từ Buffer ảnh và song song trích xuất màu sắc chủ đạo
+  const [imageVec, visualColor] = await Promise.all([
+    createImageEmbedding(imageBuffer),
+    extractDominantColor(imageBuffer),
+  ]);
+
+  // Phân loại Zero-shot ngành hàng thời trang từ vector ảnh bằng CLIP
+  const visualGarment = await classifyGarmentType(imageVec);
+  const detectedBroadCategory = visualGarment?.broadCategory || null;
+  const detectedColor = visualColor?.colorGroup && visualColor.colorGroup !== 'Khác' ? visualColor.colorGroup : null;
+
+  if (!vectorSearchService.isLoaded) {
+    vectorSearchService.loadVectors();
+  }
+  const allVectors = vectorSearchService.vectorsCache;
+
+  // Tái xếp hạng thông minh dựa trên phân tích hình ảnh
+  const scoredProducts = allVectors.map((item) => {
+    const rawSimilarity = cosineSimilarity(imageVec, item.embedding);
+
+    // Hệ số ngành hàng: Phạt nặng nếu khác nhóm trang phục lớn (ví dụ: ảnh áo nhưng kết quả là mũ/giày)
+    let categoryMultiplier = 1.0;
+    if (detectedBroadCategory) {
+      const isMatch = isMatchingBroadCategory(detectedBroadCategory, item.category_name, item.product_name);
+      categoryMultiplier = isMatch ? 1.0 : 0.35;
+    }
+
+    // Hệ số màu sắc thị giác
+    let colorMultiplier = 1.0;
+    if (detectedColor) {
+      colorMultiplier = calculateColorMultiplier(detectedColor, item.colors, item.product_name, 1.10, 0.75);
+    }
+
+    const finalSimilarity = Number(
+      Math.min(1.0, Math.max(0.0, rawSimilarity * categoryMultiplier * colorMultiplier)).toFixed(4)
+    );
+
+    return {
+      product_id: item.product_id,
+      product_name: item.product_name,
+      category_name: item.category_name,
+      brand_name: item.brand_name,
+      price: item.price,
+      colors: item.colors,
+      image_url: item.image_url,
+      similarity: finalSimilarity,
+      similarity_percent: `${(finalSimilarity * 100).toFixed(1)}%`,
+    };
+  });
+
+  const parsedThreshold = parseFloat(minThreshold);
+  const clampedThreshold = isNaN(parsedThreshold) ? 0.10 : Math.max(-1.0, Math.min(1.0, parsedThreshold));
+
+  const results = scoredProducts
+    .filter((item) => item.similarity >= clampedThreshold)
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, parseInt(topK, 10) || 10);
 
   // 2. Upload ảnh lên Cloudinary để lưu URL làm bằng chứng trong lịch sử tìm kiếm
   let searchImageUrl = null;
@@ -64,6 +207,8 @@ export async function searchByImageService({ imageBuffer, topK = 10, minThreshol
   return {
     search_image_url: searchImageUrl,
     search_type: 'IMAGE',
+    detected_category: detectedBroadCategory,
+    detected_color: detectedColor,
     total: results.length,
     products: results,
   };
@@ -112,13 +257,21 @@ export async function searchHybridService({
     ? parsed.englishPrompt
     : effectiveQuery;
 
-  // Bước 2: Tạo đồng thời Image Embedding và Text Embedding từ CLIP
-  const [imageVec, textVec] = await Promise.all([
+  // Bước 2: Tạo đồng thời Image Embedding, Text Embedding và phân tích thị giác
+  const [imageVec, textVec, visualColor] = await Promise.all([
     createImageEmbedding(imageBuffer),
     createTextEmbedding(textPrompt),
+    extractDominantColor(imageBuffer),
   ]);
 
+  const visualGarment = await classifyGarmentType(imageVec);
+
   finalVec = createHybridEmbedding(imageVec, textVec, imgWeight, txtWeight);
+
+  // Xác định ngành hàng và màu sắc ưu tiên (kết hợp cả Text lẫn Thị giác)
+  const effectiveCategory = parsed.category || null;
+  const effectiveBroadCategory = parsed.broadCategory || visualGarment?.broadCategory || null;
+  const effectiveColor = parsed.color || (visualColor?.colorGroup !== 'Khác' ? visualColor?.colorGroup : null);
 
   // Đảm bảo vector database đã được nạp
   if (!vectorSearchService.isLoaded) {
@@ -132,8 +285,8 @@ export async function searchHybridService({
 
     // 1. Hệ số Phân loại Danh mục (Category & Broad Garment Multiplier)
     let categoryMultiplier = 1.0;
-    if (parsed.category) {
-      const rel = getCategoryRelationship(parsed.category, item.category_name);
+    if (effectiveCategory) {
+      const rel = getCategoryRelationship(effectiveCategory, item.category_name);
       if (rel.type === 'EXACT') {
         categoryMultiplier = 1.0;
       } else if (rel.type === 'RELATED') {
@@ -142,88 +295,15 @@ export async function searchHybridService({
         // UNRELATED hoặc UNKNOWN (phạt nặng xuống 0.35)
         categoryMultiplier = 0.35;
       }
-    } else if (parsed.broadCategory) {
-      const cat = (item.category_name || '').toLowerCase();
-      const name = (item.product_name || '').toLowerCase();
-
-      if (parsed.broadCategory === 'TOPS') {
-        const isTop =
-          cat.includes('áo') ||
-          cat.includes('sweater') ||
-          cat.includes('hoodie') ||
-          cat.includes('blazer') ||
-          cat.includes('jacket') ||
-          cat.includes('vest') ||
-          cat.includes('polo') ||
-          cat.includes('len') ||
-          cat.includes('gilet') ||
-          cat.includes('thể thao') ||
-          name.includes('áo');
-        categoryMultiplier = isTop ? 1.0 : 0.35;
-      } else if (parsed.broadCategory === 'BOTTOMS') {
-        const isBottom =
-          cat.includes('quần') ||
-          cat.includes('jean') ||
-          cat.includes('short') ||
-          cat.includes('jogger') ||
-          cat.includes('kaki') ||
-          cat.includes('chino') ||
-          cat.includes('trouser') ||
-          name.includes('quần');
-        categoryMultiplier = isBottom ? 1.0 : 0.35;
-      } else if (parsed.broadCategory === 'DRESSES_SKIRTS') {
-        const isDress =
-          cat.includes('váy') ||
-          cat.includes('đầm') ||
-          cat.includes('dạ hội') ||
-          name.includes('váy') ||
-          name.includes('đầm');
-        categoryMultiplier = isDress ? 1.0 : 0.35;
-      } else if (parsed.broadCategory === 'HEADWEAR') {
-        const isHead = cat.includes('mũ') || cat.includes('nón') || name.includes('mũ') || name.includes('nón');
-        categoryMultiplier = isHead ? 1.0 : 0.35;
-      } else if (parsed.broadCategory === 'FOOTWEAR') {
-        const isFoot =
-          cat.includes('giày') ||
-          cat.includes('sandal') ||
-          cat.includes('dép') ||
-          cat.includes('sneaker') ||
-          name.includes('giày');
-        categoryMultiplier = isFoot ? 1.0 : 0.35;
-      } else if (parsed.broadCategory === 'BAGS') {
-        const isBag = cat.includes('túi') || cat.includes('balo') || name.includes('túi') || name.includes('balo');
-        categoryMultiplier = isBag ? 1.0 : 0.35;
-      }
+    } else if (effectiveBroadCategory) {
+      const isMatch = isMatchingBroadCategory(effectiveBroadCategory, item.category_name, item.product_name);
+      categoryMultiplier = isMatch ? 1.0 : 0.35;
     }
 
     // 2. Hệ số Màu sắc (Color Multiplier)
     let colorMultiplier = 1.0;
-    if (parsed.color) {
-      const targetCol = parsed.color.toLowerCase();
-      const targetColGroup = (parsed.colorGroup || parsed.color).toLowerCase();
-      const hasKnownColors = Array.isArray(item.colors) && item.colors.filter(Boolean).length > 0;
-      const prodName = (item.product_name || '').toLowerCase();
-
-      if (hasKnownColors) {
-        const hasColor = item.colors.some((c) => {
-          const cl = (c || '').toLowerCase();
-          return (
-            cl === targetCol ||
-            cl === targetColGroup ||
-            cl.includes(targetColGroup) ||
-            cl.includes(targetCol) ||
-            targetCol.includes(cl)
-          );
-        });
-
-        if (hasColor || prodName.includes(targetCol) || prodName.includes(targetColGroup)) {
-          colorMultiplier = 1.05; // Khớp màu -> thưởng nhẹ 5%
-        } else {
-          colorMultiplier = 0.65; // Sai màu yêu cầu -> phạt 35%
-        }
-      } else if (prodName.includes(targetCol) || prodName.includes(targetColGroup)) {
-        colorMultiplier = 1.05;
-      }
+    if (effectiveColor) {
+      colorMultiplier = calculateColorMultiplier(effectiveColor, item.colors, item.product_name, 1.05, 0.65);
     }
 
     // Điểm số tương đồng cuối cùng sau khi tinh chỉnh thông minh
