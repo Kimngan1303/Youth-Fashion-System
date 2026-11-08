@@ -405,12 +405,16 @@ const applyStatusOverrides = (ordersList) => {
         const ovRank = STATUS_RANK[ovStatus] || 0;
 
         if (ovRank >= curRank) {
+          const isComp = ov.status === 'COMPLETED' || curStatus === 'COMPLETED';
+          const isCodOrd = !ord.payment_method || ord.payment_method === 'COD' || String(ord.payment_method || '').toUpperCase().includes('COD');
           return {
             ...ord,
             order_status: ov.status,
             status: ov.status,
             status_label: ov.status_label_manager || ov.status_label || ord.status_label,
             delivered_date: ov.delivered_date || ord.delivered_date,
+            payment_status: (isCodOrd && isComp) ? 'PAID' : (ov.payment_status || ord.payment_status),
+            payment_label: (isCodOrd && isComp) ? 'COD - Đã thanh toán' : (ov.payment_label || ord.payment_label),
             note: ov.note || ord.note,
           };
         }
@@ -540,12 +544,15 @@ export default function OrderManager() {
             else if (s === 'SHIPPING') statusLabel = 'Đang vận chuyển';
             else if (s === 'CANCELLED') statusLabel = 'Đã hủy';
 
-            const isPayos = ord.payments?.[0]?.payment_method === 'PAYOS';
-            const isDirect = ord.payments?.[0]?.payment_method === 'DIRECT';
-            const payStatus = ord.payments?.[0]?.payment_status === 'SUCCESS' ? 'PAID' : 'PENDING';
+            const isPayos = ord.payments?.[0]?.payment_method === 'PAYOS' || String(ord.payment_method || '').includes('PAYOS') || String(ord.payment_method || '').includes('VietQR');
+            const isDirect = ord.payments?.[0]?.payment_method === 'DIRECT' || String(ord.payment_method || '').includes('DIRECT');
+            const isCod = !isPayos && !isDirect;
+            const isCompleted = s === 'COMPLETED' || ['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(String(ord.order_status || ord.status || '').toUpperCase());
+            const isCodPaid = isCod && (isCompleted || ord.payments?.[0]?.payment_status === 'SUCCESS');
+            const payStatus = (isPayos && ord.payments?.[0]?.payment_status === 'SUCCESS') || isCodPaid ? 'PAID' : (ord.payments?.[0]?.payment_status === 'SUCCESS' ? 'PAID' : 'PENDING');
             let payLabel = isPayos
               ? 'PayOS - Đã thanh toán'
-              : (isDirect ? 'Thanh toán trực tiếp' : 'COD - Chưa thanh toán');
+              : (isDirect ? 'Thanh toán trực tiếp' : (isCodPaid ? 'COD - Đã thanh toán' : 'COD - Chưa thanh toán'));
 
             const orderDateStr = ord.created_at ? new Date(ord.created_at).toLocaleString('vi-VN', {
               hour: '2-digit',
@@ -690,17 +697,20 @@ export default function OrderManager() {
             if (!exists && orderCodeDigits) {
               const isPayos = String(co.payment_method || '').includes('VietQR') || String(co.payment_method || '').includes('PAYOS');
               const isDirect = String(co.payment_method || '').includes('Trực tiếp') || String(co.payment_method || '').includes('DIRECT');
+              const isCod = !isPayos && !isDirect;
               
               const s = String(co.status || co.order_status || 'PENDING').toUpperCase();
               let statusLabel = 'Chờ xác nhận';
-              if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s)) statusLabel = 'Đã giao';
+              const isComp = ['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s);
+              if (isComp) statusLabel = 'Đã giao';
               else if (['SHIPPING', 'IN_TRANSIT', 'DELIVERING'].includes(s)) statusLabel = 'Đang vận chuyển';
               else if (['CANCELLED', 'FAILED'].includes(s)) statusLabel = 'Đã hủy';
               else if (['RETURNED', 'REFUNDED'].includes(s)) statusLabel = 'Đổi trả';
 
+              const isPaid = co.payment_status === 'PAID' || (isCod && isComp);
               let payLabel = isPayos
                 ? 'PayOS - Đã thanh toán'
-                : (isDirect ? 'Thanh toán trực tiếp' : 'COD - Chưa thanh toán');
+                : (isDirect ? 'Thanh toán trực tiếp' : (isPaid ? 'COD - Đã thanh toán' : 'COD - Chưa thanh toán'));
 
               updated.unshift({
                 order_id: String(co.order_id || orderCodeDigits),
@@ -726,7 +736,7 @@ export default function OrderManager() {
                 })),
                 total_amount: Number(co.total_amount || 0),
                 payment_method: isPayos ? 'PAYOS' : (isDirect ? 'DIRECT' : 'COD'),
-                payment_status: isPayos ? 'PAID' : 'PENDING',
+                payment_status: isPaid ? 'PAID' : 'PENDING',
                 payment_label: payLabel,
                 order_status: s,
                 status_label: statusLabel,
@@ -1193,12 +1203,15 @@ export default function OrderManager() {
       const overrides = rawOv ? JSON.parse(rawOv) : {};
       const isAppDecision = newStatusLabel === 'Đã hoàn tiền';
       const isRejDecision = newStatusLabel === 'Từ chối hoàn';
+      const isCodTarget = !targetOrder.payment_method || targetOrder.payment_method === 'COD' || String(targetOrder.payment_method || '').toUpperCase().includes('COD');
       const overrideEntry = {
         status: newStatus,
         status_label: newStatusLabel,
         status_label_manager: newStatusLabel,
         status_label_customer: customerLabel,
         delivered_date: newStatus === 'COMPLETED' ? formattedDate : null,
+        payment_status: (isCodTarget && newStatus === 'COMPLETED') ? 'PAID' : (targetOrder.payment_status || 'PENDING'),
+        payment_label: (isCodTarget && newStatus === 'COMPLETED') ? 'COD - Đã thanh toán' : targetOrder.payment_label,
         refund_decision: isAppDecision ? 'APPROVED' : (isRejDecision ? 'REJECTED' : targetOrder.refund_decision),
         reject_reason: isRejDecision ? (targetOrder.reject_reason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop') : targetOrder.reject_reason,
         refund_reason: targetOrder.refund_reason,
@@ -1235,12 +1248,15 @@ export default function OrderManager() {
                       (tNum && (oId === tNum || oNum === tNum)) ||
                       (digits && oDigits && digits === oDigits);
       if (isMatch) {
+        const isCodOrd = !o.payment_method || o.payment_method === 'COD' || String(o.payment_method || '').toUpperCase().includes('COD');
         return {
           ...o,
           order_status: newStatus,
           status: newStatus,
           status_label: newStatusLabel,
           delivered_date: newStatus === 'COMPLETED' ? (o.delivered_date || formattedDate) : o.delivered_date,
+          payment_status: (isCodOrd && newStatus === 'COMPLETED') ? 'PAID' : o.payment_status,
+          payment_label: (isCodOrd && newStatus === 'COMPLETED') ? 'COD - Đã thanh toán' : o.payment_label,
         };
       }
       return o;
@@ -2676,8 +2692,12 @@ export default function OrderManager() {
                               </span>
                               {ord.payment_method === 'DIRECT' ? (
                                 <span className="payment-pill pill-direct">Thanh toán trực tiếp</span>
-                              ) : ord.payment_method === 'COD' ? (
-                                <span className="payment-pill pill-cod">COD - Chưa thanh toán</span>
+                              ) : (ord.payment_method === 'COD' || !ord.payment_method || String(ord.payment_method || '').toUpperCase().includes('COD')) ? (
+                                (cat === 'COMPLETED' || ord.order_status === 'COMPLETED' || ord.status === 'COMPLETED' || ord.payment_status === 'PAID') ? (
+                                  <span className="payment-pill pill-cod-paid">COD - Đã thanh toán</span>
+                                ) : (
+                                  <span className="payment-pill pill-cod">COD - Chưa thanh toán</span>
+                                )
                               ) : (
                                 <span className="payment-pill pill-payos">PayOS - Đã thanh toán</span>
                               )}
@@ -4193,6 +4213,7 @@ export default function OrderManager() {
           width: fit-content;
         }
 
+        .pill-cod-paid,
         .pill-payos {
           background: #DCFCE7;
           color: #15803D;

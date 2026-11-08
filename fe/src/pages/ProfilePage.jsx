@@ -2753,7 +2753,11 @@ const ProfilePage = () => {
                               {ord.payment_method && (
                                 <>
                                   <span className="meta-sep">|</span>
-                                  <span className="order-method">{ord.payment_method}</span>
+                                  <span className="order-method">
+                                    {(ord.payment_method === 'COD' || ord.payment_method === 'Tiền mặt khi nhận hàng (COD)') && statusCat === 'COMPLETED'
+                                      ? 'COD - Đã thanh toán'
+                                      : ord.payment_method}
+                                  </span>
                                 </>
                               )}
                             </div>
