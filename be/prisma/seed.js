@@ -122,603 +122,1460 @@ async function main() {
   console.log('\n👕 --- Tạo Sản phẩm, Biến thể & Hình ảnh mẫu (36 sản phẩm) ---');
 
   const productsData = [
-    {
-      product_name: 'Áo Thun Oversize Youth Graphic Cotton 100%',
-      description: 'Áo thun chất liệu 100% Cotton định hình cao cấp, thoáng mát, in hình dạo phố sắc nét.',
-      category_name: 'Áo thun',
-      brand_name: 'YouthFashion Studio',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800', is_primary: true, alt: 'Áo thun oversize mặt trước' },
-        { url: 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800', is_primary: false, alt: 'Áo thun oversize cận cảnh vải' },
-      ],
-      variants: [
-        { sku: 'AT-YOUTH-01-S-DEN', size: 'S', color: 'Đen', price: 290000, stock: 50 },
-        { sku: 'AT-YOUTH-01-M-DEN', size: 'M', color: 'Đen', price: 290000, stock: 45 },
-        { sku: 'AT-YOUTH-01-L-DEN', size: 'L', color: 'Đen', price: 290000, stock: 30 },
-        { sku: 'AT-YOUTH-01-M-TRANG', size: 'M', color: 'Trắng', price: 290000, stock: 60 },
-      ],
-    },
-    {
-      product_name: 'Áo Sơ Mi Oxford Form Rộng Minimalist',
-      description: 'Áo sơ mi Oxford chuẩn phom, vải mềm mịn chống nhăn, phù hợp đi học đi làm.',
-      category_name: 'Áo sơ mi',
-      brand_name: 'Minimalist Line',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=800', is_primary: true, alt: 'Áo sơ mi Oxford màu trắng' },
-        { url: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=800', is_primary: false, alt: 'Áo sơ mi Oxford xanh navy' },
-      ],
-      variants: [
-        { sku: 'SM-OXFORD-02-M-TRANG', size: 'M', color: 'Trắng', price: 450000, stock: 30 },
-        { sku: 'SM-OXFORD-02-L-TRANG', size: 'L', color: 'Trắng', price: 450000, stock: 25 },
-        { sku: 'SM-OXFORD-02-M-NAVY', size: 'M', color: 'Xanh Navy', price: 450000, stock: 20 },
-      ],
-    },
-    {
-      product_name: 'Quần Jeans Straight Fit Dáng Suông Vintage',
-      description: 'Quần jeans dáng suông phong cách Hàn Quốc, phom đứng hiện đại, vải denim cao cấp.',
-      category_name: 'Quần Jeans',
-      brand_name: 'Denim Crafter',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800', is_primary: true, alt: 'Quần jeans straight fit' },
-        { url: 'https://images.unsplash.com/photo-1542272604-780c36856d61?w=800', is_primary: false, alt: 'Chi tiết túi quần jeans' },
-      ],
-      variants: [
-        { sku: 'QJ-VINTAGE-03-29-XANH', size: '29', color: 'Xanh Nhạt', price: 590000, stock: 20 },
-        { sku: 'QJ-VINTAGE-03-30-XANH', size: '30', color: 'Xanh Nhạt', price: 590000, stock: 35 },
-        { sku: 'QJ-VINTAGE-03-31-XANH', size: '31', color: 'Xanh Nhạt', price: 590000, stock: 15 },
-      ],
-    },
-    {
-      product_name: 'Áo Hoodie Streetwear Zip Pocket Nỉ Thêu',
-      description: 'Áo hoodie chất vải nỉ bông dày dặn, giữ ấm cực tốt, mũ trùm 2 lớp có dây rút.',
-      category_name: 'Áo Hoodie & Sweater',
-      brand_name: 'Urban Streetwear',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800', is_primary: true, alt: 'Áo hoodie streetwear màu xám' },
-        { url: 'https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=800', is_primary: false, alt: 'Áo hoodie streetwear đen' },
-      ],
-      variants: [
-        { sku: 'HD-STREET-04-M-XAM', size: 'M', color: 'Xám', price: 680000, stock: 25 },
-        { sku: 'HD-STREET-04-L-XAM', size: 'L', color: 'Xám', price: 680000, stock: 30 },
-        { sku: 'HD-STREET-04-L-DEN', size: 'L', color: 'Đen', price: 680000, stock: 40 },
-      ],
-    },
-    {
-      product_name: 'Áo Khoác Bomber Unisex Water-Resistant',
-      description: 'Áo khoác bomber chất liệu dù 2 lớp chống nước nhẹ, thời trang cá tính.',
-      category_name: 'Áo khoác & Jacket',
-      brand_name: 'YouthFashion Studio',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1548883354-7622d03aca27?w=800', is_primary: true, alt: 'Áo khoác bomber mặt trước' },
-      ],
-      variants: [
-        { sku: 'JK-BOMBER-05-M-DEN', size: 'M', color: 'Đen', price: 790000, stock: 20 },
-        { sku: 'JK-BOMBER-05-L-DEN', size: 'L', color: 'Đen', price: 790000, stock: 15 },
-      ],
-    },
-    {
-      product_name: 'Áo Vest & Blazer European Fit Ca Rô',
-      description: 'Áo blazer chuẩn phom phong cách Châu Âu, vải lót lụa mềm mịn sang trọng.',
-      category_name: 'Áo Vest & Blazer',
-      brand_name: 'Atelier Elegance',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=800', is_primary: true, alt: 'Áo blazer ca rô' },
-        { url: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800', is_primary: false, alt: 'Áo vest lịch lãm' },
-      ],
-      variants: [
-        { sku: 'VZ-EURO-06-M-CARO', size: 'M', color: 'Ghi Ca Rô', price: 1850000, stock: 12 },
-        { sku: 'VZ-EURO-06-L-CARO', size: 'L', color: 'Ghi Ca Rô', price: 1850000, stock: 10 },
-      ],
-    },
-    {
-      product_name: 'Váy Đầm Lụa Satin Cổ V Xếp Ly Sang Trọng',
-      description: 'Váy đầm lụa cao cấp, đường may tinh xảo tôn vinh vóc dáng người mặc.',
-      category_name: 'Váy & Đầm Thiết Kế',
-      brand_name: 'Modern Luxe',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=800', is_primary: true, alt: 'Đầm lụa xếp ly' },
-      ],
-      variants: [
-        { sku: 'VD-LUA-07-S-RED', size: 'S', color: 'Đỏ Rượu', price: 1450000, stock: 15 },
-        { sku: 'VD-LUA-07-M-RED', size: 'M', color: 'Đỏ Rượu', price: 1450000, stock: 18 },
-      ],
-    },
-    {
-      product_name: 'Áo Măng Tô Dạ Tuyết Dáng Dài Thu Đông',
-      description: 'Áo măng tô chất liệu dạ ép 2 lớp cực ấm, phom chuẩn Châu Âu quý phái.',
-      category_name: 'Áo khoác & Jacket',
-      brand_name: 'Heritage Vintage',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800', is_primary: true, alt: 'Áo măng tô dạ' },
-      ],
-      variants: [
-        { sku: 'MT-DA-08-M-BE', size: 'M', color: 'Beige', price: 2200000, stock: 8 },
-        { sku: 'MT-DA-08-L-BE', size: 'L', color: 'Beige', price: 2200000, stock: 10 },
-      ],
-    },
-    {
-      product_name: 'Áo Polo Dệt Kim Co Giãn Thoáng Khí',
-      description: 'Áo polo dệt kim mềm mại, cổ gập thanh lịch phù hợp mặc dạo phố hay chơi thể thao.',
-      category_name: 'Áo Polo',
-      brand_name: 'Casual Essentials',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?w=800', is_primary: true, alt: 'Áo polo dệt kim' },
-      ],
-      variants: [
-        { sku: 'PL-DETKIM-09-M-RUE', size: 'M', color: 'Xanh Rêu', price: 390000, stock: 35 },
-        { sku: 'PL-DETKIM-09-L-RUE', size: 'L', color: 'Xanh Rêu', price: 390000, stock: 30 },
-      ],
-    },
-    {
-      product_name: 'Quần Short Cargo Hàn Quốc Nhiều Túi',
-      description: 'Quần short kiểu dáng cargo bụi bặm, vải khaki túi hộp tiện dụng cá tính.',
-      category_name: 'Quần Short',
-      brand_name: 'Urban Streetwear',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=800', is_primary: true, alt: 'Quần short cargo' },
-      ],
-      variants: [
-        { sku: 'QS-CARGO-10-M-KHOAN', size: 'M', color: 'Vàng Cát', price: 350000, stock: 25 },
-        { sku: 'QS-CARGO-10-L-KHOAN', size: 'L', color: 'Vàng Cát', price: 350000, stock: 20 },
-      ],
-    },
-    {
-      product_name: 'Quần Kaki Chino Form Slimfit Công Sở',
-      description: 'Quần kaki chino phom ôm nhẹ tôn dáng, co giãn nhẹ giúp bạn thoải mái cả ngày.',
-      category_name: 'Quần Kaki & Chino',
-      brand_name: 'Minimalist Line',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=800', is_primary: true, alt: 'Quần kaki chino' },
-      ],
-      variants: [
-        { sku: 'QK-CHINO-11-30-DEN', size: '30', color: 'Đen', price: 480000, stock: 40 },
-        { sku: 'QK-CHINO-11-31-DEN', size: '31', color: 'Đen', price: 480000, stock: 30 },
-      ],
-    },
-    {
-      product_name: 'Quần Tây Trouser Xếp Ly Lưng Cao',
-      description: 'Quần tây xếp ly cổ điển, chất vải tuýt si đứng phom chống nhăn cao cấp.',
-      category_name: 'Quần Tây & Trouser',
-      brand_name: 'Atelier Elegance',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=800', is_primary: true, alt: 'Quần tây trouser' },
-      ],
-      variants: [
-        { sku: 'QT-TROUSER-12-M-XAM', size: 'M', color: 'Xám Ghi', price: 520000, stock: 22 },
-        { sku: 'QT-TROUSER-12-L-XAM', size: 'L', color: 'Xám Ghi', price: 520000, stock: 18 },
-      ],
-    },
-    {
-      product_name: 'Quần Jogger Thể Thao Bo Gấu Năng Động',
-      description: 'Quần jogger thun cotton 4 chiều mềm mại, thích hợp cho tập luyện và vận động.',
-      category_name: 'Quần Jogger & Thể thao',
-      brand_name: 'Sporty Activewear',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1552902865-b72c031ac5ea?w=800', is_primary: true, alt: 'Quần jogger thể thao' },
-      ],
-      variants: [
-        { sku: 'QJ-JOGGER-13-M-DEN', size: 'M', color: 'Đen', price: 410000, stock: 50 },
-        { sku: 'QJ-JOGGER-13-L-DEN', size: 'L', color: 'Đen', price: 410000, stock: 45 },
-      ],
-    },
-    {
-      product_name: 'Chân Váy Xếp Ly Dáng A Midi Công Sở',
-      description: 'Chân váy Midi xếp ly dài thanh lịch, dễ dàng kết hợp với áo sơ mi hay áo thun.',
-      category_name: 'Chân Váy',
-      brand_name: 'Signature Atelier',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=800', is_primary: true, alt: 'Chân váy midi' },
-      ],
-      variants: [
-        { sku: 'CV-MIDI-14-S-BE', size: 'S', color: 'Kem Be', price: 420000, stock: 20 },
-        { sku: 'CV-MIDI-14-M-BE', size: 'M', color: 'Kem Be', price: 420000, stock: 25 },
-      ],
-    },
-    {
-      product_name: 'Áo Len Cổ Lọ Wool Mềm Mịn Thu Đông',
-      description: 'Áo len cổ cao sợi Wool chọn lọc giữ ấm vượt trội, mặt vải mịn màng không gây ngứa.',
-      category_name: 'Đồ Đông & Áo Len',
-      brand_name: 'Nordic Pure',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1576871337632-b9aef4c17ab9?w=800', is_primary: true, alt: 'Áo len cổ lọ' },
-      ],
-      variants: [
-        { sku: 'AL-COLO-15-M-NAU', size: 'M', color: 'Nâu Đất', price: 650000, stock: 15 },
-        { sku: 'AL-COLO-15-L-NAU', size: 'L', color: 'Nâu Đất', price: 650000, stock: 12 },
-      ],
-    },
-    {
-      product_name: 'Áo Thun Unisex Acid Wash Streetwear',
-      description: 'Áo thun công nghệ nhuộm Acid Wash tạo hiệu ứng màu loang phá cách bụi bặm.',
-      category_name: 'Áo thun',
-      brand_name: 'Tokyo Underground',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800', is_primary: true, alt: 'Áo thun acid wash' },
-      ],
-      variants: [
-        { sku: 'AT-ACID-16-M-XAM', size: 'M', color: 'Xám Loang', price: 320000, stock: 30 },
-        { sku: 'AT-ACID-16-L-XAM', size: 'L', color: 'Xám Loang', price: 320000, stock: 28 },
-      ],
-    },
-    {
-      product_name: 'Áo Sơ Mi Linen Cổ Tàu Thoáng Mát',
-      description: 'Áo sơ mi chất liệu 100% Linen tự nhiên, thiết kế cổ tàu hiện đại mộc mạc.',
-      category_name: 'Áo sơ mi',
-      brand_name: 'Eco Style Co.',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=800', is_primary: true, alt: 'Áo sơ mi linen cổ tàu' },
-      ],
-      variants: [
-        { sku: 'SM-LINEN-17-M-TRANG', size: 'M', color: 'Trắng Ngà', price: 490000, stock: 20 },
-        { sku: 'SM-LINEN-17-L-TRANG', size: 'L', color: 'Trắng Ngà', price: 490000, stock: 18 },
-      ],
-    },
-    {
-      product_name: 'Áo Sweater Nỉ Bông In Chữ Typography',
-      description: 'Áo sweater cổ tròn vải nỉ chần bông êm ái, họa tiết in nổi thêu tinh tế.',
-      category_name: 'Áo Hoodie & Sweater',
-      brand_name: 'Street Vibe Couture',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=800', is_primary: true, alt: 'Áo sweater nỉ bông' },
-      ],
-      variants: [
-        { sku: 'SW-TYPO-18-M-REU', size: 'M', color: 'Xanh Rêu', price: 550000, stock: 25 },
-        { sku: 'SW-TYPO-18-L-REU', size: 'L', color: 'Xanh Rêu', price: 550000, stock: 22 },
-      ],
-    },
-    {
-      product_name: 'Balo Canvas Vintage Chống Nước Chứa Laptop',
-      description: 'Balo bằng chất liệu vải Canvas cao cấp kết hợp chi tiết da thật, chống thấm nước tốt.',
-      category_name: 'Túi Xách & Balo',
-      brand_name: 'Heritage Vintage',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800', is_primary: true, alt: 'Balo canvas vintage' },
-      ],
-      variants: [
-        { sku: 'BL-CANVAS-19-FREE-BO', size: 'FreeSize', color: 'Nâu Bò', price: 620000, stock: 15 },
-      ],
-    },
-    {
-      product_name: 'Túi Xách Da Pu Thêu Họa Tiết Cao Cấp',
-      description: 'Túi xách tay da cao cấp mềm mịn, thiết kế phom dáng vuông vắn tinh tế.',
-      category_name: 'Túi Xách & Balo',
-      brand_name: 'Modern Luxe',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800', is_primary: true, alt: 'Túi xách da' },
-      ],
-      variants: [
-        { sku: 'TX-DA-20-FREE-DEN', size: 'FreeSize', color: 'Đen Tuyển', price: 890000, stock: 10 },
-      ],
-    },
-    {
-      product_name: 'Giày Sneaker Retro Leather Phối Màu',
-      description: 'Giày thể thao da tự nhiên phối màu cổ điển retro, đế cao su chống trơn trượt.',
-      category_name: 'Giày & Sandal',
-      brand_name: 'Sporty Activewear',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=800', is_primary: true, alt: 'Giày sneaker retro' },
-      ],
-      variants: [
-        { sku: 'SN-RETRO-21-40-TRANG', size: '40', color: 'Trắng Phối Đỏ', price: 1150000, stock: 14 },
-        { sku: 'SN-RETRO-21-41-TRANG', size: '41', color: 'Trắng Phối Đỏ', price: 1150000, stock: 12 },
-      ],
-    },
-    {
-      product_name: 'Sandal Da Quai Ngang Đế Trấu Tự Nhiên',
-      description: 'Dép sandal thiết kế quai da thật đế gỗ trấu tự nhiên ôm chân thông thoáng.',
-      category_name: 'Giày & Sandal',
-      brand_name: 'Eco Style Co.',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1603808033192-082d6919d3e1?w=800', is_primary: true, alt: 'Sandal đế trấu' },
-      ],
-      variants: [
-        { sku: 'SD-TRAU-22-39-NAU', size: '39', color: 'Nâu Da', price: 580000, stock: 20 },
-        { sku: 'SD-TRAU-22-40-NAU', size: '40', color: 'Nâu Da', price: 580000, stock: 18 },
-      ],
-    },
-    {
-      product_name: 'Mũ Beanie Dệt Kim Phong Cách Minimalist',
-      description: 'Nón len beanie giữ ấm tai mùa lạnh, vải dệt kim mềm mịn co giãn tốt.',
-      category_name: 'Mũ & Nón Thời Trang',
-      brand_name: 'Minimalist Line',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1576871337622-98d48d1cf531?w=800', is_primary: true, alt: 'Mũ beanie len' },
-      ],
-      variants: [
-        { sku: 'MB-LEN-23-FREE-DEN', size: 'FreeSize', color: 'Đen', price: 190000, stock: 50 },
-      ],
-    },
-    {
-      product_name: 'Mũ Cap Lưỡi Trai Thêu Logo Vintage',
-      description: 'Nón lưỡi trai phom unisex chuẩn đẹp, nấc cài kim loại chỉnh size linh hoạt.',
-      category_name: 'Mũ & Nón Thời Trang',
-      brand_name: 'Urban Streetwear',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=800', is_primary: true, alt: 'Mũ lưỡi trai vintage' },
-      ],
-      variants: [
-        { sku: 'MC-VINTAGE-24-FREE-NAVY', size: 'FreeSize', color: 'Xanh Navy', price: 220000, stock: 40 },
-      ],
-    },
-    {
-      product_name: 'Thắt Lưng Da Bò Thật Khóa Kim Tinh Tế',
-      description: 'Thắt lưng da nguyên tấm bền đẹp theo thời gian, đầu khóa hợp kim không gỉ.',
-      category_name: 'Thắt Lưng & Ví Da',
-      brand_name: 'Signature Atelier',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1624222247344-550fb60583dc?w=800', is_primary: true, alt: 'Thắt lưng da bò' },
-      ],
-      variants: [
-        { sku: 'TL-DABO-25-FREE-DEN', size: 'FreeSize', color: 'Đen', price: 380000, stock: 30 },
-      ],
-    },
-    {
-      product_name: 'Kính Mát Chống Tia UV Gọng Kim Loại',
-      description: 'Kính mát chống lóa mắt chống tia UV400, gọng kim loại mạ titan siêu nhẹ.',
-      category_name: 'Kính Mát Thời Trang',
-      brand_name: 'Modern Luxe',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=800', is_primary: true, alt: 'Kính mát gọng titan' },
-      ],
-      variants: [
-        { sku: 'KM-TITAN-26-FREE-VANG', size: 'FreeSize', color: 'Gọng Vàng Tráng Gương', price: 450000, stock: 25 },
-      ],
-    },
-    {
-      product_name: 'Khăn Quàng Len Cashmere Ấm Áp Mùa Đông',
-      description: 'Khăn quàng cổ chất liệu Cashmere siêu nhẹ giữ nhiệt tối đa, phối tua rua duyên dáng.',
-      category_name: 'Khăn Quàng & Phụ Kiện',
-      brand_name: 'Nordic Pure',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1520903920243-00d872a2d1c9?w=800', is_primary: true, alt: 'Khăn quàng cashmere' },
-      ],
-      variants: [
-        { sku: 'KQ-CASHMERE-27-FREE-XAM', size: 'FreeSize', color: 'Xám Ghi', price: 340000, stock: 30 },
-      ],
-    },
-    {
-      product_name: 'Bộ Đồ Tập Gym Yoga Co Giãn 4 Chiều',
-      description: 'Set trang phục thể thao bao gồm áo bra định hình và quần legging cạp cao tôn dáng.',
-      category_name: 'Bộ Đồ Thể Thao',
-      brand_name: 'Sporty Activewear',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1518310383802-640c2de311b2?w=800', is_primary: true, alt: 'Bộ đồ tập gym yoga' },
-      ],
-      variants: [
-        { sku: 'BD-GYM-28-S-HONG', size: 'S', color: 'Hồng Đất', price: 690000, stock: 20 },
-        { sku: 'BD-GYM-28-M-HONG', size: 'M', color: 'Hồng Đất', price: 690000, stock: 18 },
-      ],
-    },
-    {
-      product_name: 'Bộ Đồ Mặc Nhà Silk Pyjama Cao Cấp',
-      description: 'Bộ lụa mặc nhà tay dài quần dài, chất lụa lướt trên da mềm mịn quý phái.',
-      category_name: 'Đồ Lót & Đồ Mặc Nhà',
-      brand_name: 'Atelier Elegance',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=800', is_primary: true, alt: 'Bộ lụa pyjama' },
-      ],
-      variants: [
-        { sku: 'PJ-SILK-29-M-XANH', size: 'M', color: 'Xanh Ngọc', price: 750000, stock: 15 },
-        { sku: 'PJ-SILK-29-L-XANH', size: 'L', color: 'Xanh Ngọc', price: 750000, stock: 12 },
-      ],
-    },
-    {
-      product_name: 'Áo Khoác Denim Vintage Oversize Unisex',
-      description: 'Áo khoác chất denim xắt dày dặn, xử lý wash mài retro cá tính mạnh mẽ.',
-      category_name: 'Áo khoác & Jacket',
-      brand_name: 'Denim Crafter',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=800', is_primary: true, alt: 'Áo khoác denim' },
-      ],
-      variants: [
-        { sku: 'JK-DENIM-30-M-XANHDAM', size: 'M', color: 'Xanh Đậm Wash', price: 820000, stock: 20 },
-        { sku: 'JK-DENIM-30-L-XANHDAM', size: 'L', color: 'Xanh Đậm Wash', price: 820000, stock: 15 },
-      ],
-    },
-    {
-      product_name: 'Đầm Dạ Hội Cổ Lệch Đính Đá Điệu Đà',
-      description: 'Đầm dạ hội đuôi cá quyến rũ, chất đính đá may tay công phu cho các buổi tiệc đêm.',
-      category_name: 'Trang Phục Dạ Hội',
-      brand_name: 'Atelier Elegance',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=800', is_primary: true, alt: 'Đầm dạ hội đính đá' },
-      ],
-      variants: [
-        { sku: 'DH-DINHDA-31-S-DEN', size: 'S', color: 'Đen Huyền Bí', price: 2800000, stock: 5 },
-        { sku: 'DH-DINHDA-31-M-DEN', size: 'M', color: 'Đen Huyền Bí', price: 2800000, stock: 7 },
-      ],
-    },
-    {
-      product_name: 'Áo Bơi Bikini 2 Mảnh Mùa Hè Rực Rỡ',
-      description: 'Bộ đồ bơi 2 mảnh chất thun bơi chống tia UV, mau khô, sắc màu hè nhiệt đới.',
-      category_name: 'Đồ Bơi & Mùa Hè',
-      brand_name: 'YouthFashion Studio',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', is_primary: true, alt: 'Bộ bơi bikini' },
-      ],
-      variants: [
-        { sku: 'BK-SUMMER-32-S-VANG', size: 'S', color: 'Vàng Rực Rỡ', price: 490000, stock: 15 },
-        { sku: 'BK-SUMMER-32-M-VANG', size: 'M', color: 'Vàng Rực Rỡ', price: 490000, stock: 20 },
-      ],
-    },
-    {
-      product_name: 'Áo sơ mi Flannel Kẻ Caro Phong Cách Grunge',
-      description: 'Áo sơ mi dạ flannel kẻ ô caro cá tính, khoác ngoài hay mặc đơn đều đẹp.',
-      category_name: 'Áo sơ mi',
-      brand_name: 'Urban Streetwear',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1603252109303-2751441dd157?w=800', is_primary: true, alt: 'Áo sơ mi flannel' },
-      ],
-      variants: [
-        { sku: 'SM-FLANNEL-33-M-DO', size: 'M', color: 'Đen Đỏ Caro', price: 460000, stock: 25 },
-        { sku: 'SM-FLANNEL-33-L-DO', size: 'L', color: 'Đen Đỏ Caro', price: 460000, stock: 30 },
-      ],
-    },
-    {
-      product_name: 'Quần Jeans Rách Gối Korean Street Style',
-      description: 'Quần denim may phom cạp cao phá cách rách gối nhẹ bụi bặm cá tính.',
-      category_name: 'Quần Jeans',
-      brand_name: 'Tokyo Underground',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1582552938357-32b906df40cb?w=800', is_primary: true, alt: 'Quần jeans rách gối' },
-      ],
-      variants: [
-        { sku: 'QJ-KOREAN-34-29-XANH', size: '29', color: 'Xanh Phấn', price: 560000, stock: 18 },
-        { sku: 'QJ-KOREAN-34-30-XANH', size: '30', color: 'Xanh Phấn', price: 560000, stock: 22 },
-      ],
-    },
-    {
-      product_name: 'Áo Gilet Vest Không Tay Phong Cách Preppy',
-      description: 'Áo gilet khoác ngoài sơ mi mang đến diện mạo tri thức, trẻ trung cuốn hút.',
-      category_name: 'Áo Vest & Blazer',
-      brand_name: 'Minimalist Line',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1618244972963-dbee1a7edc95?w=800', is_primary: true, alt: 'Áo gilet vest' },
-      ],
-      variants: [
-        { sku: 'GL-PREPPY-35-M-KEM', size: 'M', color: 'Kem Sữa', price: 430000, stock: 20 },
-        { sku: 'GL-PREPPY-35-L-KEM', size: 'L', color: 'Kem Sữa', price: 430000, stock: 15 },
-      ],
-    },
-    {
-      product_name: 'Áo Thun Ba Lỗ Ribbed Tank Top Ôm Dáng',
-      description: 'Áo thun gân gân ôm nhẹ đường nét cơ thể, thấm hút mồ hôi cực tốt.',
-      category_name: 'Áo thun',
-      brand_name: 'Casual Essentials',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1627225924765-552d49cf47ad?w=800', is_primary: true, alt: 'Áo thun ba lỗ' },
-      ],
-      variants: [
-        { sku: 'AT-TANK-36-M-TRANG', size: 'M', color: 'Trắng', price: 180000, stock: 60 },
-        { sku: 'AT-TANK-36-L-TRANG', size: 'L', color: 'Trắng', price: 180000, stock: 50 },
-      ],
-    },
-    // Các sản phẩm chủ đạo trong Tuyển tập Lookbook
-    {
-      product_name: 'Áo Măng Tô Dạ Camel Cashmere',
-      description: 'Cắt may thủ công từ 100% len lông cừu Merino pha Cashmere tự nhiên, cổ bẻ kinh điển cùng thắt lưng tôn dáng sang trọng.',
-      category_name: 'Áo khoác & Jacket',
-      brand_name: 'Atelier Elegance',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=1000', is_primary: true, alt: 'Áo Măng Tô Dạ Camel Cashmere' },
-      ],
-      variants: [
-        { sku: 'MT-CAMEL-01-S', size: 'S', color: 'Camel', price: 3850000, stock: 20 },
-        { sku: 'MT-CAMEL-01-M', size: 'M', color: 'Camel', price: 3850000, stock: 25 },
-        { sku: 'MT-CAMEL-01-L', size: 'L', color: 'Camel', price: 3850000, stock: 15 },
-      ],
-    },
-    {
-      product_name: 'Áo Len Cổ Lọ Cream Knitwear',
-      description: 'Áo len dệt kim cổ lọ mềm mịn cao cấp màu kem thanh lịch, giữ ấm hoàn hảo cho mùa thu đông.',
-      category_name: 'Đồ Đông & Áo Len',
-      brand_name: 'Nordic Pure',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1576871337632-b9aef4c17ab9?auto=format&fit=crop&q=80&w=800', is_primary: true, alt: 'Áo Len Cổ Lọ Cream Knitwear' },
-      ],
-      variants: [
-        { sku: 'AL-CREAM-02-S', size: 'S', color: 'Kem Cream', price: 950000, stock: 30 },
-        { sku: 'AL-CREAM-02-M', size: 'M', color: 'Kem Cream', price: 950000, stock: 35 },
-        { sku: 'AL-CREAM-02-L', size: 'L', color: 'Kem Cream', price: 950000, stock: 20 },
-      ],
-    },
-    {
-      product_name: 'Quần Âu Ống Suông Wool Tencel',
-      description: 'Quần âu ống suông chất liệu len Wool pha sợi Tencel mềm mượt, phom dáng đứng thanh lịch.',
-      category_name: 'Quần Tây & Trouser',
-      brand_name: 'Atelier Elegance',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1506629082955-511b1aa562c8?auto=format&fit=crop&q=80&w=800', is_primary: true, alt: 'Quần Âu Ống Suông Wool Tencel' },
-      ],
-      variants: [
-        { sku: 'QA-SUONG-03-29', size: '29', color: 'Nâu Be', price: 1250000, stock: 15 },
-        { sku: 'QA-SUONG-03-30', size: '30', color: 'Nâu Be', price: 1250000, stock: 20 },
-        { sku: 'QA-SUONG-03-31', size: '31', color: 'Nâu Be', price: 1250000, stock: 18 },
-      ],
-    },
-    {
-      product_name: 'Đầm Lụa Emerald Pleated Gown',
-      description: 'Chất tơ tằm dệt ánh ngọc lục bảo rực rỡ, đường xếp ly accordion tỉ mỉ tạo độ xòe bồng bềnh tựa dải sóng khi chuyển động.',
-      category_name: 'Váy & Đầm Thiết Kế',
-      brand_name: 'Modern Luxe',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=1000', is_primary: true, alt: 'Đầm Lụa Emerald Pleated Gown' },
-      ],
-      variants: [
-        { sku: 'DL-EMERALD-04-S', size: 'S', color: 'Xanh Emerald', price: 2950000, stock: 10 },
-        { sku: 'DL-EMERALD-04-M', size: 'M', color: 'Xanh Emerald', price: 2950000, stock: 15 },
-        { sku: 'DL-EMERALD-04-L', size: 'L', color: 'Xanh Emerald', price: 2950000, stock: 8 },
-      ],
-    },
-    {
-      product_name: 'Áo Khoác Tweed Ivory Cropped',
-      description: 'Áo khoác dáng ngắn vải tweed dệt sợi len ngà Ivory sang trọng, nút kim loại mạ vàng chạm khắc tỉ mỉ.',
-      category_name: 'Áo Vest & Blazer',
-      brand_name: 'Atelier Elegance',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&q=80&w=800', is_primary: true, alt: 'Áo Khoác Tweed Ivory Cropped' },
-      ],
-      variants: [
-        { sku: 'AK-TWEED-05-S', size: 'S', color: 'Trắng Ivory', price: 2150000, stock: 18 },
-        { sku: 'AK-TWEED-05-M', size: 'M', color: 'Trắng Ivory', price: 2150000, stock: 22 },
-      ],
-    },
-    {
-      product_name: 'Quần Tây Slim Fit Black',
-      description: 'Quần tây phom ôm nhẹ tôn dáng màu đen tuyền kinh điển, chống nhăn đứng dáng.',
-      category_name: 'Quần Tây & Trouser',
-      brand_name: 'Minimalist Line',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=800', is_primary: true, alt: 'Quần Tây Slim Fit Black' },
-      ],
-      variants: [
-        { sku: 'QT-SLIM-06-29', size: '29', color: 'Đen Tuyền', price: 890000, stock: 25 },
-        { sku: 'QT-SLIM-06-30', size: '30', color: 'Đen Tuyền', price: 890000, stock: 30 },
-        { sku: 'QT-SLIM-06-31', size: '31', color: 'Đen Tuyền', price: 890000, stock: 20 },
-      ],
-    },
-    {
-      product_name: 'Áo Blazer Kẻ Sọc Pinstripe',
-      description: 'Áo blazer kẻ sọc pinstripe tinh xảo, phom dáng oversize hiện đại mang phong cách Modern Tailoring.',
-      category_name: 'Áo Vest & Blazer',
-      brand_name: 'Signature Atelier',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=800', is_primary: true, alt: 'Áo Blazer Kẻ Sọc Pinstripe' },
-      ],
-      variants: [
-        { sku: 'BL-STRIPE-07-M', size: 'M', color: 'Ghi Xám Kẻ', price: 1950000, stock: 15 },
-        { sku: 'BL-STRIPE-07-L', size: 'L', color: 'Ghi Xám Kẻ', price: 1950000, stock: 12 },
-      ],
-    },
-    {
-      product_name: 'Sơ Mi Poplin Cotton Trắng',
-      description: 'Áo sơ mi vải Poplin 100% cotton dệt mật độ cao đanh mịn, cổ đứng kinh điển thanh lịch.',
-      category_name: 'Áo sơ mi',
-      brand_name: 'Casual Essentials',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=800', is_primary: true, alt: 'Sơ Mi Poplin Cotton Trắng' },
-      ],
-      variants: [
-        { sku: 'SM-POPLIN-08-S', size: 'S', color: 'Trắng Tinh Khôi', price: 750000, stock: 30 },
-        { sku: 'SM-POPLIN-08-M', size: 'M', color: 'Trắng Tinh Khôi', price: 750000, stock: 40 },
-        { sku: 'SM-POPLIN-08-L', size: 'L', color: 'Trắng Tinh Khôi', price: 750000, stock: 25 },
-      ],
-    },
-    {
-      product_name: 'Bốt Da Nappa Cổ Điển',
-      description: 'Bốt da nappa thật cao cấp, phom mũi vuông thời thượng gót 5cm êm ái tôn dáng.',
-      category_name: 'Giày & Sandal',
-      brand_name: 'Modern Luxe',
-      images: [
-        { url: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=800', is_primary: true, alt: 'Bốt Da Nappa Cổ Điển' },
-      ],
-      variants: [
-        { sku: 'BT-NAPPA-09-37', size: '37', color: 'Đen Da Nappa', price: 2100000, stock: 10 },
-        { sku: 'BT-NAPPA-09-38', size: '38', color: 'Đen Da Nappa', price: 2100000, stock: 14 },
-        { sku: 'BT-NAPPA-09-39', size: '39', color: 'Đen Da Nappa', price: 2100000, stock: 8 },
-      ],
-    },
-  ];
+  {
+    "product_name": "Áo Thun Oversize Unisex Màu Đen",
+    "description": "Áo thun màu đen chất liệu 100% Cotton định lượng cao cấp, thoáng mát, phom dáng oversize dạo phố trẻ trung năng động.",
+    "category_name": "Áo thun",
+    "brand_name": "YouthFashion Studio",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800",
+        "is_primary": true,
+        "alt": "Áo Thun Oversize Unisex Màu Đen"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800",
+        "is_primary": false,
+        "alt": "Áo thun oversize cận cảnh vải"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "AT-YOUTH-01-S-DEN",
+        "size": "S",
+        "color": "Đen",
+        "price": 250000,
+        "stock": 50
+      },
+      {
+        "sku": "AT-YOUTH-01-M-DEN",
+        "size": "M",
+        "color": "Đen",
+        "price": 250000,
+        "stock": 45
+      },
+      {
+        "sku": "AT-YOUTH-01-L-DEN",
+        "size": "L",
+        "color": "Đen",
+        "price": 250000,
+        "stock": 30
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Sơ Mi Oxford Dài Tay Màu Trắng",
+    "description": "Áo sơ mi màu trắng tinh tế, chất liệu vải Oxford cao cấp chống nhăn, phom dáng hiện đại thanh lịch cho công sở và dạo phố.",
+    "category_name": "Áo sơ mi",
+    "brand_name": "Minimalist Line",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=800",
+        "is_primary": true,
+        "alt": "Áo Sơ Mi Oxford Dài Tay Màu Trắng"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=800",
+        "is_primary": false,
+        "alt": "Áo sơ mi Oxford xanh navy"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "SM-OXFORD-M-TRANG",
+        "size": "M",
+        "color": "Trắng",
+        "price": 350000,
+        "stock": 30
+      },
+      {
+        "sku": "SM-OXFORD-L-TRANG",
+        "size": "L",
+        "color": "Trắng",
+        "price": 350000,
+        "stock": 25
+      }
+    ]
+  },
+  {
+    "product_name": "Quần Jeans Dáng Suông Màu Xanh",
+    "description": "Quần jeans màu xanh denim cổ điển, chất liệu vải bò dày dặn bền đẹp, phom dáng suông thẳng tôn dáng và dễ phối đồ.",
+    "category_name": "Quần Jeans",
+    "brand_name": "Urban Streetwear",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800",
+        "is_primary": true,
+        "alt": "Quần Jeans Dáng Suông Màu Xanh"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1542272604-780c36856d61?w=800",
+        "is_primary": false,
+        "alt": "Chi tiết túi quần jeans"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "QJ-VINTAGE-29-XANH",
+        "size": "29",
+        "color": "Xanh",
+        "price": 420000,
+        "stock": 20
+      },
+      {
+        "sku": "QJ-VINTAGE-30-XANH",
+        "size": "30",
+        "color": "Xanh",
+        "price": 420000,
+        "stock": 35
+      },
+      {
+        "sku": "QJ-VINTAGE-31-XANH",
+        "size": "31",
+        "color": "Xanh",
+        "price": 420000,
+        "stock": 15
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Hoodie Nỉ Bông Có Mũ Màu Xám",
+    "description": "Áo hoodie màu xám phong cách streetwear, chất liệu nỉ bông dày dặn ấm áp, có mũ trùm và túi khóa zip tiện lợi.",
+    "category_name": "Áo Hoodie & Sweater",
+    "brand_name": "Urban Streetwear",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800",
+        "is_primary": true,
+        "alt": "Áo Hoodie Nỉ Bông Có Mũ Màu Xám"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=800",
+        "is_primary": false,
+        "alt": "Áo hoodie streetwear đen"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "HD-STREET-M-XAM",
+        "size": "M",
+        "color": "Xám",
+        "price": 490000,
+        "stock": 25
+      },
+      {
+        "sku": "HD-STREET-L-XAM",
+        "size": "L",
+        "color": "Xám",
+        "price": 490000,
+        "stock": 30
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Khoác Bomber Unisex Màu Đen",
+    "description": "Áo khoác bomber màu đen phong cách thể thao khỏe khoắn, chất vải dù cao cấp chống gió và trượt nước tốt.",
+    "category_name": "Áo khoác & Jacket",
+    "brand_name": "YouthFashion Studio",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1548883354-7622d03aca27?w=800",
+        "is_primary": true,
+        "alt": "Áo Khoác Bomber Unisex Màu Đen"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "JK-BOMBER-M-DEN",
+        "size": "M",
+        "color": "Đen",
+        "price": 550000,
+        "stock": 20
+      },
+      {
+        "sku": "JK-BOMBER-L-DEN",
+        "size": "L",
+        "color": "Đen",
+        "price": 550000,
+        "stock": 15
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Thun Thể Thao Màu Đen",
+    "description": "Áo thun thể thao màu đen chất liệu thun mè thể thao thoáng khí, co giãn tốt cho vận động.",
+    "category_name": "Áo thun",
+    "brand_name": "Urban Streetwear",
+    "images": [
+      {
+        "url": "https://res.cloudinary.com/dpjpdeql3/image/upload/v1789672398/youthfashion/products/x3mygtcqlcszwckdbrda.png",
+        "is_primary": true,
+        "alt": "Áo Thun Thể Thao Màu Đen"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "YOUTH-7644-S",
+        "size": "S",
+        "color": "Đen",
+        "price": 250000,
+        "stock": 50
+      },
+      {
+        "sku": "YOUTH-7644-M",
+        "size": "M",
+        "color": "Đen",
+        "price": 250000,
+        "stock": 50
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Hoodie Nỉ Trơn Màu Đen",
+    "description": "Áo hoodie màu đen chất liệu nỉ bông ấm áp, phom rộng cá tính dạo phố phong cách đường phố.",
+    "category_name": "Áo Hoodie & Sweater",
+    "brand_name": "Urban Streetwear",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1570570134010-818fa41ebfeb?w=800",
+        "is_primary": true,
+        "alt": "Áo Hoodie Nỉ Trơn Màu Đen"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1570570134010-818fa41ebfeb?w=800",
+        "is_primary": false,
+        "alt": "Áo Hoodie Nỉ Trơn Màu Đen"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "HD-STREET-04-M-XAM",
+        "size": "M",
+        "color": "Đen",
+        "price": 680000,
+        "stock": 25
+      },
+      {
+        "sku": "HD-STREET-04-L-DEN",
+        "size": "L",
+        "color": "Đen",
+        "price": 680000,
+        "stock": 40
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Măng Tô Dạ Dáng Dài Màu Nâu",
+    "description": "Áo măng tô dạ màu nâu dáng dài sang trọng, giữ ấm mùa đông tuyệt đối, đường may tinh xảo chuẩn phong cách Hàn Quốc.",
+    "category_name": "Áo khoác & Jacket",
+    "brand_name": "Atelier Elegance",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1579000915039-b91be9e0cbe4?w=800",
+        "is_primary": true,
+        "alt": "Áo Măng Tô Dạ Dáng Dài Màu Nâu"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800",
+        "is_primary": false,
+        "alt": "Áo vest lịch lãm"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "VZ-EURO-06-M-CARO",
+        "size": "M",
+        "color": "Nâu",
+        "price": 1850000,
+        "stock": 12
+      },
+      {
+        "sku": "VZ-EURO-06-L-CARO",
+        "size": "L",
+        "color": "Nâu",
+        "price": 1850000,
+        "stock": 10
+      }
+    ]
+  },
+  {
+    "product_name": "Váy Đầm Dạ Hội Lụa Satin Màu Đỏ",
+    "description": "Đầm dạ hội màu đỏ quyến rũ chất liệu lụa satin cao cấp, thiết kế cổ chữ V xếp ly tôn dáng thanh lịch.",
+    "category_name": "Trang Phục Dạ Hội",
+    "brand_name": "Modern Luxe",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=800",
+        "is_primary": true,
+        "alt": "Váy Đầm Dạ Hội Lụa Satin Màu Đỏ"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "VD-LUA-07-S-RED",
+        "size": "S",
+        "color": "Đỏ",
+        "price": 1450000,
+        "stock": 15
+      },
+      {
+        "sku": "VD-LUA-07-M-RED",
+        "size": "M",
+        "color": "Đỏ",
+        "price": 1450000,
+        "stock": 18
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Khoác Dạ Dáng Dài Màu Be",
+    "description": "Áo khoác dạ màu be thanh lịch, phom suông dài phong cách tối giản giữ ấm mùa thu đông hiệu quả.",
+    "category_name": "Áo khoác & Jacket",
+    "brand_name": "Heritage Vintage",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1544441893-675973e31985?w=800",
+        "is_primary": true,
+        "alt": "Áo Khoác Dạ Dáng Dài Màu Be"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "MT-DA-08-M-BE",
+        "size": "M",
+        "color": "Be",
+        "price": 2200000,
+        "stock": 8
+      },
+      {
+        "sku": "MT-DA-08-L-BE",
+        "size": "L",
+        "color": "Be",
+        "price": 2200000,
+        "stock": 10
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Polo Nam Cổ Bẻ Màu Xanh Lá",
+    "description": "Áo polo màu xanh lá chất liệu dệt kim co giãn thoáng mát, cổ bẻ lịch sự cho nam giới.",
+    "category_name": "Áo Polo",
+    "brand_name": "Casual Essentials",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?w=800",
+        "is_primary": true,
+        "alt": "Áo Polo Nam Cổ Bẻ Màu Xanh Lá"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "PL-DETKIM-09-M-RUE",
+        "size": "M",
+        "color": "Xanh lá",
+        "price": 390000,
+        "stock": 35
+      },
+      {
+        "sku": "PL-DETKIM-09-L-RUE",
+        "size": "L",
+        "color": "Xanh lá",
+        "price": 390000,
+        "stock": 30
+      }
+    ]
+  },
+  {
+    "product_name": "Quần Short Kaki Túi Hộp Màu Vàng",
+    "description": "Quần short màu vàng phong cách cargo túi hộp năng động, chất kaki dày dặn bền đẹp.",
+    "category_name": "Quần Short",
+    "brand_name": "Urban Streetwear",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=800",
+        "is_primary": true,
+        "alt": "Quần Short Kaki Túi Hộp Màu Vàng"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "QS-CARGO-10-M-KHOAN",
+        "size": "M",
+        "color": "Vàng",
+        "price": 350000,
+        "stock": 25
+      },
+      {
+        "sku": "QS-CARGO-10-L-KHOAN",
+        "size": "L",
+        "color": "Vàng",
+        "price": 350000,
+        "stock": 20
+      }
+    ]
+  },
+  {
+    "product_name": "Quần Kaki Chino Slimfit Màu Đen",
+    "description": "Quần kaki màu đen phom ôm vừa vặn, lịch sự, dễ phối cùng áo sơ mi và áo polo.",
+    "category_name": "Quần Kaki & Chino",
+    "brand_name": "Minimalist Line",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=800",
+        "is_primary": true,
+        "alt": "Quần Kaki Chino Slimfit Màu Đen"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "QK-CHINO-11-30-DEN",
+        "size": "30",
+        "color": "Đen",
+        "price": 480000,
+        "stock": 40
+      },
+      {
+        "sku": "QK-CHINO-11-31-DEN",
+        "size": "31",
+        "color": "Đen",
+        "price": 480000,
+        "stock": 30
+      }
+    ]
+  },
+  {
+    "product_name": "Quần Tây Công Sở Xếp Ly Màu Xám",
+    "description": "Quần tây màu xám cạp cao xếp ly, chất vải tuyết mưa đứng phom sang trọng.",
+    "category_name": "Quần Tây & Trouser",
+    "brand_name": "Atelier Elegance",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=800",
+        "is_primary": true,
+        "alt": "Quần Tây Công Sở Xếp Ly Màu Xám"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "QT-TROUSER-12-M-XAM",
+        "size": "M",
+        "color": "Xám",
+        "price": 520000,
+        "stock": 22
+      },
+      {
+        "sku": "QT-TROUSER-12-L-XAM",
+        "size": "L",
+        "color": "Xám",
+        "price": 520000,
+        "stock": 18
+      }
+    ]
+  },
+  {
+    "product_name": "Quần Jogger Thể Thao Bo Gấu Màu Đen",
+    "description": "Quần jogger thể thao màu đen bo gấu khỏe khoắn, chất thun nỉ co giãn thoải mái khi tập luyện.",
+    "category_name": "Quần Jogger & Thể thao",
+    "brand_name": "Sporty Activewear",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1552902865-b72c031ac5ea?w=800",
+        "is_primary": true,
+        "alt": "Quần Jogger Thể Thao Bo Gấu Màu Đen"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "QJ-JOGGER-13-M-DEN",
+        "size": "M",
+        "color": "Đen",
+        "price": 410000,
+        "stock": 50
+      },
+      {
+        "sku": "QJ-JOGGER-13-L-DEN",
+        "size": "L",
+        "color": "Đen",
+        "price": 410000,
+        "stock": 45
+      }
+    ]
+  },
+  {
+    "product_name": "Chân Váy Xếp Ly Dáng Dài Màu Trắng",
+    "description": "Chân váy midi màu trắng xếp ly nhẹ nhàng, nữ tính, dễ dàng kết hợp cùng áo len hoặc sơ mi.",
+    "category_name": "Chân Váy",
+    "brand_name": "Signature Atelier",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=800",
+        "is_primary": true,
+        "alt": "Chân Váy Xếp Ly Dáng Dài Màu Trắng"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "CV-MIDI-14-S-BE",
+        "size": "S",
+        "color": "Trắng",
+        "price": 420000,
+        "stock": 20
+      },
+      {
+        "sku": "CV-MIDI-14-M-BE",
+        "size": "M",
+        "color": "Trắng",
+        "price": 420000,
+        "stock": 25
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Len Dệt Kim Cổ Lọ Màu Nâu",
+    "description": "Áo len cổ lọ màu nâu ấm áp, sợi dệt mềm mại không xù lông, giữ ấm tối ưu cho ngày lạnh.",
+    "category_name": "Đồ Đông & Áo Len",
+    "brand_name": "Nordic Pure",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1576871337632-b9aef4c17ab9?w=800",
+        "is_primary": true,
+        "alt": "Áo Len Dệt Kim Cổ Lọ Màu Nâu"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "AL-COLO-15-M-NAU",
+        "size": "M",
+        "color": "Nâu",
+        "price": 650000,
+        "stock": 15
+      },
+      {
+        "sku": "AL-COLO-15-L-NAU",
+        "size": "L",
+        "color": "Nâu",
+        "price": 650000,
+        "stock": 12
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Thun Unisex Loang Màu Xám",
+    "description": "Áo thun màu xám hiệu ứng acid wash cá tính, chất cotton 100% thoáng mát phong cách dạo phố.",
+    "category_name": "Áo thun",
+    "brand_name": "Tokyo Underground",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800",
+        "is_primary": true,
+        "alt": "Áo Thun Unisex Loang Màu Xám"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "AT-ACID-16-M-XAM",
+        "size": "M",
+        "color": "Xám",
+        "price": 320000,
+        "stock": 30
+      },
+      {
+        "sku": "AT-ACID-16-L-XAM",
+        "size": "L",
+        "color": "Xám",
+        "price": 320000,
+        "stock": 28
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Sơ Mi Vải Đũi Cổ Tàu Màu Trắng",
+    "description": "Áo sơ mi cổ tàu màu trắng chất liệu đũi linen tự nhiên, thấm hút mồ hôi và thoáng mát mùa hè.",
+    "category_name": "Áo sơ mi",
+    "brand_name": "Eco Style Co.",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=800",
+        "is_primary": true,
+        "alt": "Áo Sơ Mi Vải Đũi Cổ Tàu Màu Trắng"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "SM-LINEN-17-M-TRANG",
+        "size": "M",
+        "color": "Trắng",
+        "price": 490000,
+        "stock": 20
+      },
+      {
+        "sku": "SM-LINEN-17-L-TRANG",
+        "size": "L",
+        "color": "Trắng",
+        "price": 490000,
+        "stock": 18
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Sweater Nỉ Cổ Tròn Màu Xanh Lá",
+    "description": "Áo sweater màu xanh lá chất liệu nỉ bông mềm mịn, in chữ typography tối giản năng động.",
+    "category_name": "Áo Hoodie & Sweater",
+    "brand_name": "Street Vibe Couture",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=800",
+        "is_primary": true,
+        "alt": "Áo Sweater Nỉ Cổ Tròn Màu Xanh Lá"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "SW-TYPO-18-M-REU",
+        "size": "M",
+        "color": "Xanh lá",
+        "price": 550000,
+        "stock": 24
+      },
+      {
+        "sku": "SW-TYPO-18-L-REU",
+        "size": "L",
+        "color": "Xanh lá",
+        "price": 550000,
+        "stock": 22
+      }
+    ]
+  },
+  {
+    "product_name": "Balo Vải Canvas Laptop Màu Nâu",
+    "description": "Balo màu nâu chất liệu vải canvas chống thấm nước, nhiều ngăn chứa laptop 15.6 inch tiện dụng.",
+    "category_name": "Túi Xách & Balo",
+    "brand_name": "Heritage Vintage",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800",
+        "is_primary": true,
+        "alt": "Balo Vải Canvas Laptop Màu Nâu"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "BL-CANVAS-19-FREE-BO",
+        "size": "FreeSize",
+        "color": "Nâu",
+        "price": 620000,
+        "stock": 15
+      }
+    ]
+  },
+  {
+    "product_name": "Túi Xách Nữ Da Pu Màu Đen",
+    "description": "Túi xách tay nữ màu đen chất da PU cao cấp, phom cứng cáp sang trọng phù hợp đi làm và dự tiệc.",
+    "category_name": "Túi Xách & Balo",
+    "brand_name": "Modern Luxe",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800",
+        "is_primary": true,
+        "alt": "Túi Xách Nữ Da Pu Màu Đen"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "TX-DA-20-FREE-DEN",
+        "size": "FreeSize",
+        "color": "Đen",
+        "price": 890000,
+        "stock": 10
+      }
+    ]
+  },
+  {
+    "product_name": "Giày Sneaker Thể Thao Cổ Thấp Màu Trắng",
+    "description": "Giày sneaker màu trắng thiết kế retro thể thao, đế cao su êm ái chống trơn trượt.",
+    "category_name": "Giày & Sandal",
+    "brand_name": "Sporty Activewear",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=800",
+        "is_primary": true,
+        "alt": "Giày Sneaker Thể Thao Cổ Thấp Màu Trắng"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "SN-RETRO-21-40-TRANG",
+        "size": "40",
+        "color": "Trắng",
+        "price": 1150000,
+        "stock": 14
+      },
+      {
+        "sku": "SN-RETRO-21-41-TRANG",
+        "size": "41",
+        "color": "Trắng",
+        "price": 1150000,
+        "stock": 12
+      }
+    ]
+  },
+  {
+    "product_name": "Dép Sandal Da Quai Ngang Màu Nâu",
+    "description": "Sandal màu nâu đế trấu tự nhiên, quai da bền chắc êm chân khi di chuyển ngoài trời.",
+    "category_name": "Giày & Sandal",
+    "brand_name": "Eco Style Co.",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1603808033192-082d6919d3e1?w=800",
+        "is_primary": true,
+        "alt": "Dép Sandal Da Quai Ngang Màu Nâu"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "SD-TRAU-22-39-NAU",
+        "size": "39",
+        "color": "Nâu",
+        "price": 580000,
+        "stock": 20
+      },
+      {
+        "sku": "SD-TRAU-22-40-NAU",
+        "size": "40",
+        "color": "Nâu",
+        "price": 580000,
+        "stock": 18
+      }
+    ]
+  },
+  {
+    "product_name": "Mũ Len Beanie Dệt Kim Màu Đen",
+    "description": "Mũ len beanie màu đen dệt kim co giãn, giữ ấm đầu phong cách tối giản.",
+    "category_name": "Mũ & Nón Thời Trang",
+    "brand_name": "Minimalist Line",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1576871337622-98d48d1cf531?w=800",
+        "is_primary": true,
+        "alt": "Mũ Len Beanie Dệt Kim Màu Đen"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "MB-LEN-23-FREE-DEN",
+        "size": "FreeSize",
+        "color": "Đen",
+        "price": 190000,
+        "stock": 50
+      }
+    ]
+  },
+  {
+    "product_name": "Mũ Lưỡi Trai Nón Kết Màu Xanh",
+    "description": "Nón lưỡi trai màu xanh chất liệu kaki cotton thoáng mát, thêu logo nổi bật.",
+    "category_name": "Mũ & Nón Thời Trang",
+    "brand_name": "Urban Streetwear",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=800",
+        "is_primary": true,
+        "alt": "Mũ Lưỡi Trai Nón Kết Màu Xanh"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "MC-VINTAGE-24-FREE-NAVY",
+        "size": "FreeSize",
+        "color": "Xanh",
+        "price": 220000,
+        "stock": 40
+      }
+    ]
+  },
+  {
+    "product_name": "Thắt Lưng Da Nam Mặt Kim Màu Đen",
+    "description": "Thắt lưng nam màu đen chất da bò cao cấp, khóa kim kim loại chống gỉ tinh tế.",
+    "category_name": "Thắt Lưng & Ví Da",
+    "brand_name": "Signature Atelier",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1624222247344-550fb60583dc?w=800",
+        "is_primary": true,
+        "alt": "Thắt Lưng Da Nam Mặt Kim Màu Đen"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "TL-DABO-25-FREE-DEN",
+        "size": "FreeSize",
+        "color": "Đen",
+        "price": 380000,
+        "stock": 30
+      }
+    ]
+  },
+  {
+    "product_name": "Kính Mát Gọng Kim Loại Màu Vàng",
+    "description": "Kính râm thời trang gọng mạ màu vàng, tròng kính polarized chống lóa và chống tia UV400.",
+    "category_name": "Kính Mát Thời Trang",
+    "brand_name": "Modern Luxe",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=800",
+        "is_primary": true,
+        "alt": "Kính Mát Gọng Kim Loại Màu Vàng"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "KM-TITAN-26-FREE-VANG",
+        "size": "FreeSize",
+        "color": "Vàng",
+        "price": 450000,
+        "stock": 25
+      }
+    ]
+  },
+  {
+    "product_name": "Khăn Quàng Cổ Len Mùa Đông Màu Xám",
+    "description": "Khăn quàng cổ màu xám chất liệu len cashmere mềm mại, giữ ấm cơ thể trong mùa đông giá lạnh.",
+    "category_name": "Khăn Quàng & Phụ Kiện",
+    "brand_name": "Nordic Pure",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1520903920243-00d872a2d1c9?w=800",
+        "is_primary": true,
+        "alt": "Khăn Quàng Cổ Len Mùa Đông Màu Xám"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "KQ-CASHMERE-27-FREE-XAM",
+        "size": "FreeSize",
+        "color": "Xám",
+        "price": 340000,
+        "stock": 30
+      }
+    ]
+  },
+  {
+    "product_name": "Bộ Đồ Tập Gym Yoga Nữ Màu Hồng",
+    "description": "Set đồ tập gym yoga nữ màu hồng gồm áo bra thể thao và quần legging co giãn 4 chiều.",
+    "category_name": "Bộ Đồ Thể Thao",
+    "brand_name": "Sporty Activewear",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1518310383802-640c2de311b2?w=800",
+        "is_primary": true,
+        "alt": "Bộ Đồ Tập Gym Yoga Nữ Màu Hồng"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "BD-GYM-28-S-HONG",
+        "size": "S",
+        "color": "Hồng",
+        "price": 690000,
+        "stock": 20
+      },
+      {
+        "sku": "BD-GYM-28-M-HONG",
+        "size": "M",
+        "color": "Hồng",
+        "price": 690000,
+        "stock": 18
+      }
+    ]
+  },
+  {
+    "product_name": "Bộ Đồ Mặc Nhà Lụa Pyjama Màu Xanh",
+    "description": "Bộ pyjama mặc nhà màu xanh chất lụa satin bóng mượt, thoáng mát và mềm mại trên làn da.",
+    "category_name": "Đồ Lót & Đồ Mặc Nhà",
+    "brand_name": "Atelier Elegance",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=800",
+        "is_primary": true,
+        "alt": "Bộ Đồ Mặc Nhà Lụa Pyjama Màu Xanh"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "PJ-SILK-29-M-XANH",
+        "size": "M",
+        "color": "Xanh",
+        "price": 750000,
+        "stock": 15
+      },
+      {
+        "sku": "PJ-SILK-29-L-XANH",
+        "size": "L",
+        "color": "Xanh",
+        "price": 750000,
+        "stock": 12
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Khoác Denim Bò Cổ Bẻ Màu Xanh",
+    "description": "Áo khoác bò denim màu xanh wash cổ điển, chất vải jean dày dặn phong cách bụi bặm.",
+    "category_name": "Áo khoác & Jacket",
+    "brand_name": "Denim Crafter",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=800",
+        "is_primary": true,
+        "alt": "Áo Khoác Denim Bò Cổ Bẻ Màu Xanh"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "JK-DENIM-30-M-XANHDAM",
+        "size": "M",
+        "color": "Xanh",
+        "price": 820000,
+        "stock": 20
+      },
+      {
+        "sku": "JK-DENIM-30-L-XANHDAM",
+        "size": "L",
+        "color": "Xanh",
+        "price": 820000,
+        "stock": 15
+      }
+    ]
+  },
+  {
+    "product_name": "Đầm Dạ Hội Dáng Dài Màu Đen",
+    "description": "Đầm dạ hội màu đen xẻ tà sang trọng, đính đá viền cổ nổi bật trong các buổi dạ tiệc.",
+    "category_name": "Trang Phục Dạ Hội",
+    "brand_name": "Atelier Elegance",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=800",
+        "is_primary": true,
+        "alt": "Đầm Dạ Hội Dáng Dài Màu Đen"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "DH-DINHDA-31-S-DEN",
+        "size": "S",
+        "color": "Đen",
+        "price": 2800000,
+        "stock": 5
+      },
+      {
+        "sku": "DH-DINHDA-31-M-DEN",
+        "size": "M",
+        "color": "Đen",
+        "price": 2800000,
+        "stock": 7
+      }
+    ]
+  },
+  {
+    "product_name": "Bộ Đồ Bơi Đi Biển 2 Mảnh Màu Vàng",
+    "description": "Bộ đồ bơi bikini 2 mảnh màu vàng tươi tắn, chất liệu thun bơi chống nước co giãn ôm dáng.",
+    "category_name": "Đồ Bơi & Mùa Hè",
+    "brand_name": "YouthFashion Studio",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800",
+        "is_primary": true,
+        "alt": "Bộ Đồ Bơi Đi Biển 2 Mảnh Màu Vàng"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "BK-SUMMER-32-S-VANG",
+        "size": "S",
+        "color": "Vàng",
+        "price": 490000,
+        "stock": 15
+      },
+      {
+        "sku": "BK-SUMMER-32-M-VANG",
+        "size": "M",
+        "color": "Vàng",
+        "price": 490000,
+        "stock": 20
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Sơ Mi Flannel Kẻ Caro Màu Đỏ",
+    "description": "Áo sơ mi flannel dạ kẻ caro màu đỏ phối đen, phom rộng phong cách grunge đường phố.",
+    "category_name": "Áo sơ mi",
+    "brand_name": "Urban Streetwear",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1603252109303-2751441dd157?w=800",
+        "is_primary": true,
+        "alt": "Áo Sơ Mi Flannel Kẻ Caro Màu Đỏ"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "SM-FLANNEL-33-M-DO",
+        "size": "M",
+        "color": "Đỏ",
+        "price": 460000,
+        "stock": 25
+      },
+      {
+        "sku": "SM-FLANNEL-33-L-DO",
+        "size": "L",
+        "color": "Đỏ",
+        "price": 460000,
+        "stock": 30
+      }
+    ]
+  },
+  {
+    "product_name": "Quần Jeans Rách Gối Màu Xanh",
+    "description": "Quần jeans màu xanh nhạt rách gối cá tính, chất denim cao cấp chuẩn phong cách Hàn Quốc.",
+    "category_name": "Quần Jeans",
+    "brand_name": "Tokyo Underground",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1582552938357-32b906df40cb?w=800",
+        "is_primary": true,
+        "alt": "Quần Jeans Rách Gối Màu Xanh"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "QJ-KOREAN-34-29-XANH",
+        "size": "29",
+        "color": "Xanh",
+        "price": 560000,
+        "stock": 18
+      },
+      {
+        "sku": "QJ-KOREAN-34-30-XANH",
+        "size": "30",
+        "color": "Xanh",
+        "price": 560000,
+        "stock": 22
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Gilet Len Không Tay Màu Trắng",
+    "description": "Áo gilet len không tay màu trắng cổ tim, thích hợp phối layer cùng áo sơ mi phong cách preppy.",
+    "category_name": "Áo Vest & Blazer",
+    "brand_name": "Minimalist Line",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1618244972963-dbee1a7edc95?w=800",
+        "is_primary": true,
+        "alt": "Áo Gilet Len Không Tay Màu Trắng"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "GL-PREPPY-35-M-KEM",
+        "size": "M",
+        "color": "Trắng",
+        "price": 430000,
+        "stock": 20
+      },
+      {
+        "sku": "GL-PREPPY-35-L-KEM",
+        "size": "L",
+        "color": "Trắng",
+        "price": 430000,
+        "stock": 15
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Thun Ba Lỗ Ôm Dáng Màu Trắng",
+    "description": "Áo thun ba lỗ màu trắng chất liệu vải tăm co giãn ôm dáng, thoáng mát và quyến rũ.",
+    "category_name": "Áo thun",
+    "brand_name": "Casual Essentials",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1627225924765-552d49cf47ad?w=800",
+        "is_primary": true,
+        "alt": "Áo Thun Ba Lỗ Ôm Dáng Màu Trắng"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "AT-TANK-36-M-TRANG",
+        "size": "M",
+        "color": "Trắng",
+        "price": 180000,
+        "stock": 60
+      },
+      {
+        "sku": "AT-TANK-36-L-TRANG",
+        "size": "L",
+        "color": "Trắng",
+        "price": 180000,
+        "stock": 50
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Thun Thể Thao In Họa Tiết Màu Đen",
+    "description": "Áo thun thể thao màu đen in logo sắc nét, chất thun lạnh thấm hút mồ hôi tối ưu.",
+    "category_name": "Áo thun",
+    "brand_name": "Atelier Elegance",
+    "images": [
+      {
+        "url": "https://res.cloudinary.com/dpjpdeql3/image/upload/v1791886580/youthfashion/products/orqxrcz1ccnldzjesfvr.jpg",
+        "is_primary": true,
+        "alt": "Áo Thun Thể Thao In Họa Tiết Màu Đen"
+      },
+      {
+        "url": "https://res.cloudinary.com/dpjpdeql3/image/upload/v1791886580/youthfashion/products/stzz03uzrhcc2wdlva9k.jpg",
+        "is_primary": false,
+        "alt": "Áo MU - 2"
+      },
+      {
+        "url": "https://res.cloudinary.com/dpjpdeql3/image/upload/v1791886581/youthfashion/products/abiqswaxuiiktl2glzn2.png",
+        "is_primary": false,
+        "alt": "Áo MU - 3"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "YOUTH-7370-S",
+        "size": "S",
+        "color": "Đen",
+        "price": 250000,
+        "stock": 50
+      },
+      {
+        "sku": "YOUTH-7370-M",
+        "size": "M",
+        "color": "Đen",
+        "price": 250000,
+        "stock": 50
+      },
+      {
+        "sku": "SKU-9058",
+        "size": "L",
+        "color": "Đen",
+        "price": 290000,
+        "stock": 20
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Măng Tô Dạ Dáng Dài Màu Xanh",
+    "description": "Áo măng tô dạ dáng dài màu xanh pastel trang nhã thanh lịch, chất dạ cao cấp giữ ấm chuẩn phong cách Châu Âu.",
+    "category_name": "Áo khoác & Jacket",
+    "brand_name": "Atelier Elegance",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=1000",
+        "is_primary": true,
+        "alt": "Áo Măng Tô Dạ Dáng Dài Màu Xanh"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "MT-CAMEL-01-S",
+        "size": "S",
+        "color": "Xanh",
+        "price": 3850000,
+        "stock": 20
+      },
+      {
+        "sku": "MT-CAMEL-01-M",
+        "size": "M",
+        "color": "Xanh",
+        "price": 3850000,
+        "stock": 25
+      },
+      {
+        "sku": "MT-CAMEL-01-L",
+        "size": "L",
+        "color": "Xanh",
+        "price": 3850000,
+        "stock": 15
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Len Cổ Lọ Dệt Kim Màu Trắng",
+    "description": "Áo len dệt kim màu trắng kem cổ lọ cao, giữ ấm tuyệt đối và dễ phối cùng chân váy hay quần tây.",
+    "category_name": "Đồ Đông & Áo Len",
+    "brand_name": "Nordic Pure",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1584273143981-41c073dfe8f8?w=800",
+        "is_primary": true,
+        "alt": "Áo Len Cổ Lọ Dệt Kim Màu Trắng"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "AL-CREAM-02-S",
+        "size": "S",
+        "color": "Trắng",
+        "price": 950000,
+        "stock": 30
+      },
+      {
+        "sku": "AL-CREAM-02-M",
+        "size": "M",
+        "color": "Trắng",
+        "price": 950000,
+        "stock": 35
+      },
+      {
+        "sku": "AL-CREAM-02-L",
+        "size": "L",
+        "color": "Trắng",
+        "price": 950000,
+        "stock": 20
+      }
+    ]
+  },
+  {
+    "product_name": "Quần Âu Nam Ống Suông Màu Xám",
+    "description": "Quần âu nam màu xám ống suông chất vải tuyết mưa đứng dáng, cạp may tỉ mỉ sang trọng.",
+    "category_name": "Quần Tây & Trouser",
+    "brand_name": "Atelier Elegance",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?auto=format&fit=crop&q=80&w=800",
+        "is_primary": true,
+        "alt": "Quần Âu Nam Ống Suông Màu Xám"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "QA-SUONG-03-29",
+        "size": "29",
+        "color": "Xám",
+        "price": 1250000,
+        "stock": 15
+      },
+      {
+        "sku": "QA-SUONG-03-30",
+        "size": "30",
+        "color": "Xám",
+        "price": 1250000,
+        "stock": 20
+      },
+      {
+        "sku": "QA-SUONG-03-31",
+        "size": "31",
+        "color": "Xám",
+        "price": 1250000,
+        "stock": 18
+      }
+    ]
+  },
+  {
+    "product_name": "Đầm Lụa Dạ Hội Xếp Ly Màu Đỏ",
+    "description": "Đầm lụa dạ tiệc màu đỏ xếp ly quý phái, chất liệu satin bóng bẩy tôn vinh vẻ đẹp kiêu sa.",
+    "category_name": "Trang Phục Dạ Hội",
+    "brand_name": "Modern Luxe",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=1000",
+        "is_primary": true,
+        "alt": "Đầm Lụa Dạ Hội Xếp Ly Màu Đỏ"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "DL-EMERALD-04-S",
+        "size": "S",
+        "color": "Đỏ",
+        "price": 2950000,
+        "stock": 10
+      },
+      {
+        "sku": "DL-EMERALD-04-M",
+        "size": "M",
+        "color": "Đỏ",
+        "price": 2950000,
+        "stock": 15
+      },
+      {
+        "sku": "DL-EMERALD-04-L",
+        "size": "L",
+        "color": "Đỏ",
+        "price": 2950000,
+        "stock": 8
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Sơ Mi Oxford Nam Màu Xanh",
+    "description": "Áo sơ mi nam màu xanh chất liệu cotton Oxford bền đẹp, phom dáng regular fit lịch lãm.",
+    "category_name": "Áo sơ mi",
+    "brand_name": "Atelier Elegance",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1622626426572-c268eb006092?auto=format&fit=crop&q=80&w=800",
+        "is_primary": true,
+        "alt": "Áo Sơ Mi Oxford Nam Màu Xanh"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "AK-TWEED-05-S",
+        "size": "S",
+        "color": "Xanh",
+        "price": 2150000,
+        "stock": 18
+      },
+      {
+        "sku": "AK-TWEED-05-M",
+        "size": "M",
+        "color": "Xanh",
+        "price": 2150000,
+        "stock": 22
+      }
+    ]
+  },
+  {
+    "product_name": "Quần Tây Công Sở Nam Màu Đen",
+    "description": "Quần tây màu đen phom đứng dáng thanh lịch, cạp êm ái thích hợp cho môi trường văn phòng.",
+    "category_name": "Quần Tây & Trouser",
+    "brand_name": "Minimalist Line",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=800",
+        "is_primary": true,
+        "alt": "Quần Tây Công Sở Nam Màu Đen"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "QT-SLIM-06-29",
+        "size": "29",
+        "color": "Đen",
+        "price": 890000,
+        "stock": 25
+      },
+      {
+        "sku": "QT-SLIM-06-30",
+        "size": "30",
+        "color": "Đen",
+        "price": 890000,
+        "stock": 30
+      },
+      {
+        "sku": "QT-SLIM-06-31",
+        "size": "31",
+        "color": "Đen",
+        "price": 890000,
+        "stock": 20
+      }
+    ]
+  },
+  {
+    "product_name": "Bộ Đồ Nỉ Hoodie Thể Thao Màu Vàng",
+    "description": "Set bộ nỉ hoodie dáng croptop kèm quần jogger màu vàng tươi trẻ trung, năng động, phong cách thời trang thể thao đường phố streetwear.",
+    "category_name": "Bộ Đồ Thể Thao",
+    "brand_name": "Signature Atelier",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=800",
+        "is_primary": true,
+        "alt": "Bộ Đồ Nỉ Hoodie Thể Thao Màu Vàng"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "BL-STRIPE-07-M",
+        "size": "M",
+        "color": "Vàng",
+        "price": 1950000,
+        "stock": 15
+      },
+      {
+        "sku": "BL-STRIPE-07-L",
+        "size": "L",
+        "color": "Vàng",
+        "price": 1950000,
+        "stock": 12
+      }
+    ]
+  },
+  {
+    "product_name": "Áo Sơ Mi Poplin Dài Tay Màu Trắng",
+    "description": "Áo sơ mi màu trắng chất liệu poplin cotton thoáng khí, chống nhăn, phom dáng chuẩn mực công sở.",
+    "category_name": "Áo sơ mi",
+    "brand_name": "Casual Essentials",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=800",
+        "is_primary": true,
+        "alt": "Áo Sơ Mi Poplin Dài Tay Màu Trắng"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "SM-POPLIN-08-S",
+        "size": "S",
+        "color": "Trắng",
+        "price": 750000,
+        "stock": 30
+      },
+      {
+        "sku": "SM-POPLIN-08-M",
+        "size": "M",
+        "color": "Trắng",
+        "price": 750000,
+        "stock": 40
+      },
+      {
+        "sku": "SM-POPLIN-08-L",
+        "size": "L",
+        "color": "Trắng",
+        "price": 750000,
+        "stock": 25
+      }
+    ]
+  },
+  {
+    "product_name": "Giày Sneaker Cổ Điển Màu Trắng",
+    "description": "Giày sneaker thể thao màu trắng phom dáng cổ điển retro, lót giày êm ái chống sốc tốt.",
+    "category_name": "Giày & Sandal",
+    "brand_name": "Modern Luxe",
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=800",
+        "is_primary": true,
+        "alt": "Giày Sneaker Cổ Điển Màu Trắng"
+      }
+    ],
+    "variants": [
+      {
+        "sku": "BT-NAPPA-09-37",
+        "size": "37",
+        "color": "Trắng",
+        "price": 2100000,
+        "stock": 10
+      },
+      {
+        "sku": "BT-NAPPA-09-38",
+        "size": "38",
+        "color": "Trắng",
+        "price": 2100000,
+        "stock": 14
+      },
+      {
+        "sku": "BT-NAPPA-09-39",
+        "size": "39",
+        "color": "Trắng",
+        "price": 2100000,
+        "stock": 8
+      }
+    ]
+  }
+];
 
   const createdProductsMap = {};
 
@@ -813,7 +1670,7 @@ async function main() {
       type: 'look',
       look_code: 'LOOK 01',
       section_role: 'Khối Look 01 (Áo Măng Tô Belted & Nổi Bật Trang Chủ)',
-      title: 'Áo Măng Tô Belted Dạ Camel Cashmere Quý Phái Thời Đại',
+      title: 'Set Áo Măng Tô Dạ Dáng Dài Màu Xanh Pastel Châu Âu',
       code: 'LB - LOOK01',
       season: 'PHONG CÁCH THU ĐÔNG',
       badge: 'SIGNATURE',
@@ -827,9 +1684,9 @@ async function main() {
       cta_text: 'Mua Trọn Bộ Phối Đồ (Tiết Kiệm 10%) • 5.445.000₫',
       conversion_rate: '36%',
       products: [
-        buildTaggedProduct('Áo Măng Tô Dạ Camel Cashmere'),
-        buildTaggedProduct('Áo Len Cổ Lọ Cream Knitwear'),
-        buildTaggedProduct('Quần Âu Ống Suông Wool Tencel'),
+        buildTaggedProduct('Áo Măng Tô Dạ Dáng Dài Màu Xanh'),
+        buildTaggedProduct('Áo Len Cổ Lọ Dệt Kim Màu Trắng'),
+        buildTaggedProduct('Quần Âu Nam Ống Suông Màu Xám'),
       ].filter(Boolean),
       hotspots: [
         { top: '38%', left: '46%', label: 'Áo Măng Tô Dạ Camel — 3.850.000₫' },
@@ -840,7 +1697,7 @@ async function main() {
       type: 'look',
       look_code: 'LOOK 02',
       section_role: 'Khối Look 02 (Đầm Dạ Tiệc & Haute Couture)',
-      title: 'Đầm Xếp Ly Emerald Lộng Lẫy Tơ Tằm Cao Cấp',
+      title: 'Đầm Lụa Dạ Hội Xếp Ly Màu Đỏ Quý Phái & Quyến Rũ',
       code: 'LB - LOOK02',
       season: 'DẠ TIỆC & HAUTE COUTURE',
       badge: 'PHIÊN BẢN GIỚI HẠN',
@@ -855,14 +1712,14 @@ async function main() {
       cta_text: 'ĐẶT MUA NGAY',
       conversion_rate: '28%',
       products: [
-        buildTaggedProduct('Đầm Lụa Emerald Pleated Gown'),
+        buildTaggedProduct('Đầm Lụa Dạ Hội Xếp Ly Màu Đỏ'),
       ].filter(Boolean),
     },
     {
       type: 'look',
       look_code: 'LOOK 03',
       section_role: 'Khối Look 03 (Cột 1 Lưới: Set Parisian Chic)',
-      title: 'Set Áo Tweed Ivory & Quần Âu Cắt May Cổ Điển',
+      title: 'Set Áo Sơ Mi Oxford Nam Màu Xanh & Quần Tây Đen Lịch Lãm',
       code: 'LB - LOOK03',
       season: 'PARISIAN CHIC',
       badge: 'BÁN CHẠY',
@@ -875,15 +1732,15 @@ async function main() {
       cta_text: 'Mua Ngay',
       conversion_rate: '24%',
       products: [
-        buildTaggedProduct('Áo Khoác Tweed Ivory Cropped'),
-        buildTaggedProduct('Quần Tây Slim Fit Black'),
+        buildTaggedProduct('Áo Sơ Mi Oxford Nam Màu Xanh'),
+        buildTaggedProduct('Quần Tây Công Sở Nam Màu Đen'),
       ].filter(Boolean),
     },
     {
       type: 'look',
       look_code: 'LOOK 04',
       section_role: 'Khối Look 04 (Cột 2 Lưới: Modern Tailoring)',
-      title: 'Oversized Charcoal Blazer & Minimalist Shirt',
+      title: 'Set Bộ Đồ Nỉ Hoodie Thể Thao Màu Vàng Năng Động Trẻ Trung',
       code: 'LB - LOOK04',
       season: 'MODERN TAILORING',
       badge: 'TRENDING',
@@ -896,8 +1753,8 @@ async function main() {
       cta_text: 'Mua Ngay',
       conversion_rate: '21%',
       products: [
-        buildTaggedProduct('Áo Blazer Kẻ Sọc Pinstripe'),
-        buildTaggedProduct('Sơ Mi Poplin Cotton Trắng'),
+        buildTaggedProduct('Bộ Đồ Nỉ Hoodie Thể Thao Màu Vàng'),
+        buildTaggedProduct('Giày Sneaker Cổ Điển Màu Trắng'),
       ].filter(Boolean),
     },
   ];

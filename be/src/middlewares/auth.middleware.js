@@ -52,3 +52,25 @@ export const authorizeRoles = (...allowedRoles) => {
     return BaseResponse.error(res, 'Bạn không có quyền truy cập tài nguyên này', [], 403);
   };
 };
+
+/**
+ * Middleware tùy chọn: Nếu có Access Token thì giải mã gắn vào req.user, nếu không thì vẫn cho qua tiếp tục (cho khách vãng lai)
+ */
+export const optionalAuthenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+
+  try {
+    const decoded = verifyAccessToken(token);
+    req.user = decoded;
+  } catch (err) {
+    req.user = null;
+  }
+  next();
+};
+

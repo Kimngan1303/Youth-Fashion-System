@@ -10,6 +10,7 @@ import AISearchModal from './components/AISearchModal';
 import HomePage from './pages/HomePage';
 import ProductListPage from './pages/customer/ProductListPage';
 import ProductDetailPage from './pages/customer/ProductDetailPage';
+import SearchPage from './pages/customer/SearchPage';
 import WishlistPage from './pages/customer/WishlistPage';
 import CartPage from './pages/customer/CartPage';
 import CheckoutPage from './pages/customer/CheckoutPage';
@@ -100,6 +101,7 @@ function AppContent() {
             path="/products" 
             element={<ProductListPage onOpenAISearch={() => setIsAISearchOpen(true)} />} 
           />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/products/:id" element={<ProductDetailPage />} />
           <Route path="/product/:id" element={<ProductDetailPage />} />
           <Route path="/lookbook" element={<LookbookPage />} />

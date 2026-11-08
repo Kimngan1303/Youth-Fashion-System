@@ -7,7 +7,7 @@ import { createProductSchema, updateProductSchema, validateProductBody } from '.
 const router = express.Router();
 
 /**
- * Public Routes (Ai cũng có thể xem, tìm kiếm, lọc)
+ * Public Routes
  */
 router.get('/meta', productController.getCategoriesAndBrands);
 router.get('/', productController.getProducts);

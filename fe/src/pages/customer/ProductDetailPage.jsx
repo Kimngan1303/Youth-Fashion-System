@@ -315,7 +315,7 @@ export default function ProductDetailPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     const fetchProduct = async () => {
-      if (!id || id === 'camel-coat' || id === '1' || id === 'default') {
+      if (!id || id === 'camel-coat' || id === 'default') {
         setProduct(FIGMA_COAT_DATA);
         return;
       }
@@ -380,6 +380,27 @@ export default function ProductDetailPage() {
             rawVariants: data.variants || [],
             description_p1: data.description || FIGMA_COAT_DATA.description_p1,
           });
+
+          // Lưu vào lịch sử sản phẩm vừa xem (Recently Viewed)
+          try {
+            const prodIdStr = String(data.product_id || id);
+            const primaryImg = imagesList[0] || FIGMA_COAT_DATA.images[0];
+            const stored = JSON.parse(localStorage.getItem('youthfashion_recently_viewed') || '[]');
+            const updated = [
+              {
+                product_id: prodIdStr,
+                product_name: data.product_name || FIGMA_COAT_DATA.product_name,
+                category_name: data.category?.category_name || FIGMA_COAT_DATA.category_name,
+                brand_name: data.brand?.brand_name || FIGMA_COAT_DATA.brand_name,
+                price: primaryPrice,
+                image_url: primaryImg,
+              },
+              ...stored.filter((p) => String(p.product_id) !== prodIdStr),
+            ].slice(0, 10);
+            localStorage.setItem('youthfashion_recently_viewed', JSON.stringify(updated));
+          } catch (storageErr) {
+            // Ignore localStorage quota errors
+          }
 
           if (isAccessoryProduct) {
             setSelectedSize('');

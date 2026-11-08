@@ -10,6 +10,7 @@ import voucherRoutes from './voucher.routes.js';
 import cartRoutes from './cart.routes.js';
 import wishlistRoutes from './wishlist.routes.js';
 import orderRoutes from './order.routes.js';
+import aiRoutes from './ai.routes.js';
 
 const router = Router();
 
@@ -48,5 +49,8 @@ router.use('/orders', orderRoutes);
 
 // Admin Routes (Users & System Configuration)
 router.use('/admin', adminRoutes);
+
+// AI Search & Recommendation Routes
+router.use('/ai', aiRoutes);
 
 export default router;

@@ -152,6 +152,16 @@ const Header = ({ onOpenAISearch }) => {
     }
   };
 
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setShowSearchInput(false);
+    } else {
+      navigate('/search');
+    }
+  };
+
   const announcementText = [
     { icon: <Globe size={13} />, text: 'MIỄN PHÍ VẬN CHUYỂN TOÀN QUỐC CHO ĐƠN HÀNG TỪ 1.500.000Đ' },
     { icon: <Sun size={13} />, text: 'THỜI TRANG BỀN VỮNG' },
@@ -210,24 +220,32 @@ const Header = ({ onOpenAISearch }) => {
           {/* Search trigger */}
           <div className="search-wrapper">
             {showSearchInput ? (
-              <div className="inline-search-input animate-fade-in">
+              <form onSubmit={handleSearchSubmit} className="inline-search-input animate-fade-in">
                 <input
                   type="text"
-                  placeholder="Tìm sản phẩm..."
+                  placeholder="Tìm kiếm sản phẩm hoặc AI..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   autoFocus
                   onBlur={() => !searchQuery && setShowSearchInput(false)}
                 />
-                <button className="icon-btn-inline" onClick={onOpenAISearch} title="Tìm bằng AI Image">
+                <button type="submit" className="icon-btn-inline" title="Tìm kiếm">
+                  <Search size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn-inline ai-sparkle-btn"
+                  onClick={() => navigate('/search')}
+                  title="Tìm kiếm thông minh AI"
+                >
                   ✨
                 </button>
-              </div>
+              </form>
             ) : (
               <button
-                className={`action-icon ${showSearchInput ? 'active' : ''}`}
-                title="Tìm kiếm"
-                onClick={() => setShowSearchInput(true)}
+                className={`action-icon ${location.pathname === '/search' ? 'active' : ''}`}
+                title="Tìm kiếm thông minh AI"
+                onClick={() => navigate('/search')}
               >
                 <Search size={18} />
               </button>
@@ -708,10 +726,19 @@ const Header = ({ onOpenAISearch }) => {
         .inline-search-input {
           display: flex;
           align-items: center;
+          gap: 4px;
           background-color: #f3f4f6;
           border-radius: 20px;
-          padding: 4px 12px;
-          width: 180px;
+          padding: 4px 10px 4px 12px;
+          width: 220px;
+          border: 1px solid #e5e7eb;
+          transition: all 0.2s;
+        }
+
+        .inline-search-input:focus-within {
+          border-color: #000000;
+          background-color: #ffffff;
+          box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
         }
 
         .inline-search-input input {
@@ -720,10 +747,33 @@ const Header = ({ onOpenAISearch }) => {
           font-size: 12px;
           width: 100%;
           color: #111827;
+          outline: none;
         }
 
         .icon-btn-inline {
+          background: none;
+          border: none;
+          cursor: pointer;
           font-size: 13px;
+          color: #4b5563;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 2px;
+          transition: color 0.15s;
+        }
+
+        .icon-btn-inline:hover {
+          color: #000000;
+        }
+
+        .icon-btn-inline.ai-sparkle-btn {
+          font-size: 14px;
+          transition: transform 0.2s;
+        }
+
+        .icon-btn-inline.ai-sparkle-btn:hover {
+          transform: scale(1.2);
         }
 
         .action-icon {
