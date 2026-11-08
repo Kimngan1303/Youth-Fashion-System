@@ -100,3 +100,42 @@ export const cancelOrder = async (req, res, next) => {
   }
 };
 
+export const getAllOrders = async (req, res, next) => {
+  try {
+    const orders = await orderService.getAllOrdersService();
+    return BaseResponse.success(res, 'Lấy danh sách tất cả đơn hàng thành công', orders);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateOrderStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status, note } = req.body;
+    const result = await orderService.updateOrderStatusService(id, status, note);
+    return BaseResponse.success(res, 'Cập nhật trạng thái đơn hàng thành công', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const clearAllOrders = async (req, res, next) => {
+  try {
+    const result = await orderService.clearAllOrdersService();
+    return BaseResponse.success(res, 'Đã xóa tất cả đơn hàng thành công', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteOrder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await orderService.deleteOrderService(id);
+    return BaseResponse.success(res, 'Xóa đơn hàng thành công', result);
+  } catch (error) {
+    next(error);
+  }
+};
+

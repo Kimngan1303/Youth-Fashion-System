@@ -66,5 +66,53 @@ export const orderService = {
       }
     }
   },
+
+  /**
+   * Lấy danh sách toàn bộ đơn hàng (Dành cho Quản trị viên & Quản lý)
+   */
+  getAllOrders: async () => {
+    try {
+      const res = await axiosClient.get('/orders');
+      return res.data;
+    } catch (error) {
+      return { status: false, data: [] };
+    }
+  },
+
+  /**
+   * Cập nhật trạng thái đơn hàng (Dành cho Quản trị viên & Quản lý)
+   */
+  updateOrderStatus: async (orderId, status, note) => {
+    try {
+      const res = await axiosClient.patch(`/orders/${orderId}/status`, { status, note });
+      return res.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Xóa đơn hàng (Dành cho Quản trị viên & Quản lý)
+   */
+  deleteOrder: async (orderId) => {
+    try {
+      const res = await axiosClient.delete(`/orders/${orderId}`);
+      return res.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Xóa toàn bộ đơn hàng của tất cả tài khoản
+   */
+  clearAllOrders: async () => {
+    try {
+      const res = await axiosClient.delete('/orders/clear-all');
+      return res.data;
+    } catch (error) {
+      return { status: false };
+    }
+  },
 };
 

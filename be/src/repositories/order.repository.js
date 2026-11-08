@@ -245,18 +245,182 @@ export const findOrdersByCustomer = async ({ customerId, email } = {}) => {
   });
 };
 
+export const findAllOrders = async () => {
+  return await prisma.order.findMany({
+    orderBy: { created_at: 'desc' },
+    include: {
+      customer: {
+        select: {
+          customer_id: true,
+          full_name: true,
+          phone: true,
+          email: true,
+        },
+      },
+      order_items: {
+        include: {
+          variant: {
+            include: {
+              product: {
+                include: {
+                  images: true,
+                  category: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      payments: true,
+    },
+  });
+};
+
 export const findOrdersByCustomerId = async (customerId) => {
   return await findOrdersByCustomer({ customerId });
 };
 
-export const updateOrderStatus = async (orderId, status) => {
-  return await prisma.order.update({
-    where: { order_id: BigInt(orderId) },
-    data: { order_status: status },
-  });
+export const clearAllOrders = async () => {
+  try {
+    await prisma.payment.deleteMany({});
+  } catch (e) {}
+  try {
+    await prisma.orderItem.deleteMany({});
+  } catch (e) {}
+  try {
+    return await prisma.order.deleteMany({});
+  } catch (e) {}
+  return { count: 0 };
+};
+
+export const deleteOrderById = async (orderIdOrNumber) => {
+  try {
+    const rawStr = String(orderIdOrNumber || '').trim();
+    const digitsOnly = rawStr.replace(/\D/g, '');
+    const variants = [rawStr, `YF-${rawStr}`, `YF - ${rawStr}`];
+    if (digitsOnly) variants.push(digitsOnly, `YF-${digitsOnly}`, `YF - ${digitsOnly}`);
+
+    const orConditions = [
+      { order_number: { in: variants } },
+    ];
+    if (!isNaN(Number(orderIdOrNumber))) {
+      orConditions.push({ order_id: BigInt(orderIdOrNumber) });
+    }
+    if (digitsOnly && !isNaN(Number(digitsOnly))) {
+      orConditions.push({ order_id: BigInt(digitsOnly) });
+    }
+
+    const foundOrders = await prisma.order.findMany({
+      where: { OR: orConditions },
+      select: { order_id: true },
+    });
+
+    const ids = foundOrders.map(o => o.order_id);
+    if (ids.length > 0) {
+      await prisma.payment.deleteMany({ where: { order_id: { in: ids } } });
+      await prisma.orderItem.deleteMany({ where: { order_id: { in: ids } } });
+      return await prisma.order.deleteMany({ where: { order_id: { in: ids } } });
+    }
+  } catch (e) {
+    console.error('Error deleting order in DB:', e.message);
+  }
+  return { count: 0 };
+};
+
+export const updateOrderStatus = async (orderIdOrNumber, status, note) => {
+  try {
+    const rawStr = String(orderIdOrNumber || '').trim();
+    const digitsOnly = rawStr.replace(/\D/g, '');
+    const variants = [rawStr, `YF-${rawStr}`, `YF - ${rawStr}`];
+    if (digitsOnly) {
+      variants.push(digitsOnly, `YF-${digitsOnly}`, `YF - ${digitsOnly}`);
+    }
+
+    const orConditions = [
+      { order_number: { in: variants } },
+    ];
+    if (digitsOnly) {
+      orConditions.push({ order_number: { contains: digitsOnly } });
+    }
+    if (!isNaN(Number(orderIdOrNumber))) {
+      orConditions.push({ order_id: BigInt(orderIdOrNumber) });
+    }
+    if (digitsOnly && !isNaN(Number(digitsOnly))) {
+      orConditions.push({ order_id: BigInt(digitsOnly) });
+    }
+
+    // Ánh xạ trạng thái an toàn sang Enum OrderStatus của Prisma CSDL MySQL
+    let prismaStatus = 'PENDING';
+    const s = String(status || '').toUpperCase();
+    if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s)) {
+      prismaStatus = 'DELIVERED';
+    } else if (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s)) {
+      prismaStatus = 'SHIPPED';
+    } else if (['PROCESSING', 'PREPARING'].includes(s)) {
+      prismaStatus = 'PROCESSING';
+    } else if (['CONFIRMED'].includes(s)) {
+      prismaStatus = 'CONFIRMED';
+    } else if (['RETURNED', 'REFUNDED', 'EXCHANGE'].includes(s)) {
+      prismaStatus = 'RETURNED';
+    } else if (['CANCELLED', 'FAILED'].includes(s)) {
+      prismaStatus = 'CANCELLED';
+    }
+
+    if (prismaStatus === 'RETURNED') {
+      try {
+        if (note) {
+          if (digitsOnly) {
+            await prisma.$executeRawUnsafe(
+              "UPDATE orders SET order_status = 'RETURNED', note = ? WHERE order_id = ? OR order_number LIKE ?",
+              String(note),
+              digitsOnly,
+              `%${digitsOnly}%`
+            );
+          } else {
+            await prisma.$executeRawUnsafe(
+              "UPDATE orders SET order_status = 'RETURNED', note = ? WHERE order_number = ?",
+              String(note),
+              rawStr
+            );
+          }
+        } else {
+          if (digitsOnly) {
+            await prisma.$executeRawUnsafe(
+              "UPDATE orders SET order_status = 'RETURNED' WHERE order_id = ? OR order_number LIKE ?",
+              digitsOnly,
+              `%${digitsOnly}%`
+            );
+          } else {
+            await prisma.$executeRawUnsafe(
+              "UPDATE orders SET order_status = 'RETURNED' WHERE order_number = ?",
+              rawStr
+            );
+          }
+        }
+        return { count: 1 };
+      } catch (err) {
+        console.error('Error raw update to RETURNED:', err.message);
+      }
+    }
+
+    const updateData = { order_status: prismaStatus };
+    if (note) {
+      updateData.note = String(note);
+    }
+
+    return await prisma.order.updateMany({
+      where: { OR: orConditions },
+      data: updateData,
+    });
+  } catch (e) {
+    console.error('Error updating order status in DB:', e.message);
+  }
+  return null;
 };
 
 export const cancelOrder = async (orderIdOrNumber, reason = 'Khách hàng yêu cầu hủy đơn') => {
+  const cancelText = reason ? String(reason).trim() : 'Khách hàng yêu cầu hủy đơn';
+  const cancelNote = cancelText.startsWith('Khách hủy đơn:') ? cancelText : `Khách hủy đơn: ${cancelText}`;
   const isNumeric = !isNaN(Number(orderIdOrNumber));
   if (isNumeric) {
     try {
@@ -264,7 +428,7 @@ export const cancelOrder = async (orderIdOrNumber, reason = 'Khách hàng yêu c
         where: { order_id: BigInt(orderIdOrNumber) },
         data: {
           order_status: 'CANCELLED',
-          note: reason ? String(reason) : undefined,
+          note: cancelNote,
         },
       });
     } catch (e) {}
@@ -283,7 +447,7 @@ export const cancelOrder = async (orderIdOrNumber, reason = 'Khách hàng yêu c
     },
     data: {
       order_status: 'CANCELLED',
-      note: reason ? String(reason) : undefined,
+      note: cancelNote,
     },
   });
 };

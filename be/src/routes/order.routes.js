@@ -21,8 +21,20 @@ const optionalAuth = (req, res, next) => {
 // Tạo đơn hàng mới (hỗ trợ cả khách đăng nhập và khách mua nhanh)
 router.post('/', optionalAuth, orderController.createOrder);
 
+// Lấy tất cả đơn hàng (cho Manager / Admin)
+router.get('/', optionalAuth, orderController.getAllOrders);
+
 // Lấy danh sách đơn hàng của khách hàng hiện tại
 router.get('/my-orders', optionalAuth, orderController.getMyOrders);
+
+// Cập nhật trạng thái đơn hàng (cho Manager / Admin)
+router.patch('/:id/status', optionalAuth, orderController.updateOrderStatus);
+
+// Xóa toàn bộ đơn hàng (cho Manager / Admin)
+router.delete('/clear-all', optionalAuth, orderController.clearAllOrders);
+
+// Xóa đơn hàng (cho Manager / Admin)
+router.delete('/:id', optionalAuth, orderController.deleteOrder);
 
 // Hủy đơn hàng
 router.patch('/:id/cancel', optionalAuth, orderController.cancelOrder);

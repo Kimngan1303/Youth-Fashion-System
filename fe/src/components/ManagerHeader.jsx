@@ -93,8 +93,12 @@ export default function ManagerHeader({
   userRole = 'Quản Lý Cửa Hàng & Bán Hàng'
 }) {
   const { user } = useAuth();
-  const displayName = user?.full_name || userName;
-  const displayRole = user?.role || userRole;
+  const displayName = (userName && userName !== 'Quản Lý Youth Fashion') ? userName : (user?.full_name || userName);
+  const displayRole = (userRole && userRole !== 'Quản Lý Cửa Hàng & Bán Hàng') ? userRole : (
+    String(user?.role || '').toUpperCase() === 'MANAGER' ? 'Quản Lý Cửa Hàng & Bán Hàng' :
+    String(user?.role || '').toUpperCase() === 'ADMIN' ? 'Quản Trị Viên Hệ Thống' :
+    (userRole || user?.role || 'Quản Lý Cửa Hàng & Bán Hàng')
+  );
 
   return (
     <header className={`top-header-bar ${!showSearch ? 'no-search' : ''}`}>

@@ -443,15 +443,35 @@ export default function CheckoutPage() {
         try {
           sessionStorage.setItem('yf_last_completed_order', JSON.stringify(orderSummary));
           const userOrderKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : 'yf_customer_orders';
-          const existingOrders = JSON.parse(localStorage.getItem(userOrderKey) || localStorage.getItem('yf_customer_orders') || '[]');
+          const mockSet = new Set(['891', '890', '889', '888', '887', '886', '885', '884', '88210', '85420', '79114', '72015', '68192']);
+          
+          const rawExisting = JSON.parse(localStorage.getItem(userOrderKey) || localStorage.getItem('yf_customer_orders') || '[]');
+          const existingOrders = (Array.isArray(rawExisting) ? rawExisting : []).filter(o => {
+            const rawId = String(o.order_id || '').trim();
+            const rawCode = String(o.order_code || o.order_number || '').replace(/\D/g, '');
+            return !mockSet.has(rawId) && !mockSet.has(rawCode);
+          });
+
           const nowStr = new Date().toLocaleDateString('vi-VN');
+          const fullAddressString = [addressDetail.trim(), selectedWard, selectedDistrict, selectedProvince].filter(Boolean).join(', ');
+
           const newOrderEntry = {
             order_id: String(orderCode),
+            order_number: orderNumber || `YF-${orderCode}`,
             order_code: `YF - ${orderCode}`,
             created_at: nowStr,
-            payment_method: paymentMethod === 'PAYOS' ? 'Thanh toán: Chuyển khoản VietQR' : 'Thanh toán: Tiền mặt khi nhận hàng (COD)',
-            status: paymentMethod === 'PAYOS' ? 'SHIPPING' : 'DELIVERING',
-            status_label: paymentMethod === 'PAYOS' ? 'ĐANG GIAO HÀNG HỎA TỐC' : 'CHỜ GIAO HÀNG',
+            created_date: new Date().toISOString(),
+            recipient_name: fullName.trim() || user?.full_name || 'Khách hàng',
+            recipient_phone: phone.trim() || user?.phone || '090****000',
+            recipient_email: email.trim() || user?.email || '',
+            address: fullAddressString || 'Giao tận nơi theo đơn đặt hàng',
+            shipping_address: fullAddressString || 'Giao tận nơi theo đơn đặt hàng',
+            payment_method: paymentMethod === 'PAYOS' ? 'PAYOS' : (paymentMethod === 'DIRECT' ? 'DIRECT' : 'COD'),
+            payment_label: paymentMethod === 'PAYOS' ? 'PayOS - Đã thanh toán' : (paymentMethod === 'DIRECT' ? 'Thanh toán trực tiếp' : 'COD - Chưa thanh toán'),
+            payment_status: paymentMethod === 'PAYOS' ? 'PAID' : 'PENDING',
+            status: 'PENDING',
+            order_status: 'PENDING',
+            status_label: 'CHỜ XÁC NHẬN',
             total_amount: finalTotal,
             items: checkoutItems.map(item => ({
               id: item.id || item.variant_id,
@@ -475,8 +495,33 @@ export default function CheckoutPage() {
               ]
             }
           };
-          localStorage.setItem(userOrderKey, JSON.stringify([newOrderEntry, ...existingOrders]));
-          localStorage.setItem('yf_customer_orders', JSON.stringify([newOrderEntry, ...existingOrders]));
+
+          const updatedList = [newOrderEntry, ...existingOrders];
+          localStorage.setItem(userOrderKey, JSON.stringify(updatedList));
+          localStorage.setItem('yf_customer_orders', JSON.stringify(updatedList));
+          localStorage.setItem('yf_orders_reset_all_v3', 'true');
+
+          // Đảm bảo đơn hàng mới không bị vướng trong danh sách xóa
+          try {
+            const rawDel = localStorage.getItem('yf_deleted_order_ids');
+            if (rawDel) {
+              const delList = JSON.parse(rawDel);
+              const orderDigits = String(orderCode).replace(/\D/g, '');
+              const filteredDel = delList.filter(d => String(d) !== String(orderCode) && String(d) !== String(orderNumber) && String(d) !== orderDigits);
+              localStorage.setItem('yf_deleted_order_ids', JSON.stringify(filteredDel));
+            }
+          } catch (e) {}
+
+          // Đồng bộ tức thì sang danh sách quản lý đơn hàng của Manager/Admin
+          try {
+            const rawMgr = localStorage.getItem('yf_manager_orders');
+            const mgrExisting = (rawMgr ? JSON.parse(rawMgr) : []).filter(o => {
+              const rawId = String(o.order_id || '').trim();
+              const rawCode = String(o.order_code || o.order_number || '').replace(/\D/g, '');
+              return !mockSet.has(rawId) && !mockSet.has(rawCode);
+            });
+            localStorage.setItem('yf_manager_orders', JSON.stringify([newOrderEntry, ...mgrExisting]));
+          } catch (e) {}
         } catch (e) {}
 
         // Lưu thông tin người nhận & địa chỉ vào hồ sơ người dùng để dùng cho những lần đặt sau

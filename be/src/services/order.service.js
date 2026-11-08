@@ -284,3 +284,46 @@ export const handlePayosWebhookService = async (webhookBody) => {
 export const cancelOrderService = async (orderIdOrNumber, reason) => {
   return await orderRepo.cancelOrder(orderIdOrNumber, reason);
 };
+
+/**
+ * Lấy tất cả đơn hàng cho khu vực Quản trị Manager/Admin
+ */
+export const getAllOrdersService = async () => {
+  return await orderRepo.findAllOrders();
+};
+
+/**
+ * Cập nhật trạng thái đơn hàng từ trang Quản trị
+ */
+export const updateOrderStatusService = async (orderId, status, note) => {
+  let mappedStatus = 'PENDING';
+  const s = String(status || '').toUpperCase();
+  if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s)) {
+    mappedStatus = 'DELIVERED';
+  } else if (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s)) {
+    mappedStatus = 'SHIPPED';
+  } else if (['PROCESSING', 'PREPARING'].includes(s)) {
+    mappedStatus = 'PROCESSING';
+  } else if (['CONFIRMED'].includes(s)) {
+    mappedStatus = 'CONFIRMED';
+  } else if (['RETURNED', 'REFUNDED', 'EXCHANGE'].includes(s)) {
+    mappedStatus = 'RETURNED';
+  } else if (['CANCELLED', 'FAILED'].includes(s)) {
+    mappedStatus = 'CANCELLED';
+  }
+  return await orderRepo.updateOrderStatus(orderId, mappedStatus, note);
+};
+
+/**
+ * Xóa toàn bộ đơn hàng
+ */
+export const clearAllOrdersService = async () => {
+  return await orderRepo.clearAllOrders();
+};
+
+/**
+ * Xóa đơn hàng từ trang Quản trị
+ */
+export const deleteOrderService = async (orderId) => {
+  return await orderRepo.deleteOrderById(orderId);
+};

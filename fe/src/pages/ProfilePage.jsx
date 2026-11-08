@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   User, Package, Lock, Heart, LogOut, CheckCircle,
   Camera, MapPin, Calendar, Clock, CreditCard, ChevronRight, AlertCircle, Tag, Copy, LayoutDashboard, Eye, EyeOff,
-  Search, Truck, Check, X, Star, RefreshCw, FileText, ShieldCheck, ChevronLeft, ArrowRight
+  Search, Truck, Check, X, Star, RefreshCw, FileText, ShieldCheck, ChevronLeft, ArrowRight, Phone, RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ProductCard from '../components/ProductCard';
@@ -85,11 +85,561 @@ const validateDob = (dobStr) => {
   return '';
 };
 
-// Hàm hỗ trợ lọc bỏ dữ liệu mẫu cũ nếu còn lưu trong bộ nhớ
+// Hàm hỗ trợ lọc bỏ dữ liệu mẫu cũ và đơn hàng đã bị xóa nếu còn lưu trong bộ nhớ
 const purgeMockOrders = (list) => {
   if (!Array.isArray(list)) return [];
-  const mockIds = new Set(['88210', '85420', '79114', '72015', '68192']);
-  return list.filter(o => !mockIds.has(String(o.order_id)) && !mockIds.has(String(o.order_code || '').replace(/\D/g, '')));
+  const mockIds = new Set(['891', '890', '889', '888', '887', '886', '885', '884', '88210', '85420', '79114', '72015', '68192']);
+  let deletedSet = new Set();
+  try {
+    const rawDel = localStorage.getItem('yf_deleted_order_ids');
+    if (rawDel) deletedSet = new Set(JSON.parse(rawDel));
+  } catch (e) { }
+
+  return list.filter(o => {
+    if (!o) return false;
+    const rawId = String(o.order_id || '').trim();
+    const rawCode = String(o.order_code || o.order_number || '').trim();
+    const digitsOnly = (rawCode || rawId).replace(/\D/g, '');
+
+    if (mockIds.has(rawId)) return false;
+    if (mockIds.has(rawCode)) return false;
+    if (digitsOnly && mockIds.has(digitsOnly)) return false;
+
+    if (deletedSet.has(rawId)) return false;
+    if (deletedSet.has(rawCode)) return false;
+    if (digitsOnly && deletedSet.has(digitsOnly)) return false;
+
+    return true;
+  });
+};
+
+const STATUS_RANK = {
+  PENDING: 1,
+  CONFIRMED: 2,
+  PROCESSING: 3,
+  PREPARING: 3,
+  SHIPPING: 4,
+  DELIVERING: 4,
+  SHIPPED: 4,
+  IN_TRANSIT: 4,
+  COMPLETED: 5,
+  DELIVERED: 5,
+  SUCCESS: 5,
+  RETURNED: 6,
+  REFUNDED: 6,
+  CANCELLED: 7,
+  FAILED: 7
+};
+
+// Phân giải chính xác trạng thái hoàn tiền (ĐỒNG Ý / TỪ CHỐI HOÀN) dựa trên đa nguồn dữ liệu (Quản lý & Overrides)
+const resolveOrderRefundStatus = (ord) => {
+  if (!ord) return { isApproved: false, isRejected: false, decision: null, rejectReason: '' };
+  const rawId = String(ord.order_id || '').trim();
+  const rawCode = String(ord.order_code || ord.order_number || '').trim();
+  const digits = (rawCode || rawId).replace(/\D/g, '');
+
+  let decision = (ord.refund_decision && ord.refund_decision !== 'PENDING') ? ord.refund_decision : null;
+  let rejectReason = ord.reject_reason || '';
+  let noteStr = String(ord.note || '');
+  let labelStr = String(ord.status_label || '').toUpperCase();
+  const noteLow = noteStr.toLowerCase();
+
+  // 0. Kiểm tra trực tiếp từ chính thuộc tính của ord
+  if (!decision) {
+    if (labelStr.includes('ĐÃ HOÀN') || noteLow.includes('đã xác nhận hoàn tiền') || noteLow.includes('đã hoàn tiền') || ord.payment_status === 'REFUNDED') {
+      decision = 'APPROVED';
+    } else if (labelStr.includes('TỪ CHỐI') || noteLow.includes('từ chối hoàn')) {
+      decision = 'REJECTED';
+    }
+  }
+
+  // 1. Kiểm tra trực tiếp từ yf_manager_orders (quyết định thực tế từ phía Quản lý Shop)
+  try {
+    const rawMgr = localStorage.getItem('yf_manager_orders');
+    if (rawMgr) {
+      const mgrList = JSON.parse(rawMgr);
+      if (Array.isArray(mgrList)) {
+        const mMatch = mgrList.find(m => {
+          if (!m) return false;
+          const mId = String(m.order_id || '').trim();
+          const mNum = String(m.order_number || m.order_code || '').trim();
+          const mDigits = (mNum || mId).replace(/\D/g, '');
+          return (rawId && (mId === rawId || mNum === rawId)) ||
+                 (rawCode && (mId === rawCode || mNum === rawCode)) ||
+                 (digits && mDigits && digits === mDigits);
+        });
+        if (mMatch) {
+          const mL = String(mMatch.status_label || '').toUpperCase();
+          const mN = String(mMatch.note || '').toLowerCase();
+          if (mMatch.refund_decision === 'APPROVED' || mL.includes('ĐÃ HOÀN') || mN.includes('đã xác nhận hoàn tiền') || mN.includes('đã hoàn tiền') || mMatch.payment_status === 'REFUNDED') {
+            decision = 'APPROVED';
+          } else if (mMatch.refund_decision === 'REJECTED' || mL.includes('TỪ CHỐI') || mN.includes('từ chối hoàn')) {
+            decision = 'REJECTED';
+          }
+          if (mMatch.reject_reason) rejectReason = mMatch.reject_reason;
+          if (mMatch.note) noteStr = mMatch.note;
+        }
+      }
+    }
+  } catch (e) {}
+
+  // 2. Kiểm tra từ yf_order_status_overrides với mọi biến thể mã đơn (kể cả en-dash – và dấu cách)
+  if (!decision) {
+    try {
+      const rawOv = localStorage.getItem('yf_order_status_overrides');
+      if (rawOv) {
+        const ovs = JSON.parse(rawOv);
+        let ov = null;
+        if (digits) {
+          ov = ovs[digits] || ovs[`YF-${digits}`] || ovs[`#YF-${digits}`] || ovs[`YF - ${digits}`] || ovs[`#YF - ${digits}`] || ovs[`YF – ${digits}`] || ovs[`#YF – ${digits}`] || ovs[`#${digits}`];
+        }
+        if (!ov && rawId) ov = ovs[rawId];
+        if (!ov && rawCode) ov = ovs[rawCode];
+        if (!ov && typeof ovs === 'object') {
+          for (const k of Object.keys(ovs)) {
+            if (digits && k.replace(/\D/g, '') === digits) {
+              ov = ovs[k];
+              break;
+            }
+          }
+        }
+        if (ov) {
+          const ovL = String(ov.status_label_customer || ov.status_label || '').toUpperCase();
+          const ovN = String(ov.note || '').toLowerCase();
+          if (ov.refund_decision === 'APPROVED' || ovL.includes('ĐÃ HOÀN') || ovN.includes('đã xác nhận hoàn tiền') || ovN.includes('đã hoàn tiền')) {
+            decision = 'APPROVED';
+          } else if (ov.refund_decision === 'REJECTED' || ovL.includes('TỪ CHỐI') || ovN.includes('từ chối hoàn')) {
+            decision = 'REJECTED';
+          }
+          if (ov.reject_reason) rejectReason = rejectReason || ov.reject_reason;
+          if (ov.note) noteStr = noteStr || ov.note;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 3. Kiểm tra từ yf_customer_orders và các key user lưu trữ
+  if (!decision) {
+    try {
+      const allCustKeys = Object.keys(localStorage).filter(k => k && k.startsWith('yf_customer_orders'));
+      for (const ck of allCustKeys) {
+        const rawCust = localStorage.getItem(ck);
+        if (!rawCust) continue;
+        const cList = JSON.parse(rawCust);
+        if (!Array.isArray(cList)) continue;
+        const cMatch = cList.find(c => {
+          if (!c) return false;
+          const cId = String(c.order_id || '').trim();
+          const cCode = String(c.order_code || c.order_number || '').trim();
+          const cDigits = (cCode || cId).replace(/\D/g, '');
+          return (rawId && (cId === rawId || cCode === rawId)) ||
+                 (rawCode && (cId === rawCode || cCode === rawCode)) ||
+                 (digits && cDigits && digits === cDigits);
+        });
+        if (cMatch) {
+          const cL = String(cMatch.status_label || '').toUpperCase();
+          const cN = String(cMatch.note || '').toLowerCase();
+          if (cMatch.refund_decision === 'APPROVED' || cL.includes('ĐÃ HOÀN') || cN.includes('đã xác nhận hoàn tiền') || cN.includes('đã hoàn tiền')) {
+            decision = 'APPROVED';
+          } else if (cMatch.refund_decision === 'REJECTED' || cL.includes('TỪ CHỐI') || cN.includes('từ chối hoàn')) {
+            decision = 'REJECTED';
+          }
+          if (cMatch.reject_reason) rejectReason = rejectReason || cMatch.reject_reason;
+          if (cMatch.note) noteStr = noteStr || cMatch.note;
+          if (decision) break;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 4. Kiểm tra từ chính ord note và status_label
+  if (!decision) {
+    if (ord.refund_decision === 'APPROVED' || labelStr.includes('ĐÃ HOÀN') || noteLow.includes('đã xác nhận hoàn tiền') || noteLow.includes('đã hoàn tiền')) decision = 'APPROVED';
+    else if (ord.refund_decision === 'REJECTED' || labelStr.includes('TỪ CHỐI') || noteLow.includes('từ chối hoàn')) decision = 'REJECTED';
+  }
+
+  if (!rejectReason && noteStr.includes('Từ chối hoàn tiền:')) {
+    rejectReason = noteStr.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim();
+  }
+
+  return {
+    isApproved: decision === 'APPROVED',
+    isRejected: decision === 'REJECTED',
+    decision,
+    rejectReason: rejectReason || (decision === 'REJECTED' ? 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop' : '')
+  };
+};
+
+const pickAuthoritativeStatus = (statusA, statusB, labelA, labelB, noteA = '', noteB = '', refundDecisionA = '', refundDecisionB = '') => {
+  const sA = String(statusA || '').toUpperCase();
+  const sB = String(statusB || '').toUpperCase();
+  const lA = String(labelA || '').toUpperCase();
+  const lB = String(labelB || '').toUpperCase();
+  const rA = String(refundDecisionA || '').toUpperCase();
+  const rB = String(refundDecisionB || '').toUpperCase();
+
+  // Đơn hàng đã hủy là trạng thái tuyệt đối, không thể ghi đè ngược về bất kỳ trạng thái nào khác
+  if (sA === 'CANCELLED' || sB === 'CANCELLED') {
+    return { status: 'CANCELLED', label: 'ĐÃ HỦY' };
+  }
+
+  // Nếu là đơn hoàn/đổi trả: ưu tiên trạng thái đã được Shop quyết định (ĐÃ HOÀN TIỀN / TỪ CHỐI HOÀN)
+  if (sA === 'RETURNED' || sB === 'RETURNED' || lA.includes('ĐỔI TRẢ') || lB.includes('ĐỔI TRẢ') || lA.includes('HOÀN') || lB.includes('HOÀN')) {
+    const isAppr = rA === 'APPROVED' || rB === 'APPROVED' || lA.includes('ĐÃ HOÀN') || lB.includes('ĐÃ HOÀN');
+    const isRej = rA === 'REJECTED' || rB === 'REJECTED' || lA.includes('TỪ CHỐI') || lB.includes('TỪ CHỐI');
+    const bestLabel = isAppr ? 'ĐÃ HOÀN TIỀN' : (isRej ? 'TỪ CHỐI HOÀN' : 'ĐỔI TRẢ');
+    return { status: 'RETURNED', label: bestLabel };
+  }
+
+  const rankA = STATUS_RANK[sA] || 0;
+  const rankB = STATUS_RANK[sB] || 0;
+
+  if (rankA >= rankB && rankA > 1) {
+    return { status: sA, label: labelA };
+  }
+  if (rankB > 1) {
+    return { status: sB, label: labelB };
+  }
+  return { status: sA || sB || 'PENDING', label: labelA || labelB || 'CHỜ XÁC NHẬN' };
+};
+
+// Helper nhận diện và trích xuất lý do hủy đơn (phân biệt Shop hủy vs Khách hủy)
+const resolveCancelInfo = (ord) => {
+  if (!ord) return { isShopCancelled: false, cancelReason: 'Đổi ý, không muốn mua nữa' };
+  const rawId = String(ord.order_id || '').trim();
+  const rawCode = String(ord.order_code || ord.order_number || '').trim();
+  const digits = (rawCode || rawId).replace(/\D/g, '');
+
+  let cancelledBy = ord.cancelled_by || '';
+  let cancelReason = ord.cancel_reason || '';
+  let noteStr = String(ord.note || '');
+
+  // 1. Kiểm tra từ yf_order_status_overrides
+  try {
+    const rawOv = localStorage.getItem('yf_order_status_overrides');
+    if (rawOv) {
+      const ovs = JSON.parse(rawOv);
+      const ov = (digits && (ovs[digits] || ovs[`YF-${digits}`] || ovs[`#YF-${digits}`] || ovs[`YF - ${digits}`] || ovs[`#YF - ${digits}`])) || (rawId && ovs[rawId]) || (rawCode && ovs[rawCode]);
+      if (ov) {
+        if (ov.cancelled_by) cancelledBy = ov.cancelled_by;
+        if (ov.cancel_reason) cancelReason = ov.cancel_reason;
+        if (ov.note && !noteStr) noteStr = ov.note;
+      }
+    }
+  } catch (e) {}
+
+  // 2. Kiểm tra từ yf_manager_orders
+  try {
+    const rawMgr = localStorage.getItem('yf_manager_orders');
+    if (rawMgr) {
+      const mgrList = JSON.parse(rawMgr);
+      if (Array.isArray(mgrList)) {
+        const m = mgrList.find(item => {
+          const mDigits = String(item.order_number || item.order_code || item.order_id || '').replace(/\D/g, '');
+          return digits && mDigits && digits === mDigits;
+        });
+        if (m) {
+          if (m.cancelled_by) cancelledBy = m.cancelled_by;
+          if (m.cancel_reason) cancelReason = m.cancel_reason;
+          if (m.note) noteStr = m.note;
+        }
+      }
+    }
+  } catch (e) {}
+
+  const noteLow = noteStr.toLowerCase();
+  const isShop = cancelledBy === 'SHOP' ||
+                 cancelledBy === 'MANAGER' ||
+                 noteLow.includes('shop hủy đơn') ||
+                 noteLow.includes('shop hủy') ||
+                 String(cancelReason).toLowerCase().includes('shop hủy');
+
+  let finalReason = cancelReason;
+  if (!finalReason || finalReason === 'Khách hủy đơn' || finalReason === 'Đổi ý, không muốn mua nữa') {
+    if (noteStr.includes('Shop hủy đơn:')) {
+      finalReason = noteStr.split('Shop hủy đơn:')[1]?.trim();
+    } else if (noteStr.includes('Khách hủy đơn:')) {
+      finalReason = noteStr.split('Khách hủy đơn:')[1]?.trim();
+    }
+  }
+  if (!finalReason) {
+    finalReason = isShop ? 'Sản phẩm tạm thời hết hàng trong kho' : 'Đổi ý, không muốn mua nữa';
+  }
+
+  return {
+    isShopCancelled: isShop,
+    cancelReason: finalReason.replace('Shop hủy đơn:', '').replace('Khách hủy đơn:', '').trim()
+  };
+};
+
+// Áp dụng trạng thái ghi đè (overrides) để trang người dùng luôn đồng bộ 100% với Manager
+const applyStatusOverrides = (ordersList) => {
+  if (!Array.isArray(ordersList)) return [];
+  try {
+    const rawOverrides = localStorage.getItem('yf_order_status_overrides');
+    const overrides = rawOverrides ? JSON.parse(rawOverrides) : {};
+    let overridesModified = false;
+
+    let mgrOrdersList = [];
+    try {
+      const rawMgr = localStorage.getItem('yf_manager_orders');
+      if (rawMgr) mgrOrdersList = JSON.parse(rawMgr);
+    } catch (e) {}
+
+    const result = ordersList.map(ord => {
+      if (!ord) return ord;
+      const rawId = String(ord.order_id || '').trim();
+      const rawCode = String(ord.order_code || ord.order_number || '').trim();
+      const digits = (rawCode || rawId).replace(/\D/g, '');
+
+      const curStatus = String(ord.status || ord.order_status || '').toUpperCase();
+      let ov = (digits && (overrides[digits] || overrides[`YF-${digits}`] || overrides[`#YF-${digits}`] || overrides[`YF - ${digits}`] || overrides[`#YF - ${digits}`] || overrides[`YF – ${digits}`] || overrides[`#YF – ${digits}`] || overrides[`#${digits}`])) || (rawId && overrides[rawId]) || (rawCode && overrides[rawCode]);
+      if (!ov && digits && typeof overrides === 'object') {
+        for (const k of Object.keys(overrides)) {
+          if (k.replace(/\D/g, '') === digits) {
+            ov = overrides[k];
+            break;
+          }
+        }
+      }
+
+      // Kiểm tra quyết định quản lý mới nhất từ yf_manager_orders
+      let mgrOrd = null;
+      if (Array.isArray(mgrOrdersList)) {
+        mgrOrd = mgrOrdersList.find(m => {
+          if (!m) return false;
+          const mId = String(m.order_id || '').trim();
+          const mNum = String(m.order_number || m.order_code || '').trim();
+          const mDigits = (mNum || mId).replace(/\D/g, '');
+          return (rawId && (mId === rawId || mNum === rawId)) ||
+                 (rawCode && (mId === rawCode || mNum === rawCode)) ||
+                 (digits && mDigits && digits === mDigits);
+        });
+      }
+
+      // Nếu Manager đã từ chối hoặc hoàn tiền trong yf_manager_orders thì ưu tiên áp dụng ngay
+      if (mgrOrd) {
+        const mgrL = String(mgrOrd.status_label || '').toUpperCase();
+        const mgrN = String(mgrOrd.note || '').toLowerCase();
+        const isMgrRej = mgrOrd.refund_decision === 'REJECTED' || mgrL.includes('TỪ CHỐI') || mgrN.includes('từ chối hoàn tiền') || mgrN.includes('từ chối hoàn');
+        const isMgrApp = !isMgrRej && (mgrOrd.refund_decision === 'APPROVED' || mgrL.includes('ĐÃ HOÀN') || mgrN.includes('đã xác nhận hoàn tiền') || mgrN.includes('đã hoàn tiền') || mgrOrd.payment_status === 'REFUNDED');
+        if (isMgrRej) {
+          const mgrRejectReason = mgrOrd.reject_reason || (mgrOrd.note?.includes('Từ chối hoàn tiền:') ? mgrOrd.note.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim() : 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop');
+          ov = {
+            ...(ov || {}),
+            status: 'RETURNED',
+            status_label: 'Từ chối hoàn',
+            status_label_manager: 'Từ chối hoàn',
+            status_label_customer: 'TỪ CHỐI HOÀN',
+            refund_decision: 'REJECTED',
+            reject_reason: mgrRejectReason,
+            refund_reason: mgrOrd.refund_reason || ov?.refund_reason || ord.refund_reason,
+            refund_bank: mgrOrd.refund_bank || ov?.refund_bank || ord.refund_bank,
+            note: mgrOrd.note || ov?.note || ord.note,
+            updated_at: Date.now()
+          };
+          if (digits) {
+            overrides[digits] = ov;
+            overrides[`YF-${digits}`] = ov;
+            overrides[`#YF-${digits}`] = ov;
+            overrides[`YF - ${digits}`] = ov;
+            overrides[`#YF - ${digits}`] = ov;
+            overrides[`YF – ${digits}`] = ov;
+            overrides[`#YF – ${digits}`] = ov;
+            overrides[`#${digits}`] = ov;
+          }
+          if (rawId) overrides[rawId] = ov;
+          if (rawCode) overrides[rawCode] = ov;
+          overridesModified = true;
+        } else if (isMgrApp) {
+          ov = {
+            ...(ov || {}),
+            status: 'RETURNED',
+            status_label: 'Đã hoàn tiền',
+            status_label_manager: 'Đã hoàn tiền',
+            status_label_customer: 'ĐÃ HOÀN TIỀN',
+            refund_decision: 'APPROVED',
+            refund_reason: mgrOrd.refund_reason || ov?.refund_reason || ord.refund_reason,
+            refund_bank: mgrOrd.refund_bank || ov?.refund_bank || ord.refund_bank,
+            note: mgrOrd.note || ov?.note || ord.note,
+            updated_at: Date.now()
+          };
+          if (digits) {
+            overrides[digits] = ov;
+            overrides[`YF-${digits}`] = ov;
+            overrides[`#YF-${digits}`] = ov;
+            overrides[`YF - ${digits}`] = ov;
+            overrides[`#YF - ${digits}`] = ov;
+            overrides[`YF – ${digits}`] = ov;
+            overrides[`#YF – ${digits}`] = ov;
+            overrides[`#${digits}`] = ov;
+          }
+          if (rawId) overrides[rawId] = ov;
+          if (rawCode) overrides[rawCode] = ov;
+          overridesModified = true;
+        }
+      }
+
+      // 1. Đơn hàng đã hủy tuyệt đối không bị hạ cấp
+      if (curStatus === 'CANCELLED') {
+        const isShop = (ov && ov.cancelled_by === 'SHOP') || (ord.cancelled_by === 'SHOP') ||
+          String(ord.note || '').toLowerCase().includes('shop hủy') ||
+          String(ov?.note || '').toLowerCase().includes('shop hủy');
+        const defaultNote = isShop ? 'Shop hủy đơn' : 'Khách hủy đơn';
+        const bestCancelReason = ord.cancel_reason || ov?.cancel_reason || (isShop ? 'Sản phẩm tạm thời hết hàng trong kho' : 'Đổi ý, không muốn mua nữa');
+        if (ov && ov.status !== 'CANCELLED') {
+          const fixedOv = {
+            status: 'CANCELLED',
+            status_label: 'Đã hủy',
+            status_label_manager: 'Đã hủy',
+            status_label_customer: 'ĐÃ HỦY',
+            cancel_reason: bestCancelReason,
+            cancelled_by: isShop ? 'SHOP' : (ord.cancelled_by || ov?.cancelled_by || 'CUSTOMER'),
+            note: ord.note || ov?.note || defaultNote,
+            updated_at: Date.now(),
+          };
+          if (digits) overrides[digits] = fixedOv;
+          if (rawId) overrides[rawId] = fixedOv;
+          if (rawCode) overrides[rawCode] = fixedOv;
+          overridesModified = true;
+        }
+        return {
+          ...ord,
+          status: 'CANCELLED',
+          order_status: 'CANCELLED',
+          status_label: 'ĐÃ HỦY',
+          cancel_reason: bestCancelReason,
+          cancelled_by: isShop ? 'SHOP' : (ord.cancelled_by || ov?.cancelled_by || 'CUSTOMER'),
+        };
+      }
+
+      // 2. Áp dụng override
+      if (ov) {
+        const ovStatus = String(ov.status || '').toUpperCase();
+        const ovLabel = String(ov.status_label_customer || ov.status_label || '').toUpperCase();
+        const ovDecision = String(ov.refund_decision || '').toUpperCase();
+
+        let resolvedLabel = ov.status_label_customer || ov.status_label;
+        if (ovStatus === 'RETURNED') {
+          const effectiveDecision = ovDecision || String(ord.refund_decision || '').toUpperCase();
+          const effectiveLabel = ovLabel || String(ord.status_label || '').toUpperCase();
+          const effectiveNote = String(ov.note || ord.note || '').toLowerCase();
+          if (effectiveDecision === 'APPROVED' || effectiveLabel.includes('ĐÃ HOÀN') || effectiveNote.includes('đã xác nhận hoàn tiền') || effectiveNote.includes('đã hoàn tiền')) resolvedLabel = 'ĐÃ HOÀN TIỀN';
+          else if (effectiveDecision === 'REJECTED' || effectiveLabel.includes('TỪ CHỐI') || effectiveNote.includes('từ chối hoàn tiền') || effectiveNote.includes('từ chối hoàn')) resolvedLabel = 'TỪ CHỐI HOÀN';
+          else resolvedLabel = 'ĐỔI TRẢ';
+        } else if (!resolvedLabel) {
+          resolvedLabel = ovStatus === 'COMPLETED' ? 'ĐÃ GIAO' : (
+            ovStatus === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
+              ovStatus === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
+                ovStatus === 'CANCELLED' ? 'ĐÃ HỦY' : 'CHỜ XÁC NHẬN'
+              )
+            )
+          );
+        }
+
+        const resolvedDecision = (resolvedLabel === 'ĐÃ HOÀN TIỀN' ? 'APPROVED' : ((resolvedLabel === 'TỪ CHỐI HOÀN' || resolvedLabel === 'TỪ CHỐI HOÀN TIỀN') ? 'REJECTED' : (ov.refund_decision || ord.refund_decision)));
+
+        let resolvedRejectReason = ov.reject_reason || ord.reject_reason || '';
+        const checkNote = ov.note || ord.note || '';
+        if (!resolvedRejectReason && checkNote.includes('Từ chối hoàn tiền:')) {
+          resolvedRejectReason = checkNote.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim();
+        }
+
+        return {
+          ...ord,
+          status: ov.status,
+          order_status: ov.status,
+          status_label: resolvedLabel,
+          delivered_date: ov.delivered_date || ord.delivered_date,
+          cancel_reason: ov.cancel_reason || ord.cancel_reason,
+          cancelled_by: ov.cancelled_by || ord.cancelled_by,
+          refund_decision: resolvedDecision,
+          refund_bank: ov.refund_bank || ord.refund_bank,
+          refund_reason: ov.refund_reason || ord.refund_reason,
+          reject_reason: resolvedRejectReason,
+          note: ov.note || ord.note,
+        };
+      }
+      return ord;
+    });
+
+    if (overridesModified) {
+      try {
+        localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
+      } catch (e) {}
+    }
+
+    return result;
+  } catch (e) {
+    return ordersList;
+  }
+};
+
+// Chuẩn hóa trạng thái đơn hàng đồng bộ theo Manager
+const normalizeInitialOrderStatus = (order) => {
+  if (!order) return order;
+  const s = String(order.status || order.order_status || '').toUpperCase();
+  const label = String(order.status_label || '').toUpperCase();
+  const noteStr = String(order.note || '').toLowerCase();
+
+  const isReturned = ['RETURNED', 'REFUNDED', 'EXCHANGE', 'RETURN'].includes(s) ||
+    label.includes('ĐỔI TRẢ') ||
+    label.includes('TRẢ HÀNG') ||
+    label.includes('HOÀN TIỀN') ||
+    label.includes('TỪ CHỐI') ||
+    label.includes('ĐÃ HOÀN') ||
+    Boolean(order.refund_reason) ||
+    Boolean(order.refund_bank) ||
+    order.refund_decision === 'APPROVED' ||
+    order.refund_decision === 'REJECTED' ||
+    noteStr.includes('khách yêu cầu hoàn tiền') ||
+    noteStr.includes('yêu cầu hoàn tiền') ||
+    (noteStr.includes('stk:') && !noteStr.includes('khách hủy đơn:'));
+  const isCancelled = !isReturned && (['CANCELLED', 'FAILED'].includes(s) || label.includes('HỦY'));
+  const isCompleted = !isReturned && !isCancelled && (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s) || label.includes('ĐÃ GIAO') || label.includes('GIAO THÀNH CÔNG'));
+  const isShipping = !isReturned && !isCancelled && !isCompleted && (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s) || (label.includes('VẬN CHUYỂN') && !label.includes('CHỜ VẬN CHUYỂN')) || label.includes('ĐANG GIAO'));
+  const isConfirmed = !isReturned && !isCancelled && !isCompleted && !isShipping && (['CONFIRMED'].includes(s) || label.includes('ĐÃ XÁC NHẬN'));
+
+  let normalizedStatus = 'PENDING';
+  let normalizedLabel = 'CHỜ XÁC NHẬN';
+
+  if (isReturned) {
+    normalizedStatus = 'RETURNED';
+    const refSt = resolveOrderRefundStatus(order);
+    const isAppr = refSt.isApproved || order.refund_decision === 'APPROVED' || label.includes('ĐÃ HOÀN') || noteStr.includes('đã xác nhận hoàn tiền') || noteStr.includes('đã hoàn tiền');
+    const isRej = !isAppr && (refSt.isRejected || order.refund_decision === 'REJECTED' || label.includes('TỪ CHỐI') || noteStr.includes('từ chối hoàn tiền') || noteStr.includes('từ chối hoàn'));
+    if (isAppr) normalizedLabel = 'ĐÃ HOÀN TIỀN';
+    else if (isRej) normalizedLabel = 'TỪ CHỐI HOÀN';
+    else normalizedLabel = 'ĐỔI TRẢ';
+  } else if (isCancelled) {
+    normalizedStatus = 'CANCELLED';
+    normalizedLabel = (order.status_label && !order.status_label.toUpperCase().includes('CHỜ XÁC NHẬN')) ? order.status_label : 'ĐÃ HỦY';
+  } else if (isCompleted) {
+    normalizedStatus = 'COMPLETED';
+    normalizedLabel = (order.status_label && !order.status_label.toUpperCase().includes('CHỜ XÁC NHẬN') && !order.status_label.toUpperCase().includes('ĐỔI TRẢ')) ? order.status_label : (order.delivered_date ? `ĐÃ GIAO (${order.delivered_date})` : 'ĐÃ GIAO');
+  } else if (isShipping) {
+    normalizedStatus = 'SHIPPING';
+    normalizedLabel = 'ĐANG VẬN CHUYỂN';
+  } else if (isConfirmed) {
+    normalizedStatus = 'CONFIRMED';
+    normalizedLabel = 'ĐÃ XÁC NHẬN';
+  }
+
+  // Tự động phân giải reject_reason nếu có trong note hoặc refSt
+  const refStFinal = resolveOrderRefundStatus(order);
+  let rejectReason = order.reject_reason || refStFinal.rejectReason || '';
+  if (!rejectReason && order.note && order.note.includes('Từ chối hoàn tiền:')) {
+    rejectReason = order.note.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim();
+  }
+
+  return {
+    ...order,
+    status: normalizedStatus,
+    order_status: normalizedStatus,
+    status_label: normalizedLabel,
+    refund_decision: isReturned ? (normalizedLabel === 'ĐÃ HOÀN TIỀN' ? 'APPROVED' : ((normalizedLabel === 'TỪ CHỐI HOÀN' || normalizedLabel === 'TỪ CHỐI HOÀN TIỀN') ? 'REJECTED' : (order.refund_decision || 'PENDING'))) : order.refund_decision,
+    reject_reason: rejectReason || order.reject_reason,
+  };
 };
 
 const ProfilePage = () => {
@@ -125,6 +675,24 @@ const ProfilePage = () => {
   // Lịch sử đơn hàng: Chỉ tải các đơn hàng thực tế mà người dùng đã đặt thành công
   const [customerOrders, setCustomerOrders] = useState(() => {
     try {
+      if (localStorage.getItem('yf_orders_reset_all_v3') !== 'true') {
+        orderService.clearAllOrders().catch(() => { });
+        localStorage.removeItem('yf_manager_orders');
+        localStorage.removeItem('yf_customer_orders');
+        localStorage.removeItem('yf_deleted_order_ids');
+        sessionStorage.removeItem('yf_last_completed_order');
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('yf_customer_orders') || k.startsWith('yf_orders_reset_') || k === 'yf_manager_orders')) {
+            keysToRemove.push(k);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+        localStorage.setItem('yf_orders_reset_all_v3', 'true');
+        return [];
+      }
+
       const userKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : null;
       let saved = [];
       if (userKey) {
@@ -135,8 +703,70 @@ const ProfilePage = () => {
         const g = localStorage.getItem('yf_customer_orders');
         if (g) saved = JSON.parse(g);
       }
-      const cleaned = purgeMockOrders(saved);
-      return cleaned.map(order => ({
+      let cleaned = purgeMockOrders(saved);
+      try {
+        const mgrRaw = localStorage.getItem('yf_manager_orders');
+        if (mgrRaw) {
+          const mgrOrders = JSON.parse(mgrRaw);
+          if (Array.isArray(mgrOrders) && mgrOrders.length > 0) {
+            cleaned = cleaned.map(loc => {
+              const locDigits = String(loc.order_code || loc.order_id || loc.order_number || '').replace(/\D/g, '');
+              const locId = String(loc.order_id || '');
+              const locCode = String(loc.order_code || loc.order_number || '');
+              const m = mgrOrders.find(item => {
+                if (!item) return false;
+                const mId = String(item.order_id || '').trim();
+                const mNum = String(item.order_number || item.order_code || '').trim();
+                const mDigits = (mNum || mId).replace(/\D/g, '');
+                return (locId && (mId === locId || mNum === locId)) ||
+                       (locCode && (mId === locCode || mNum === locCode)) ||
+                       (locDigits && mDigits && locDigits === mDigits);
+              });
+              if (m && (m.order_status || m.status)) {
+                const rawMStatus = String(m.order_status || m.status).toUpperCase();
+                let mStatus = rawMStatus;
+                if (['SHIPPING', 'SHIPPED', 'DELIVERING', 'IN_TRANSIT'].includes(rawMStatus)) mStatus = 'SHIPPING';
+                else if (['CONFIRMED'].includes(rawMStatus)) mStatus = 'CONFIRMED';
+                else if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(rawMStatus)) mStatus = 'COMPLETED';
+                else if (['CANCELLED', 'FAILED'].includes(rawMStatus)) mStatus = 'CANCELLED';
+                else if (['RETURNED', 'REFUNDED', 'EXCHANGE'].includes(rawMStatus)) mStatus = 'RETURNED';
+                else mStatus = 'PENDING';
+
+                const isRej = m.refund_decision === 'REJECTED' || String(m.status_label || '').toUpperCase().includes('TỪ CHỐI') || String(m.note || '').toLowerCase().includes('từ chối hoàn tiền') || String(m.note || '').toLowerCase().includes('từ chối hoàn');
+                const isApp = !isRej && (m.refund_decision === 'APPROVED' || String(m.status_label || '').toUpperCase().includes('ĐÃ HOÀN') || String(m.note || '').toLowerCase().includes('đã xác nhận hoàn tiền') || String(m.note || '').toLowerCase().includes('đã hoàn tiền') || m.payment_status === 'REFUNDED');
+                let mLabel = m.status_label_customer || m.status_label;
+                if (mStatus === 'RETURNED') {
+                  if (isApp) {
+                    mLabel = 'ĐÃ HOÀN TIỀN';
+                  } else if (isRej) {
+                    mLabel = 'TỪ CHỐI HOÀN';
+                  } else {
+                    mLabel = 'ĐỔI TRẢ';
+                  }
+                }
+                const rejReason = m.reject_reason || loc.reject_reason || (m.note?.includes('Từ chối hoàn tiền:') ? m.note.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim() : 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop');
+                return {
+                  ...loc,
+                  status: mStatus,
+                  order_status: mStatus,
+                  status_label: isRej ? 'TỪ CHỐI HOÀN' : (isApp ? 'ĐÃ HOÀN TIỀN' : mLabel),
+                  refund_decision: isRej ? 'REJECTED' : (isApp ? 'APPROVED' : (m.refund_decision || loc.refund_decision)),
+                  reject_reason: isRej ? rejReason : (m.reject_reason || loc.reject_reason),
+                  refund_reason: m.refund_reason || loc.refund_reason,
+                  refund_bank: m.refund_bank || loc.refund_bank,
+                  note: m.note || loc.note,
+                };
+              }
+              return loc;
+            });
+          }
+        }
+      } catch (e) {}
+      try {
+        if (userKey) localStorage.setItem(userKey, JSON.stringify(cleaned));
+        localStorage.setItem('yf_customer_orders', JSON.stringify(cleaned));
+      } catch (e) { }
+      return applyStatusOverrides(cleaned).map(order => normalizeInitialOrderStatus({
         ...order,
         items: (order.items || []).map(item => ({
           ...item,
@@ -148,10 +778,16 @@ const ProfilePage = () => {
     }
   });
 
-  // Modal theo dõi hành trình, đánh giá, bảo hành, hủy đơn
+  // Modal theo dõi hành trình, đánh giá, bảo hành, hủy đơn, hoàn tiền
   const [trackingModalOrder, setTrackingModalOrder] = useState(null);
   const [reviewModalOrder, setReviewModalOrder] = useState(null);
   const [warrantyModalOpen, setWarrantyModalOpen] = useState(false);
+  const [refundModalOrder, setRefundModalOrder] = useState(null);
+  const [refundReason, setRefundReason] = useState('Sản phẩm không vừa kích cỡ (Size)');
+  const [customRefundReason, setCustomRefundReason] = useState('');
+  const [refundBankInfo, setRefundBankInfo] = useState('');
+  const [refundBankError, setRefundBankError] = useState('');
+  const [isRefunding, setIsRefunding] = useState(false);
   const [cancelModalOrder, setCancelModalOrder] = useState(null);
   const [cancelReason, setCancelReason] = useState('Đổi ý, không muốn mua nữa');
   const [customCancelReason, setCustomCancelReason] = useState('');
@@ -170,8 +806,29 @@ const ProfilePage = () => {
     }
   }, [searchParams]);
 
-  // Đồng bộ đơn hàng từ database backend & localStorage thực tế
-  useEffect(() => {
+  // Đồng bộ đơn hàng từ database backend, Manager storage & LocalStorage thực tế
+  const loadOrders = useCallback(() => {
+    if (localStorage.getItem('yf_orders_reset_all_v3') !== 'true') {
+      try {
+        orderService.clearAllOrders().catch(() => { });
+        localStorage.removeItem('yf_manager_orders');
+        localStorage.removeItem('yf_customer_orders');
+        localStorage.removeItem('yf_deleted_order_ids');
+        sessionStorage.removeItem('yf_last_completed_order');
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('yf_customer_orders') || k.startsWith('yf_orders_reset_') || k === 'yf_manager_orders')) {
+            keysToRemove.push(k);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+        localStorage.setItem('yf_orders_reset_all_v3', 'true');
+      } catch (e) { }
+      setCustomerOrders([]);
+      return;
+    }
+
     const userKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : null;
     let local = [];
     try {
@@ -183,26 +840,150 @@ const ProfilePage = () => {
         const gSaved = localStorage.getItem('yf_customer_orders');
         if (gSaved) local = JSON.parse(gSaved);
       }
-      local = purgeMockOrders(local).map(order => ({
+      local = purgeMockOrders(local).map(order => normalizeInitialOrderStatus({
         ...order,
         items: (order.items || []).map(item => ({
           ...item,
           image: resolveOrderItemImage(item),
         }))
       }));
+
+      // Đồng bộ trực tiếp từ danh sách quản lý đơn hàng của Manager/Admin (yf_manager_orders)
+      const mgrRaw = localStorage.getItem('yf_manager_orders');
+      if (mgrRaw) {
+        const mgrOrders = JSON.parse(mgrRaw);
+        if (Array.isArray(mgrOrders) && mgrOrders.length > 0) {
+          local = local.map(loc => {
+            const locDigits = String(loc.order_code || loc.order_id || loc.order_number || '').replace(/\D/g, '');
+            const locId = String(loc.order_id || '');
+            const locCode = String(loc.order_code || loc.order_number || '');
+            const m = mgrOrders.find(item => {
+              if (!item) return false;
+              const mId = String(item.order_id || '').trim();
+              const mNum = String(item.order_number || item.order_code || '').trim();
+              const mDigits = (mNum || mId).replace(/\D/g, '');
+              return (locId && (mId === locId || mNum === locId)) ||
+                     (locCode && (mId === locCode || mNum === locCode)) ||
+                     (locDigits && mDigits && locDigits === mDigits);
+            });
+            if (m && m.order_status) {
+              const rawMStatus = String(m.order_status).toUpperCase();
+              let mStatus = rawMStatus;
+              if (['SHIPPING', 'SHIPPED', 'DELIVERING', 'IN_TRANSIT'].includes(rawMStatus)) mStatus = 'SHIPPING';
+              else if (['CONFIRMED'].includes(rawMStatus)) mStatus = 'CONFIRMED';
+              else if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(rawMStatus)) mStatus = 'COMPLETED';
+              else if (['CANCELLED', 'FAILED'].includes(rawMStatus)) mStatus = 'CANCELLED';
+              else if (['RETURNED', 'REFUNDED', 'EXCHANGE'].includes(rawMStatus)) mStatus = 'RETURNED';
+              else mStatus = 'PENDING';
+
+              const formattedDate = new Date().toLocaleDateString('vi-VN');
+              const isRej = m.refund_decision === 'REJECTED' || String(m.status_label || '').toUpperCase().includes('TỪ CHỐI') || String(m.note || '').toLowerCase().includes('từ chối hoàn tiền') || String(m.note || '').toLowerCase().includes('từ chối hoàn');
+              const isApp = !isRej && (m.refund_decision === 'APPROVED' || String(m.status_label || '').toUpperCase().includes('ĐÃ HOÀN') || String(m.note || '').toLowerCase().includes('đã xác nhận hoàn tiền') || String(m.note || '').toLowerCase().includes('đã hoàn tiền') || m.payment_status === 'REFUNDED');
+              let mLabel = m.status_label_customer || m.status_label;
+              if (mStatus === 'RETURNED') {
+                if (isApp) {
+                  mLabel = 'ĐÃ HOÀN TIỀN';
+                } else if (isRej) {
+                  mLabel = 'TỪ CHỐI HOÀN';
+                } else {
+                  mLabel = 'ĐỔI TRẢ';
+                }
+              } else if (!mLabel) {
+                mLabel = (
+                  mStatus === 'COMPLETED' ? `ĐÃ GIAO (${formattedDate})` : (
+                    mStatus === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
+                      mStatus === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
+                        mStatus === 'CANCELLED' ? 'ĐÃ HỦY' : 'CHỜ XÁC NHẬN'
+                      )
+                    )
+                  )
+                );
+              }
+              const curLocStatus = String(loc.status || loc.order_status || '').toUpperCase();
+              if (curLocStatus === 'CANCELLED' && mStatus !== 'CANCELLED') {
+                return loc;
+              }
+
+              const rejReason = m.reject_reason || loc.reject_reason || (m.note?.includes('Từ chối hoàn tiền:') ? m.note.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim() : 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop');
+              return {
+                ...loc,
+                status: mStatus,
+                order_status: mStatus,
+                status_label: isRej ? 'TỪ CHỐI HOÀN' : (isApp ? 'ĐÃ HOÀN TIỀN' : mLabel),
+                refund_decision: isRej ? 'REJECTED' : (isApp ? 'APPROVED' : (m.refund_decision || loc.refund_decision)),
+                reject_reason: isRej ? rejReason : (m.reject_reason || loc.reject_reason),
+                refund_reason: m.refund_reason || loc.refund_reason,
+                refund_bank: m.refund_bank || loc.refund_bank,
+                note: m.note || loc.note,
+                delivered_date: mStatus === 'COMPLETED' ? (loc.delivered_date || formattedDate) : loc.delivered_date,
+              };
+            }
+            return loc;
+          });
+        }
+      }
+
+      local = applyStatusOverrides(local);
       if (userKey) localStorage.setItem(userKey, JSON.stringify(local));
       localStorage.setItem('yf_customer_orders', JSON.stringify(local));
-    } catch (e) {}
+    } catch (e) { }
+
+    // Cập nhật giao diện ngay lập tức từ local storage
+    if (local && local.length > 0) {
+      setCustomerOrders(local);
+    }
 
     // Gọi API lấy các đơn hàng thực tế đã lưu trong MySQL
     orderService.getMyOrders(user?.email)
       .then((res) => {
         if (res?.status && Array.isArray(res.data)) {
           const apiFormatted = res.data.map((apiOrd) => {
-            const isCompleted = ['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(String(apiOrd.order_status).toUpperCase());
-            const isShipping = ['SHIPPING', 'PROCESSING', 'PREPARING'].includes(String(apiOrd.order_status).toUpperCase());
-            const isCancelled = ['CANCELLED', 'RETURNED', 'FAILED'].includes(String(apiOrd.order_status).toUpperCase());
+            const s = String(apiOrd.order_status || '').toUpperCase();
+            const isCompleted = ['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s);
+            const isShipping = ['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s);
+            const isConfirmed = ['CONFIRMED'].includes(s);
+            const isReturned = ['RETURNED', 'REFUNDED', 'EXCHANGE', 'RETURN'].includes(s);
+            const isCancelled = ['CANCELLED', 'FAILED'].includes(s);
             const orderDateStr = new Date(apiOrd.created_at).toLocaleDateString('vi-VN');
+            const apiNote = String(apiOrd.note || '');
+
+            let currentStatus = isCompleted
+              ? 'COMPLETED'
+              : (isReturned
+                ? 'RETURNED'
+                : (isCancelled
+                  ? 'CANCELLED'
+                  : (isShipping ? 'SHIPPING' : (isConfirmed ? 'CONFIRMED' : 'PENDING'))));
+
+            let currentStatusLabel = isCompleted
+              ? `ĐÃ GIAO (${orderDateStr})`
+              : (isCancelled
+                ? 'ĐÃ HỦY'
+                : (isShipping ? 'ĐANG VẬN CHUYỂN' : (isConfirmed ? 'ĐÃ XÁC NHẬN' : 'CHỜ XÁC NHẬN')));
+
+            let refundDecision = undefined;
+            let rejectReason = '';
+            let refundReason = '';
+            let refundBank = '';
+
+            if (isReturned) {
+              const apiNoteLow = apiNote.toLowerCase();
+              if (apiNoteLow.includes('đã xác nhận hoàn tiền') || apiNoteLow.includes('đã hoàn tiền')) {
+                refundDecision = 'APPROVED';
+                currentStatusLabel = 'ĐÃ HOÀN TIỀN';
+              } else if (apiNoteLow.includes('từ chối hoàn tiền') || apiNoteLow.includes('từ chối hoàn')) {
+                refundDecision = 'REJECTED';
+                currentStatusLabel = 'TỪ CHỐI HOÀN';
+                rejectReason = apiNote.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim();
+              } else {
+                currentStatusLabel = 'ĐỔI TRẢ';
+              }
+              if (apiNote.includes('STK:')) {
+                refundBank = apiNote.split('STK:')[1]?.trim();
+                const rPart = apiNote.split('STK:')[0].replace('Khách yêu cầu hoàn tiền:', '').replace('Đã xác nhận hoàn tiền:', '').replace('|', '').trim();
+                if (rPart && !rPart.includes('₫') && !rPart.includes('đ')) refundReason = rPart;
+              }
+            }
 
             return {
               order_id: String(apiOrd.order_id || apiOrd.order_number),
@@ -211,14 +992,16 @@ const ProfilePage = () => {
               payment_method: apiOrd.payments?.[0]?.payment_method === 'PAYOS'
                 ? 'Thanh toán: Chuyển khoản VietQR'
                 : 'Thanh toán: Tiền mặt khi nhận hàng (COD)',
-              status: apiOrd.order_status,
-              status_label: isCompleted
-                ? `GIAO THÀNH CÔNG (${orderDateStr})`
-                : (isShipping
-                  ? 'ĐANG GIAO HÀNG HỎA TỐC'
-                  : (isCancelled ? 'ĐÃ HỦY' : 'CHỜ GIAO HÀNG')),
+              status: currentStatus,
+              order_status: currentStatus,
+              status_label: currentStatusLabel,
               delivered_date: isCompleted ? orderDateStr : null,
               total_amount: Number(apiOrd.total_amount || 0),
+              note: apiNote,
+              refund_decision: refundDecision,
+              reject_reason: rejectReason,
+              refund_reason: refundReason,
+              refund_bank: refundBank,
               items: (apiOrd.order_items || []).map((i) => ({
                 id: i.order_item_id || i.variant_id,
                 name: i.product_name,
@@ -229,37 +1012,50 @@ const ProfilePage = () => {
                 image: resolveOrderItemImage(i),
                 collection_tag: i.variant?.product?.category?.category_name || 'THỜI TRANG CAO CẤP',
               })),
-              stepper: isShipping || String(apiOrd.order_status).toUpperCase() === 'PENDING' ? {
-                estimated_delivery: 'Dự kiến: Trong 24-48 giờ tới',
-                tracking_code: `GHN-VFP-${apiOrd.order_id}`,
-                driver_name: 'Lê Hoàng Nam (Hotline: 0906 234 567)',
-                steps: [
-                  { id: 1, name: 'Xác nhận', time: `${orderDateStr} Hoàn tất`, status: 'completed' },
-                  { id: 2, name: 'Đóng gói', time: isShipping ? 'Đã đóng gói' : 'Đang chuẩn bị', status: isShipping ? 'completed' : 'active' },
-                  { id: 3, name: 'Vận chuyển hỏa tốc', time: isShipping ? 'Đang điều phối' : 'Chờ lấy hàng', status: isShipping ? 'active' : 'pending' },
-                  { id: 4, name: 'Nhận hàng', time: 'Dự kiến 1-2 ngày', status: 'pending' },
-                ]
-              } : null
             };
           });
 
-          // Hợp nhất đơn hàng từ backend và local (chỉ giữ đơn hàng thật)
+          // Hợp nhất đơn hàng từ backend và local (ưu tiên cập nhật trạng thái mới nhất từ Manager)
           const merged = [...apiFormatted];
           for (const item of (local || [])) {
-            const exists = merged.some(m =>
+            const idx = merged.findIndex(m =>
               String(m.order_code).replace(/\D/g, '') === String(item.order_code || item.order_id).replace(/\D/g, '')
             );
-            if (!exists) {
-              merged.push({
+            if (idx === -1) {
+              merged.push(normalizeInitialOrderStatus({
                 ...item,
                 items: (item.items || []).map(it => ({
                   ...it,
                   image: resolveOrderItemImage(it),
                 }))
-              });
+              }));
+            } else {
+              const best = pickAuthoritativeStatus(
+                merged[idx].status,
+                item.status,
+                merged[idx].status_label,
+                item.status_label,
+                merged[idx].note,
+                item.note,
+                merged[idx].refund_decision,
+                item.refund_decision
+              );
+              merged[idx] = {
+                ...merged[idx],
+                ...item,
+                status: best.status,
+                order_status: best.status,
+                status_label: best.label,
+                delivered_date: best.status === 'COMPLETED' ? (item.delivered_date || merged[idx].delivered_date || new Date().toLocaleDateString('vi-VN')) : (item.delivered_date || merged[idx].delivered_date),
+                refund_decision: (item.refund_decision === 'REJECTED' || merged[idx].refund_decision === 'REJECTED' || best.label === 'TỪ CHỐI HOÀN' || best.label === 'TỪ CHỐI HOÀN TIỀN') ? 'REJECTED' : (item.refund_decision || merged[idx].refund_decision || (best.label === 'ĐÃ HOÀN TIỀN' ? 'APPROVED' : undefined)),
+                refund_bank: item.refund_bank || merged[idx].refund_bank,
+                refund_reason: item.refund_reason || merged[idx].refund_reason,
+                reject_reason: item.reject_reason || merged[idx].reject_reason || ((best.label === 'TỪ CHỐI HOÀN' || best.label === 'TỪ CHỐI HOÀN TIỀN') ? 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop' : ''),
+                note: item.note || merged[idx].note,
+              };
             }
           }
-          const finalOrders = purgeMockOrders(merged).map(ord => ({
+          const finalOrders = applyStatusOverrides(purgeMockOrders(merged)).map(ord => normalizeInitialOrderStatus({
             ...ord,
             items: (ord.items || []).map(it => ({
               ...it,
@@ -270,13 +1066,199 @@ const ProfilePage = () => {
           if (userKey) localStorage.setItem(userKey, JSON.stringify(finalOrders));
           localStorage.setItem('yf_customer_orders', JSON.stringify(finalOrders));
         } else {
-          setCustomerOrders(purgeMockOrders(local || []));
+          setCustomerOrders(applyStatusOverrides(purgeMockOrders(local || [])).map(normalizeInitialOrderStatus));
         }
       })
       .catch(() => {
-        setCustomerOrders(purgeMockOrders(local || []));
+        setCustomerOrders(applyStatusOverrides(purgeMockOrders(local || [])).map(normalizeInitialOrderStatus));
       });
   }, [user]);
+
+  // Lắng nghe sự kiện đồng bộ thời gian thực khi Manager cập nhật trạng thái
+  useEffect(() => {
+    loadOrders();
+
+    const handleOrderSync = (e) => {
+      // Khi tab khác ghi đè đơn hàng qua storage, tự động tải lại toàn bộ
+      if (e?.key === 'yf_manager_orders' || e?.key === 'yf_order_status_overrides' || e?.key?.startsWith('yf_customer_orders')) {
+        loadOrders();
+        return;
+      }
+
+      let detail = e?.detail;
+      if (!detail && e?.key === 'yf_last_status_event' && e?.newValue) {
+        try {
+          detail = JSON.parse(e.newValue);
+        } catch (err) { }
+      }
+      if (!detail) {
+        try {
+          const raw = localStorage.getItem('yf_last_status_event');
+          if (raw) detail = JSON.parse(raw);
+        } catch (err) { }
+      }
+
+      if (detail?.action === 'CLEAR_ALL') {
+        setCustomerOrders([]);
+        setTrackingModalOrder(null);
+        return;
+      }
+
+      if (detail?.status) {
+        const s = detail.status;
+        let cLabel = detail.customerLabel;
+        if (s === 'RETURNED') {
+          if (detail.refund_decision === 'APPROVED' || String(detail.statusLabel || '').toLowerCase().includes('hoàn tiền') || String(detail.customerLabel || '').includes('HOÀN TIỀN')) {
+            cLabel = 'ĐÃ HOÀN TIỀN';
+          } else if (detail.refund_decision === 'REJECTED' || String(detail.statusLabel || '').toLowerCase().includes('từ chối') || String(detail.customerLabel || '').includes('TỪ CHỐI')) {
+            cLabel = 'TỪ CHỐI HOÀN';
+          } else {
+            cLabel = 'ĐỔI TRẢ';
+          }
+        } else if (!cLabel) {
+          cLabel = detail.statusLabel || (
+            s === 'COMPLETED' ? 'ĐÃ GIAO' : (
+              s === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
+                s === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
+                  s === 'CANCELLED' ? 'ĐÃ HỦY' : 'CHỜ XÁC NHẬN'
+                )
+              )
+            )
+          );
+        }
+
+        const evtDigits = String(detail.orderDigits || detail.digits || detail.orderNumber || detail.orderId || '').replace(/\D/g, '');
+        try {
+          const rawOv = localStorage.getItem('yf_order_status_overrides');
+          const ovs = rawOv ? JSON.parse(rawOv) : {};
+          if (evtDigits) {
+            const ovEntry = {
+              status: s,
+              status_label: detail.statusLabel || cLabel,
+              status_label_customer: cLabel,
+              refund_decision: detail.refund_decision,
+              reject_reason: detail.reject_reason,
+              note: detail.note,
+              updated_at: Date.now()
+            };
+            ovs[evtDigits] = ovEntry;
+            ovs[`YF-${evtDigits}`] = ovEntry;
+            ovs[`#YF-${evtDigits}`] = ovEntry;
+            ovs[`YF - ${evtDigits}`] = ovEntry;
+            ovs[`#YF - ${evtDigits}`] = ovEntry;
+            ovs[`YF – ${evtDigits}`] = ovEntry;
+            ovs[`#YF – ${evtDigits}`] = ovEntry;
+            localStorage.setItem('yf_order_status_overrides', JSON.stringify(ovs));
+          }
+        } catch (e) {}
+
+        setCustomerOrders(prev => {
+          const updated = prev.map(ord => {
+            const oId = String(ord.order_id || '').trim();
+            const oCode = String(ord.order_code || ord.order_number || '').trim();
+            const oDigits = (oCode || oId).replace(/\D/g, '');
+            const evtId = String(detail.orderId || '').trim();
+            const evtCode = String(detail.orderNumber || detail.orderCode || '').trim();
+
+            const isMatch = (evtId && (oId === evtId || oCode === evtId)) ||
+              (evtCode && (oId === evtCode || oCode === evtCode)) ||
+              (evtDigits && oDigits && evtDigits === oDigits);
+
+            if (isMatch) {
+              return {
+                ...ord,
+                status: s,
+                order_status: s,
+                status_label: cLabel,
+                cancel_reason: detail.cancel_reason || ord.cancel_reason,
+                cancelled_by: detail.cancelled_by || ord.cancelled_by,
+                refund_decision: detail.refund_decision || ord.refund_decision,
+                refund_bank: detail.refund_bank || ord.refund_bank,
+                reject_reason: detail.reject_reason || ord.reject_reason,
+                note: detail.note || ord.note,
+              };
+            }
+            return ord;
+          });
+          try {
+            const userKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : null;
+            if (userKey) localStorage.setItem(userKey, JSON.stringify(updated));
+            localStorage.setItem('yf_customer_orders', JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
+
+        setTrackingModalOrder(prev => {
+          if (!prev) return null;
+          const matchId = String(prev.order_id || '').trim();
+          const matchCode = String(prev.order_code || prev.order_number || '').trim();
+          const matchDigits = (matchCode || matchId).replace(/\D/g, '');
+          const evtId = String(detail.orderId || '').trim();
+          const evtCode = String(detail.orderNumber || '').trim();
+          const evtDigits = String(detail.orderDigits || detail.digits || evtCode || evtId).replace(/\D/g, '');
+
+          const isMatch = (evtId && (matchId === evtId || matchCode === evtId)) ||
+            (evtCode && (matchId === evtCode || matchCode === evtCode)) ||
+            (evtDigits && matchDigits && evtDigits === matchDigits);
+
+          if (isMatch) {
+            return {
+              ...prev,
+              status: s,
+              order_status: s,
+              status_label: cLabel,
+              cancel_reason: detail.cancel_reason || prev.cancel_reason,
+              cancelled_by: detail.cancelled_by || prev.cancelled_by,
+              refund_decision: detail.refund_decision || prev.refund_decision,
+              refund_bank: detail.refund_bank || prev.refund_bank,
+              reject_reason: detail.reject_reason || prev.reject_reason,
+              note: detail.note || prev.note,
+            };
+          }
+          return prev;
+        });
+      }
+    };
+
+    let bc = null;
+    try {
+      bc = new BroadcastChannel('yf_orders_sync_channel');
+      bc.onmessage = (evt) => {
+        if (evt?.data) {
+          handleOrderSync({ detail: evt.data });
+        }
+      };
+    } catch (e) {}
+
+    window.addEventListener('order_status_updated', handleOrderSync);
+    window.addEventListener('yf_order_status_changed', handleOrderSync);
+    window.addEventListener('storage', handleOrderSync);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadOrders();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', loadOrders);
+
+    // Đồng bộ định kỳ 2.5s đảm bảo luôn cập nhật theo mọi thao tác của Manager
+    const pollInterval = setInterval(() => {
+      loadOrders();
+    }, 2500);
+
+    return () => {
+      clearInterval(pollInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', loadOrders);
+      window.removeEventListener('order_status_updated', handleOrderSync);
+      window.removeEventListener('yf_order_status_changed', handleOrderSync);
+      window.removeEventListener('storage', handleOrderSync);
+      if (bc) {
+        try { bc.close(); } catch (e) {}
+      }
+    };
+  }, [loadOrders]);
   const DEFAULT_AVATAR = '/logo-white.png';
 
   // Nén ảnh tải lên về chuẩn JPEG (max 400x400) để tối ưu lưu trữ CSDL & LocalStorage
@@ -667,7 +1649,7 @@ const ProfilePage = () => {
   const [vouchersList, setVouchersList] = useState(() => voucherService.getCustomerVouchers());
 
   useEffect(() => {
-    voucherService.fetchVouchers().catch(() => {});
+    voucherService.fetchVouchers().catch(() => { });
     const unsubscribe = voucherService.subscribe(() => {
       setVouchersList(voucherService.getCustomerVouchers());
     });
@@ -707,25 +1689,60 @@ const ProfilePage = () => {
   };
 
   // Phân loại trạng thái đơn hàng theo nhóm
-  const getOrderStatusCategory = (status) => {
-    const s = String(status || '').toUpperCase();
-    if (['SHIPPING', 'PROCESSING', 'PREPARING', 'IN_TRANSIT', 'PAID'].includes(s)) return 'SHIPPING';
-    if (['DELIVERING', 'PENDING_DELIVERY', 'CONFIRMED', 'PENDING_PAYMENT', 'PENDING'].includes(s)) return 'DELIVERING';
-    if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s)) return 'COMPLETED';
-    if (['CANCELLED', 'RETURNED', 'FAILED'].includes(s)) return 'CANCELLED';
-    return 'SHIPPING';
+  const getOrderStatusCategory = (status, order = null) => {
+    if (order) {
+      const refSt = resolveOrderRefundStatus(order);
+      if (refSt.isApproved || refSt.isRejected) return 'RETURNED';
+    }
+
+    const s = String(status || order?.order_status || order?.status || '').toUpperCase();
+    const label = String(order?.status_label || '').toUpperCase();
+    const noteStr = String(order?.note || '').toLowerCase();
+
+    if (['RETURNED', 'REFUNDED', 'EXCHANGE', 'RETURN'].includes(s) ||
+        label.includes('ĐỔI TRẢ') ||
+        label.includes('TRẢ HÀNG') ||
+        label.includes('HOÀN TIỀN') ||
+        label.includes('TỪ CHỐI') ||
+        label.includes('ĐÃ HOÀN') ||
+        Boolean(order?.refund_reason) ||
+        Boolean(order?.refund_bank) ||
+        order?.refund_decision === 'APPROVED' ||
+        order?.refund_decision === 'REJECTED' ||
+        noteStr.includes('khách yêu cầu hoàn tiền') ||
+        (noteStr.includes('stk:') && !noteStr.includes('khách hủy đơn:'))) {
+      return 'RETURNED';
+    }
+    if (['CANCELLED', 'FAILED'].includes(s) || label.includes('HỦY')) {
+      return 'CANCELLED';
+    }
+    if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s) || label.includes('ĐÃ GIAO') || label.includes('GIAO THÀNH CÔNG')) {
+      return 'COMPLETED';
+    }
+    if (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT', 'PROCESSING', 'PREPARING'].includes(s) || label.includes('VẬN CHUYỂN') || label.includes('ĐANG GIAO')) {
+      return 'SHIPPING';
+    }
+    if (['CONFIRMED'].includes(s) || label.includes('ĐÃ XÁC NHẬN')) {
+      return 'CONFIRMED';
+    }
+    if (['PENDING', 'AWAITING_CONFIRMATION'].includes(s) || label.includes('CHỜ XÁC NHẬN')) {
+      return 'PENDING';
+    }
+    return 'PENDING';
   };
 
   const orderCounts = {
     ALL: customerOrders.length,
-    SHIPPING: customerOrders.filter(o => getOrderStatusCategory(o.status) === 'SHIPPING').length,
-    DELIVERING: customerOrders.filter(o => getOrderStatusCategory(o.status) === 'DELIVERING').length,
-    COMPLETED: customerOrders.filter(o => getOrderStatusCategory(o.status) === 'COMPLETED').length,
-    CANCELLED: customerOrders.filter(o => getOrderStatusCategory(o.status) === 'CANCELLED').length,
+    PENDING: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'PENDING').length,
+    CONFIRMED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'CONFIRMED').length,
+    SHIPPING: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'SHIPPING').length,
+    COMPLETED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'COMPLETED').length,
+    CANCELLED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'CANCELLED').length,
+    RETURNED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'RETURNED').length,
   };
 
   const filteredOrders = customerOrders.filter(ord => {
-    if (orderStatusFilter !== 'ALL' && getOrderStatusCategory(ord.status) !== orderStatusFilter) {
+    if (orderStatusFilter !== 'ALL' && getOrderStatusCategory(ord.status, ord) !== orderStatusFilter) {
       return false;
     }
     if (orderSearchQuery.trim()) {
@@ -763,23 +1780,250 @@ const ProfilePage = () => {
   const confirmCancelOrder = async (ord) => {
     if (!ord) return;
     setIsCancelling(true);
-    const finalReason = cancelReason === 'Lý do khác' && customCancelReason.trim()
-      ? customCancelReason.trim()
-      : cancelReason;
+    try {
+      const finalReason = cancelReason === 'Lý do khác' && customCancelReason.trim()
+        ? customCancelReason.trim()
+        : cancelReason;
+
+      const orderDisplayCode = ord.order_code || ord.order_number || ord.order_id;
+      const orderDigits = String(orderDisplayCode || ord.order_id || '').replace(/\D/g, '');
+      const tId = String(ord.order_id || '').trim();
+      const tNum = String(orderDisplayCode || '').trim();
+
+      const isRealCustNote = (txt) => {
+        if (!txt) return false;
+        const low = String(txt).toLowerCase().trim();
+        const cancelPhrases = [
+          'hủy', 'hoàn tiền', 'stk:', 'đổi trả', 'đổi ý', 'không muốn mua nữa',
+          'muốn thay đổi địa chỉ nhận hàng', 'muốn thay đổi địa chỉ', 'thay đổi địa chỉ',
+          'muốn thay đổi sản phẩm', 'thủ tục thanh toán quá rắc rối', 'tìm thấy giá rẻ hơn',
+          'đặt trùng đơn'
+        ];
+        return !cancelPhrases.some(p => low.includes(p));
+      };
+      const cleanDeliveryNote = isRealCustNote(ord.customer_delivery_note) ? ord.customer_delivery_note : (isRealCustNote(ord.note) ? ord.note : '');
+
+      // 1. Cập nhật state customerOrders ngay lập tức
+      const updatedOrders = customerOrders.map((o) => {
+        const oId = String(o.order_id || '').trim();
+        const oNum = String(o.order_code || o.order_number || '').trim();
+        const oDigits = (oNum || oId).replace(/\D/g, '');
+        const isMatch =
+          (tId && (oId === tId || oNum === tId)) ||
+          (tNum && (oId === tNum || oNum === tNum)) ||
+          (orderDigits && oDigits && orderDigits === oDigits);
+        if (isMatch) {
+          return {
+            ...o,
+            status: 'CANCELLED',
+            order_status: 'CANCELLED',
+            status_label: 'ĐÃ HỦY',
+            cancel_reason: finalReason,
+            cancelled_by: 'CUSTOMER',
+            stepper: null,
+          };
+        }
+        return o;
+      });
+
+      setCustomerOrders(updatedOrders);
+
+      // 2. Lưu đè vĩnh viễn vào yf_order_status_overrides để ĐẢM BẢO F5 hoặc API không làm mất trạng thái Đã hủy
+      try {
+        const rawOverrides = localStorage.getItem('yf_order_status_overrides');
+        const overrides = rawOverrides ? JSON.parse(rawOverrides) : {};
+        const overrideEntry = {
+          status: 'CANCELLED',
+          status_label: 'Đã hủy',
+          status_label_manager: 'Đã hủy',
+          status_label_customer: 'ĐÃ HỦY',
+          cancel_reason: finalReason,
+          cancelled_by: 'CUSTOMER',
+          note: cleanDeliveryNote,
+          cancel_note: `Khách hủy đơn: ${finalReason}`,
+          updated_at: Date.now(),
+        };
+        if (orderDigits) {
+          overrides[orderDigits] = overrideEntry;
+          overrides[`YF-${orderDigits}`] = overrideEntry;
+          overrides[`#YF-${orderDigits}`] = overrideEntry;
+          overrides[`YF - ${orderDigits}`] = overrideEntry;
+          overrides[`#YF - ${orderDigits}`] = overrideEntry;
+          overrides[`YF – ${orderDigits}`] = overrideEntry;
+          overrides[`#YF – ${orderDigits}`] = overrideEntry;
+          overrides[`#${orderDigits}`] = overrideEntry;
+        }
+        if (tId) overrides[tId] = overrideEntry;
+        if (tNum) overrides[tNum] = overrideEntry;
+        localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
+      } catch (e) {}
+
+      // 3. Lưu vào tất cả key yf_customer_orders* trong localStorage
+      try {
+        const userKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : null;
+        if (userKey) localStorage.setItem(userKey, JSON.stringify(updatedOrders));
+        localStorage.setItem('yf_customer_orders', JSON.stringify(updatedOrders));
+
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('yf_customer_orders_') && k !== userKey) {
+            try {
+              const rawK = localStorage.getItem(k);
+              if (rawK) {
+                const parsedK = JSON.parse(rawK);
+                if (Array.isArray(parsedK)) {
+                  const updatedK = parsedK.map(item => {
+                    const iId = String(item.order_id || '').trim();
+                    const iNum = String(item.order_code || item.order_number || '').trim();
+                    const iDigits = (iNum || iId).replace(/\D/g, '');
+                    if ((tId && (iId === tId || iNum === tId)) ||
+                        (tNum && (iId === tNum || iNum === tNum)) ||
+                        (orderDigits && iDigits && orderDigits === iDigits)) {
+                      return { ...item, status: 'CANCELLED', order_status: 'CANCELLED', status_label: 'ĐÃ HỦY', cancel_reason: finalReason, cancelled_by: 'CUSTOMER' };
+                    }
+                    return item;
+                  });
+                  localStorage.setItem(k, JSON.stringify(updatedK));
+                }
+              }
+            } catch (err) {}
+          }
+        }
+      } catch (e) {}
+
+      // 4. Cập nhật trực tiếp vào yf_manager_orders để trang quản lý nhận được ngay lập tức
+      try {
+        const mgrRaw = localStorage.getItem('yf_manager_orders');
+        if (mgrRaw) {
+          const mgrOrders = JSON.parse(mgrRaw);
+          if (Array.isArray(mgrOrders)) {
+            const updatedMgr = mgrOrders.map(m => {
+              const mId = String(m.order_id || '').trim();
+              const mNum = String(m.order_number || m.order_code || '').trim();
+              const mDigits = (mNum || mId).replace(/\D/g, '');
+              const isMatch =
+                (tId && (mId === tId || mNum === tId)) ||
+                (tNum && (mId === tNum || mNum === tNum)) ||
+                (orderDigits && mDigits && orderDigits === mDigits);
+              if (isMatch) {
+                return {
+                  ...m,
+                  order_status: 'CANCELLED',
+                  status: 'CANCELLED',
+                  status_label: 'Đã hủy',
+                  cancel_reason: finalReason,
+                  cancelled_by: 'CUSTOMER',
+                  note: cleanDeliveryNote,
+                  cancel_note: `Khách hủy đơn: ${finalReason}`,
+                };
+              }
+              return m;
+            });
+            localStorage.setItem('yf_manager_orders', JSON.stringify(updatedMgr));
+          }
+        }
+      } catch (e) {}
+
+      // 5. Phát sự kiện toàn cục & cross-tab để OrderManager cập nhật tức thì
+      const statusPayload = {
+        orderId: tId,
+        orderNumber: tNum,
+        orderDigits,
+        digits: orderDigits,
+        status: 'CANCELLED',
+        statusLabel: 'Đã hủy',
+        customerLabel: 'ĐÃ HỦY',
+        reason: finalReason,
+        cancel_reason: finalReason,
+        cancelled_by: 'CUSTOMER',
+        note: cleanDeliveryNote,
+        cancel_note: `Khách hủy đơn: ${finalReason}`,
+        timestamp: Date.now()
+      };
+      try {
+        localStorage.setItem('yf_last_status_event', JSON.stringify(statusPayload));
+      } catch (e) {}
+
+      try {
+        window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: statusPayload }));
+        window.dispatchEvent(new CustomEvent('order_status_updated', { detail: statusPayload }));
+      } catch (e) {}
+
+      try {
+        const bc = new BroadcastChannel('yf_orders_sync_channel');
+        bc.postMessage(statusPayload);
+        bc.close();
+      } catch (e) {}
+
+      // 6. Gửi API backend cập nhật CSDL MySQL
+      try {
+        if (tId) orderService.cancelOrder(tId, finalReason).catch(() => {});
+        if (tNum && tNum !== tId) orderService.cancelOrder(tNum, finalReason).catch(() => {});
+        if (orderDigits && orderDigits !== tId && orderDigits !== tNum) orderService.cancelOrder(orderDigits, finalReason).catch(() => {});
+        if (tId) orderService.updateOrderStatus(tId, 'CANCELLED').catch(() => {});
+        if (orderDigits && orderDigits !== tId) orderService.updateOrderStatus(orderDigits, 'CANCELLED').catch(() => {});
+      } catch (err) {
+        console.warn('Cập nhật hủy đơn DB:', err?.message);
+      }
+
+      setOrderAlert({
+        type: 'success',
+        message: `Đã hủy thành công đơn hàng #${orderDisplayCode}!`,
+      });
+      setTimeout(() => setOrderAlert({ type: '', message: '' }), 4000);
+    } catch (err) {
+      console.error('Lỗi khi hủy đơn:', err);
+    } finally {
+      setIsCancelling(false);
+      setCancelModalOrder(null);
+    }
+  };
+
+  const confirmRefundOrder = async (ord) => {
+    if (!ord) return;
+
+    // Bắt buộc nhập thông tin tài khoản ngân hàng để nhận tiền hoàn
+    const bankTrimmed = String(refundBankInfo || '').trim();
+    if (!bankTrimmed) {
+      setRefundBankError('Vui lòng nhập đầy đủ thông tin tài khoản ngân hàng (STK, Tên ngân hàng, Tên chủ thẻ)!');
+      setOrderAlert({
+        type: 'error',
+        message: 'Bắt buộc nhập thông tin tài khoản ngân hàng (Số tài khoản, Tên ngân hàng, Chủ tài khoản) để nhận tiền hoàn!',
+      });
+      setTimeout(() => setOrderAlert({ type: '', message: '' }), 4000);
+      return;
+    }
+    setRefundBankError('');
+    setIsRefunding(true);
+    try {
+      const finalReason = refundReason === 'Lý do khác' && customRefundReason.trim()
+        ? customRefundReason.trim()
+        : refundReason;
 
     const orderDisplayCode = ord.order_code || ord.order_number || ord.order_id;
+    const orderDigits = String(orderDisplayCode || ord.order_id || '').replace(/\D/g, '');
+    const tId = String(ord.order_id || '').trim();
+    const tNum = String(orderDisplayCode || '').trim();
+    const refundNote = `Khách yêu cầu hoàn tiền: ${finalReason} | STK: ${bankTrimmed}`;
 
-    // 1. Cập nhật state customerOrders ngay lập tức
+    // 1. Cập nhật state customerOrders ngay lập tức sang RETURNED (Đổi trả)
     const updatedOrders = customerOrders.map((o) => {
+      const oId = String(o.order_id || '').trim();
+      const oNum = String(o.order_code || o.order_number || '').trim();
+      const oDigits = (oNum || oId).replace(/\D/g, '');
       const isMatch =
-        String(o.order_id) === String(ord.order_id) ||
-        String(o.order_code || '').replace(/\D/g, '') === String(ord.order_code || ord.order_id).replace(/\D/g, '');
+        (tId && (oId === tId || oNum === tId)) ||
+        (tNum && (oId === tNum || oNum === tNum)) ||
+        (orderDigits && oDigits && orderDigits === oDigits);
       if (isMatch) {
         return {
           ...o,
-          status: 'CANCELLED',
-          status_label: 'ĐÃ HỦY',
-          cancel_reason: finalReason,
+          status: 'RETURNED',
+          order_status: 'RETURNED',
+          status_label: 'ĐỔI TRẢ',
+          refund_reason: finalReason,
+          refund_bank: bankTrimmed,
+          note: refundNote,
           stepper: null,
         };
       }
@@ -788,27 +2032,306 @@ const ProfilePage = () => {
 
     setCustomerOrders(updatedOrders);
 
-    // 2. Lưu vào localStorage
+    // 2. Lưu vào localStorage & đồng bộ sang Manager
     try {
       const userKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : null;
       if (userKey) localStorage.setItem(userKey, JSON.stringify(updatedOrders));
       localStorage.setItem('yf_customer_orders', JSON.stringify(updatedOrders));
-    } catch (e) {}
+
+      // Cập nhật tất cả key yf_customer_orders_*
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('yf_customer_orders_') && k !== userKey) {
+          try {
+            const rawK = localStorage.getItem(k);
+            if (rawK) {
+              const parsedK = JSON.parse(rawK);
+              if (Array.isArray(parsedK)) {
+                const updatedK = parsedK.map(item => {
+                  const iId = String(item.order_id || '').trim();
+                  const iNum = String(item.order_code || item.order_number || '').trim();
+                  const iDigits = (iNum || iId).replace(/\D/g, '');
+                  if ((tId && (iId === tId || iNum === tId)) ||
+                      (tNum && (iId === tNum || iNum === tNum)) ||
+                      (orderDigits && iDigits && orderDigits === iDigits)) {
+                    return {
+                      ...item,
+                      status: 'RETURNED',
+                      order_status: 'RETURNED',
+                      status_label: 'ĐỔI TRẢ',
+                      refund_reason: finalReason,
+                      refund_bank: bankTrimmed,
+                      note: refundNote
+                    };
+                  }
+                  return item;
+                });
+                localStorage.setItem(k, JSON.stringify(updatedK));
+              }
+            }
+          } catch (err) {}
+        }
+      }
+
+      // Ghi đè trạng thái overrides vĩnh viễn
+      const rawOverrides = localStorage.getItem('yf_order_status_overrides');
+      const overrides = rawOverrides ? JSON.parse(rawOverrides) : {};
+      const overrideEntry = {
+        status: 'RETURNED',
+        status_label: 'Đổi trả',
+        status_label_manager: 'Đổi trả',
+        status_label_customer: 'ĐỔI TRẢ',
+        refund_reason: finalReason,
+        refund_bank: bankTrimmed,
+        note: refundNote,
+        updated_at: Date.now()
+      };
+      if (orderDigits) {
+        overrides[orderDigits] = overrideEntry;
+        overrides[`YF-${orderDigits}`] = overrideEntry;
+        overrides[`#YF-${orderDigits}`] = overrideEntry;
+        overrides[`YF - ${orderDigits}`] = overrideEntry;
+      }
+      if (tId) overrides[tId] = overrideEntry;
+      if (tNum) overrides[tNum] = overrideEntry;
+      localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
+
+      // Cập nhật yf_manager_orders để trang quản lý nhận được ngay lập tức
+      const mgrRaw = localStorage.getItem('yf_manager_orders');
+      if (mgrRaw) {
+        const mgrOrders = JSON.parse(mgrRaw);
+        if (Array.isArray(mgrOrders)) {
+          const updatedMgr = mgrOrders.map(m => {
+            const mId = String(m.order_id || '').trim();
+            const mNum = String(m.order_number || m.order_code || '').trim();
+            const mDigits = (mNum || mId).replace(/\D/g, '');
+            const isMatch =
+              (tId && (mId === tId || mNum === tId)) ||
+              (tNum && (mId === tNum || mNum === tNum)) ||
+              (orderDigits && mDigits && orderDigits === mDigits);
+            if (isMatch) {
+              return {
+                ...m,
+                order_status: 'RETURNED',
+                status: 'RETURNED',
+                status_label: 'Đổi trả',
+                refund_reason: finalReason,
+                refund_bank: bankTrimmed,
+                note: refundNote,
+              };
+            }
+            return m;
+          });
+          localStorage.setItem('yf_manager_orders', JSON.stringify(updatedMgr));
+        }
+      }
+
+      // Phát event storage đa tab & BroadcastChannel
+      const statusPayload = {
+        orderId: tId,
+        orderNumber: tNum,
+        orderDigits: orderDigits,
+        digits: orderDigits,
+        orderCode: orderDisplayCode,
+        status: 'RETURNED',
+        statusLabel: 'Đổi trả',
+        customerLabel: 'ĐỔI TRẢ',
+        refund_bank: bankTrimmed,
+        refund_reason: finalReason,
+        reason: finalReason,
+        note: refundNote,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('yf_last_status_event', JSON.stringify(statusPayload));
+      window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: statusPayload }));
+      window.dispatchEvent(new CustomEvent('order_status_updated', { detail: statusPayload }));
+
+      try {
+        const bc = new BroadcastChannel('yf_orders_sync_channel');
+        bc.postMessage(statusPayload);
+        bc.close();
+      } catch (e) {}
+    } catch (e) {
+      console.warn('Lỗi lưu localStorage khi hoàn tiền:', e);
+    }
 
     // 3. Đồng bộ lên Backend MySQL CSDL
     try {
-      await orderService.cancelOrder(ord.order_id || ord.order_number, finalReason);
+      if (orderService.updateOrderStatus) {
+        if (tId) await orderService.updateOrderStatus(tId, 'RETURNED', refundNote).catch(() => {});
+        if (tNum && tNum !== tId) await orderService.updateOrderStatus(tNum, 'RETURNED', refundNote).catch(() => {});
+        if (orderDigits && orderDigits !== tId && orderDigits !== tNum) await orderService.updateOrderStatus(orderDigits, 'RETURNED', refundNote).catch(() => {});
+      }
     } catch (err) {
-      console.warn('Cập nhật hủy đơn DB:', err?.message);
+      console.warn('Cập nhật hoàn tiền DB:', err?.message);
     }
 
-    setIsCancelling(false);
-    setCancelModalOrder(null);
-    setOrderAlert({
-      type: 'success',
-      message: `Đã hủy thành công đơn hàng #${orderDisplayCode}!`,
+      setOrderAlert({
+        type: 'success',
+        message: `Đã gửi yêu cầu hoàn tiền đơn hàng #${orderDisplayCode} thành công! Đơn hàng đã chuyển sang trạng thái "Đổi trả".`,
+      });
+      setTimeout(() => setOrderAlert({ type: '', message: '' }), 4500);
+    } catch (err) {
+      console.error('Lỗi khi gửi yêu cầu hoàn tiền:', err);
+    } finally {
+      setIsRefunding(false);
+      setRefundModalOrder(null);
+    }
+  };
+
+  // Mở modal theo dõi chi tiết với đầy đủ dữ liệu cập nhật mới nhất (đồng ý / từ chối hoàn)
+  const handleOpenTrackingModal = (ord) => {
+    if (!ord) return;
+    const rawId = String(ord.order_id || '').trim();
+    const rawCode = String(ord.order_code || ord.order_number || '').trim();
+    const digits = (rawCode || rawId).replace(/\D/g, '');
+
+    let refundReason = ord.refund_reason || '';
+    let refundBank = ord.refund_bank || '';
+    let refundDecision = (ord.refund_decision && ord.refund_decision !== 'PENDING') ? ord.refund_decision : '';
+    let rejectReason = ord.reject_reason || '';
+    let note = ord.note || '';
+
+    // 1. Tìm kiếm trong yf_order_status_overrides với mọi biến thể mã
+    try {
+      const rawOv = localStorage.getItem('yf_order_status_overrides');
+      if (rawOv) {
+        const overrides = JSON.parse(rawOv);
+        const ov = (digits && overrides[digits]) ||
+                   (rawId && overrides[rawId]) ||
+                   (rawCode && overrides[rawCode]) ||
+                   (digits && overrides[`YF-${digits}`]) ||
+                   (digits && overrides[`YF - ${digits}`]) ||
+                   (digits && overrides[`#YF-${digits}`]) ||
+                   (digits && overrides[`#${digits}`]);
+        if (ov) {
+          refundReason = refundReason || ov.refund_reason || '';
+          refundBank = refundBank || ov.refund_bank || '';
+          const ovL = String(ov.status_label_customer || ov.status_label || '').toUpperCase();
+          const ovN = String(ov.note || '').toLowerCase();
+          if (ov.refund_decision === 'APPROVED' || ovL.includes('ĐÃ HOÀN') || ovN.includes('đã xác nhận hoàn tiền') || ovN.includes('đã hoàn tiền')) {
+            refundDecision = 'APPROVED';
+          } else if (ov.refund_decision === 'REJECTED' || ovL.includes('TỪ CHỐI') || ovN.includes('từ chối hoàn')) {
+            refundDecision = 'REJECTED';
+          } else if (ov.refund_decision) {
+            refundDecision = ov.refund_decision;
+          }
+          rejectReason = rejectReason || ov.reject_reason || '';
+          note = ov.note || note || '';
+        }
+      }
+    } catch (e) {}
+
+    // 2. Tìm kiếm trong yf_manager_orders để lấy quyết định mới nhất từ Shop
+    try {
+      const rawMgr = localStorage.getItem('yf_manager_orders');
+      if (rawMgr) {
+        const mgrOrders = JSON.parse(rawMgr);
+        if (Array.isArray(mgrOrders)) {
+          const m = mgrOrders.find(item => {
+            const mId = String(item.order_id || '').trim();
+            const mNum = String(item.order_number || item.order_code || '').trim();
+            const mDigits = (mNum || mId).replace(/\D/g, '');
+            return (rawId && (mId === rawId || mNum === rawId)) ||
+                   (rawCode && (mId === rawCode || mNum === rawCode)) ||
+                   (digits && mDigits && digits === mDigits);
+          });
+          if (m) {
+            refundReason = refundReason || m.refund_reason || '';
+            refundBank = refundBank || m.refund_bank || '';
+            const mL = String(m.status_label || '').toUpperCase();
+            const mN = String(m.note || '').toLowerCase();
+            if (m.refund_decision === 'APPROVED' || mL.includes('ĐÃ HOÀN') || mN.includes('đã xác nhận hoàn tiền') || mN.includes('đã hoàn tiền') || m.payment_status === 'REFUNDED') {
+              refundDecision = 'APPROVED';
+            } else if (m.refund_decision === 'REJECTED' || mL.includes('TỪ CHỐI') || mN.includes('từ chối hoàn')) {
+              refundDecision = 'REJECTED';
+            } else if (m.refund_decision) {
+              refundDecision = m.refund_decision;
+            }
+            rejectReason = rejectReason || m.reject_reason || '';
+            note = m.note || note || '';
+          }
+        }
+      }
+    } catch (e) {}
+
+    // 3. Phân tích chi tiết từ chuỗi note
+    if (note) {
+      if (note.includes('Đã xác nhận hoàn tiền') || note.toLowerCase().includes('đã hoàn tiền') || ord.status_label === 'Đã hoàn tiền' || ord.status_label === 'ĐÃ HOÀN TIỀN') {
+        refundDecision = 'APPROVED';
+      } else if (note.includes('Từ chối hoàn tiền') || note.toLowerCase().includes('từ chối hoàn') || ord.status_label === 'Từ chối hoàn' || ord.status_label === 'TỪ CHỐI HOÀN TIỀN' || ord.status_label === 'TỪ CHỐI') {
+        refundDecision = 'REJECTED';
+      }
+      if (!rejectReason && note.includes('Từ chối hoàn tiền:')) {
+        rejectReason = note.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim();
+      }
+      if (!refundReason && note.includes('Lý do khách gửi:')) {
+        refundReason = note.split('Lý do khách gửi:')[1]?.trim();
+      } else if (!refundReason && note.includes('Lý do:')) {
+        refundReason = note.split('Lý do:')[1]?.split('|')[0]?.trim();
+      }
+      if (note.includes('STK:')) {
+        const parts = note.split('STK:');
+        if (parts[1] && !refundBank) refundBank = parts[1].trim();
+        if (parts[0] && !refundReason) {
+          const rPart = parts[0].replace('Khách yêu cầu hoàn tiền:', '').replace('Đã xác nhận hoàn tiền:', '').replace('|', '').trim();
+          if (rPart && !rPart.includes('₫') && !rPart.includes('đ')) refundReason = rPart;
+        }
+      }
+    }
+
+    const refStatus = resolveOrderRefundStatus(ord);
+    const ordL = String(ord.status_label || '').toUpperCase();
+    const ordN = String(note || ord.note || '').toLowerCase();
+    const isActuallyRejected = refStatus.isRejected || refundDecision === 'REJECTED' || ord.refund_decision === 'REJECTED' || ordL.includes('TỪ CHỐI') || ordN.includes('từ chối hoàn tiền') || ordN.includes('từ chối hoàn');
+    const isActuallyApproved = !isActuallyRejected && (refStatus.isApproved || refundDecision === 'APPROVED' || ord.refund_decision === 'APPROVED' || ordL.includes('ĐÃ HOÀN') || ordN.includes('đã xác nhận hoàn tiền') || ordN.includes('đã hoàn tiền') || ord.payment_status === 'REFUNDED');
+
+    const finalDecision = isActuallyApproved ? 'APPROVED' : (isActuallyRejected ? 'REJECTED' : (refundDecision || 'PENDING'));
+    const finalLabel = isActuallyApproved ? 'ĐÃ HOÀN TIỀN' : (isActuallyRejected ? 'TỪ CHỐI HOÀN' : (ord.status_label || 'ĐỔI TRẢ'));
+
+    if (isActuallyRejected && !rejectReason) {
+      rejectReason = refStatus.rejectReason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop';
+    }
+
+    // Tự động cập nhật đồng bộ đơn hàng trong customerOrders state
+    if (isActuallyApproved) {
+      setCustomerOrders(prev => prev.map(o => {
+        const oId = String(o.order_id || '').trim();
+        const oCode = String(o.order_code || o.order_number || '').trim();
+        const oDigits = (oCode || oId).replace(/\D/g, '');
+        if ((rawId && (oId === rawId || oCode === rawId)) ||
+            (rawCode && (oId === rawCode || oCode === rawCode)) ||
+            (digits && oDigits && digits === oDigits)) {
+          return {
+            ...o,
+            status: 'RETURNED',
+            order_status: 'RETURNED',
+            status_label: 'ĐÃ HOÀN TIỀN',
+            refund_decision: 'APPROVED',
+            refund_bank: refundBank || o.refund_bank,
+            refund_reason: refundReason || o.refund_reason,
+            note: note || o.note,
+          };
+        }
+        return o;
+      }));
+    }
+
+    const cancelInfo = resolveCancelInfo(ord);
+
+    setTrackingModalOrder({
+      ...ord,
+      status: (isActuallyApproved || isActuallyRejected || ord.status === 'RETURNED' || ord.order_status === 'RETURNED') ? 'RETURNED' : ord.status,
+      order_status: (isActuallyApproved || isActuallyRejected || ord.status === 'RETURNED' || ord.order_status === 'RETURNED') ? 'RETURNED' : ord.order_status,
+      status_label: finalLabel,
+      refund_reason: refundReason,
+      refund_bank: refundBank,
+      refund_decision: finalDecision,
+      reject_reason: isActuallyRejected ? (rejectReason || refStatus.rejectReason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop') : '',
+      cancel_reason: cancelInfo.cancelReason,
+      cancelled_by: cancelInfo.isShopCancelled ? 'SHOP' : (ord.cancelled_by || 'CUSTOMER'),
+      note: note,
     });
-    setTimeout(() => setOrderAlert({ type: '', message: '' }), 4000);
   };
 
   return (
@@ -825,9 +2348,9 @@ const ProfilePage = () => {
                 onChange={handleAvatarFileChange}
                 style={{ display: 'none' }}
               />
-              <img 
-                src={formData.avatar_url || DEFAULT_AVATAR} 
-                alt={user?.full_name || (isManagerOrAdmin ? 'Quản Lý Youth Fashion' : 'Khách hàng Youth Fashion')} 
+              <img
+                src={formData.avatar_url || DEFAULT_AVATAR}
+                alt={user?.full_name || (isManagerOrAdmin ? 'Quản Lý Youth Fashion' : 'Khách hàng Youth Fashion')}
                 className="hero-avatar-img"
                 onClick={() => fileInputRef.current?.click()}
                 onError={(e) => {
@@ -933,7 +2456,7 @@ const ProfilePage = () => {
 
               {/* Menu Item: Bảng Quản Lý (Đối với tài khoản manager hoặc admin) */}
               {isManagerOrAdmin && (
-                <button 
+                <button
                   className="nav-item-btn manager-nav-btn"
                   onClick={() => navigate('/manager')}
                 >
@@ -1175,15 +2698,17 @@ const ProfilePage = () => {
                 {/* Status Filter Tabs chuẩn mẫu Haute Couture */}
                 <div className="status-filter-tabs">
                   {[
-                    { key: 'ALL', label: `Tất cả (${String(orderCounts.ALL).padStart(2, '0')})` },
-                    { key: 'SHIPPING', label: `Đang xử lý / Vận chuyển (${String(orderCounts.SHIPPING).padStart(2, '0')})` },
-                    { key: 'DELIVERING', label: `Chờ giao hàng (${String(orderCounts.DELIVERING).padStart(2, '0')})` },
-                    { key: 'COMPLETED', label: `Hoàn thành (${String(orderCounts.COMPLETED).padStart(2, '0')})` },
-                    { key: 'CANCELLED', label: `Đã hủy / Đổi trả (${String(orderCounts.CANCELLED).padStart(2, '0')})` }
+                    { key: 'ALL', label: `Tất cả (${String(orderCounts.ALL).padStart(2, '0')})`, type: 'all' },
+                    { key: 'PENDING', label: `Chờ xác nhận (${String(orderCounts.PENDING).padStart(2, '0')})`, type: 'pending' },
+                    { key: 'CONFIRMED', label: `Đã xác nhận (${String(orderCounts.CONFIRMED).padStart(2, '0')})`, type: 'confirmed' },
+                    { key: 'SHIPPING', label: `Đang vận chuyển (${String(orderCounts.SHIPPING).padStart(2, '0')})`, type: 'shipping' },
+                    { key: 'COMPLETED', label: `Đã giao (${String(orderCounts.COMPLETED).padStart(2, '0')})`, type: 'completed' },
+                    { key: 'CANCELLED', label: `Đã hủy (${String(orderCounts.CANCELLED).padStart(2, '0')})`, type: 'cancelled' },
+                    { key: 'RETURNED', label: `Đổi trả (${String(orderCounts.RETURNED).padStart(2, '0')})`, type: 'returned' }
                   ].map(st => (
                     <button
                       key={st.key}
-                      className={`status-tab ${orderStatusFilter === st.key ? 'active' : ''}`}
+                      className={`status-tab tab-${st.type} ${orderStatusFilter === st.key ? 'active' : ''}`}
                       onClick={() => {
                         setOrderStatusFilter(st.key);
                         setOrderCurrentPage(1);
@@ -1216,7 +2741,7 @@ const ProfilePage = () => {
                     </div>
                   ) : (
                     currentOrders.map(ord => {
-                      const statusCat = getOrderStatusCategory(ord.status);
+                      const statusCat = getOrderStatusCategory(ord.status, ord);
                       return (
                         <div key={ord.order_id} className="order-item-card animate-fade-in">
                           {/* Header Bar */}
@@ -1234,24 +2759,53 @@ const ProfilePage = () => {
                             </div>
 
                             <div className="order-status-badge">
-                              {statusCat === 'SHIPPING' && (
-                                <span className="status-badge-pill badge-shipping">
-                                  <Truck size={14} /> {ord.status_label || 'ĐANG GIAO HÀNG HỎA TỐC'}
-                                </span>
-                              )}
-                              {statusCat === 'DELIVERING' && (
-                                <span className="status-badge-pill badge-delivering">
-                                  <Clock size={14} /> {ord.status_label || 'CHỜ GIAO HÀNG'}
-                                </span>
-                              )}
-                              {statusCat === 'COMPLETED' && (
+                              {statusCat === 'COMPLETED' ? (
                                 <span className="status-badge-pill badge-completed">
-                                  <Check size={14} strokeWidth={2.5} /> {ord.status_label || (ord.delivered_date ? `GIAO THÀNH CÔNG (${ord.delivered_date})` : 'GIAO THÀNH CÔNG')}
+                                  <Check size={14} strokeWidth={2.5} /> {ord.status_label ? ord.status_label.replace('GIAO THÀNH CÔNG', 'ĐÃ GIAO') : (ord.delivered_date ? `ĐÃ GIAO (${ord.delivered_date})` : 'ĐÃ GIAO')}
                                 </span>
-                              )}
-                              {statusCat === 'CANCELLED' && (
+                              ) : statusCat === 'RETURNED' ? (
+                                (() => {
+                                  const { isApproved, isRejected } = resolveOrderRefundStatus(ord);
+                                  const ordL = String(ord.status_label || '').toUpperCase();
+                                  const ordN = String(ord.note || '').toLowerCase();
+                                  const isActuallyApproved = isApproved || ord.refund_decision === 'APPROVED' || ordL.includes('ĐÃ HOÀN') || ordN.includes('đã xác nhận hoàn tiền') || ordN.includes('đã hoàn tiền');
+                                  const isActuallyRejected = !isActuallyApproved && (isRejected || ord.refund_decision === 'REJECTED' || ordL.includes('TỪ CHỐI') || ordN.includes('từ chối hoàn tiền') || ordN.includes('từ chối hoàn'));
+
+                                  if (isActuallyApproved) {
+                                    return (
+                                      <span className="status-badge-pill badge-completed" style={{ background: '#DCFCE7', color: '#15803D', border: '1.5px solid #BBF7D0' }}>
+                                        <Check size={14} strokeWidth={2.5} /> ĐÃ HOÀN TIỀN
+                                      </span>
+                                    );
+                                  }
+                                  if (isActuallyRejected) {
+                                    return (
+                                      <span className="status-badge-pill badge-cancelled" style={{ background: '#FEE2E2', color: '#DC2626', border: '1.5px solid #FECACA', fontWeight: 700 }}>
+                                        <X size={14} strokeWidth={2.5} /> TỪ CHỐI HOÀN
+                                      </span>
+                                    );
+                                  }
+                                  return (
+                                    <span className="status-badge-pill badge-returned">
+                                      <RefreshCw size={14} /> {ord.status_label || 'ĐỔI TRẢ'}
+                                    </span>
+                                  );
+                                })()
+                              ) : statusCat === 'CANCELLED' ? (
                                 <span className="status-badge-pill badge-cancelled">
                                   <X size={14} strokeWidth={2.5} /> {ord.status_label || 'ĐÃ HỦY'}
+                                </span>
+                              ) : (statusCat === 'SHIPPING' || ord.status === 'SHIPPING' || ord.status_label === 'ĐANG GIAO HÀNG HỎA TỐC' || ord.status_label === 'ĐANG VẬN CHUYỂN') ? (
+                                <span className="status-badge-pill badge-shipping">
+                                  <Truck size={14} /> {ord.status_label === 'CHỜ GIAO HÀNG' ? 'ĐANG VẬN CHUYỂN' : (ord.status_label || 'ĐANG VẬN CHUYỂN')}
+                                </span>
+                              ) : statusCat === 'CONFIRMED' ? (
+                                <span className="status-badge-pill badge-confirmed">
+                                  <CheckCircle size={14} /> {ord.status_label || 'ĐÃ XÁC NHẬN'}
+                                </span>
+                              ) : (
+                                <span className="status-badge-pill badge-delivering badge-processing badge-pending">
+                                  <Clock size={14} /> {(!ord.status_label || ord.status_label === 'CHỜ GIAO HÀNG' || ord.status_label === 'ĐANG XỬ LÝ') ? 'CHỜ XÁC NHẬN' : ord.status_label}
                                 </span>
                               )}
                             </div>
@@ -1272,95 +2826,147 @@ const ProfilePage = () => {
                                       e.target.src = resolveOrderItemImage(item);
                                     }}
                                   />
-                                <div className="item-details">
-                                  {item.collection_tag && (
-                                    <span className="item-collection-tag">{item.collection_tag}</span>
-                                  )}
-                                  <h4 className="item-title font-serif">{item.name}</h4>
-                                  <div className="item-specs-row">
-                                    <span>Kích thước: {item.size}</span>
-                                    <span className="specs-dot">•</span>
-                                    <span>Màu sắc: {item.color}</span>
-                                    {item.quantity && (
-                                      <>
-                                        <span className="specs-dot">•</span>
-                                        <span>Số lượng: {String(item.quantity).padStart(2, '0')}</span>
-                                      </>
+                                  <div className="item-details">
+                                    {item.collection_tag && (
+                                      <span className="item-collection-tag">{item.collection_tag}</span>
+                                    )}
+                                    <h4 className="item-title font-serif">{item.name}</h4>
+                                    <div className="item-specs-row">
+                                      <span>Kích thước: {item.size}</span>
+                                      <span className="specs-dot">•</span>
+                                      <span>Màu sắc: {item.color}</span>
+                                      {item.quantity && (
+                                        <>
+                                          <span className="specs-dot">•</span>
+                                          <span>Số lượng: {String(item.quantity).padStart(2, '0')}</span>
+                                        </>
+                                      )}
+                                    </div>
+                                    {item.service_note && (
+                                      <div className="item-service-note">{item.service_note}</div>
+                                    )}
+                                    {item.warranty_tag && (
+                                      <div className="item-warranty-badge">{item.warranty_tag}</div>
                                     )}
                                   </div>
-                                  {item.service_note && (
-                                    <div className="item-service-note">{item.service_note}</div>
-                                  )}
-                                  {item.warranty_tag && (
-                                    <div className="item-warranty-badge">{item.warranty_tag}</div>
-                                  )}
-                                </div>
 
-                                <div className="item-price-col">
-                                  <span className="item-current-price">{(item.price * (item.quantity || 1)).toLocaleString('vi-VN')}₫</span>
-                                  {item.discount_text && (
-                                    <span className="item-discount-text">{item.discount_text}</span>
-                                  )}
-                                  {item.original_price && (
-                                    <span className="item-original-price">{(item.original_price).toLocaleString('vi-VN')}₫</span>
-                                  )}
+                                  <div className="item-price-col">
+                                    <span className="item-current-price">{(item.price * (item.quantity || 1)).toLocaleString('vi-VN')}₫</span>
+                                    {item.discount_text && (
+                                      <span className="item-discount-text">{item.discount_text}</span>
+                                    )}
+                                    {item.original_price && (
+                                      <span className="item-original-price">{(item.original_price).toLocaleString('vi-VN')}₫</span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Khối cảnh báo nếu Shop đã từ chối hoàn tiền */}
+                          {statusCat === 'RETURNED' && (() => {
+                            const { isRejected, rejectReason } = resolveOrderRefundStatus(ord);
+                            const ordL = String(ord.status_label || '').toUpperCase();
+                            const ordN = String(ord.note || '');
+                            const isActuallyRejected = isRejected || ord.refund_decision === 'REJECTED' || ordL.includes('TỪ CHỐI') || ordN.toLowerCase().includes('từ chối hoàn tiền');
+                            if (!isActuallyRejected) return null;
+                            const finalReason = rejectReason || ord.reject_reason || (ordN.includes('Từ chối hoàn tiền:') ? ordN.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim() : 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop');
+                            return (
+                              <div style={{
+                                margin: '0 0 12px',
+                                padding: '10px 14px',
+                                background: '#FEF2F2',
+                                border: '1.5px solid #FECACA',
+                                borderRadius: '8px',
+                                fontSize: '12.5px',
+                                color: '#991B1B',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                width: '100%',
+                                boxSizing: 'border-box'
+                              }}>
+                                <AlertCircle size={15} style={{ color: '#DC2626', flexShrink: 0 }} />
+                                <div>
+                                  <strong style={{ color: '#B91C1C' }}>Shop đã từ chối yêu cầu hoàn tiền:</strong>{' '}
+                                  <span style={{ color: '#1C1917', fontWeight: 600 }}>
+                                    "{finalReason}"
+                                  </span>
                                 </div>
                               </div>
                             );
-                          })}
-                        </div>
+                          })()}
 
-                          {/* Tiến trình đơn hàng Stepper (Dành cho đơn đang xử lý hoặc vận chuyển) */}
-                          {ord.stepper && (
-                            <div className="order-stepper-card">
-                              <div className="stepper-header-row">
-                                <span className="stepper-title">TIẾN TRÌNH ĐƠN HÀNG</span>
-                                {ord.stepper.estimated_delivery && (
-                                  <span className="stepper-estimated">
-                                    Dự kiến nhận: <strong>{ord.stepper.estimated_delivery}</strong>
+                          {/* Khối thông báo nếu Shop đã đồng ý & hoàn tiền thành công */}
+                          {statusCat === 'RETURNED' && (() => {
+                            const { isApproved } = resolveOrderRefundStatus(ord);
+                            const ordL = String(ord.status_label || '').toUpperCase();
+                            const ordN = String(ord.note || '').toLowerCase();
+                            const isActuallyApproved = isApproved || ord.refund_decision === 'APPROVED' || ordL.includes('ĐÃ HOÀN') || ordN.includes('đã xác nhận hoàn tiền') || ordN.includes('đã hoàn tiền') || ord.payment_status === 'REFUNDED';
+                            if (!isActuallyApproved) return null;
+                            const bankInfo = ord.refund_bank || (ord.note && ord.note.includes('STK:') ? ord.note.split('STK:')[1]?.trim() : '');
+                            const refundAmt = Number(ord.total_amount || 0).toLocaleString('vi-VN');
+                            return (
+                              <div style={{
+                                margin: '0 0 12px',
+                                padding: '10px 14px',
+                                background: '#F0FDF4',
+                                border: '1.5px solid #BBF7D0',
+                                borderRadius: '8px',
+                                fontSize: '12.5px',
+                                color: '#15803D',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                width: '100%',
+                                boxSizing: 'border-box'
+                              }}>
+                                <CheckCircle size={15} style={{ color: '#16A34A', flexShrink: 0 }} />
+                                <div>
+                                  <strong style={{ color: '#15803D' }}>Shop đã xác nhận hoàn tiền thành công:</strong>{' '}
+                                  <span style={{ color: '#166534', fontWeight: 600 }}>
+                                    Đã hoàn trả {refundAmt}₫ {bankInfo ? `về tài khoản ngân hàng (${bankInfo})` : ''}. Quý khách vui lòng kiểm tra biến động số dư.
                                   </span>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Khối cảnh báo lý do hủy đơn (phân biệt Shop hủy vs Khách hủy) */}
+                          {statusCat === 'CANCELLED' && (() => {
+                            const { isShopCancelled, cancelReason } = resolveCancelInfo(ord);
+                            return (
+                              <div style={{
+                                margin: '0 0 12px',
+                                padding: '10px 14px',
+                                background: isShopCancelled ? '#FEF2F2' : '#F9FAFB',
+                                border: isShopCancelled ? '1.5px solid #FECACA' : '1px solid #E5E7EB',
+                                borderRadius: '8px',
+                                fontSize: '12.5px',
+                                color: isShopCancelled ? '#991B1B' : '#4B5563',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                width: '100%',
+                                boxSizing: 'border-box'
+                              }}>
+                                {isShopCancelled ? (
+                                  <AlertCircle size={15} style={{ color: '#DC2626', flexShrink: 0 }} />
+                                ) : (
+                                  <X size={15} style={{ color: '#6B7280', flexShrink: 0 }} />
                                 )}
-                              </div>
-
-                              <div className="stepper-timeline">
-                                <div className="stepper-line" />
-                                <div
-                                  className="stepper-line-active"
-                                  style={{
-                                    width: ord.stepper.steps.filter(s => s.status === 'completed').length === 1 ? '33%' :
-                                           ord.stepper.steps.filter(s => s.status === 'completed').length === 2 ? '66%' :
-                                           ord.stepper.steps.filter(s => s.status === 'completed').length >= 3 ? '100%' : '15%'
-                                  }}
-                                />
-                                <div className="stepper-nodes-row">
-                                  {ord.stepper.steps.map((st, sIdx) => {
-                                    const isDone = st.status === 'completed';
-                                    const isActive = st.status === 'active';
-                                    return (
-                                      <div key={st.id || sIdx} className={`stepper-node-col ${isDone ? 'done' : ''} ${isActive ? 'active' : ''}`}>
-                                        <div className="stepper-circle">
-                                          {isDone ? <Check size={14} strokeWidth={3} /> : (st.id || sIdx + 1)}
-                                        </div>
-                                        <span className="stepper-step-name">{st.name}</span>
-                                        <span className="stepper-step-time">{st.time}</span>
-                                      </div>
-                                    );
-                                  })}
+                                <div>
+                                  <strong style={{ color: isShopCancelled ? '#DC2626' : '#374151' }}>
+                                    {isShopCancelled ? 'Shop đã hủy đơn hàng này:' : 'Đơn hàng đã được hủy theo yêu cầu của bạn:'}
+                                  </strong>{' '}
+                                  <span style={{ color: '#1F2937', fontWeight: 600 }}>
+                                    "{cancelReason}"
+                                  </span>
                                 </div>
                               </div>
-
-                              <div className="stepper-meta-bar">
-                                <div className="stepper-meta-item">
-                                  <span className="meta-lbl">Mã vận đơn bưu cục: </span>
-                                  <span className="meta-val font-mono">{ord.stepper.tracking_code || 'GHN-VFP-494124'}</span>
-                                </div>
-                                <div className="stepper-meta-item">
-                                  <span className="meta-lbl">Tài xế giao nhận: </span>
-                                  <span className="meta-val">{ord.stepper.driver_name || 'Lê Hoàng Nam (Hotline: 0906 234 567)'}</span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
+                            );
+                          })()}
 
                           {/* Footer & Action Buttons */}
                           <div className="order-card-footer">
@@ -1379,7 +2985,7 @@ const ProfilePage = () => {
                             </div>
 
                             <div className="order-actions-group">
-                              {(statusCat === 'SHIPPING' || statusCat === 'DELIVERING') && (
+                              {(statusCat === 'PENDING' || statusCat === 'CONFIRMED') && (
                                 <>
                                   <button
                                     type="button"
@@ -1395,7 +3001,19 @@ const ProfilePage = () => {
                                   <button
                                     type="button"
                                     className="btn-order-action btn-black-solid"
-                                    onClick={() => setTrackingModalOrder(ord)}
+                                    onClick={() => handleOpenTrackingModal(ord)}
+                                  >
+                                    THEO DÕI HÀNH TRÌNH CHI TIẾT
+                                  </button>
+                                </>
+                              )}
+
+                              {(statusCat === 'SHIPPING' || statusCat === 'DELIVERING') && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn-order-action btn-black-solid"
+                                    onClick={() => handleOpenTrackingModal(ord)}
                                   >
                                     THEO DÕI HÀNH TRÌNH CHI TIẾT
                                   </button>
@@ -1405,16 +3023,28 @@ const ProfilePage = () => {
                               {statusCat === 'COMPLETED' && (
                                 <>
                                   <button
+                                    className="btn-order-action btn-neutral-outline"
+                                    onClick={() => handleOpenTrackingModal(ord)}
+                                  >
+                                    Xem Hành Trình
+                                  </button>
+                                  <button
                                     className="btn-order-action btn-gold-outline"
                                     onClick={() => setReviewModalOrder(ord)}
                                   >
-                                    ★ Viết Đánh Giá (+100 Điểm)
+                                    ★ Viết Đánh Giá
                                   </button>
                                   <button
                                     className="btn-order-action btn-neutral-outline"
-                                    onClick={() => setWarrantyModalOpen(true)}
+                                    onClick={() => {
+                                      setRefundReason('Sản phẩm không vừa kích cỡ (Size)');
+                                      setCustomRefundReason('');
+                                      setRefundBankInfo('');
+                                      setRefundBankError('');
+                                      setRefundModalOrder(ord);
+                                    }}
                                   >
-                                    Yêu Cầu Hỗ Trợ Bảo Hành
+                                    Yêu Cầu Hoàn Tiền
                                   </button>
                                   <button
                                     className="btn-order-action btn-dark-outline"
@@ -1425,13 +3055,24 @@ const ProfilePage = () => {
                                 </>
                               )}
 
-                              {statusCat === 'CANCELLED' && (
+                              {(statusCat === 'CANCELLED' || statusCat === 'RETURNED') && (
                                 <>
                                   <button
                                     className="btn-order-action btn-neutral-outline"
-                                    onClick={() => alert(`Lý do hủy đơn: ${ord.cancel_reason || 'Đổi sang mẫu thiết kế khác'}`)}
+                                    onClick={() => handleOpenTrackingModal(ord)}
                                   >
-                                    Chi Tiết Hủy Đơn
+                                    {statusCat === 'RETURNED'
+                                      ? (() => {
+                                          const { isApproved, isRejected } = resolveOrderRefundStatus(ord);
+                                          const ordL = String(ord.status_label || '').toUpperCase();
+                                          const ordN = String(ord.note || '').toLowerCase();
+                                          const app = isApproved || ord.refund_decision === 'APPROVED' || ordL.includes('ĐÃ HOÀN') || ordN.includes('đã xác nhận hoàn tiền') || ordN.includes('đã hoàn tiền');
+                                          const rej = !app && (isRejected || ord.refund_decision === 'REJECTED' || ordL.includes('TỪ CHỐI') || ordN.includes('từ chối hoàn tiền') || ordN.includes('từ chối hoàn'));
+                                          if (app) return 'Chi Tiết Hoàn Tiền';
+                                          if (rej) return 'Chi Tiết Từ Chối';
+                                          return 'Chi Tiết Đổi Trả';
+                                        })()
+                                      : 'Chi Tiết Hủy Đơn'}
                                   </button>
                                   <button
                                     className="btn-order-action btn-dark-outline"
@@ -1655,72 +3296,552 @@ const ProfilePage = () => {
       </div>
 
       {/* Modal 1: Theo Dõi Hành Trình Chi Tiết */}
-      {trackingModalOrder && (
-        <div className="profile-modal-overlay animate-fade-in" onClick={() => setTrackingModalOrder(null)}>
-          <div className="profile-modal-box tracking-modal-box" onClick={e => e.stopPropagation()}>
-            <div className="modal-header-row">
-              <div>
-                <span className="modal-super-title">THEO DÕI HỎA TỐC 2H</span>
-                <h3 className="modal-title font-serif">Mã Đơn #{trackingModalOrder.order_code || trackingModalOrder.order_id}</h3>
-              </div>
-              <button className="modal-close-btn" onClick={() => setTrackingModalOrder(null)}>
-                <X size={18} />
-              </button>
-            </div>
+      {trackingModalOrder && (() => {
+        const refStatus = resolveOrderRefundStatus(trackingModalOrder);
+        const ordL = String(trackingModalOrder.status_label || '').toUpperCase();
+        const ordN = String(trackingModalOrder.note || '').toLowerCase();
+        const isApproved = refStatus.isApproved || trackingModalOrder.refund_decision === 'APPROVED' || ordL.includes('ĐÃ HOÀN') || ordN.includes('đã xác nhận hoàn tiền') || ordN.includes('đã hoàn tiền');
+        const isRejected = !isApproved && (refStatus.isRejected || trackingModalOrder.refund_decision === 'REJECTED' || ordL.includes('TỪ CHỐI') || ordN.includes('từ chối hoàn tiền') || ordN.includes('từ chối hoàn'));
+        const isRet = isApproved || isRejected || Boolean(trackingModalOrder.refund_reason) || Boolean(trackingModalOrder.refund_bank) || getOrderStatusCategory(trackingModalOrder.status, trackingModalOrder) === 'RETURNED';
+        const modalCat = isRet ? 'RETURNED' : getOrderStatusCategory(trackingModalOrder.status, trackingModalOrder);
+        const cancelInfo = resolveCancelInfo(trackingModalOrder);
 
-            <div className="tracking-modal-card">
-              <div className="carrier-badge-row">
-                <span className="carrier-name">🚚 Giao Hàng Nhanh (Express VIP)</span>
-                <span className="carrier-code">Mã bưu cục: {trackingModalOrder.stepper?.tracking_code || 'GHN-VFP-494124'}</span>
-              </div>
-              <div className="shipper-info-box">
-                <User size={15} />
-                <span>Tài xế giao nhận: <strong>{trackingModalOrder.stepper?.driver_name || 'Lê Hoàng Nam (Hotline: 0906 234 567)'}</strong></span>
-              </div>
-            </div>
+        const isShippingOrDelivered = ['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT', 'COMPLETED', 'DELIVERED', 'SUCCESS'].includes(modalCat);
+        const orderDate = trackingModalOrder.created_at || 'Hôm nay';
+        const recipientName = trackingModalOrder.recipient_name || trackingModalOrder.customer?.name || trackingModalOrder.customer_name || user?.full_name || 'Khách hàng';
+        const recipientPhone = trackingModalOrder.recipient_phone || trackingModalOrder.customer?.phone || trackingModalOrder.phone || user?.phone || '';
+        const recipientAddress = trackingModalOrder.shipping_address || trackingModalOrder.address || trackingModalOrder.customer?.address || (typeof user?.address === 'string' ? user.address : [user?.address?.detail, user?.address?.ward, user?.address?.district, user?.address?.province].filter(Boolean).join(', ')) || '';
 
-            <div className="tracking-history-timeline">
-              <h4 className="timeline-section-title">Nhật ký hành trình đơn hàng:</h4>
-              <div className="history-step active">
-                <div className="history-dot" />
-                <div className="history-content">
-                  <span className="history-time">Hôm nay - 14:15</span>
-                  <p className="history-text">Tài xế đang điều phối hỏa tốc, dự kiến giao tới bạn trước 17:30</p>
-                </div>
-              </div>
-              <div className="history-step">
-                <div className="history-dot" />
-                <div className="history-content">
-                  <span className="history-time">Hôm nay - 13:30</span>
-                  <p className="history-text">Kiện hàng hoàn tất kiểm định chất lượng và rời kho Tân Bình</p>
-                </div>
-              </div>
-              <div className="history-step">
-                <div className="history-dot" />
-                <div className="history-content">
-                  <span className="history-time">24/10 - 11:20</span>
-                  <p className="history-text">Đã đóng gói hộp quà Haute Couture kèm thiệp bảo hành Youth Fashion</p>
-                </div>
-              </div>
-              <div className="history-step">
-                <div className="history-dot" />
-                <div className="history-content">
-                  <span className="history-time">24/10 - 09:15</span>
-                  <p className="history-text">Xác nhận đơn đặt may thủ công thành công từ hệ thống</p>
-                </div>
-              </div>
-            </div>
+        const statusBadgeStyle = modalCat === 'COMPLETED'
+          ? { background: '#dcfce7', color: '#15803d' }
+          : (modalCat === 'SHIPPING'
+            ? { background: '#dbeafe', color: '#1d4ed8' }
+            : (modalCat === 'CONFIRMED'
+              ? { background: '#e0f2fe', color: '#0369a1' }
+              : (modalCat === 'CANCELLED'
+                ? { background: '#fee2e2', color: '#b91c1c' }
+                : (modalCat === 'RETURNED'
+                  ? (isApproved
+                    ? { background: '#dcfce7', color: '#15803d' }
+                    : (isRejected
+                      ? { background: '#fee2e2', color: '#b91c1c' }
+                      : { background: '#f3e8ff', color: '#7e22ce' }))
+                  : { background: '#fef3c7', color: '#b45309' }))));
 
-            <div className="modal-footer-actions">
-              <button className="btn-modal-primary" onClick={() => setTrackingModalOrder(null)}>
-                ĐÃ HIỂU
-              </button>
+        const statusText = modalCat === 'COMPLETED'
+          ? 'ĐÃ GIAO HÀNG'
+          : (modalCat === 'SHIPPING'
+            ? 'ĐANG VẬN CHUYỂN'
+            : (modalCat === 'CONFIRMED'
+              ? 'ĐÃ XÁC NHẬN'
+              : (modalCat === 'CANCELLED'
+                ? 'ĐÃ HỦY'
+                : (modalCat === 'RETURNED'
+                  ? (isApproved ? 'ĐÃ HOÀN TIỀN' : (isRejected ? 'TỪ CHỐI HOÀN TIỀN' : 'ĐỔI TRẢ'))
+                  : 'CHỜ XÁC NHẬN'))));
+
+        return (
+          <div className="profile-modal-overlay animate-fade-in" onClick={() => setTrackingModalOrder(null)}>
+            <div className="profile-modal-box tracking-modal-box" onClick={e => e.stopPropagation()}>
+              <div className="modal-header-row">
+                <div>
+                  <span className="modal-super-title">THEO DÕI HỎA TỐC 2H</span>
+                  <h3 className="modal-title font-serif">Mã Đơn #{trackingModalOrder.order_code || trackingModalOrder.order_id}</h3>
+                </div>
+                <button className="modal-close-btn" onClick={() => setTrackingModalOrder(null)}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* 1. Thông tin người đặt hàng hiển thị ở trên cùng */}
+              <div className="tracking-customer-box">
+                <div className="tracking-section-header">
+                  <span className="tracking-sub-title">THÔNG TIN NGƯỜI ĐẶT HÀNG</span>
+                  <span className="tracking-order-badge" style={statusBadgeStyle}>{statusText}</span>
+                </div>
+                <div className="customer-info-content">
+                  <div className="customer-info-row">
+                    <div className="info-cell">
+                      <User size={14} className="cell-icon" />
+                      <span className="cell-label">Người đặt:</span>
+                      <strong className="cell-value">{recipientName}</strong>
+                    </div>
+                    {recipientPhone && (
+                      <div className="info-cell">
+                        <Phone size={14} className="cell-icon" />
+                        <span className="cell-label">Điện thoại:</span>
+                        <strong className="cell-value">{recipientPhone}</strong>
+                      </div>
+                    )}
+                  </div>
+                  {recipientAddress && (
+                    <div className="customer-address-row">
+                      <MapPin size={14} className="cell-icon" />
+                      <span className="cell-label">Địa chỉ nhận:</span>
+                      <span className="cell-value">{recipientAddress}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 2. Thông tin xử lý đổi trả & hoàn tiền hoặc bưu cục/shipper */}
+              {modalCat === 'RETURNED' ? (
+                <div className="tracking-modal-card" style={{
+                  background: isApproved ? '#F0FDF4' : (isRejected ? '#FEF2F2' : '#FAF5FF'),
+                  borderColor: isApproved ? '#BBF7D0' : (isRejected ? '#FECACA' : '#E9D5FF'),
+                  borderRadius: '10px',
+                  padding: '14px 16px',
+                  marginBottom: '16px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', paddingBottom: '8px', borderBottom: isApproved ? '1px solid #DCFCE7' : (isRejected ? '1px solid #FEE2E2' : '1px solid #F3E8FF') }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        background: isApproved ? '#16A34A' : (isRejected ? '#DC2626' : '#7E22CE'),
+                        color: '#FFFFFF'
+                      }}>
+                        {isApproved ? <Check size={13} strokeWidth={2.5} /> : isRejected ? <X size={13} strokeWidth={2.5} /> : <RotateCcw size={13} strokeWidth={2.5} />}
+                      </span>
+                      <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: isApproved ? '#15803D' : (isRejected ? '#DC2626' : '#7E22CE'), textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        {isApproved ? 'Shop Đã Phê Duyệt & Hoàn Tiền Thành Công' : isRejected ? 'Shop Đã Từ Chối Yêu Cầu Hoàn Tiền' : 'Thông Tin Yêu Cầu Đổi Trả & Hoàn Tiền'}
+                      </h4>
+                    </div>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      background: isApproved ? '#DCFCE7' : (isRejected ? '#FEE2E2' : '#F3E8FF'),
+                      color: isApproved ? '#15803D' : (isRejected ? '#B91C1C' : '#7E22CE'),
+                      border: isApproved ? '1px solid #BBF7D0' : (isRejected ? '1px solid #FECACA' : '1px solid #E9D5FF'),
+                      padding: '2px 8px',
+                      borderRadius: '12px'
+                    }}>
+                      {isApproved ? '✓ ĐÃ HOÀN TIỀN' : isRejected ? '✕ TỪ CHỐI HOÀN TIỀN' : '⏳ CHỜ XỬ LÝ'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                    {!isApproved && (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                        <strong style={{ color: isRejected ? '#991B1B' : '#581C87', minWidth: '135px' }}>Lý do đổi trả:</strong>
+                        <span style={{ color: '#1C1917', fontWeight: 600 }}>
+                          {trackingModalOrder.refund_reason || (trackingModalOrder.note && trackingModalOrder.note.includes('STK:') ? trackingModalOrder.note.split('STK:')[0].replace('Khách yêu cầu hoàn tiền:', '').replace('|', '').trim() : (trackingModalOrder.note ? trackingModalOrder.note.replace('Khách yêu cầu hoàn tiền:', '').trim() : 'Sản phẩm không vừa kích cỡ (Size)'))}
+                        </span>
+                      </div>
+                    )}
+
+                    {(trackingModalOrder.refund_bank || (trackingModalOrder.note && trackingModalOrder.note.includes('STK:'))) && (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                        <strong style={{ color: isApproved ? '#166534' : (isRejected ? '#991B1B' : '#581C87'), minWidth: '135px' }}>TK nhận tiền hoàn:</strong>
+                        <span style={{
+                          color: isApproved ? '#15803D' : '#7E22CE',
+                          fontWeight: 700,
+                          background: '#FFFFFF',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          border: isApproved ? '1px solid #BBF7D0' : '1px solid #D8B4FE',
+                          letterSpacing: '0.2px'
+                        }}>
+                          {trackingModalOrder.refund_bank || (trackingModalOrder.note && trackingModalOrder.note.split('STK:')[1]?.trim())}
+                        </span>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
+                      <span style={{ color: isApproved ? '#166534' : (isRejected ? '#991B1B' : '#6B21A8'), minWidth: '135px' }}>Số tiền hoàn trả:</span>
+                      <strong style={{ fontSize: '14px', color: isApproved ? '#15803D' : '#7E22CE' }}>
+                        {Number(trackingModalOrder.total_amount || 0).toLocaleString('vi-VN')}₫
+                      </strong>
+                    </div>
+
+                    {isRejected && (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '4px', padding: '10px 12px', background: '#FFFFFF', borderRadius: '8px', border: '1.5px solid #FECACA', color: '#991B1B' }}>
+                        <strong style={{ minWidth: '135px', color: '#B91C1C' }}>Lý do từ chối từ Shop:</strong>
+                        <span style={{ fontWeight: 600, color: '#DC2626' }}>
+                          {trackingModalOrder.reject_reason || (trackingModalOrder.note && trackingModalOrder.note.includes('Từ chối hoàn tiền:') ? trackingModalOrder.note.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim() : 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop')}
+                        </span>
+                      </div>
+                    )}
+
+                    {isApproved && (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '4px', padding: '10px 12px', background: '#FFFFFF', borderRadius: '8px', border: '1.5px solid #BBF7D0', color: '#15803D' }}>
+                        <strong style={{ minWidth: '135px', color: '#166534' }}>Thông báo từ Shop:</strong>
+                        <span style={{ fontWeight: 600, color: '#15803D' }}>
+                          Shop đã phê duyệt yêu cầu đổi trả và hoàn tất chuyển tiền hoàn trả về tài khoản ngân hàng của bạn. Quý khách vui lòng kiểm tra biến động số dư.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : modalCat === 'CANCELLED' ? (
+                <div className="tracking-modal-card" style={{
+                  background: '#FEF2F2',
+                  borderColor: '#FECACA',
+                  borderRadius: '10px',
+                  padding: '14px 16px',
+                  marginBottom: '16px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', paddingBottom: '8px', borderBottom: '1px solid #FEE2E2' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        background: '#DC2626',
+                        color: '#FFFFFF'
+                      }}>
+                        <X size={13} strokeWidth={2.5} />
+                      </span>
+                      <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#DC2626', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        {cancelInfo.isShopCancelled ? 'Shop Đã Hủy Đơn Hàng' : 'Đơn Hàng Đã Bị Hủy'}
+                      </h4>
+                    </div>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      background: '#FEE2E2',
+                      color: '#B91C1C',
+                      border: '1px solid #FECACA',
+                      padding: '2px 8px',
+                      borderRadius: '12px'
+                    }}>
+                      ✕ ĐÃ HỦY
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <strong style={{ color: '#991B1B', minWidth: '135px' }}>
+                        {cancelInfo.isShopCancelled ? 'Lý do từ Shop:' : 'Lý do hủy đơn:'}
+                      </strong>
+                      <span style={{ color: '#B91C1C', fontWeight: 600 }}>
+                        {cancelInfo.cancelReason || 'Đổi ý, không muốn mua nữa'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <strong style={{ color: '#991B1B', minWidth: '135px' }}>Người thực hiện:</strong>
+                      <span style={{ color: '#1C1917', fontWeight: 600 }}>
+                        {cancelInfo.isShopCancelled ? 'Shop Youth Fashion (Quản trị viên)' : 'Khách hàng'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '4px', padding: '10px 12px', background: '#FFFFFF', borderRadius: '8px', border: '1.5px solid #FECACA', color: '#991B1B' }}>
+                      <AlertCircle size={15} style={{ color: '#DC2626', flexShrink: 0, marginTop: '2px' }} />
+                      <span style={{ fontSize: '12.5px', lineHeight: '1.5' }}>
+                        {cancelInfo.isShopCancelled ? (
+                          <>
+                            Đơn hàng đã được phía <strong>Shop Youth Fashion</strong> hủy. Toàn bộ tiền cọc hoặc các khoản thanh toán (nếu có) sẽ được xử lý hoàn trả theo quy định. Nếu quý khách có bất kỳ thắc mắc nào, vui lòng liên hệ hotline/chat để được hỗ trợ nhanh nhất.
+                          </>
+                        ) : (
+                          <>
+                            Đơn hàng đã được hủy theo yêu cầu của bạn. Sản phẩm đã được trả về kho tồn hệ thống.
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="tracking-modal-card">
+                  <div className="carrier-badge-row">
+                    <span className="carrier-name">🚚 Giao Hàng Nhanh (Express VIP)</span>
+                    <span className="carrier-code">Mã bưu cục: GHN-VFP-{String(trackingModalOrder.order_code || trackingModalOrder.order_id).replace(/\D/g, '').slice(-6) || '494124'}</span>
+                  </div>
+                  {isShippingOrDelivered ? (
+                    <div className="shipper-info-box">
+                      <User size={15} />
+                      <span>Tài xế giao nhận: <strong>{trackingModalOrder.stepper?.driver_name || 'Lê Hoàng Nam (Hotline: 0906 234 567)'}</strong></span>
+                    </div>
+                  ) : (
+                    <div className="shipper-info-box pending-shipper">
+                      <Clock size={14} className="pending-icon" />
+                      <span className="pending-note">Thông tin tài xế sẽ hiển thị khi đơn hàng chuyển sang trạng thái <strong>Đang vận chuyển</strong>.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 3. Nhật ký hành trình đơn hàng */}
+              <div className="tracking-history-timeline">
+                <h4 className="timeline-section-title">Nhật ký hành trình đơn hàng:</h4>
+                {(() => {
+                  if (modalCat === 'COMPLETED') {
+                    return (
+                      <>
+                        <div className="history-step active">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">{trackingModalOrder.delivered_date || orderDate} - Nhận hàng thành công</span>
+                            <p className="history-text">Đơn hàng đã được giao thành công tận tay khách hàng.</p>
+                          </div>
+                        </div>
+                        <div className="history-step">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">{orderDate} - 11:20 - Đang vận chuyển</span>
+                            <p className="history-text">Kiện hàng đã hoàn tất đóng gói Haute Couture và bàn giao cho đơn vị vận chuyển Giao Hàng Nhanh (Express VIP).</p>
+                          </div>
+                        </div>
+                        <div className="history-step">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">{orderDate} - 09:30 - Đang xử lý</span>
+                            <p className="history-text">Đơn hàng đã được nhân viên kiểm duyệt thông tin và chuẩn bị tại shop.</p>
+                          </div>
+                        </div>
+                        <div className="history-step">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">{orderDate} - Tiếp nhận đơn</span>
+                            <p className="history-text">Tiếp nhận đơn hàng thành công trên hệ thống thương mại điện tử Youth Fashion.</p>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  }
+
+                  if (modalCat === 'SHIPPING') {
+                    return (
+                      <>
+                        <div className="history-step active">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">{orderDate} - Đã bàn giao shipper</span>
+                            <p className="history-text">Kiện hàng đã hoàn tất đóng gói và bàn giao cho đơn vị vận chuyển Giao Hàng Nhanh (Express VIP). Đơn hàng đang trên đường vận chuyển tới địa chỉ của bạn.</p>
+                          </div>
+                        </div>
+                        <div className="history-step">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">{orderDate} - Đang xử lý</span>
+                            <p className="history-text">Đơn hàng đã được nhân viên kiểm duyệt thông tin, hoàn tất đóng gói tại shop.</p>
+                          </div>
+                        </div>
+                        <div className="history-step">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">{orderDate} - Tiếp nhận đơn</span>
+                            <p className="history-text">Xác nhận đơn hàng thành công trên hệ thống Youth Fashion.</p>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  }
+
+                  if (modalCat === 'CANCELLED') {
+                    return (
+                      <>
+                        <div className="history-step active">
+                          <div className="history-dot" style={{ background: '#DC2626' }} />
+                          <div className="history-content">
+                            <span className="history-time" style={{ color: '#DC2626', fontWeight: 700 }}>
+                              {cancelInfo.isShopCancelled ? 'Hôm nay - Shop đã hủy đơn hàng' : 'Hôm nay - Đã hủy đơn hàng'}
+                            </span>
+                            <p className="history-text">
+                              {cancelInfo.isShopCancelled ? (
+                                <>
+                                  Đơn hàng đã được phía Shop hủy. Lý do từ Shop: <strong style={{ color: '#DC2626' }}>"{cancelInfo.cancelReason}"</strong>. Quý khách vui lòng liên hệ hotline/chat nếu cần hỗ trợ thêm.
+                                </>
+                              ) : (
+                                <>
+                                  Đơn hàng đã hủy theo yêu cầu của khách hàng. Lý do: <strong>"{cancelInfo.cancelReason}"</strong>.
+                                </>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="history-step">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">Ghi nhận hủy đơn</span>
+                            <p className="history-text">
+                              {cancelInfo.isShopCancelled ? 'Quản lý cửa hàng đã xác nhận hủy đơn trên hệ thống và hoàn trả số lượng sản phẩm về kho tồn.' : 'Hệ thống ghi nhận yêu cầu hủy đơn và hoàn trả số lượng sản phẩm về kho tồn.'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="history-step">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">{orderDate} - Đang xử lý</span>
+                            <p className="history-text">Đơn hàng đang chờ nhân viên kiểm duyệt thông tin và chuẩn bị tại shop.</p>
+                          </div>
+                        </div>
+                        <div className="history-step">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">{orderDate} - Tiếp nhận đơn</span>
+                            <p className="history-text">Tiếp nhận đơn hàng thành công trên hệ thống thương mại điện tử Youth Fashion.</p>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  }
+
+                  if (modalCat === 'RETURNED') {
+                    const refSt = resolveOrderRefundStatus(trackingModalOrder);
+                    const tmLabel = String(trackingModalOrder.status_label || '').toUpperCase();
+                    const tmNote = String(trackingModalOrder.note || '').toLowerCase();
+                    const isApproved = refSt.isApproved || trackingModalOrder.refund_decision === 'APPROVED' || tmLabel.includes('ĐÃ HOÀN') || tmNote.includes('đã xác nhận hoàn tiền') || tmNote.includes('đã hoàn tiền');
+                    const isRejected = !isApproved && (refSt.isRejected || trackingModalOrder.refund_decision === 'REJECTED' || tmLabel.includes('TỪ CHỐI') || tmNote.includes('từ chối hoàn tiền') || tmNote.includes('từ chối hoàn'));
+                    const originalReason = trackingModalOrder.refund_reason || (trackingModalOrder.note && trackingModalOrder.note.includes('STK:') ? trackingModalOrder.note.split('STK:')[0].replace('Khách yêu cầu hoàn tiền:', '').replace('|', '').trim() : (trackingModalOrder.note ? trackingModalOrder.note.replace('Khách yêu cầu hoàn tiền:', '').trim() : 'Khách yêu cầu hoàn tiền sau khi nhận hàng'));
+                    return (
+                      <>
+                        {isApproved ? (
+                          <>
+                            <div className="history-step active">
+                              <div className="history-dot" style={{ background: '#16A34A' }} />
+                              <div className="history-content">
+                                <span className="history-time" style={{ color: '#16A34A', fontWeight: 700 }}>Hôm nay - Shop đã đồng ý &amp; hoàn tiền thành công</span>
+                                <p className="history-text">
+                                  Shop đã xác nhận và thực hiện hoàn tiền thành công số tiền <strong>{Number(trackingModalOrder.total_amount || 0).toLocaleString('vi-VN')}₫</strong> về tài khoản: <strong>{trackingModalOrder.refund_bank || (trackingModalOrder.note && trackingModalOrder.note.split('STK:')[1]?.trim()) || 'Tài khoản đã cung cấp'}</strong>. Quý khách vui lòng kiểm tra biến động số dư tài khoản ngân hàng.
+                                </p>
+                              </div>
+                            </div>
+                            <div className="history-step">
+                              <div className="history-dot" />
+                              <div className="history-content">
+                                <span className="history-time">Tiếp nhận yêu cầu đổi trả &amp; hoàn tiền</span>
+                                <p className="history-text">
+                                  Hệ thống đã tiếp nhận và hoàn tất xử lý yêu cầu đổi trả &amp; hoàn tiền của quý khách.
+                                </p>
+                              </div>
+                            </div>
+                          </>
+                        ) : isRejected ? (
+                          <>
+                            <div className="history-step active">
+                              <div className="history-dot" style={{ background: '#DC2626' }} />
+                              <div className="history-content">
+                                <span className="history-time" style={{ color: '#DC2626', fontWeight: 700 }}>Hôm nay - Shop đã từ chối yêu cầu hoàn tiền</span>
+                                <p className="history-text">
+                                  Shop đã từ chối yêu cầu đổi trả &amp; hoàn tiền của bạn. Lý do từ chối: <strong style={{ color: '#DC2626' }}>{trackingModalOrder.reject_reason || (trackingModalOrder.note && trackingModalOrder.note.includes('Từ chối hoàn tiền:') ? trackingModalOrder.note.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim() : 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop')}</strong>.
+                                </p>
+                              </div>
+                            </div>
+                            <div className="history-step">
+                              <div className="history-dot" />
+                              <div className="history-content">
+                                <span className="history-time">Tiếp nhận yêu cầu đổi trả &amp; hoàn tiền</span>
+                                <p className="history-text">
+                                  Hệ thống đã tiếp nhận yêu cầu đổi trả &amp; hoàn tiền từ khách hàng. Lý do: <strong>{originalReason}</strong>.
+                                </p>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="history-step active">
+                            <div className="history-dot" style={{ background: '#7E22CE' }} />
+                            <div className="history-content">
+                              <span className="history-time" style={{ color: '#7E22CE', fontWeight: 700 }}>Hôm nay - Tiếp nhận yêu cầu hoàn tiền (Đang chờ Shop xử lý)</span>
+                              <p className="history-text">
+                                Hệ thống đã tiếp nhận yêu cầu đổi trả &amp; hoàn tiền. Lý do: <strong>{originalReason}</strong>.
+                                {(trackingModalOrder.refund_bank || (trackingModalOrder.note && trackingModalOrder.note.includes('STK:'))) ? (
+                                  <span style={{ display: 'block', marginTop: '4px', color: '#6b21a8' }}>
+                                    Tài khoản nhận hoàn tiền: <strong>{trackingModalOrder.refund_bank || (trackingModalOrder.note && trackingModalOrder.note.split('STK:')[1]?.trim())}</strong>.
+                                  </span>
+                                ) : (
+                                  <span style={{ display: 'block', marginTop: '4px', color: '#6b21a8' }}>
+                                    Tiền hoàn sẽ được chuyển về tài khoản thanh toán ban đầu.
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        <div className="history-step">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">Đang đối soát &amp; xử lý hoàn tiền</span>
+                            <p className="history-text">Bộ phận Chăm sóc Khách hàng đang đối soát hồ sơ đổi trả và điều phối bưu tá thu hồi kiện hàng.</p>
+                          </div>
+                        </div>
+                        <div className="history-step">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">{trackingModalOrder.delivered_date || 'Trước đó'} - Nhận hàng thành công</span>
+                            <p className="history-text">Đơn hàng đã được giao thành công tận tay khách hàng trước khi phát sinh yêu cầu đổi trả.</p>
+                          </div>
+                        </div>
+                        <div className="history-step">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">{orderDate} - Đang xử lý</span>
+                            <p className="history-text">Kiện hàng đã được kiểm định, hoàn tất đóng gói và chuẩn bị tại shop.</p>
+                          </div>
+                        </div>
+                        <div className="history-step">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">{orderDate} - Tiếp nhận đơn</span>
+                            <p className="history-text">Tiếp nhận đơn hàng thành công trên hệ thống thương mại điện tử Youth Fashion.</p>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  }
+
+                  if (modalCat === 'CONFIRMED') {
+                    return (
+                      <>
+                        <div className="history-step">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">{orderDate} - Đang xử lý</span>
+                            <p className="history-text">Đơn hàng đang chờ nhân viên kiểm duyệt thông tin, kiểm tra tồn kho và chuẩn bị tại shop.</p>
+                          </div>
+                        </div>
+                        <div className="history-step active">
+                          <div className="history-dot" />
+                          <div className="history-content">
+                            <span className="history-time">Hôm nay - Đã tiếp nhận đơn</span>
+                            <p className="history-text">Tiếp nhận đơn hàng thành công trên hệ thống thương mại điện tử Youth Fashion.</p>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  }
+
+                  // Default: PENDING (Chờ xác nhận / Đang xử lý)
+                  return (
+                    <>
+                      <div className="history-step active">
+                        <div className="history-dot" />
+                        <div className="history-content">
+                          <span className="history-time">Hôm nay - Đang xử lý</span>
+                          <p className="history-text">Đơn hàng đang chờ nhân viên kiểm duyệt thông tin, kiểm tra tồn kho và chuẩn bị tại shop.</p>
+                        </div>
+                      </div>
+                      <div className="history-step">
+                        <div className="history-dot" />
+                        <div className="history-content">
+                          <span className="history-time">{orderDate} - Tiếp nhận đơn</span>
+                          <p className="history-text">Tiếp nhận đơn hàng thành công trên hệ thống thương mại điện tử Youth Fashion.</p>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
+              <div className="modal-footer-actions">
+                <button className="btn-modal-primary" onClick={() => setTrackingModalOrder(null)}>
+                  ĐÃ HIỂU
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
-      {/* Modal 2: Viết Đánh Giá (+100 Điểm) */}
+      {/* Modal 2: Viết Đánh Giá*/}
       {reviewModalOrder && (
         <div className="profile-modal-overlay animate-fade-in" onClick={() => setReviewModalOrder(null)}>
           <div className="profile-modal-box review-modal-box" onClick={e => e.stopPropagation()}>
@@ -1886,7 +4007,7 @@ const ProfilePage = () => {
               <p style={{ margin: '0 0 14px 0', fontSize: '13.5px', color: '#44403c', lineHeight: 1.5 }}>
                 Bạn có chắc chắn muốn hủy đơn hàng này không? Sau khi xác nhận, đơn hàng sẽ chuyển sang trạng thái <strong>ĐÃ HỦY</strong>.
               </p>
-              
+
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1c1917', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                 Vui lòng chọn lý do hủy:
               </label>
@@ -1949,6 +4070,139 @@ const ProfilePage = () => {
                 style={{ backgroundColor: '#dc2626', borderColor: '#dc2626' }}
               >
                 {isCancelling ? 'ĐANG XỬ LÝ...' : 'XÁC NHẬN HỦY ĐƠN'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 5: Yêu Cầu Hoàn Tiền */}
+      {refundModalOrder && (
+        <div className="profile-modal-overlay animate-fade-in" onClick={() => !isRefunding && setRefundModalOrder(null)}>
+          <div className="profile-modal-box cancel-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="modal-header-row">
+              <div>
+                <span className="modal-super-title" style={{ color: '#7e22ce' }}>CHÍNH SÁCH ĐỔI TRẢ & HOÀN TIỀN</span>
+                <h3 className="modal-title font-serif">Mã Đơn #{refundModalOrder.order_code || refundModalOrder.order_id}</h3>
+              </div>
+              <button className="modal-close-btn" disabled={isRefunding} onClick={() => setRefundModalOrder(null)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '16px 0', borderBottom: '1px solid #f1f3f5' }}>
+              <div style={{
+                background: '#faf5ff',
+                border: '1px solid #e9d5ff',
+                borderRadius: '8px',
+                padding: '12px 14px',
+                marginBottom: '16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span style={{ fontSize: '12.5px', color: '#6b21a8', fontWeight: 600 }}>Số tiền hoàn dự kiến:</span>
+                <strong style={{ fontSize: '15px', color: '#7e22ce' }}>
+                  {Number(refundModalOrder.total_amount || 0).toLocaleString('vi-VN')}₫
+                </strong>
+              </div>
+
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1c1917', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                Vui lòng chọn lý do yêu cầu hoàn tiền:
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {[
+                  'Sản phẩm không vừa kích cỡ (Size)',
+                  'Sản phẩm lỗi đường may / chất liệu vải',
+                  'Giao sai mẫu / sai màu sắc so với ảnh',
+                  'Không ưng ý sau khi nhận sản phẩm',
+                  'Lý do khác'
+                ].map((reason) => (
+                  <label key={reason} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#44403c', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="refund_reason"
+                      value={reason}
+                      checked={refundReason === reason}
+                      onChange={(e) => setRefundReason(e.target.value)}
+                      style={{ accentColor: '#7e22ce', cursor: 'pointer' }}
+                    />
+                    <span>{reason}</span>
+                  </label>
+                ))}
+              </div>
+
+              {refundReason === 'Lý do khác' && (
+                <textarea
+                  placeholder="Nhập lý do chi tiết..."
+                  value={customRefundReason}
+                  onChange={(e) => setCustomRefundReason(e.target.value)}
+                  style={{
+                    width: '100%',
+                    marginTop: '12px',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #d6d3d1',
+                    fontSize: '13px',
+                    minHeight: '64px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              )}
+
+              <div style={{ marginTop: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1c1917', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                  Thông tin tài khoản nhận tiền hoàn (STK / Ngân hàng / Chủ tài khoản) <span style={{ color: '#dc2626' }}>* (Bắt buộc)</span>:
+                </label>
+                <input
+                  type="text"
+                  placeholder="VD: 1903688888 - Techcombank - NGUYEN VAN A"
+                  value={refundBankInfo}
+                  onChange={(e) => {
+                    setRefundBankInfo(e.target.value);
+                    if (refundBankError) setRefundBankError('');
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: refundBankError ? '1.5px solid #dc2626' : '1px solid #d6d3d1',
+                    fontSize: '13px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    backgroundColor: refundBankError ? '#fef2f2' : '#ffffff'
+                  }}
+                />
+                {refundBankError ? (
+                  <span style={{ display: 'block', fontSize: '12px', color: '#dc2626', fontWeight: 600, marginTop: '6px' }}>
+                    ⚠️ {refundBankError}
+                  </span>
+                ) : (
+                  <span style={{ display: 'block', fontSize: '11.5px', color: '#6b21a8', fontWeight: 500, marginTop: '5px' }}>
+                    * Bắt buộc: Quý khách vui lòng cung cấp Số tài khoản, Tên ngân hàng và Tên chủ tài khoản để Youth Fashion tiến hành hoàn tiền.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-footer-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '18px' }}>
+              <button
+                type="button"
+                className="btn-order-action btn-dark-outline"
+                disabled={isRefunding}
+                onClick={() => setRefundModalOrder(null)}
+              >
+                QUAY LẠI
+              </button>
+              <button
+                type="button"
+                className="btn-order-action btn-black-solid"
+                disabled={isRefunding}
+                onClick={() => confirmRefundOrder(refundModalOrder)}
+                style={{ backgroundColor: '#7e22ce', borderColor: '#7e22ce', color: '#ffffff' }}
+              >
+                {isRefunding ? 'ĐANG GỬI...' : 'XÁC NHẬN HOÀN TIỀN'}
               </button>
             </div>
           </div>
@@ -2786,6 +5040,48 @@ const ProfilePage = () => {
           box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
         }
 
+        .status-tab.active.tab-pending {
+          background-color: #fef3c7;
+          color: #92400e;
+          border-color: #fcd34d;
+          box-shadow: 0 2px 8px rgba(217, 119, 6, 0.15);
+        }
+
+        .status-tab.active.tab-confirmed {
+          background-color: #e0f2fe;
+          color: #0369a1;
+          border-color: #bae6fd;
+          box-shadow: 0 2px 8px rgba(3, 105, 161, 0.15);
+        }
+
+        .status-tab.active.tab-shipping {
+          background-color: #eff6ff;
+          color: #1d4ed8;
+          border-color: #bfdbfe;
+          box-shadow: 0 2px 8px rgba(29, 78, 216, 0.15);
+        }
+
+        .status-tab.active.tab-completed {
+          background-color: #dcfce7;
+          color: #15803d;
+          border-color: #86efac;
+          box-shadow: 0 2px 8px rgba(22, 163, 74, 0.15);
+        }
+
+        .status-tab.active.tab-cancelled {
+          background-color: #fee2e2;
+          color: #991b1b;
+          border-color: #fca5a5;
+          box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+        }
+
+        .status-tab.active.tab-returned {
+          background-color: #f3e8ff;
+          color: #6b21a8;
+          border-color: #d8b4fe;
+          box-shadow: 0 2px 8px rgba(126, 34, 206, 0.15);
+        }
+
         .orders-list {
           display: flex;
           flex-direction: column;
@@ -2839,7 +5135,7 @@ const ProfilePage = () => {
           color: #78716c;
         }
 
-        /* Status Badge Pills */
+        /* Status Badge Pills - Khung hiển thị trạng thái đơn hàng */
         .status-badge-pill {
           display: inline-flex;
           align-items: center;
@@ -2851,28 +5147,48 @@ const ProfilePage = () => {
           letter-spacing: 0.3px;
         }
 
-        .badge-shipping {
+        /* 1. Khung Chờ xác nhận: Màu vàng */
+        .badge-pending,
+        .badge-delivering,
+        .badge-processing {
           background-color: #fef3c7;
           color: #b45309;
           border: 1px solid #fde68a;
         }
 
-        .badge-delivering {
+        /* 1.1 Khung Đã xác nhận: Màu xanh ngọc / sky blue */
+        .badge-confirmed {
+          background-color: #f0f9ff;
+          color: #0369a1;
+          border: 1px solid #bae6fd;
+        }
+
+        /* 2. Khung Đang vận chuyển: Màu xanh dương */
+        .badge-shipping {
           background-color: #eff6ff;
           color: #1d4ed8;
           border: 1px solid #bfdbfe;
         }
 
+        /* 3. Khung Đã giao: Màu xanh lá */
         .badge-completed {
           background-color: #dcfce7;
           color: #15803d;
           border: 1px solid #bbf7d0;
         }
 
+        /* 4. Khung Đã hủy: Màu đỏ */
         .badge-cancelled {
           background-color: #fee2e2;
           color: #991b1b;
           border: 1px solid #fecdd3;
+        }
+
+        /* 5. Khung Đổi trả: Màu tím */
+        .badge-returned {
+          background-color: #f3e8ff;
+          color: #7e22ce;
+          border: 1px solid #d8b4fe;
         }
 
         /* Order Items */
@@ -2984,144 +5300,6 @@ const ProfilePage = () => {
           font-size: 12px;
           color: #a8a29e;
           text-decoration: line-through;
-        }
-
-        /* Order Stepper Component */
-        .order-stepper-card {
-          margin: 0 20px 18px;
-          background-color: #fafaf9;
-          border: 1px solid #f0eee9;
-          border-radius: 10px;
-          padding: 18px 22px;
-        }
-
-        .stepper-header-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 22px;
-          font-size: 11.5px;
-        }
-
-        .stepper-title {
-          font-weight: 700;
-          letter-spacing: 0.6px;
-          color: #1c1917;
-          text-transform: uppercase;
-        }
-
-        .stepper-estimated {
-          color: #78716c;
-          font-size: 11.5px;
-        }
-
-        .stepper-estimated strong {
-          color: #1c1917;
-        }
-
-        .stepper-timeline {
-          position: relative;
-          margin-bottom: 18px;
-          padding: 0 10px;
-        }
-
-        .stepper-line {
-          position: absolute;
-          top: 15px;
-          left: 45px;
-          right: 45px;
-          height: 2px;
-          background-color: #e7e5e4;
-          z-index: 1;
-        }
-
-        .stepper-line-active {
-          position: absolute;
-          top: 15px;
-          left: 45px;
-          height: 2px;
-          background-color: #d97706;
-          z-index: 1;
-          transition: width 0.3s;
-        }
-
-        .stepper-nodes-row {
-          display: flex;
-          justify-content: space-between;
-          position: relative;
-          z-index: 2;
-        }
-
-        .stepper-node-col {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-          width: 120px;
-        }
-
-        .stepper-circle {
-          width: 30px;
-          height: 30px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 12px;
-          font-weight: 700;
-          background-color: #e7e5e4;
-          color: #78716c;
-          margin-bottom: 8px;
-          transition: all 0.2s;
-        }
-
-        .stepper-node-col.done .stepper-circle {
-          background-color: #1c1917;
-          color: #ffffff;
-        }
-
-        .stepper-node-col.active .stepper-circle {
-          background-color: #d97706;
-          color: #ffffff;
-          box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.2);
-        }
-
-        .stepper-step-name {
-          font-size: 12px;
-          font-weight: 600;
-          color: #1c1917;
-          margin-bottom: 2px;
-        }
-
-        .stepper-step-time {
-          font-size: 11px;
-          color: #78716c;
-        }
-
-        .stepper-node-col.active .stepper-step-time {
-          color: #d97706;
-          font-weight: 600;
-        }
-
-        .stepper-meta-bar {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding-top: 14px;
-          border-top: 1px dashed #e7e5e4;
-          font-size: 11.5px;
-          color: #57534e;
-          flex-wrap: wrap;
-          gap: 10px;
-        }
-
-        .meta-lbl {
-          color: #78716c;
-        }
-
-        .meta-val {
-          color: #1c1917;
-          font-weight: 600;
         }
 
         /* Order Card Footer */
@@ -3343,6 +5521,86 @@ const ProfilePage = () => {
           color: #1c1917;
         }
 
+        /* Khối thông tin người đặt & nhận hàng */
+        .tracking-customer-box {
+          background-color: #fafaf9;
+          border: 1px solid #f0eee9;
+          border-radius: 10px;
+          padding: 14px 16px;
+          margin-bottom: 14px;
+        }
+
+        .tracking-section-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 10px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid #f1f3f5;
+        }
+
+        .tracking-sub-title {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.6px;
+          color: #1c1917;
+          text-transform: uppercase;
+        }
+
+        .tracking-order-badge {
+          font-size: 10.5px;
+          font-weight: 700;
+          padding: 2px 8px;
+          border-radius: 20px;
+        }
+
+        .customer-info-content {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          font-size: 12.5px;
+        }
+
+        .customer-info-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .info-cell {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          color: #44403c;
+        }
+
+        .customer-address-row {
+          display: flex;
+          align-items: flex-start;
+          gap: 6px;
+          color: #57534e;
+          font-size: 12px;
+          line-height: 1.4;
+          margin-top: 2px;
+        }
+
+        .cell-icon {
+          color: #78716c;
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+
+        .cell-label {
+          color: #78716c;
+          font-weight: 500;
+        }
+
+        .cell-value {
+          color: #1c1917;
+        }
+
         .tracking-modal-card {
           background-color: #fafaf9;
           border: 1px solid #f0eee9;
@@ -3383,6 +5641,21 @@ const ProfilePage = () => {
           color: #57534e;
           border-top: 1px dashed #e7e5e4;
           padding-top: 10px;
+        }
+
+        .shipper-info-box.pending-shipper {
+          color: #78716c;
+          font-size: 11.5px;
+          line-height: 1.4;
+        }
+
+        .shipper-info-box.pending-shipper .pending-icon {
+          color: #d97706;
+          flex-shrink: 0;
+        }
+
+        .shipper-info-box.pending-shipper .pending-note strong {
+          color: #1c1917;
         }
 
         .timeline-section-title {

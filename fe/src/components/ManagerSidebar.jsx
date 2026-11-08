@@ -210,6 +210,86 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
     String(user?.role || '').toUpperCase() === 'ADMIN' ||
     String(user?.employee_role || '').toUpperCase() === 'ADMIN';
 
+  // Số lượng đơn hàng chờ duyệt thực tế (không hiển thị số ảo)
+  const [pendingOrdersCount, setPendingOrdersCount] = React.useState(() => {
+    try {
+      const mockSet = new Set(['891', '890', '889', '888', '887', '886', '885', '884', '88210', '85420', '79114', '72015', '68192']);
+      let delSet = new Set();
+      try {
+        const rawDel = localStorage.getItem('yf_deleted_order_ids');
+        if (rawDel) delSet = new Set(JSON.parse(rawDel));
+      } catch (e) {}
+
+      const raw = localStorage.getItem('yf_manager_orders') || localStorage.getItem('yf_customer_orders');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(o => {
+            const rawId = String(o.order_id || '').trim();
+            const rawCode = String(o.order_number || o.order_code || '').trim();
+            const digits = (rawCode || rawId).replace(/\D/g, '');
+            if (mockSet.has(rawId) || mockSet.has(rawCode)) return false;
+            if (digits && mockSet.has(digits)) return false;
+            if (delSet.has(rawId) || delSet.has(rawCode)) return false;
+            if (digits && delSet.has(digits)) return false;
+
+            const s = String(o.order_status || o.status || '').toUpperCase();
+            const l = String(o.status_label || '').toUpperCase();
+            return s === 'PENDING' || s === 'CONFIRMED' || l.includes('CHỜ XÁC NHẬN');
+          }).length;
+        }
+      }
+    } catch (e) {}
+    return 0;
+  });
+
+  React.useEffect(() => {
+    const updateCount = () => {
+      try {
+        const mockSet = new Set(['891', '890', '889', '888', '887', '886', '885', '884', '88210', '85420', '79114', '72015', '68192']);
+        let delSet = new Set();
+        try {
+          const rawDel = localStorage.getItem('yf_deleted_order_ids');
+          if (rawDel) delSet = new Set(JSON.parse(rawDel));
+        } catch (e) {}
+
+        const raw = localStorage.getItem('yf_manager_orders') || localStorage.getItem('yf_customer_orders');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const count = parsed.filter(o => {
+              const rawId = String(o.order_id || '').trim();
+              const rawCode = String(o.order_number || o.order_code || '').trim();
+              const digits = (rawCode || rawId).replace(/\D/g, '');
+              if (mockSet.has(rawId) || mockSet.has(rawCode)) return false;
+              if (digits && mockSet.has(digits)) return false;
+              if (delSet.has(rawId) || delSet.has(rawCode)) return false;
+              if (digits && delSet.has(digits)) return false;
+
+              const s = String(o.order_status || o.status || '').toUpperCase();
+              const l = String(o.status_label || '').toUpperCase();
+              return s === 'PENDING' || s === 'CONFIRMED' || l.includes('CHỜ XÁC NHẬN');
+            }).length;
+            setPendingOrdersCount(count);
+            return;
+          }
+        }
+      } catch (e) {}
+      setPendingOrdersCount(0);
+    };
+
+    updateCount();
+    window.addEventListener('order_status_updated', updateCount);
+    window.addEventListener('yf_order_status_changed', updateCount);
+    window.addEventListener('storage', updateCount);
+
+    return () => {
+      window.removeEventListener('order_status_updated', updateCount);
+      window.removeEventListener('yf_order_status_changed', updateCount);
+      window.removeEventListener('storage', updateCount);
+    };
+  }, []);
+
   const handleLogout = async () => {
     const confirmed = await confirmModal({
       title: 'Đăng xuất tài khoản',
@@ -321,15 +401,17 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
           <button
             type="button"
             className={`nav-menu-link ${activeMenu === 'orders' ? 'active' : ''}`}
-            onClick={() => navigate('/manager')}
+            onClick={() => navigate('/manager/orders')}
           >
             <div className="nav-item-inner">
               <ShoppingBag size={16} />
               <span>Quản Lý Đơn Hàng</span>
             </div>
-            <span className="order-count-badge">
-              18
-            </span>
+            {pendingOrdersCount > 0 && (
+              <span className="order-count-badge">
+                {pendingOrdersCount}
+              </span>
+            )}
           </button>
 
           {/* 6. Tư Vấn & CSKH */}
