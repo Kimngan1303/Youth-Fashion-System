@@ -233,6 +233,12 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
             if (delSet.has(rawId) || delSet.has(rawCode)) return false;
             if (digits && delSet.has(digits)) return false;
 
+            const isPayos = o.payment_method === 'PAYOS' || String(o.payment_method || '').includes('VietQR') || String(o.payment_label || '').includes('PayOS');
+            if (isPayos) {
+              const pStatus = String(o.payment_status || '').toUpperCase();
+              if (pStatus === 'PENDING' || pStatus === 'CANCELLED' || pStatus === 'FAILED' || pStatus === 'UNPAID') return false;
+            }
+
             const s = String(o.order_status || o.status || '').toUpperCase();
             const l = String(o.status_label || '').toUpperCase();
             return s === 'PENDING' || s === 'CONFIRMED' || l.includes('CHỜ XÁC NHẬN');
@@ -265,6 +271,12 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
               if (digits && mockSet.has(digits)) return false;
               if (delSet.has(rawId) || delSet.has(rawCode)) return false;
               if (digits && delSet.has(digits)) return false;
+
+              const isPayos = o.payment_method === 'PAYOS' || String(o.payment_method || '').includes('VietQR') || String(o.payment_label || '').includes('PayOS');
+              if (isPayos) {
+                const pStatus = String(o.payment_status || '').toUpperCase();
+                if (pStatus === 'PENDING' || pStatus === 'CANCELLED' || pStatus === 'FAILED' || pStatus === 'UNPAID') return false;
+              }
 
               const s = String(o.order_status || o.status || '').toUpperCase();
               const l = String(o.status_label || '').toUpperCase();

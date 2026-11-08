@@ -109,6 +109,16 @@ const purgeMockOrders = (list) => {
     if (deletedSet.has(rawCode)) return false;
     if (digitsOnly && deletedSet.has(digitsOnly)) return false;
 
+    // Không tính các đơn hàng PayOS chưa thanh toán thành công hoặc đã bị hủy
+    const isPayosOrder = o.payment_method === 'PAYOS' || String(o.payment_method || '').includes('VietQR') || String(o.payment_method || '').includes('PAYOS') || String(o.payment_label || '').includes('PayOS');
+    if (isPayosOrder) {
+      const pStatus = String(o.payment_status || '').toUpperCase();
+      const oStatus = String(o.order_status || o.status || '').toUpperCase();
+      if (pStatus === 'PENDING' || pStatus === 'CANCELLED' || pStatus === 'FAILED' || pStatus === 'UNPAID' || oStatus === 'CANCELLED') {
+        return false;
+      }
+    }
+
     return true;
   });
 };
@@ -938,6 +948,13 @@ const ProfilePage = () => {
       .then((res) => {
         if (res?.status && Array.isArray(res.data)) {
           const apiFormatted = res.data.map((apiOrd) => {
+            const isPayos = apiOrd.payments?.[0]?.payment_method === 'PAYOS' || String(apiOrd.payment_method || '').includes('PAYOS') || String(apiOrd.payment_method || '').includes('VietQR');
+            const isPayosPaid = isPayos && (apiOrd.payments?.[0]?.payment_status === 'SUCCESS' || apiOrd.payments?.[0]?.payment_status === 'PAID');
+            // Nếu đơn PayOS chưa thanh toán thành công hoặc đã bị hủy thì không tính là đơn hàng đặt
+            if (isPayos && !isPayosPaid) {
+              return null;
+            }
+
             const s = String(apiOrd.order_status || '').toUpperCase();
             const isCompleted = ['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s);
             const isShipping = ['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s);
@@ -1016,7 +1033,7 @@ const ProfilePage = () => {
           });
 
           // Hợp nhất đơn hàng từ backend và local (ưu tiên cập nhật trạng thái mới nhất từ Manager)
-          const merged = [...apiFormatted];
+          const merged = [...apiFormatted.filter(Boolean)];
           for (const item of (local || [])) {
             const idx = merged.findIndex(m =>
               String(m.order_code).replace(/\D/g, '') === String(item.order_code || item.order_id).replace(/\D/g, '')

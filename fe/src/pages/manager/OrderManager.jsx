@@ -78,6 +78,16 @@ const purgeMockOrders = (list) => {
     if (deletedSet.has(rawCode)) return false;
     if (digitsOnly && deletedSet.has(digitsOnly)) return false;
 
+    // Không tính các đơn hàng PayOS chưa thanh toán thành công hoặc đã bị hủy
+    const isPayosOrder = o.payment_method === 'PAYOS' || String(o.payment_method || '').includes('VietQR') || String(o.payment_method || '').includes('PAYOS') || String(o.payment_label || '').includes('PayOS');
+    if (isPayosOrder) {
+      const pStatus = String(o.payment_status || '').toUpperCase();
+      const oStatus = String(o.order_status || o.status || '').toUpperCase();
+      if (pStatus === 'PENDING' || pStatus === 'CANCELLED' || pStatus === 'FAILED' || pStatus === 'UNPAID' || oStatus === 'CANCELLED') {
+        return false;
+      }
+    }
+
     return true;
   });
 };
@@ -550,11 +560,18 @@ export default function OrderManager() {
             const isPayos = ord.payments?.[0]?.payment_method === 'PAYOS' || String(ord.payment_method || '').includes('PAYOS') || String(ord.payment_method || '').includes('VietQR');
             const isDirect = ord.payments?.[0]?.payment_method === 'DIRECT' || String(ord.payment_method || '').includes('DIRECT');
             const isCod = !isPayos && !isDirect;
+            const isPayosPaid = isPayos && (ord.payments?.[0]?.payment_status === 'SUCCESS' || ord.payments?.[0]?.payment_status === 'PAID');
+
+            // Nếu đơn PayOS chưa thanh toán thành công hoặc đã bị hủy thì không tính là đơn hàng đặt
+            if (isPayos && !isPayosPaid) {
+              return null;
+            }
+
             const isCompleted = s === 'COMPLETED' || s === 'RETURNED' || ['COMPLETED', 'RETURNED', 'DELIVERED', 'SUCCESS', 'REFUNDED'].includes(String(ord.order_status || ord.status || '').toUpperCase());
             const isCodPaid = isCod && (isCompleted || ord.payments?.[0]?.payment_status === 'SUCCESS');
-            const payStatus = (isPayos && ord.payments?.[0]?.payment_status === 'SUCCESS') || isCodPaid ? 'PAID' : (ord.payments?.[0]?.payment_status === 'SUCCESS' ? 'PAID' : 'PENDING');
+            const payStatus = isPayosPaid || isCodPaid ? 'PAID' : (ord.payments?.[0]?.payment_status === 'SUCCESS' ? 'PAID' : 'PENDING');
             let payLabel = isPayos
-              ? 'PayOS - Đã thanh toán'
+              ? (isPayosPaid ? 'PayOS - Đã thanh toán' : 'PayOS - Chưa thanh toán')
               : (isDirect ? 'Thanh toán trực tiếp' : (isCodPaid ? 'COD - Đã thanh toán' : 'COD - Chưa thanh toán'));
 
             const orderDateStr = ord.created_at ? new Date(ord.created_at).toLocaleString('vi-VN', {
@@ -597,7 +614,7 @@ export default function OrderManager() {
             };
           });
 
-          const cleanedApi = purgeMockOrders(apiFormatted);
+          const cleanedApi = purgeMockOrders(apiFormatted.filter(Boolean));
 
           // Hợp nhất đơn thật từ backend lên đầu
           setOrders((prev) => {

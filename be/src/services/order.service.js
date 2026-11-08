@@ -322,8 +322,14 @@ export const clearAllOrdersService = async () => {
 };
 
 /**
- * Xóa đơn hàng từ trang Quản trị
+ * Xóa đơn hàng từ trang Quản trị hoặc khi khách hủy thanh toán PayOS
  */
 export const deleteOrderService = async (orderId) => {
+  try {
+    const digitsOnly = String(orderId || '').replace(/\D/g, '');
+    if (digitsOnly) {
+      await payosService.cancelPaymentLink(digitsOnly).catch(() => {});
+    }
+  } catch (e) {}
   return await orderRepo.deleteOrderById(orderId);
 };

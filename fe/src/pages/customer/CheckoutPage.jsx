@@ -270,43 +270,81 @@ export default function CheckoutPage() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const isCanceled = params.get('cancel') === 'true' || params.get('status') === 'CANCELLED' || params.get('canceled') === 'true';
-    const orderCode = params.get('orderCode');
+    const orderCode = params.get('orderCode') || sessionStorage.getItem('yf_pending_order_code');
 
     if (isCanceled) {
-      showInfo('Bạn đã hủy thanh toán qua PayOS. Bạn có thể chọn lại phương thức thanh toán hoặc tiến hành thanh toán lại.');
-
-      // Nếu giỏ hàng đang trống, tự động khôi phục lại dữ liệu ngay lập tức
-      if ((!cart || cart.length === 0) && orderCode) {
-        orderService.getOrderByNumber(`YF-${orderCode}`).then((res) => {
-          if (res?.data?.order_items && res.data.order_items.length > 0 && setCart) {
-            const restoredItems = res.data.order_items.map((item) => ({
-              id: String(item.variant_id || item.order_item_id),
-              variant_id: item.variant_id,
-              productId: item.variant?.product_id || item.variant_id,
-              sku: item.sku,
-              categoryTag: item.variant?.product?.category?.category_name || 'THỜI TRANG',
-              title: item.product_name,
-              colorName: item.color,
-              colorDot: '#000000',
-              size: item.size,
-              price: Number(item.unit_price || 0),
-              quantity: Number(item.quantity || 1),
-              image: item.variant?.product?.images?.[0]?.image_url || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800',
-              selected: true,
-            }));
-            setCart(restoredItems);
-          }
-        }).catch(() => {});
-      } else if (!cart || cart.length === 0) {
-        try {
-          const cached = sessionStorage.getItem('yf_pending_checkout_items');
-          if (cached && setCart) {
-            setCart(JSON.parse(cached));
-          }
-        } catch (e) {}
+      // 1. Gọi backend xóa bỏ đơn hàng khỏi Database MySQL (hoàn lại tồn kho và voucher)
+      if (orderCode) {
+        orderService.deleteOrder(orderCode).catch(() => {});
+        orderService.deleteOrder(`YF-${orderCode}`).catch(() => {});
       }
+
+      // 2. Thêm vào danh sách ID đơn đã xóa để tránh hiển thị ở trang Quản lý đơn hoặc Profile
+      try {
+        const rawDel = localStorage.getItem('yf_deleted_order_ids');
+        const delList = rawDel ? JSON.parse(rawDel) : [];
+        if (orderCode) {
+          const digits = String(orderCode).replace(/\D/g, '');
+          const newDel = Array.from(new Set([...delList, String(orderCode), `YF-${orderCode}`, `YF - ${orderCode}`, digits]));
+          localStorage.setItem('yf_deleted_order_ids', JSON.stringify(newDel));
+        }
+      } catch (e) {}
+
+      // 3. Xóa đơn hàng này khỏi localStorage (nếu có lưu)
+      try {
+        const filterOutOrder = (list) => {
+          if (!Array.isArray(list)) return [];
+          const targetDigits = String(orderCode || '').replace(/\D/g, '');
+          return list.filter((o) => {
+            const rawId = String(o.order_id || '').trim();
+            const rawCode = String(o.order_code || o.order_number || '').trim();
+            const digits = (rawCode || rawId).replace(/\D/g, '');
+            if (rawId === String(orderCode) || rawCode === `YF-${orderCode}` || rawCode === `YF - ${orderCode}`) return false;
+            if (targetDigits && digits === targetDigits) return false;
+            return true;
+          });
+        };
+
+        const custOrders = JSON.parse(localStorage.getItem('yf_customer_orders') || '[]');
+        localStorage.setItem('yf_customer_orders', JSON.stringify(filterOutOrder(custOrders)));
+
+        const userOrderKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : null;
+        if (userOrderKey) {
+          const userOrders = JSON.parse(localStorage.getItem(userOrderKey) || '[]');
+          localStorage.setItem(userOrderKey, JSON.stringify(filterOutOrder(userOrders)));
+        }
+
+        const mgrOrders = JSON.parse(localStorage.getItem('yf_manager_orders') || '[]');
+        localStorage.setItem('yf_manager_orders', JSON.stringify(filterOutOrder(mgrOrders)));
+      } catch (e) {}
+
+      // 4. Xóa session đơn hàng chờ PayOS
+      sessionStorage.removeItem('yf_pending_payos_order');
+      sessionStorage.removeItem('yf_pending_order_code');
+      sessionStorage.removeItem('yf_last_completed_order');
+
+      // 5. Khôi phục giỏ hàng
+      try {
+        const cached = sessionStorage.getItem('yf_pending_checkout_items');
+        if (cached && setCart) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCart(parsed);
+          }
+        }
+      } catch (e) {}
+
+      // 6. Xóa param cancel/status khỏi URL
+      window.history.replaceState({}, '', window.location.pathname);
+
+      // 7. Thông báo cho người dùng
+      showInfo('Bạn đã hủy thanh toán đơn hàng qua PayOS. Đơn hàng chưa được đặt, các sản phẩm đã được giữ lại trong giỏ hàng.');
+
+      // 8. Kích hoạt custom event
+      window.dispatchEvent(new Event('order_status_updated'));
+      window.dispatchEvent(new Event('yf_order_status_changed'));
     }
-  }, [location.search]);
+  }, [location.search, setCart, user]);
 
   // Xử lý Gửi Đơn Hàng & Thanh Toán
   const handleSubmitOrder = async (e) => {
@@ -440,89 +478,49 @@ export default function CheckoutPage() {
             image: resolveOrderItemImage(item),
           })),
         };
-        try {
-          sessionStorage.setItem('yf_last_completed_order', JSON.stringify(orderSummary));
-          const userOrderKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : 'yf_customer_orders';
-          const mockSet = new Set(['891', '890', '889', '888', '887', '886', '885', '884', '88210', '85420', '79114', '72015', '68192']);
-          
-          const rawExisting = JSON.parse(localStorage.getItem(userOrderKey) || localStorage.getItem('yf_customer_orders') || '[]');
-          const existingOrders = (Array.isArray(rawExisting) ? rawExisting : []).filter(o => {
-            const rawId = String(o.order_id || '').trim();
-            const rawCode = String(o.order_code || o.order_number || '').replace(/\D/g, '');
-            return !mockSet.has(rawId) && !mockSet.has(rawCode);
-          });
+        const nowStr = new Date().toLocaleDateString('vi-VN');
+        const fullAddressString = [addressDetail.trim(), selectedWard, selectedDistrict, selectedProvince].filter(Boolean).join(', ');
 
-          const nowStr = new Date().toLocaleDateString('vi-VN');
-          const fullAddressString = [addressDetail.trim(), selectedWard, selectedDistrict, selectedProvince].filter(Boolean).join(', ');
-
-          const newOrderEntry = {
-            order_id: String(orderCode),
-            order_number: orderNumber || `YF-${orderCode}`,
-            order_code: `YF - ${orderCode}`,
-            created_at: nowStr,
-            created_date: new Date().toISOString(),
-            recipient_name: fullName.trim() || user?.full_name || 'Khách hàng',
-            recipient_phone: phone.trim() || user?.phone || '090****000',
-            recipient_email: email.trim() || user?.email || '',
-            address: fullAddressString || 'Giao tận nơi theo đơn đặt hàng',
-            shipping_address: fullAddressString || 'Giao tận nơi theo đơn đặt hàng',
-            payment_method: paymentMethod === 'PAYOS' ? 'PAYOS' : (paymentMethod === 'DIRECT' ? 'DIRECT' : 'COD'),
-            payment_label: paymentMethod === 'PAYOS' ? 'PayOS - Đã thanh toán' : (paymentMethod === 'DIRECT' ? 'Thanh toán trực tiếp' : 'COD - Chưa thanh toán'),
-            payment_status: paymentMethod === 'PAYOS' ? 'PAID' : 'PENDING',
-            status: 'PENDING',
-            order_status: 'PENDING',
-            status_label: 'CHỜ XÁC NHẬN',
-            total_amount: finalTotal,
-            items: checkoutItems.map(item => ({
-              id: item.id || item.variant_id,
-              name: item.title || item.product_name,
-              image: resolveOrderItemImage(item),
-              size: item.size || 'Size M',
-              color: item.colorName || item.color || 'Tiêu chuẩn',
-              quantity: Number(item.quantity || 1),
-              price: Number(item.price || 0),
-              collection_tag: 'FALL/WINTER COUTURE ATELIER',
-            })),
-            stepper: {
-              estimated_delivery: 'Dự kiến: Trong 24-48 giờ tới',
-              tracking_code: `GHN-VFP-${orderCode}`,
-              driver_name: 'Lê Hoàng Nam (Hotline: 0906 234 567)',
-              steps: [
-                { id: 1, name: 'Xác nhận', time: `${nowStr} Vừa xong`, status: 'completed' },
-                { id: 2, name: 'Đóng gói', time: 'Đang chuẩn bị', status: 'completed' },
-                { id: 3, name: 'Vận chuyển hỏa tốc', time: 'Đang điều phối', status: 'active' },
-                { id: 4, name: 'Nhận hàng', time: 'Dự kiến 1-2 ngày', status: 'pending' },
-              ]
-            }
-          };
-
-          const updatedList = [newOrderEntry, ...existingOrders];
-          localStorage.setItem(userOrderKey, JSON.stringify(updatedList));
-          localStorage.setItem('yf_customer_orders', JSON.stringify(updatedList));
-          localStorage.setItem('yf_orders_reset_all_v3', 'true');
-
-          // Đảm bảo đơn hàng mới không bị vướng trong danh sách xóa
-          try {
-            const rawDel = localStorage.getItem('yf_deleted_order_ids');
-            if (rawDel) {
-              const delList = JSON.parse(rawDel);
-              const orderDigits = String(orderCode).replace(/\D/g, '');
-              const filteredDel = delList.filter(d => String(d) !== String(orderCode) && String(d) !== String(orderNumber) && String(d) !== orderDigits);
-              localStorage.setItem('yf_deleted_order_ids', JSON.stringify(filteredDel));
-            }
-          } catch (e) {}
-
-          // Đồng bộ tức thì sang danh sách quản lý đơn hàng của Manager/Admin
-          try {
-            const rawMgr = localStorage.getItem('yf_manager_orders');
-            const mgrExisting = (rawMgr ? JSON.parse(rawMgr) : []).filter(o => {
-              const rawId = String(o.order_id || '').trim();
-              const rawCode = String(o.order_code || o.order_number || '').replace(/\D/g, '');
-              return !mockSet.has(rawId) && !mockSet.has(rawCode);
-            });
-            localStorage.setItem('yf_manager_orders', JSON.stringify([newOrderEntry, ...mgrExisting]));
-          } catch (e) {}
-        } catch (e) {}
+        const newOrderEntry = {
+          order_id: String(orderCode),
+          order_number: orderNumber || `YF-${orderCode}`,
+          order_code: `YF - ${orderCode}`,
+          created_at: nowStr,
+          created_date: new Date().toISOString(),
+          recipient_name: fullName.trim() || user?.full_name || 'Khách hàng',
+          recipient_phone: phone.trim() || user?.phone || '090****000',
+          recipient_email: email.trim() || user?.email || '',
+          address: fullAddressString || 'Giao tận nơi theo đơn đặt hàng',
+          shipping_address: fullAddressString || 'Giao tận nơi theo đơn đặt hàng',
+          payment_method: paymentMethod === 'PAYOS' ? 'PAYOS' : (paymentMethod === 'DIRECT' ? 'DIRECT' : 'COD'),
+          payment_label: paymentMethod === 'PAYOS' ? 'PayOS - Đã thanh toán' : (paymentMethod === 'DIRECT' ? 'Thanh toán trực tiếp' : 'COD - Chưa thanh toán'),
+          payment_status: paymentMethod === 'PAYOS' ? 'PAID' : 'PENDING',
+          status: 'PENDING',
+          order_status: 'PENDING',
+          status_label: 'CHỜ XÁC NHẬN',
+          total_amount: finalTotal,
+          items: checkoutItems.map(item => ({
+            id: item.id || item.variant_id,
+            name: item.title || item.product_name,
+            image: resolveOrderItemImage(item),
+            size: item.size || 'Size M',
+            color: item.colorName || item.color || 'Tiêu chuẩn',
+            quantity: Number(item.quantity || 1),
+            price: Number(item.price || 0),
+            collection_tag: 'FALL/WINTER COUTURE ATELIER',
+          })),
+          stepper: {
+            estimated_delivery: 'Dự kiến: Trong 24-48 giờ tới',
+            tracking_code: `GHN-VFP-${orderCode}`,
+            driver_name: 'Lê Hoàng Nam (Hotline: 0906 234 567)',
+            steps: [
+              { id: 1, name: 'Xác nhận', time: `${nowStr} Vừa xong`, status: 'completed' },
+              { id: 2, name: 'Đóng gói', time: 'Đang chuẩn bị', status: 'completed' },
+              { id: 3, name: 'Vận chuyển hỏa tốc', time: 'Đang điều phối', status: 'active' },
+              { id: 4, name: 'Nhận hàng', time: 'Dự kiến 1-2 ngày', status: 'pending' },
+            ]
+          }
+        };
 
         // Lưu thông tin người nhận & địa chỉ vào hồ sơ người dùng để dùng cho những lần đặt sau
         if (user && updateUserProfile) {
@@ -547,18 +545,64 @@ export default function CheckoutPage() {
         } catch (e) {}
 
         if (paymentMethod === 'PAYOS') {
+          // Lưu dữ liệu đơn hàng chờ thanh toán vào sessionStorage
+          // TUYỆT ĐỐI KHÔNG ghi vào yf_customer_orders hay yf_manager_orders tại đây!
+          // Chỉ khi người dùng thanh toán thành công ở màn hình PayOS (Hình 2) thì mới tính là đơn hàng đặt.
+          try {
+            sessionStorage.setItem('yf_pending_payos_order', JSON.stringify(newOrderEntry));
+            sessionStorage.setItem('yf_pending_checkout_items', JSON.stringify(checkoutItems));
+            sessionStorage.setItem('yf_pending_order_code', String(orderCode));
+            sessionStorage.setItem('yf_pending_order_summary', JSON.stringify(orderSummary));
+          } catch (e) {}
+
           if (checkoutUrl) {
             showSuccess('Đang chuyển hướng tới cổng thanh toán PayOS...');
-            // Lưu lại thông tin sản phẩm và giỏ hàng để khôi phục nếu người dùng bấm Hủy
-            try {
-              sessionStorage.setItem('yf_pending_checkout_items', JSON.stringify(checkoutItems));
-            } catch (e) {}
-            // Chuyển hướng trực tiếp tới cổng PayOS VietQR
             window.location.href = checkoutUrl;
           } else {
             navigate(`/order-success?orderCode=${orderCode}&orderNumber=${orderNumber}`);
           }
         } else {
+          // Phương thức COD: Ghi nhận đơn hàng ngay lập tức
+          try {
+            sessionStorage.setItem('yf_last_completed_order', JSON.stringify(orderSummary));
+            const userOrderKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : 'yf_customer_orders';
+            const mockSet = new Set(['891', '890', '889', '888', '887', '886', '885', '884', '88210', '85420', '79114', '72015', '68192']);
+            
+            const rawExisting = JSON.parse(localStorage.getItem(userOrderKey) || localStorage.getItem('yf_customer_orders') || '[]');
+            const existingOrders = (Array.isArray(rawExisting) ? rawExisting : []).filter(o => {
+              const rawId = String(o.order_id || '').trim();
+              const rawCode = String(o.order_code || o.order_number || '').replace(/\D/g, '');
+              return !mockSet.has(rawId) && !mockSet.has(rawCode);
+            });
+
+            const updatedList = [newOrderEntry, ...existingOrders];
+            localStorage.setItem(userOrderKey, JSON.stringify(updatedList));
+            localStorage.setItem('yf_customer_orders', JSON.stringify(updatedList));
+            localStorage.setItem('yf_orders_reset_all_v3', 'true');
+
+            // Đảm bảo đơn hàng mới không bị vướng trong danh sách xóa
+            try {
+              const rawDel = localStorage.getItem('yf_deleted_order_ids');
+              if (rawDel) {
+                const delList = JSON.parse(rawDel);
+                const orderDigits = String(orderCode).replace(/\D/g, '');
+                const filteredDel = delList.filter(d => String(d) !== String(orderCode) && String(d) !== String(orderNumber) && String(d) !== orderDigits);
+                localStorage.setItem('yf_deleted_order_ids', JSON.stringify(filteredDel));
+              }
+            } catch (e) {}
+
+            // Đồng bộ tức thì sang danh sách quản lý đơn hàng của Manager/Admin
+            try {
+              const rawMgr = localStorage.getItem('yf_manager_orders');
+              const mgrExisting = (rawMgr ? JSON.parse(rawMgr) : []).filter(o => {
+                const rawId = String(o.order_id || '').trim();
+                const rawCode = String(o.order_code || o.order_number || '').replace(/\D/g, '');
+                return !mockSet.has(rawId) && !mockSet.has(rawCode);
+              });
+              localStorage.setItem('yf_manager_orders', JSON.stringify([newOrderEntry, ...mgrExisting]));
+            } catch (e) {}
+          } catch (e) {}
+
           // Phương thức COD: Xóa các sản phẩm đã mua khỏi giỏ hàng frontend
           const remainingCart = (cart || []).filter(
             (cItem) => !checkoutItems.some((bItem) => (bItem.variant_id || bItem.id) === (cItem.variant_id || cItem.id))

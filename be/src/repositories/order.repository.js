@@ -220,7 +220,7 @@ export const findOrdersByCustomer = async ({ customerId, email } = {}) => {
 
   if (conditions.length === 0) return [];
 
-  return await prisma.order.findMany({
+  const orders = await prisma.order.findMany({
     where: {
       OR: conditions,
     },
@@ -243,10 +243,20 @@ export const findOrdersByCustomer = async ({ customerId, email } = {}) => {
       payments: true,
     },
   });
+
+  // Lọc bỏ đơn PayOS chưa thanh toán thành công hoặc đã bị hủy
+  return orders.filter((o) => {
+    const isPayos = o.payments?.some((p) => p.payment_method === 'PAYOS');
+    if (isPayos) {
+      const isPaid = o.payments?.some((p) => p.payment_status === 'SUCCESS' || p.payment_status === 'PAID');
+      if (!isPaid) return false;
+    }
+    return true;
+  });
 };
 
 export const findAllOrders = async () => {
-  return await prisma.order.findMany({
+  const orders = await prisma.order.findMany({
     orderBy: { created_at: 'desc' },
     include: {
       customer: {
@@ -273,6 +283,16 @@ export const findAllOrders = async () => {
       },
       payments: true,
     },
+  });
+
+  // Lọc bỏ đơn PayOS chưa thanh toán thành công hoặc đã bị hủy
+  return orders.filter((o) => {
+    const isPayos = o.payments?.some((p) => p.payment_method === 'PAYOS');
+    if (isPayos) {
+      const isPaid = o.payments?.some((p) => p.payment_status === 'SUCCESS' || p.payment_status === 'PAID');
+      if (!isPaid) return false;
+    }
+    return true;
   });
 };
 
@@ -312,8 +332,28 @@ export const deleteOrderById = async (orderIdOrNumber) => {
 
     const foundOrders = await prisma.order.findMany({
       where: { OR: orConditions },
-      select: { order_id: true },
+      select: { order_id: true, voucher_code: true },
+      include: { order_items: true },
     });
+
+    for (const ord of foundOrders) {
+      if (ord.order_items && ord.order_items.length > 0) {
+        for (const it of ord.order_items) {
+          if (it.variant_id) {
+            await prisma.productVariant.updateMany({
+              where: { variant_id: it.variant_id },
+              data: { stock: { increment: Number(it.quantity || 1) } },
+            }).catch(() => {});
+          }
+        }
+      }
+      if (ord.voucher_code) {
+        await prisma.voucher.updateMany({
+          where: { code: ord.voucher_code.toUpperCase().trim() },
+          data: { used_count: { decrement: 1 } },
+        }).catch(() => {});
+      }
+    }
 
     const ids = foundOrders.map(o => o.order_id);
     if (ids.length > 0) {

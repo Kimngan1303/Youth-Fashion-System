@@ -155,3 +155,34 @@ export const getPaymentInformation = async (orderCode) => {
   }
 };
 
+/**
+ * Hủy liên kết thanh toán trên PayOS khi khách hàng hủy giao dịch
+ */
+export const cancelPaymentLink = async (orderCode, cancellationReason = 'Khách hủy thanh toán') => {
+  const clientId = process.env.PAYOS_CLIENT_ID?.trim();
+  const apiKey = process.env.PAYOS_API_KEY?.trim();
+
+  if (!clientId || !apiKey) {
+    return { isSimulation: true, status: 'CANCELLED' };
+  }
+
+  try {
+    const response = await fetch(`${PAYOS_API_URL}/${orderCode}/cancel`, {
+      method: 'POST',
+      headers: {
+        'x-client-id': clientId,
+        'x-api-key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ cancellationReason }),
+    });
+
+    const result = await response.json();
+    return result.data || null;
+  } catch (error) {
+    console.error('❌ [PayOS Cancel Failed]:', error.message);
+    return null;
+  }
+};
+
+
