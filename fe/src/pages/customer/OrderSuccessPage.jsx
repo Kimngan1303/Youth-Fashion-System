@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { orderService } from '../../services/orderService';
 import { useAuth } from '../../context/AuthContext';
+import { resolveOrderItemImage } from '../../utils/productImageUtils';
 
 export default function OrderSuccessPage() {
   const [searchParams] = useSearchParams();
@@ -24,7 +25,7 @@ export default function OrderSuccessPage() {
   const isSimulated = searchParams.get('simulated') === 'true';
   const payosStatusParam = searchParams.get('status');
 
-  const { setCart } = useAuth();
+  const { user, setCart } = useAuth();
   const [copied, setCopied] = useState(false);
 
   // Khởi tạo ngay lập tức từ sessionStorage (nếu có) để tránh màn hình bị chớp/trắng khi tải
@@ -102,19 +103,125 @@ export default function OrderSuccessPage() {
 
   // Xóa các sản phẩm đã thanh toán thành công khỏi giỏ hàng
   useEffect(() => {
-    if (paymentStatus === 'PAID' || paymentStatus === 'COD' || order?.payments?.[0]?.payment_method === 'COD') {
-      if (setCart && order?.order_items?.length > 0) {
-        setCart((prev) => {
-          if (!prev || prev.length === 0) return [];
-          const boughtNames = new Set(order.order_items.map((i) => i.product_name || i.title));
-          return prev.filter((item) => !boughtNames.has(item.title) && !boughtNames.has(item.product_name));
-        });
+    if (paymentStatus === 'PAID' || payosStatusParam === 'PAID' || paymentStatus === 'COD' || order?.payments?.[0]?.payment_method === 'COD') {
+      if (setCart) {
+        let boughtNames = new Set();
+        if (order?.order_items?.length > 0) {
+          boughtNames = new Set(order.order_items.map((i) => i.product_name || i.title));
+        }
+        try {
+          const pendingItems = JSON.parse(sessionStorage.getItem('yf_pending_checkout_items') || '[]');
+          if (Array.isArray(pendingItems)) {
+            pendingItems.forEach((i) => {
+              if (i.title) boughtNames.add(i.title);
+              if (i.product_name) boughtNames.add(i.product_name);
+            });
+          }
+        } catch (e) {}
+
+        if (boughtNames.size > 0) {
+          setCart((prev) => {
+            if (!prev || prev.length === 0) return [];
+            return prev.filter((item) => !boughtNames.has(item.title) && !boughtNames.has(item.product_name));
+          });
+        }
       }
       sessionStorage.removeItem('yf_checkout_voucher');
       sessionStorage.removeItem('yf_checkout_note');
       sessionStorage.removeItem('yf_pending_checkout_items');
     }
-  }, [paymentStatus, order]);
+  }, [paymentStatus, payosStatusParam, order, setCart]);
+
+  // Khi thanh toán PayOS thành công (Hình 2): Chính thức ghi nhận đơn hàng vào danh sách đơn của Khách hàng và Quản lý
+  useEffect(() => {
+    if ((paymentStatus === 'PAID' || payosStatusParam === 'PAID') && (order || orderCode)) {
+      try {
+        const orderCodeStr = String(orderCode || order?.order_id || '').replace(/\D/g, '');
+        const targetNumber = order?.order_number || orderNumberParam || `YF-${orderCodeStr}`;
+
+        let pendingData = null;
+        try {
+          const rawPending = sessionStorage.getItem('yf_pending_payos_order');
+          if (rawPending) pendingData = JSON.parse(rawPending);
+        } catch (e) {}
+
+        const nowStr = new Date().toLocaleDateString('vi-VN');
+        const userOrderKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : 'yf_customer_orders';
+
+        const finalOrderEntry = {
+          ...(pendingData || {}),
+          order_id: String(order?.order_id || orderCodeStr),
+          order_number: targetNumber,
+          order_code: targetNumber.startsWith('YF') ? targetNumber : `YF - ${targetNumber}`,
+          payment_method: 'PAYOS',
+          payment_label: 'PayOS - Đã thanh toán',
+          payment_status: 'PAID',
+          status: 'PENDING',
+          order_status: 'PENDING',
+          status_label: 'CHỜ XÁC NHẬN',
+          total_amount: Number(order?.total_amount || pendingData?.total_amount || 0),
+          created_at: pendingData?.created_at || nowStr,
+          created_date: pendingData?.created_date || new Date().toISOString(),
+          recipient_name: order?.recipient_name || order?.customer?.full_name || pendingData?.recipient_name || user?.full_name || 'Khách hàng',
+          recipient_phone: order?.recipient_phone || order?.customer?.phone || pendingData?.recipient_phone || user?.phone || '090****000',
+          recipient_email: order?.recipient_email || order?.customer?.email || pendingData?.recipient_email || user?.email || '',
+          address: order?.shipping_address_line || pendingData?.address || '',
+          shipping_address: order?.shipping_address_line || pendingData?.shipping_address || '',
+          items: (order?.order_items || pendingData?.items || []).map((it) => ({
+            id: it.order_item_id || it.variant_id || it.id,
+            name: it.product_name || it.name,
+            image: resolveOrderItemImage(it),
+            size: it.size ? (String(it.size).startsWith('Size') ? it.size : `Size ${it.size}`) : 'Size M',
+            color: it.color ? (String(it.color).startsWith('Màu') ? it.color : `Màu ${it.color}`) : 'Tiêu chuẩn',
+            quantity: Number(it.quantity || 1),
+            price: Number(it.unit_price || it.price || 0),
+          })),
+        };
+
+        const mockSet = new Set(['891', '890', '889', '888', '887', '886', '885', '884', '88210', '85420', '79114', '72015', '68192']);
+
+        // Lưu vào danh sách đơn của khách hàng
+        const rawCust = JSON.parse(localStorage.getItem(userOrderKey) || localStorage.getItem('yf_customer_orders') || '[]');
+        const existingCust = (Array.isArray(rawCust) ? rawCust : []).filter(o => {
+          const rawId = String(o.order_id || '').trim();
+          const rawCode = String(o.order_code || o.order_number || '').replace(/\D/g, '');
+          return !mockSet.has(rawId) && !mockSet.has(rawCode) && rawId !== String(order?.order_id) && rawCode !== orderCodeStr;
+        });
+        const updatedCust = [finalOrderEntry, ...existingCust];
+        localStorage.setItem(userOrderKey, JSON.stringify(updatedCust));
+        localStorage.setItem('yf_customer_orders', JSON.stringify(updatedCust));
+        localStorage.setItem('yf_orders_reset_all_v3', 'true');
+
+        // Lưu vào danh sách quản lý đơn hàng của Admin / Manager
+        const rawMgr = JSON.parse(localStorage.getItem('yf_manager_orders') || '[]');
+        const existingMgr = (Array.isArray(rawMgr) ? rawMgr : []).filter(o => {
+          const rawId = String(o.order_id || '').trim();
+          const rawCode = String(o.order_code || o.order_number || '').replace(/\D/g, '');
+          return !mockSet.has(rawId) && !mockSet.has(rawCode) && rawId !== String(order?.order_id) && rawCode !== orderCodeStr;
+        });
+        localStorage.setItem('yf_manager_orders', JSON.stringify([finalOrderEntry, ...existingMgr]));
+
+        // Xóa đơn này khỏi danh sách đơn đã xóa (nếu có lỡ lưu trước đó)
+        try {
+          const rawDel = localStorage.getItem('yf_deleted_order_ids');
+          if (rawDel) {
+            const delList = JSON.parse(rawDel);
+            const filteredDel = delList.filter(d => String(d) !== String(order?.order_id) && String(d) !== targetNumber && String(d) !== orderCodeStr);
+            localStorage.setItem('yf_deleted_order_ids', JSON.stringify(filteredDel));
+          }
+        } catch (e) {}
+
+        sessionStorage.setItem('yf_last_completed_order', JSON.stringify(finalOrderEntry));
+        sessionStorage.removeItem('yf_pending_payos_order');
+        sessionStorage.removeItem('yf_pending_order_code');
+
+        window.dispatchEvent(new Event('order_status_updated'));
+        window.dispatchEvent(new Event('yf_order_status_changed'));
+      } catch (e) {
+        console.error('Lỗi khi lưu đơn hàng PayOS thành công:', e);
+      }
+    }
+  }, [paymentStatus, payosStatusParam, order, orderCode, orderNumberParam, user]);
 
   const displayOrderNumber =
     order?.order_number || orderNumberParam || (orderCode ? `YF-${orderCode}` : 'YF-ORDER');
@@ -323,19 +430,16 @@ export default function OrderSuccessPage() {
 
               <div className="items-rows-wrap">
                 {order.order_items.map((item, idx) => {
-                  const itemImg =
-                    item.image ||
-                    item.variant?.product?.images?.[0]?.image_url ||
-                    'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800';
+                  const itemImg = resolveOrderItemImage(item);
                   return (
                     <div key={item.order_item_id || idx} className="order-item-detail-row">
                       <img
                         src={itemImg}
-                        alt={item.product_name}
+                        alt={item.product_name || item.name}
                         className="item-detail-img"
                         onError={(e) => {
-                          e.target.src =
-                            'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800';
+                          e.target.onerror = null;
+                          e.target.src = resolveOrderItemImage(item);
                         }}
                       />
                       <div className="item-detail-meta">
@@ -415,7 +519,7 @@ export default function OrderSuccessPage() {
               <span>QUAY VỀ MUA SẮM TIẾP</span>
             </Link>
 
-            <Link to="/profile" className="btn-action-secondary">
+            <Link to="/profile?tab=orders" className="btn-action-secondary">
               <span>XEM LỊCH SỬ ĐƠN HÀNG</span>
               <ArrowRight size={17} />
             </Link>

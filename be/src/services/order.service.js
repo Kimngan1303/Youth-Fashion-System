@@ -153,6 +153,16 @@ export const createOrderService = async ({
 };
 
 /**
+ * Lấy danh sách đơn hàng thực tế của khách hàng theo customerId hoặc email
+ */
+export const getMyOrdersService = async (params) => {
+  if (typeof params === 'object' && params !== null) {
+    return await orderRepo.findOrdersByCustomer(params);
+  }
+  return await orderRepo.findOrdersByCustomer({ customerId: params });
+};
+
+/**
  * Lấy thông tin đơn hàng theo order_number
  */
 export const getOrderByNumberService = async (orderNumber) => {
@@ -266,4 +276,60 @@ export const handlePayosWebhookService = async (webhookBody) => {
   }
 
   return { success: true };
+};
+
+/**
+ * Hủy đơn hàng và lưu lý do hủy
+ */
+export const cancelOrderService = async (orderIdOrNumber, reason) => {
+  return await orderRepo.cancelOrder(orderIdOrNumber, reason);
+};
+
+/**
+ * Lấy tất cả đơn hàng cho khu vực Quản trị Manager/Admin
+ */
+export const getAllOrdersService = async () => {
+  return await orderRepo.findAllOrders();
+};
+
+/**
+ * Cập nhật trạng thái đơn hàng từ trang Quản trị
+ */
+export const updateOrderStatusService = async (orderId, status, note) => {
+  let mappedStatus = 'PENDING';
+  const s = String(status || '').toUpperCase();
+  if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s)) {
+    mappedStatus = 'DELIVERED';
+  } else if (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s)) {
+    mappedStatus = 'SHIPPED';
+  } else if (['PROCESSING', 'PREPARING'].includes(s)) {
+    mappedStatus = 'PROCESSING';
+  } else if (['CONFIRMED'].includes(s)) {
+    mappedStatus = 'CONFIRMED';
+  } else if (['RETURNED', 'REFUNDED', 'EXCHANGE'].includes(s)) {
+    mappedStatus = 'RETURNED';
+  } else if (['CANCELLED', 'FAILED'].includes(s)) {
+    mappedStatus = 'CANCELLED';
+  }
+  return await orderRepo.updateOrderStatus(orderId, mappedStatus, note);
+};
+
+/**
+ * Xóa toàn bộ đơn hàng
+ */
+export const clearAllOrdersService = async () => {
+  return await orderRepo.clearAllOrders();
+};
+
+/**
+ * Xóa đơn hàng từ trang Quản trị hoặc khi khách hủy thanh toán PayOS
+ */
+export const deleteOrderService = async (orderId) => {
+  try {
+    const digitsOnly = String(orderId || '').replace(/\D/g, '');
+    if (digitsOnly) {
+      await payosService.cancelPaymentLink(digitsOnly).catch(() => {});
+    }
+  } catch (e) {}
+  return await orderRepo.deleteOrderById(orderId);
 };

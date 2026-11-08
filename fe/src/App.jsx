@@ -1,8 +1,9 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { ConfirmModalProvider } from './context/ConfirmModalContext';
+import { orderService } from './services/orderService';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AISearchModal from './components/AISearchModal';
@@ -15,6 +16,7 @@ import CartPage from './pages/customer/CartPage';
 import CheckoutPage from './pages/customer/CheckoutPage';
 import OrderSuccessPage from './pages/customer/OrderSuccessPage';
 import ProfilePage from './pages/ProfilePage';
+import NotificationPage from './pages/customer/NotificationPage';
 import ContactPage from './pages/ContactPage';
 import LookbookPage from './pages/LookbookPage';
 import ChatPage from './pages/ChatPage';
@@ -28,6 +30,7 @@ import CategoryManager from './pages/manager/CategoryManager';
 import BrandManager from './pages/manager/BrandManager';
 import LookbookManagement from './pages/manager/LookbookManagement';
 import VoucherManager from './pages/manager/VoucherManager';
+import OrderManager from './pages/manager/OrderManager';
 import UserManagement from './pages/manager/UserManagement';
 import SystemConfig from './pages/manager/SystemConfig';
 import ChatManagement from './pages/manager/ChatManagement';
@@ -40,18 +43,40 @@ function ProtectedRoute({ children }) {
 function AdminRoute({ children }) {
   const { user, isAuthenticated } = useContext(AuthContext);
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  const hasAccess =
-    user?.role === 'ADMIN' ||
-    user?.employee_role === 'ADMIN' ||
-    user?.role === 'MANAGER' ||
-    user?.employee_role === 'MANAGER' ||
-    user?.user_type === 'EMPLOYEE';
-  return hasAccess ? children : <Navigate to="/manager" replace />;
+  const isAdmin =
+    String(user?.role || '').toUpperCase() === 'ADMIN' ||
+    String(user?.employee_role || '').toUpperCase() === 'ADMIN';
+  return isAdmin ? children : <Navigate to="/manager" replace />;
 }
 
 function AppContent() {
   const [isAISearchOpen, setIsAISearchOpen] = useState(false);
   const location = useLocation();
+
+  // Đảm bảo xóa sạch đơn hàng cũ từ tất cả tài khoản người dùng và backend khi khởi chạy
+  useEffect(() => {
+    if (localStorage.getItem('yf_orders_reset_all_v3') !== 'true') {
+      try {
+        orderService.clearAllOrders().catch(() => {});
+        localStorage.removeItem('yf_manager_orders');
+        localStorage.removeItem('yf_customer_orders');
+        localStorage.removeItem('yf_deleted_order_ids');
+        sessionStorage.removeItem('yf_last_completed_order');
+
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('yf_customer_orders') || k.startsWith('yf_orders_reset_') || k === 'yf_manager_orders')) {
+            keysToRemove.push(k);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+        localStorage.setItem('yf_orders_reset_all_v3', 'true');
+        window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: { action: 'CLEAR_ALL' } }));
+        window.dispatchEvent(new Event('order_status_updated'));
+      } catch (e) {}
+    }
+  }, []);
 
   // Xác định các trang không cần hiển thị Header và Footer của khách hàng
   const hideHeaderFooter = ['/login', '/register', '/verify-email', '/forgot-password'].includes(location.pathname) || location.pathname.startsWith('/manager') || location.pathname.startsWith('/admin');
@@ -101,6 +126,22 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/notifications" 
+            element={
+              <ProtectedRoute>
+                <NotificationPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/thong-bao" 
+            element={
+              <ProtectedRoute>
+                <NotificationPage />
               </ProtectedRoute>
             } 
           />
@@ -164,6 +205,22 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <VoucherManager />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/manager/orders"
+            element={
+              <ProtectedRoute>
+                <OrderManager />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/orders"
+            element={
+              <ProtectedRoute>
+                <OrderManager />
               </ProtectedRoute>
             }
           />

@@ -1,13 +1,4 @@
 /**
- * ==============================================================================
- * TRANG BỘ SƯU TẬP THỜI TRANG (CLIENT LOOKBOOK EDITORIAL PAGE)
- * ==============================================================================
- * 
- * Mục đích file:
- * - Hiển thị bộ sưu tập Lookbook dành cho khách hàng với giao diện tạp chí thời trang cao cấp (Editorial).
- * - Đồng bộ thời gian thực (Real-time) với bảng điều khiển của Quản lý (Manager Dashboard) qua localStorage & Custom Event.
- * - Cho phép khách hàng xem chi tiết trang phục, tag sản phẩm phối đồ, giá combo và bấm đặt mua.
- * 
  * Kiến trúc & Các khối giao diện chính:
  * 1. Khối 1: Thanh tiêu đề phụ (Editorial Bar) & Nút sao chép liên kết chia sẻ.
  * 2. Khối 2: Banner Hero toàn cảnh (Cinematic Hero Banner) giới thiệu chủ đề mùa.
