@@ -1,5 +1,6 @@
 import * as productRepo from '../repositories/product.repository.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
+import { vectorSearchService } from './ai/vectorSearch.service.js';
 
 /**
  * Service layer xử lý nghiệp vụ cho Sản phẩm
@@ -159,6 +160,11 @@ export const createProductService = async (body, files = []) => {
     images: uploadedImages,
   });
 
+  // Tự động sinh Vector Embedding bất đồng bộ cho sản phẩm mới
+  vectorSearchService.syncSingleProductEmbedding(newProduct.product_id).catch((err) => {
+    console.warn('[ProductService] Lỗi tạo vector AI nền cho sản phẩm mới:', err.message);
+  });
+
   return formatProduct(newProduct);
 };
 
@@ -206,6 +212,12 @@ export const updateProductService = async (productId, body, files = []) => {
   }
 
   const finalProduct = await productRepo.findProductById(productId);
+
+  // Tự động cập nhật lại vector cho sản phẩm
+  vectorSearchService.syncSingleProductEmbedding(productId).catch((err) => {
+    console.warn('[ProductService] Lỗi cập nhật vector AI nền:', err.message);
+  });
+
   return formatProduct(finalProduct);
 };
 
@@ -220,6 +232,10 @@ export const deleteProductService = async (productId) => {
     throw error;
   }
   await productRepo.deleteProduct(productId);
+
+  // Xóa vector khỏi RAM và file cache
+  vectorSearchService.removeProduct(productId);
+
   return { message: 'Đã xóa sản phẩm thành công' };
 };
 
@@ -239,6 +255,13 @@ export const addProductImageService = async (productId, file, isPrimary = false)
     alt_text: 'Product Image',
     is_primary: isPrimary === true || isPrimary === 'true',
   });
+
+  // Nếu là ảnh chính mới, cập nhật lại vector
+  if (isPrimary === true || isPrimary === 'true') {
+    vectorSearchService.syncSingleProductEmbedding(productId).catch((err) => {
+      console.warn('[ProductService] Lỗi cập nhật vector ảnh chính:', err.message);
+    });
+  }
 
   return {
     ...newImage,
