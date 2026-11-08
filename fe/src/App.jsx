@@ -15,6 +15,7 @@ import CartPage from './pages/customer/CartPage';
 import CheckoutPage from './pages/customer/CheckoutPage';
 import OrderSuccessPage from './pages/customer/OrderSuccessPage';
 import ProfilePage from './pages/ProfilePage';
+import NotificationPage from './pages/customer/NotificationPage';
 import ContactPage from './pages/ContactPage';
 import LookbookPage from './pages/LookbookPage';
 import ChatPage from './pages/ChatPage';
@@ -123,6 +124,22 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/notifications" 
+            element={
+              <ProtectedRoute>
+                <NotificationPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/thong-bao" 
+            element={
+              <ProtectedRoute>
+                <NotificationPage />
               </ProtectedRoute>
             } 
           />

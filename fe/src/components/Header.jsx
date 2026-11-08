@@ -302,11 +302,7 @@ const Header = ({ onOpenAISearch }) => {
                             markNotificationAsRead(item.id, user);
                             refreshNotifications();
                             setShowNotifications(false);
-                            if (item.link) {
-                              navigate(item.link);
-                            } else {
-                              navigate('/profile?tab=orders');
-                            }
+                            navigate('/notifications');
                           }}
                           style={{
                             cursor: 'pointer',
@@ -382,7 +378,7 @@ const Header = ({ onOpenAISearch }) => {
                       type="button"
                       onClick={() => {
                         setShowNotifications(false);
-                        navigate('/profile?tab=notifications');
+                        navigate('/notifications');
                       }}
                       style={{
                         background: 'none',
@@ -395,7 +391,7 @@ const Header = ({ onOpenAISearch }) => {
                         textDecoration: 'underline'
                       }}
                     >
-                      Xem tất cả trong Trung tâm thông báo &rarr;
+                      Xem tất cả trong Trang thông báo &rarr;
                     </button>
                   </div>
                 )}
@@ -485,6 +481,13 @@ const Header = ({ onOpenAISearch }) => {
                   onClick={() => setShowUserMenu(false)}
                 >
                   Sản phẩm yêu thích
+                </Link>
+                <Link
+                  to="/notifications"
+                  className="dropdown-item"
+                  onClick={() => setShowUserMenu(false)}
+                >
+                  Thông báo của tôi
                 </Link>
                 {isManagerOrAdmin && (
                   <Link

@@ -305,3 +305,4 @@ export const clearAllNotifications = (user = null) => {
 
   window.dispatchEvent(new CustomEvent('yf_notifications_updated', { detail: { cleared: true } }));
 };
+
