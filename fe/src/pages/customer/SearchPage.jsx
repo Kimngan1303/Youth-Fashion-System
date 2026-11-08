@@ -4,6 +4,7 @@ import {
   Search,
   Camera,
   Upload,
+  UploadCloud,
   X,
   Sparkles,
   Clock,
@@ -31,9 +32,11 @@ export default function SearchPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { confirmModal } = useConfirmModal();
-  const { showSuccess, showInfo } = useToast();
+  const { showSuccess, showError, showInfo } = useToast();
 
   const fileInputRef = useRef(null);
+  const dragCounterRef = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Search input state
   const urlQuery = searchParams.get("q") || searchParams.get("search") || "";
@@ -312,22 +315,96 @@ export default function SearchPage() {
     executeSearch(suggestion);
   };
 
-  // Image handling
+  // Xử lý file ảnh (dùng chung cho Upload file, Kéo thả Drag & Drop và Dán Clipboard Ctrl+V)
+  const processImageFile = (file) => {
+    if (!file) return;
+    if (!file.type || !file.type.startsWith("image/")) {
+      showError("Vui lòng chọn hoặc kéo thả file định dạng hình ảnh (PNG, JPG, WEBP,...)");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showError("Dung lượng ảnh tối đa cho phép là 10MB");
+      return;
+    }
+
+    if (
+      imagePreview &&
+      typeof imagePreview === "string" &&
+      imagePreview.startsWith("blob:")
+    ) {
+      URL.revokeObjectURL(imagePreview);
+    }
+
+    setSelectedImage(file);
+    setImagePreview(URL.createObjectURL(file));
+    setErrorMessage("");
+    showSuccess("Đã nhận ảnh tìm kiếm! Nhấn 'TÌM KIẾM' để AI phân tích trang phục.");
+  };
+
   const handleImageFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (
-        imagePreview &&
-        typeof imagePreview === "string" &&
-        imagePreview.startsWith("blob:")
-      ) {
-        URL.revokeObjectURL(imagePreview);
-      }
-      setSelectedImage(file);
-      setImagePreview(URL.createObjectURL(file));
-      setErrorMessage("");
+    if (e.target.files && e.target.files[0]) {
+      processImageFile(e.target.files[0]);
     }
   };
+
+  // Drag & Drop handlers cho khu vực tìm kiếm
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      setIsDragging(false);
+      dragCounterRef.current = 0;
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounterRef.current = 0;
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processImageFile(e.dataTransfer.files[0]);
+      e.dataTransfer.clearData();
+    }
+  };
+
+  // Hỗ trợ dán ảnh trực tiếp từ Clipboard (Ctrl + V)
+  useEffect(() => {
+    const handlePaste = (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type && items[i].type.indexOf("image") !== -1) {
+          e.preventDefault();
+          const file = items[i].getAsFile();
+          if (file) {
+            processImageFile(file);
+          }
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [imagePreview]);
 
   const removeImage = () => {
     if (
@@ -365,7 +442,33 @@ export default function SearchPage() {
       {/* 1. Main Search Header Box (Shopee-inspired, tailored for YouthFashion) */}
       <section className="search-hero-section">
         <div className="container">
-          <div className="search-box-card">
+          <div
+            className={`search-box-card ${isDragging ? "dragging-over" : ""}`}
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {/* Drag & Drop Visual Overlay khi người dùng kéo ảnh vào */}
+            {isDragging && (
+              <div className="drag-drop-overlay animate-fade-in">
+                <div className="drag-drop-card-inner">
+                  <div className="drag-drop-icon-pulse">
+                    <UploadCloud size={46} />
+                  </div>
+                  <h3 className="drag-drop-title font-serif">
+                    Thả hình ảnh vào đây
+                  </h3>
+                  <p className="drag-drop-subtitle">
+                    AI sẽ tự động nhận diện kiểu dáng, màu sắc và tìm kiếm trang phục tương tự
+                  </p>
+                  <span className="drag-drop-types">
+                    Hỗ trợ JPG, PNG, WEBP (tối đa 10MB)
+                  </span>
+                </div>
+              </div>
+            )}
+
             <h1 className="search-hero-title font-serif">
               Tìm Kiếm Thời Trang Thông Minh
             </h1>
@@ -432,6 +535,19 @@ export default function SearchPage() {
                   )}
                 </button>
               </div>
+
+              {/* Gợi ý kéo thả ảnh tiện ích khi chưa có ảnh */}
+              {!imagePreview && (
+                <div
+                  className="search-dropzone-hint animate-fade-in"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Nhấn để tải ảnh hoặc kéo thả trực tiếp vào khung tìm kiếm"
+                >
+                  <UploadCloud size={14} className="dropzone-hint-icon" />
+                  <span>Kéo & thả ảnh vào đây, hoặc nhấn máy ảnh để tìm bằng hình ảnh</span>
+                  <span className="dropzone-paste-badge">Ctrl + V</span>
+                </div>
+              )}
 
               {/* Preview ảnh nhỏ gọn ngay dưới ô search khi đã chọn ảnh */}
               {imagePreview && (
@@ -778,11 +894,116 @@ export default function SearchPage() {
         }
 
         .search-box-card {
+          position: relative;
           background: #ffffff;
           border-radius: 18px;
           padding: 32px 36px;
           box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
           border: 1px solid #f1f1ee;
+          transition: all 0.25s ease;
+        }
+
+        .search-box-card.dragging-over {
+          border-color: #111827 !important;
+          background-color: #fcfbf9 !important;
+          box-shadow: 0 14px 40px -5px rgba(0, 0, 0, 0.12), 0 0 0 3px rgba(17, 24, 39, 0.08) !important;
+        }
+
+        .drag-drop-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(4px);
+          border: 2px dashed #111827;
+          border-radius: 18px;
+          z-index: 50;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          pointer-events: none;
+        }
+
+        .drag-drop-card-inner {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          padding: 24px;
+        }
+
+        .drag-drop-icon-pulse {
+          width: 76px;
+          height: 76px;
+          border-radius: 50%;
+          background-color: #f4f3ef;
+          color: #111827;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 14px;
+          animation: pulse 1.8s infinite;
+        }
+
+        .drag-drop-title {
+          font-size: 21px;
+          font-weight: 700;
+          color: #111827;
+          margin-bottom: 6px;
+        }
+
+        .drag-drop-subtitle {
+          font-size: 13.5px;
+          color: #4b5563;
+          max-width: 440px;
+          margin-bottom: 10px;
+        }
+
+        .drag-drop-types {
+          font-size: 11px;
+          font-weight: 600;
+          color: #9ca3af;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+        }
+
+        .search-dropzone-hint {
+          display: inline-flex;
+          align-items: center;
+          align-self: center;
+          gap: 8px;
+          margin-top: 6px;
+          padding: 6px 16px;
+          background-color: #f7f6f2;
+          border: 1px dashed #d1cebe;
+          border-radius: 999px;
+          font-size: 12.5px;
+          color: #6b7280;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          user-select: none;
+        }
+
+        .search-dropzone-hint:hover {
+          background-color: #edeae0;
+          border-color: #111827;
+          color: #111827;
+        }
+
+        .dropzone-hint-icon {
+          color: #4b5563;
+          flex-shrink: 0;
+        }
+
+        .dropzone-paste-badge {
+          padding: 2px 7px;
+          background-color: #ffffff;
+          border: 1px solid #d1cebe;
+          border-radius: 4px;
+          font-size: 10px;
+          font-weight: 700;
+          color: #374151;
+          font-family: monospace;
+          letter-spacing: 0.5px;
         }
 
         .search-hero-title {
