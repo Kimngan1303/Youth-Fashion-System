@@ -9,7 +9,6 @@ import {
   Sparkles,
   Clock,
   Trash2,
-  SlidersHorizontal,
   Layers,
   Image as ImageIcon,
   Type,
@@ -43,7 +42,6 @@ export default function SearchPage() {
   const [queryText, setQueryText] = useState(urlQuery);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [hybridWeightMode, setHybridWeightMode] = useState("image_priority"); // 70/30 | 50/50 | 30/70
 
   // Execution state
   const [isSearching, setIsSearching] = useState(false);
@@ -183,16 +181,12 @@ export default function SearchPage() {
     setSuggestedQuery(null);
     setWasCorrected(false);
 
-    // Tính toán trọng số multimodal
-    let imgWeight = 0.7;
-    let txtWeight = 0.3;
-    if (hybridWeightMode === "balanced") {
-      imgWeight = 0.5;
-      txtWeight = 0.5;
-    } else if (hybridWeightMode === "text_priority") {
-      imgWeight = 0.3;
-      txtWeight = 0.7;
-    }
+    // Tự động tối ưu hóa trọng số Multimodal (Adaptive Auto-Weighting):
+    // - Nếu từ khóa ngắn/chung chung (<= 2 từ): Ưu tiên hình ảnh (70% ảnh - 30% text)
+    // - Nếu từ khóa mô tả chi tiết (>= 3 từ): Cân bằng tối ưu (50% ảnh - 50% text)
+    const words = (targetText || "").trim().split(/\s+/).filter(Boolean);
+    const imgWeight = words.length <= 2 ? 0.7 : 0.5;
+    const txtWeight = words.length <= 2 ? 0.3 : 0.5;
 
     try {
       let response;
@@ -577,42 +571,6 @@ export default function SearchPage() {
                 </div>
               )}
 
-              {/* Multimodal Weight Control (Chỉ hiện khi VỪA CÓ ẢNH VỪA CÓ CHỮ) */}
-              {selectedImage && queryText.trim() && (
-                <div className="multimodal-weight-panel animate-fade-in">
-                  <div className="weight-panel-left">
-                    <SlidersHorizontal
-                      size={15}
-                      className="weight-panel-icon"
-                    />
-                    <span>Tỷ lệ hòa trộn Multimodal (CLIP):</span>
-                  </div>
-                  <div className="weight-preset-group">
-                    <button
-                      type="button"
-                      className={`weight-preset-chip ${hybridWeightMode === "image_priority" ? "active" : ""}`}
-                      onClick={() => setHybridWeightMode("image_priority")}
-                    >
-                      Ưu tiên ảnh (70/30)
-                    </button>
-                    <button
-                      type="button"
-                      className={`weight-preset-chip ${hybridWeightMode === "balanced" ? "active" : ""}`}
-                      onClick={() => setHybridWeightMode("balanced")}
-                    >
-                      Cân bằng (50/50)
-                    </button>
-                    <button
-                      type="button"
-                      className={`weight-preset-chip ${hybridWeightMode === "text_priority" ? "active" : ""}`}
-                      onClick={() => setHybridWeightMode("text_priority")}
-                    >
-                      Ưu tiên mô tả (30/70)
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {/* Error message */}
               {errorMessage && (
                 <div className="search-error-box animate-fade-in">
@@ -703,15 +661,7 @@ export default function SearchPage() {
                     {searchMetadata.searchType === "HYBRID" && (
                       <>
                         <Layers size={13} />
-                        Đa phương thức (Ảnh{" "}
-                        {Math.round(
-                          (searchMetadata.weights?.image ?? 0.7) * 100,
-                        )}
-                        % + Text{" "}
-                        {Math.round(
-                          (searchMetadata.weights?.text ?? 0.3) * 100,
-                        )}
-                        %)
+                        Tìm kiếm kết hợp (Hình ảnh + Mô tả)
                       </>
                     )}
                     {searchMetadata.searchType === "IMAGE" && (
@@ -1174,55 +1124,6 @@ export default function SearchPage() {
           background-color: #fee2e2;
         }
 
-        .multimodal-weight-panel {
-          background-color: #faf5ff;
-          border: 1px solid #e9d5ff;
-          border-radius: 10px;
-          padding: 10px 14px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 10px;
-        }
-
-        .weight-panel-left {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 12.5px;
-          font-weight: 600;
-          color: #6b21a8;
-        }
-
-        .weight-panel-icon {
-          color: #9333ea;
-        }
-
-        .weight-preset-group {
-          display: flex;
-          gap: 6px;
-        }
-
-        .weight-preset-chip {
-          background: #ffffff;
-          border: 1px solid #d8b4fe;
-          color: #6b21a8;
-          font-size: 11.5px;
-          font-weight: 600;
-          padding: 5px 12px;
-          border-radius: 6px;
-          cursor: pointer;
-          transition: all 0.15s ease;
-        }
-
-        .weight-preset-chip.active {
-          background: #7c3aed;
-          border-color: #7c3aed;
-          color: #ffffff;
-          box-shadow: 0 2px 5px rgba(124, 58, 237, 0.3);
-        }
-
         .search-error-box {
           display: flex;
           align-items: center;
@@ -1550,11 +1451,6 @@ export default function SearchPage() {
             margin-left: 0;
             margin-top: 8px;
             justify-content: center;
-          }
-
-          .multimodal-weight-panel {
-            flex-direction: column;
-            align-items: flex-start;
           }
         }
 
