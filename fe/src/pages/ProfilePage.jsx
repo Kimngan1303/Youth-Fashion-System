@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   User, Package, Lock, Heart, LogOut, CheckCircle,
@@ -1758,6 +1758,23 @@ const ProfilePage = () => {
     RETURNED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'RETURNED').length,
   };
 
+  // Chỉ tính những đơn hàng có trạng thái ĐÃ GIAO cho mục Tổng chi tiêu ở Profile
+  const deliveredOrders = useMemo(() => {
+    return customerOrders.filter((ord) => getOrderStatusCategory(ord.status, ord) === 'COMPLETED');
+  }, [customerOrders]);
+
+  const deliveredSpent = useMemo(() => {
+    return deliveredOrders.reduce((sum, ord) => sum + Number(ord.total_amount || 0), 0);
+  }, [deliveredOrders]);
+
+  const formattedDeliveredSpent = useMemo(() => {
+    if (deliveredSpent <= 0) return '0₫';
+    if (deliveredSpent >= 1000000) {
+      return `${(deliveredSpent / 1000000).toFixed(1).replace('.0', '')}tr`;
+    }
+    return `${deliveredSpent.toLocaleString('vi-VN')}₫`;
+  }, [deliveredSpent]);
+
   const filteredOrders = customerOrders.filter(ord => {
     if (orderStatusFilter !== 'ALL' && getOrderStatusCategory(ord.status, ord) !== orderStatusFilter) {
       return false;
@@ -2402,14 +2419,12 @@ const ProfilePage = () => {
               <div className="stat-col">
                 <span className="stat-label">TỔNG CHI TIÊU</span>
                 <span className="stat-value">
-                  {user?.total_spent || (customerOrders.length > 0
-                    ? (customerOrders.reduce((sum, ord) => sum + Number(ord.total_amount || 0), 0) >= 1000000
-                      ? `${(customerOrders.reduce((sum, ord) => sum + Number(ord.total_amount || 0), 0) / 1000000).toFixed(1).replace('.0', '')}tr`
-                      : `${customerOrders.reduce((sum, ord) => sum + Number(ord.total_amount || 0), 0).toLocaleString('vi-VN')}₫`)
-                    : '0₫')}
+                  {deliveredOrders.length > 0 ? formattedDeliveredSpent : '0₫'}
                 </span>
                 <span className="stat-sub gold-sub">
-                  {user?.discount || (customerOrders.length > 0 ? `Chốt chẵn ${String(orderCounts.ALL).padStart(2, '0')} đơn đặt` : 'Chưa có đơn đặt')}
+                  {deliveredOrders.length > 0
+                    ? `Chốt chẵn ${String(deliveredOrders.length).padStart(2, '0')} đơn đã giao`
+                    : 'Chưa có đơn đã giao'}
                 </span>
               </div>
             </div>
