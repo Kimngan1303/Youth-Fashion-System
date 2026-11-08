@@ -13,7 +13,6 @@ import {
   DollarSign,
   Search,
   Filter,
-  Plus,
   Trash2,
   Edit,
   Eye,
@@ -2474,15 +2473,6 @@ export default function OrderManager() {
               <p className="order-super-title">YOUTHFASHION • QUẢN LÝ VẬN HÀNH & ĐƠN HÀNG</p>
               <h1 className="order-main-title font-serif">Danh Sách Đơn Hàng</h1>
             </div>
-
-            <button
-              type="button"
-              className="btn-create-order"
-              onClick={() => setIsCreateModalOpen(true)}
-            >
-              <Plus size={15} strokeWidth={2.5} />
-              <span>Tạo Đơn Hàng Mới</span>
-            </button>
           </div>
 
           {/* 3 Metric Summary Cards */}
