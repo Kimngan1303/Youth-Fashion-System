@@ -13,33 +13,63 @@ const STORAGE_PATH = fileURLToPath(new URL('../../data/product_embeddings.json',
 class VectorSearchService {
   constructor() {
     this.vectorsCache = [];
+    this.metadata = null;
     this.isLoaded = false;
   }
 
   /**
    * Nạp vector từ file JSON vào RAM (In-Memory)
+   * Tương thích an toàn cả định dạng mảng cũ và định dạng cấu trúc mới kèm metadata
    */
   loadVectors() {
     try {
       if (fs.existsSync(STORAGE_PATH)) {
         const raw = fs.readFileSync(STORAGE_PATH, 'utf-8');
-        this.vectorsCache = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+
+        if (Array.isArray(parsed)) {
+          // Định dạng mảng cũ (Legacy format) -> tự động tương thích
+          this.vectorsCache = parsed;
+          this.metadata = {
+            model_id: 'Xenova/clip-vit-base-patch32',
+            embedding_dimension: 512,
+            normalization_method: 'L2',
+            updated_at: new Date().toISOString(),
+            total_products: parsed.length,
+          };
+          console.log(`[VectorSearch] Đã nạp ${this.vectorsCache.length} vector sản phẩm (legacy array) vào RAM.`);
+        } else if (parsed && Array.isArray(parsed.vectors)) {
+          // Định dạng mới có metadata cấu trúc
+          this.vectorsCache = parsed.vectors;
+          this.metadata = {
+            model_id: parsed.model_id || 'Xenova/clip-vit-base-patch32',
+            embedding_dimension: parsed.embedding_dimension || 512,
+            normalization_method: parsed.normalization_method || 'L2',
+            updated_at: parsed.updated_at || new Date().toISOString(),
+            total_products: parsed.vectors.length,
+          };
+          console.log(`[VectorSearch] Đã nạp ${this.vectorsCache.length} vector sản phẩm (Model: ${this.metadata.model_id}) vào RAM.`);
+        } else {
+          this.vectorsCache = [];
+          this.metadata = null;
+        }
         this.isLoaded = true;
-        console.log(`[VectorSearch] Đã nạp ${this.vectorsCache.length} vector sản phẩm vào bộ nhớ RAM.`);
       } else {
         this.vectorsCache = [];
+        this.metadata = null;
         this.isLoaded = true;
       }
     } catch (err) {
       console.error('[VectorSearch] Lỗi đọc file vector embeddings:', err.message);
       this.vectorsCache = [];
+      this.metadata = null;
       this.isLoaded = true;
     }
     return this.vectorsCache;
   }
 
   /**
-   * Lưu danh sách vector hiện tại ra file JSON
+   * Lưu danh sách vector hiện tại ra file JSON kèm metadata đầy đủ
    */
   saveVectors() {
     try {
@@ -47,8 +77,26 @@ class VectorSearchService {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      fs.writeFileSync(STORAGE_PATH, JSON.stringify(this.vectorsCache, null, 2), 'utf-8');
-      console.log(`[VectorSearch] Đã lưu ${this.vectorsCache.length} vector vào ${STORAGE_PATH}`);
+
+      const payload = {
+        model_id: 'Xenova/clip-vit-base-patch32',
+        embedding_dimension: 512,
+        normalization_method: 'L2',
+        updated_at: new Date().toISOString(),
+        total_products: this.vectorsCache.length,
+        vectors: this.vectorsCache,
+      };
+
+      this.metadata = {
+        model_id: payload.model_id,
+        embedding_dimension: payload.embedding_dimension,
+        normalization_method: payload.normalization_method,
+        updated_at: payload.updated_at,
+        total_products: payload.total_products,
+      };
+
+      fs.writeFileSync(STORAGE_PATH, JSON.stringify(payload, null, 2), 'utf-8');
+      console.log(`[VectorSearch] Đã lưu ${this.vectorsCache.length} vector kèm metadata vào ${STORAGE_PATH}`);
     } catch (err) {
       console.error('[VectorSearch] Lỗi ghi file vector embeddings:', err.message);
     }
@@ -210,13 +258,35 @@ class VectorSearchService {
   /**
    * Tìm kiếm các sản phẩm có vector gần nhất với Query Vector
    * @param {number[]} queryVector - Vector 512D của từ khóa hoặc ảnh người dùng tìm kiếm
-   * @param {number} topK - Số lượng kết quả cần lấy
-   * @param {number} minThreshold - Điểm tương đồng tối thiểu (mặc định 0.15)
+   * @param {number} topK - Số lượng kết quả cần lấy (kẹp trong [1, 50])
+   * @param {number} minThreshold - Điểm tương đồng tối thiểu (kẹp trong [-1.0, 1.0])
    */
   searchSimilar(queryVector, topK = 10, minThreshold = 0.10) {
     if (!this.isLoaded) {
       this.loadVectors();
     }
+
+    // Validation nghiêm ngặt cho queryVector (đúng 512 chiều, toàn bộ là số hữu hạn)
+    if (!Array.isArray(queryVector) || queryVector.length !== 512) {
+      const err = new Error(`Query vector không hợp lệ: Yêu cầu mảng 512 chiều (nhận được: ${Array.isArray(queryVector) ? queryVector.length : typeof queryVector})`);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const hasInvalidNumber = queryVector.some((v) => typeof v !== 'number' || !Number.isFinite(v));
+    if (hasInvalidNumber) {
+      const err = new Error('Query vector chứa giá trị không hợp lệ (NaN hoặc Infinity)');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Giới hạn và chuẩn hóa tham số topK: [1, 50]
+    const parsedTopK = parseInt(topK, 10);
+    const clampedTopK = isNaN(parsedTopK) ? 10 : Math.max(1, Math.min(50, parsedTopK));
+
+    // Giới hạn và chuẩn hóa tham số minThreshold: [-1.0, 1.0]
+    const parsedThreshold = parseFloat(minThreshold);
+    const clampedThreshold = isNaN(parsedThreshold) ? 0.10 : Math.max(-1.0, Math.min(1.0, parsedThreshold));
 
     if (this.vectorsCache.length === 0) {
       return [];
@@ -239,9 +309,9 @@ class VectorSearchService {
 
     // Lọc theo ngưỡng tương đồng và sắp xếp từ cao xuống thấp
     return scoredProducts
-      .filter((item) => item.similarity >= minThreshold)
+      .filter((item) => item.similarity >= clampedThreshold)
       .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, topK);
+      .slice(0, clampedTopK);
   }
 }
 
