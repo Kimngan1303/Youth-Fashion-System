@@ -6,6 +6,8 @@ import {
   Upload,
   UploadCloud,
   X,
+  Crop,
+  Eye,
   Sparkles,
   Clock,
   Trash2,
@@ -19,6 +21,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import ProductCard from "../../components/ProductCard";
+import ImageCropperModal from "../../components/ImageCropperModal";
+import ImageViewerModal from "../../components/ImageViewerModal";
 import { aiService } from "../../services/aiService";
 import { useAuth } from "../../context/AuthContext";
 import { useConfirmModal } from "../../context/ConfirmModalContext";
@@ -42,6 +46,8 @@ export default function SearchPage() {
   const [queryText, setQueryText] = useState(urlQuery);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   // Execution state
   const [isSearching, setIsSearching] = useState(false);
@@ -335,9 +341,32 @@ export default function SearchPage() {
     }
 
     setSelectedImage(file);
-    setImagePreview(URL.createObjectURL(file));
+    const newPreviewUrl = URL.createObjectURL(file);
+    setImagePreview(newPreviewUrl);
     setErrorMessage("");
-    showSuccess("Đã nhận ảnh tìm kiếm! Nhấn 'TÌM KIẾM' để AI phân tích trang phục.");
+    // Tự động mở modal cắt ảnh Shopee Style để khách hàng khoanh vùng trang phục
+    setIsCropperOpen(true);
+  };
+
+  // Xác nhận cắt ảnh xong
+  const handleCropComplete = (croppedFile, croppedUrl) => {
+    if (
+      imagePreview &&
+      typeof imagePreview === "string" &&
+      imagePreview.startsWith("blob:")
+    ) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setSelectedImage(croppedFile);
+    setImagePreview(croppedUrl);
+    setIsCropperOpen(false);
+    showSuccess("Đã cắt khung trang phục thành công! Nhấn 'TÌM KIẾM' để AI phân tích.");
+  };
+
+  // Bỏ qua cắt, giữ ảnh gốc
+  const handleKeepOriginal = () => {
+    setIsCropperOpen(false);
+    showInfo("Giữ nguyên ảnh gốc để tìm kiếm.");
   };
 
   const handleImageFileChange = (e) => {
@@ -548,31 +577,52 @@ export default function SearchPage() {
                 </div>
               )}
 
-              {/* Preview ảnh nhỏ gọn ngay dưới ô search khi đã chọn ảnh */}
+              {/* Preview ảnh tinh gọn chuẩn Shopee: Bỏ text "Ảnh mẫu tìm kiếm" và tên file, hỗ trợ click xem chi tiết & cắt ảnh */}
               {imagePreview && (
                 <div className="selected-image-bar animate-fade-in">
-                  <div className="selected-img-preview-box">
-                    <img
-                      src={imagePreview}
-                      alt="Selected"
-                      className="selected-thumb"
-                    />
-                    <div className="selected-img-info">
-                      <span className="selected-img-title">
-                        Ảnh mẫu tìm kiếm
-                      </span>
-                      <span className="selected-img-name">
-                        {selectedImage?.name || "Uploaded image"}
-                      </span>
+                  <div className="selected-img-left">
+                    <div
+                      className="selected-thumb-wrapper"
+                      onClick={() => setIsViewerOpen(true)}
+                      title="Nhấn để xem chi tiết ảnh vừa tải lên"
+                    >
+                      <img
+                        src={imagePreview}
+                        alt="Ảnh tìm kiếm"
+                        className="selected-thumb"
+                      />
+                      <div className="thumb-zoom-overlay">
+                        <Eye size={14} />
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      className="view-detail-img-text"
+                      onClick={() => setIsViewerOpen(true)}
+                      title="Xem phóng to ảnh mẫu"
+                    >
+                      Xem chi tiết ảnh
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="remove-selected-img-btn"
-                    onClick={removeImage}
-                  >
-                    <X size={14} /> Gỡ ảnh
-                  </button>
+
+                  <div className="selected-img-actions">
+                    <button
+                      type="button"
+                      className="crop-selected-img-btn"
+                      onClick={() => setIsCropperOpen(true)}
+                      title="Cắt khung trang phục (Shopee Style) để loại bỏ nền"
+                    >
+                      <Crop size={14} /> Cắt ảnh
+                    </button>
+                    <button
+                      type="button"
+                      className="remove-selected-img-btn"
+                      onClick={removeImage}
+                      title="Xóa ảnh tìm kiếm"
+                    >
+                      <X size={14} /> Gỡ ảnh
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -799,6 +849,23 @@ export default function SearchPage() {
           )}
         </div>
       </section>
+
+      {/* Shopee-style Image Cropper Modal */}
+      <ImageCropperModal
+        isOpen={isCropperOpen}
+        imageSrc={imagePreview}
+        onClose={() => setIsCropperOpen(false)}
+        onCropComplete={handleCropComplete}
+        onKeepOriginal={handleKeepOriginal}
+      />
+
+      {/* Full-size Image Detail Viewer Lightbox */}
+      <ImageViewerModal
+        isOpen={isViewerOpen}
+        imageSrc={imagePreview}
+        onClose={() => setIsViewerOpen(false)}
+        onOpenCropper={() => setIsCropperOpen(true)}
+      />
 
       {/* Page Styles */}
       <style>{`
@@ -1071,62 +1138,120 @@ export default function SearchPage() {
           justify-content: space-between;
           background-color: #f8fafc;
           border: 1px solid #e2e8f0;
-          border-radius: 10px;
+          border-radius: 12px;
           padding: 8px 14px;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
 
-        .selected-img-preview-box {
+        .selected-img-left {
           display: flex;
           align-items: center;
           gap: 12px;
         }
 
-        .selected-thumb {
+        .selected-thumb-wrapper {
+          position: relative;
           width: 44px;
           height: 44px;
-          object-fit: cover;
           border-radius: 8px;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .selected-img-info {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .selected-img-title {
-          font-size: 12.5px;
-          font-weight: 700;
-          color: #1e293b;
-        }
-
-        .selected-img-name {
-          font-size: 11px;
-          color: #64748b;
-          max-width: 320px;
-          white-space: nowrap;
           overflow: hidden;
-          text-overflow: ellipsis;
+          cursor: pointer;
+          border: 1px solid #cbd5e1;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .selected-thumb-wrapper:hover {
+          transform: scale(1.06);
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .selected-thumb {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .thumb-zoom-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.4);
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          opacity: 0;
+          transition: opacity 0.2s;
+        }
+
+        .selected-thumb-wrapper:hover .thumb-zoom-overlay {
+          opacity: 1;
+        }
+
+        .view-detail-img-text {
+          background: none;
+          border: none;
+          color: #2563eb;
+          font-size: 12.5px;
+          font-weight: 600;
+          cursor: pointer;
+          padding: 0;
+          text-decoration: underline;
+          text-underline-offset: 3px;
+        }
+
+        .view-detail-img-text:hover {
+          color: #1d4ed8;
+        }
+
+        .selected-img-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .crop-selected-img-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background-color: #fff7ed;
+          border: 1px solid #fed7aa;
+          color: #ea580c;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 600;
+          padding: 6px 12px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .crop-selected-img-btn:hover {
+          background-color: #ffedd5;
+          border-color: #fdba74;
+          transform: translateY(-1px);
         }
 
         .remove-selected-img-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
           background: none;
           border: 1px solid #fecaca;
           color: #dc2626;
           background-color: #fef2f2;
-          border-radius: 6px;
-          font-size: 11.5px;
+          border-radius: 8px;
+          font-size: 12px;
           font-weight: 600;
-          padding: 5px 10px;
+          padding: 6px 12px;
           cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          transition: all 0.15s ease;
+          transition: all 0.2s ease;
         }
 
         .remove-selected-img-btn:hover {
           background-color: #fee2e2;
+          border-color: #fca5a5;
+          transform: translateY(-1px);
         }
 
         .search-error-box {
