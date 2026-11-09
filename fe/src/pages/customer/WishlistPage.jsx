@@ -15,15 +15,29 @@ export default function WishlistPage() {
   useEffect(() => {
     const fetchSimilar = async () => {
       try {
-        const res = await productService.getProducts({ limit: 4 });
+        const firstWishlistItem = wishlist[0];
+        const targetId = firstWishlistItem?.id || firstWishlistItem?.product_id;
+        if (targetId) {
+          const res = await productService.getSimilarProducts(targetId, 4);
+          const items = res.data?.products || res.products || res.data || [];
+          if (Array.isArray(items) && items.length > 0) {
+            const filtered = items.filter(p => !wishlist.some(w => String(w.id || w.product_id) === String(p.product_id || p.id)));
+            if (filtered.length > 0) {
+              setSimilarProducts(filtered.slice(0, 4));
+              return;
+            }
+          }
+        }
+
+        const res = await productService.getProducts({ limit: 6 });
         const items = res.data?.products || res.products || [];
-        setSimilarProducts(items);
+        setSimilarProducts(items.filter(p => !wishlist.some(w => String(w.id || w.product_id) === String(p.product_id || p.id))).slice(0, 4));
       } catch (err) {
         console.error('Lỗi khi tải sản phẩm tương tự từ MySQL:', err);
       }
     };
     fetchSimilar();
-  }, []);
+  }, [wishlist.length]);
 
   const handleSelectSize = (productId, size) => {
     setSelectedSizes(prev => ({ ...prev, [productId]: size }));

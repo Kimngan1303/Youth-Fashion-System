@@ -420,19 +420,45 @@ export default function ProductDetailPage() {
     fetchProduct();
   }, [id]);
 
-  // Load Similar Products from MySQL / API
+  // Load Similar Products from MySQL / API (ưu tiên cùng category và vector AI)
   useEffect(() => {
     const fetchSimilar = async () => {
       try {
-        const res = await productService.getProducts({ limit: 4 });
-        const items = res.data?.products || res.products || [];
-        setSimilarProducts(items.filter(p => String(p.product_id) !== String(id)).slice(0, 4));
+        if (!id) return;
+        // 1. Thử gọi API chuyên dụng tìm sản phẩm tương tự
+        const res = await productService.getSimilarProducts(id, 4);
+        const items = res.data?.products || res.products || res.data || [];
+        if (Array.isArray(items) && items.length > 0) {
+          const filtered = items.filter(p => String(p.product_id || p.id) !== String(id)).slice(0, 4);
+          if (filtered.length > 0) {
+            setSimilarProducts(filtered);
+            return;
+          }
+        }
       } catch (err) {
-        console.error('Lỗi khi tải sản phẩm tương tự:', err);
+        console.warn('Lỗi gọi API getSimilarProducts, fallback sang cùng danh mục:', err.message);
+      }
+
+      // 2. Fallback: Lấy theo category_id của sản phẩm hiện tại
+      try {
+        const catId = product?.category_id || product?.category?.category_id;
+        const res = await productService.getProducts({ category_id: catId, limit: 6 });
+        const items = res.data?.products || res.products || [];
+        const filtered = items.filter(p => String(p.product_id || p.id) !== String(id)).slice(0, 4);
+        if (filtered.length > 0) {
+          setSimilarProducts(filtered);
+        } else {
+          // 3. Fallback lấy sản phẩm mới nhất
+          const fallbackRes = await productService.getProducts({ limit: 6 });
+          const fallbackItems = fallbackRes.data?.products || fallbackRes.products || [];
+          setSimilarProducts(fallbackItems.filter(p => String(p.product_id || p.id) !== String(id)).slice(0, 4));
+        }
+      } catch (fallbackErr) {
+        console.error('Lỗi khi tải sản phẩm tương tự:', fallbackErr);
       }
     };
     fetchSimilar();
-  }, [id]);
+  }, [id, product?.category_id]);
 
   const activeImage = product.images?.[activeImageIndex]?.url || product.images?.[0]?.url;
   const isWishlisted = Boolean(user && wishlist.some(item => (typeof item === 'object' ? (item.id === product.id || item.product_id === product.id) : item === product.id)));
@@ -1048,7 +1074,7 @@ export default function ProductDetailPage() {
                   id: p.product_id,
                   name: p.product_name,
                   price: priceVal > 0 ? priceVal.toLocaleString('vi-VN') + 'đ' : 'Liên hệ',
-                  tag: 'MỚI',
+                  tag: p.tag && p.tag !== 'MỚI' ? p.tag : null,
                   image: primaryImg,
                 };
                 return (
