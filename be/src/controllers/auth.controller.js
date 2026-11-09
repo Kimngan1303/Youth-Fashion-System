@@ -1,6 +1,7 @@
 import {
   registerService,
   loginService,
+  googleLoginService,
   logoutService,
   refreshAccessTokenService,
   verifyEmailService,
@@ -94,6 +95,29 @@ export const loginController = async (req, res, next) => {
     });
 
     return BaseResponse.success(res, 'Đăng nhập thành công', result, 200);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Endpoint Đăng nhập bằng Google (POST /api/auth/google)
+ */
+export const googleLoginController = async (req, res, next) => {
+  try {
+    const { credential, email, name, picture, google_id } = req.body;
+
+    const result = await googleLoginService({ credential, email, name, picture, google_id });
+
+    // Lưu Refresh Token vào Cookie HTTP-Only bảo mật
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
+    });
+
+    return BaseResponse.success(res, 'Đăng nhập Google thành công', result, 200);
   } catch (error) {
     next(error);
   }

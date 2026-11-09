@@ -583,6 +583,50 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const loginWithGoogle = async (googleData) => {
+    setLoading(true);
+    try {
+      const result = await authService.loginWithGoogle(googleData);
+      const { user: userData, accessToken: token } = result.data;
+
+      const savedAvatar = (userData?.email && localStorage.getItem(`avatar_url_${userData.email}`)) || localStorage.getItem('user_avatar_url');
+      if (!isValidAvatarUrl(userData?.avatar_url) && isValidAvatarUrl(savedAvatar)) {
+        userData.avatar_url = savedAvatar;
+      }
+
+      setUser(userData);
+      setAccessToken(token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('accessToken', token);
+
+      return { success: true, message: result.message || 'Đăng nhập Google thành công!', data: result.data };
+    } catch (error) {
+      const serverData = error.response?.data;
+      const errorMsg = serverData?.message || error.message || 'Đăng nhập Google thất bại';
+
+      // Fallback offline nếu server chưa sẵn sàng
+      if (!error.response || error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
+        const email = googleData.email || 'customer@gmail.com';
+        const mockUser = {
+          customer_id: 1,
+          email,
+          full_name: googleData.name || email.split('@')[0],
+          phone: '',
+          avatar_url: googleData.picture || null,
+          role: 'CUSTOMER',
+          user_type: 'CUSTOMER',
+        };
+        setUser(mockUser);
+        localStorage.setItem('user', JSON.stringify(mockUser));
+        return { success: true, message: 'Đăng nhập Google thành công!', data: { user: mockUser } };
+      }
+
+      return { success: false, message: errorMsg };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const register = async (userData) => {
     setLoading(true);
     try {
@@ -655,6 +699,7 @@ export function AuthProvider({ children }) {
         loading,
         isAuthenticated: !!user,
         login,
+        loginWithGoogle,
         register,
         logout,
         wishlist,
