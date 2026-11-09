@@ -128,7 +128,11 @@ const AISearchModal = ({ isOpen, onClose }) => {
       }
 
       if (response && response.status) {
-        setSearchResults(response.data?.products || []);
+        const rawProducts = response.data?.products || [];
+        const validProducts = rawProducts.filter((p) =>
+          typeof p.similarity === 'number' ? p.similarity >= 0.80 : true
+        );
+        setSearchResults(validProducts);
         const actualType =
           response.data?.search_type ||
           (selectedImage && textToSearch ? 'HYBRID' : selectedImage ? 'IMAGE' : 'TEXT');
