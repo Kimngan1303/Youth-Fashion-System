@@ -19,12 +19,23 @@ export default function CheckoutPage() {
   const { user, cart, setCart, updateUserProfile } = useAuth();
   const { showSuccess, showError, showInfo } = useToast();
 
-  // 1. Lấy sản phẩm được chọn từ giỏ hàng
+  // 1. Lấy sản phẩm được chọn từ Mua Ngay hoặc từ Giỏ hàng
   const checkoutItems = useMemo(() => {
+    if (location.state?.buyNowItem) {
+      return [location.state.buyNowItem];
+    }
+    try {
+      const savedBuyNow = sessionStorage.getItem('yf_buy_now_item');
+      if (savedBuyNow) {
+        const parsed = JSON.parse(savedBuyNow);
+        if (parsed && typeof parsed === 'object') return [parsed];
+      }
+    } catch (e) {}
+
     const list = cart || [];
     const selected = list.filter((i) => i.selected);
     return selected.length > 0 ? selected : list;
-  }, [cart]);
+  }, [cart, location.state]);
 
   // 2. Voucher & Ghi chú từ Giỏ hàng chuyển sang
   const [appliedVoucher, setAppliedVoucher] = useState(() => {
@@ -299,6 +310,7 @@ export default function CheckoutPage() {
       sessionStorage.removeItem('yf_pending_payos_order');
       sessionStorage.removeItem('yf_pending_order_code');
       sessionStorage.removeItem('yf_last_completed_order');
+      sessionStorage.removeItem('yf_buy_now_item');
 
       // 5. Khôi phục giỏ hàng
       try {
@@ -580,16 +592,20 @@ export default function CheckoutPage() {
             } catch (e) {}
           } catch (e) {}
 
-          // Phương thức COD: Xóa các sản phẩm đã mua khỏi giỏ hàng frontend
-          const remainingCart = (cart || []).filter(
-            (cItem) => !checkoutItems.some((bItem) => (bItem.variant_id || bItem.id) === (cItem.variant_id || cItem.id))
-          );
-          if (setCart) setCart(remainingCart);
+          // Phương thức COD: Xóa các sản phẩm đã mua khỏi giỏ hàng frontend nếu mua từ giỏ hàng
+          const isBuyNowOrder = checkoutItems.some((i) => i.isBuyNow);
+          if (!isBuyNowOrder) {
+            const remainingCart = (cart || []).filter(
+              (cItem) => !checkoutItems.some((bItem) => (bItem.variant_id || bItem.id) === (cItem.variant_id || cItem.id))
+            );
+            if (setCart) setCart(remainingCart);
+          }
 
           // Dọn dẹp session checkout
           sessionStorage.removeItem('yf_checkout_voucher');
           sessionStorage.removeItem('yf_checkout_note');
           sessionStorage.removeItem('yf_pending_checkout_items');
+          sessionStorage.removeItem('yf_buy_now_item');
 
           showSuccess('Đặt hàng thành công! Đang chuyển đến xác nhận đơn hàng...');
           navigate(`/order-success?orderCode=${orderCode}&orderNumber=${orderNumber}`);
@@ -613,7 +629,7 @@ export default function CheckoutPage() {
           <nav className="checkout-breadcrumb">
             <Link to="/" className="b-link">TRANG CHỦ</Link>
             <span className="b-sep">&gt;</span>
-            <Link to="/cart" className="b-link">GIỎ HÀNG</Link>
+            <Link to="/cart" className="b-link" onClick={() => sessionStorage.removeItem('yf_buy_now_item')}>GIỎ HÀNG</Link>
             <span className="b-sep">&gt;</span>
             <span className="b-current">THANH TOÁN ĐƠN HÀNG</span>
           </nav>
@@ -1131,7 +1147,7 @@ export default function CheckoutPage() {
 
               {/* Quay lại sửa giỏ hàng */}
               <div className="back-to-cart-wrapper">
-                <Link to="/cart" className="link-back-to-cart">
+                <Link to="/cart" className="link-back-to-cart" onClick={() => sessionStorage.removeItem('yf_buy_now_item')}>
                   &larr; SỬA GIỎ HÀNG
                 </Link>
               </div>
