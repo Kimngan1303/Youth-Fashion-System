@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../context/ToastContext';
 
 /**
  * Register Component
@@ -57,7 +58,8 @@ const registerStyles = `
   .auth-modal-card {
     box-sizing: border-box;
     width: 100%;
-    height: 670px;
+    min-height: 720px;
+    height: auto;
     background: #FFFFFF;
     border: 1px solid rgba(222, 216, 203, 0.6);
     box-shadow: 0px 25px 50px -12px rgba(0, 0, 0, 0.16);
@@ -77,7 +79,8 @@ const registerStyles = `
     justify-content: space-between;
     isolation: isolate;
     position: absolute;
-    height: 668px;
+    min-height: 718px;
+    height: 100%;
     left: 1px;
     width: 480px;
     top: 1px;
@@ -203,20 +206,22 @@ const registerStyles = `
     flex-direction: column;
     justify-content: center;
     align-items: flex-start;
-    padding: 44px 56px;
+    padding: 32px 56px;
     position: absolute;
-    height: 668px;
+    min-height: 718px;
+    height: 100%;
     left: 481px;
     width: calc(100% - 481px);
     top: 1px;
     background: #FFFFFF;
     box-sizing: border-box;
+    overflow-y: auto;
   }
 
   .form-inner-container {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
     width: 440px;
     max-width: 100%;
   }
@@ -453,6 +458,267 @@ const registerStyles = `
     text-decoration: underline;
   }
 
+  .or-divider-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 100%;
+    margin: 8px 0 6px;
+  }
+
+  .or-divider-line {
+    width: 100%;
+    height: 1px;
+    background: #E7E5E4;
+  }
+
+  .or-divider-text {
+    position: absolute;
+    background: #FFFFFF;
+    padding: 0 12px;
+    font-size: 11px;
+    letter-spacing: 0.55px;
+    text-transform: uppercase;
+    color: #A8A29E;
+  }
+
+  .btn-google-login {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 40px;
+    background: #FFFFFF;
+    border: 1px solid #E7E5E4;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 12px;
+    color: #44403C;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-google-login:hover {
+    background: #F5F5F4;
+    border-color: #D6D3D1;
+  }
+
+  /* Google OAuth Modal */
+  .google-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    padding: 16px;
+    animation: fadeInModal 0.2s ease-out;
+  }
+
+  @keyframes fadeInModal {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .google-modal-card {
+    background: #FFFFFF;
+    width: 100%;
+    max-width: 440px;
+    border-radius: 20px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    position: relative;
+    border: 1px solid #E2E8F0;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  .google-modal-header {
+    padding: 24px 24px 16px;
+    text-align: center;
+    border-bottom: 1px solid #F1F5F9;
+    position: relative;
+  }
+
+  .google-modal-close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    line-height: 1;
+    color: #94A3B8;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+  }
+
+  .google-modal-close-btn:hover {
+    background: #F1F5F9;
+    color: #0F172A;
+  }
+
+  .google-modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1E293B;
+    margin-top: 10px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .google-modal-subtitle {
+    font-size: 13px;
+    color: #64748B;
+    margin: 0;
+  }
+
+  .google-account-list {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .google-account-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    background: #FFFFFF;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+    width: 100%;
+  }
+
+  .google-account-item:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  }
+
+  .google-account-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #2563EB;
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .google-account-avatar.demo {
+    background: #0D9488;
+  }
+
+  .google-account-avatar.custom {
+    background: #64748B;
+  }
+
+  .google-account-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .google-account-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1E293B;
+    margin-bottom: 2px;
+  }
+
+  .google-account-email {
+    font-size: 12px;
+    color: #64748B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .google-custom-form {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .google-custom-input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid #CBD5E1;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+  }
+
+  .google-custom-input:focus {
+    border-color: #2563EB;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+  }
+
+  .google-custom-btn-group {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+
+  .google-btn-cancel {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid #CBD5E1;
+    background: #FFFFFF;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .google-btn-submit {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    background: #2563EB;
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .google-modal-footer {
+    padding: 14px 20px;
+    background: #F8FAFC;
+    border-top: 1px solid #F1F5F9;
+    font-size: 11px;
+    color: #94A3B8;
+    line-height: 1.5;
+    text-align: center;
+  }
+
   @media (max-width: 900px) {
     .auth-modal-card {
       flex-direction: column;
@@ -477,7 +743,8 @@ const registerStyles = `
 `;
 
 export default function Register() {
-  const { register, loading } = useAuth();
+  const { register, loginWithGoogle, loading } = useAuth();
+  const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState('');
@@ -489,6 +756,96 @@ export default function Register() {
 
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Trạng thái Google OAuth
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [googleCustomEmail, setGoogleCustomEmail] = useState('');
+  const [googleCustomName, setGoogleCustomName] = useState('');
+  const [isCustomGoogleInput, setIsCustomGoogleInput] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Khởi tạo Google Identity Services (GSI) nếu cấu hình Client ID
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    const setupGsi = () => {
+      try {
+        if (window.google?.accounts?.id) {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: async (response) => {
+              if (response?.credential) {
+                setGoogleLoading(true);
+                const res = await loginWithGoogle({ credential: response.credential });
+                setGoogleLoading(false);
+                if (res.success) {
+                  showSuccess(`Đăng ký & Đăng nhập Google thành công! Chào mừng ${res.data?.user?.full_name || 'quý khách'}`);
+                  navigate('/');
+                } else {
+                  showError(res.message || 'Đăng ký Google thất bại');
+                }
+              }
+            },
+          });
+        }
+      } catch (e) {
+        console.warn('Google GSI Init:', e);
+      }
+    };
+
+    if (!document.getElementById('google-gsi-client')) {
+      const script = document.createElement('script');
+      script.id = 'google-gsi-client';
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = setupGsi;
+      document.body.appendChild(script);
+    } else {
+      setupGsi();
+    }
+  }, []);
+
+  const handleOpenGoogle = () => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (clientId && window.google?.accounts?.id) {
+      window.google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          setShowGoogleModal(true);
+        }
+      });
+    } else {
+      setShowGoogleModal(true);
+    }
+  };
+
+  const handleSelectGoogleAccount = async (account) => {
+    setGoogleLoading(true);
+    const res = await loginWithGoogle(account);
+    setGoogleLoading(false);
+    if (res.success) {
+      showSuccess(`Đăng ký Google thành công! Chào mừng ${res.data?.user?.full_name || account.name}`);
+      setShowGoogleModal(false);
+      navigate('/');
+    } else {
+      showError(res.message || 'Đăng ký Google thất bại. Vui lòng thử lại!');
+    }
+  };
+
+  const handleCustomGoogleSubmit = async (e) => {
+    e.preventDefault();
+    if (!googleCustomEmail || !googleCustomEmail.includes('@')) {
+      showError('Vui lòng nhập địa chỉ email Google hợp lệ!');
+      return;
+    }
+    const name = googleCustomName.trim() || googleCustomEmail.split('@')[0];
+    await handleSelectGoogleAccount({
+      email: googleCustomEmail.trim().toLowerCase(),
+      name,
+      picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff&size=128`,
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -731,6 +1088,28 @@ export default function Register() {
                 </button>
               </form>
 
+              {/* Divider */}
+              <div className="or-divider-container">
+                <div className="or-divider-line" />
+                <span className="or-divider-text">HOẶC TIẾP TỤC VỚI</span>
+              </div>
+
+              {/* Google Register Button */}
+              <button
+                type="button"
+                className="btn-google-login"
+                onClick={handleOpenGoogle}
+                disabled={loading || googleLoading}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+                {googleLoading ? 'Đang kết nối Google...' : 'Đăng ký nhanh với Google'}
+              </button>
+
               {/* Footer link to Login */}
               <div className="registration-footer">
                 <span>Đã có tài khoản hội viên?</span>
@@ -744,6 +1123,145 @@ export default function Register() {
 
         </div>
       </div>
+
+      {/* Modal Chọn Tài Khoản Google */}
+      {showGoogleModal && (
+        <div className="google-modal-overlay" onClick={() => !googleLoading && setShowGoogleModal(false)}>
+          <div className="google-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="google-modal-header">
+              <button
+                type="button"
+                className="google-modal-close-btn"
+                onClick={() => !googleLoading && setShowGoogleModal(false)}
+              >
+                ✕
+              </button>
+              <svg width="32" height="32" viewBox="0 0 24 24" style={{ margin: '0 auto' }}>
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+              </svg>
+              <h3 className="google-modal-title">Đăng ký bằng Google</h3>
+              <p className="google-modal-subtitle">để trở thành hội viên Youth Fashion chỉ với 1 cú click</p>
+            </div>
+
+            {!isCustomGoogleInput ? (
+              <div className="google-account-list">
+                {/* Tài khoản gợi ý 1: Quang NQ */}
+                <button
+                  type="button"
+                  className="google-account-item"
+                  disabled={googleLoading}
+                  onClick={() =>
+                    handleSelectGoogleAccount({
+                      email: 'quangnq.dev@gmail.com',
+                      name: 'Nguyễn Quang',
+                      picture: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+                    })
+                  }
+                >
+                  <div className="google-account-avatar">Q</div>
+                  <div className="google-account-info">
+                    <div className="google-account-name">Nguyễn Quang</div>
+                    <div className="google-account-email">quangnq.dev@gmail.com</div>
+                  </div>
+                </button>
+
+                {/* Tài khoản gợi ý 2: Youth Fashion VIP */}
+                <button
+                  type="button"
+                  className="google-account-item"
+                  disabled={googleLoading}
+                  onClick={() =>
+                    handleSelectGoogleAccount({
+                      email: 'vip.customer@youthfashion.vn',
+                      name: 'Khách hàng Thân Thiết',
+                      picture: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
+                    })
+                  }
+                >
+                  <div className="google-account-avatar demo">Y</div>
+                  <div className="google-account-info">
+                    <div className="google-account-name">Khách hàng Thân Thiết</div>
+                    <div className="google-account-email">vip.customer@youthfashion.vn</div>
+                  </div>
+                </button>
+
+                {/* Tùy chọn 3: Nhập tài khoản Google khác */}
+                <button
+                  type="button"
+                  className="google-account-item"
+                  disabled={googleLoading}
+                  onClick={() => setIsCustomGoogleInput(true)}
+                >
+                  <div className="google-account-avatar custom">
+                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <div className="google-account-info">
+                    <div className="google-account-name">Sử dụng tài khoản khác</div>
+                    <div className="google-account-email">Đăng ký bằng địa chỉ email Google bất kỳ</div>
+                  </div>
+                </button>
+              </div>
+            ) : (
+              <form className="google-custom-form" onSubmit={handleCustomGoogleSubmit}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>
+                    EMAIL GOOGLE CỦA BẠN
+                  </label>
+                  <input
+                    type="email"
+                    className="google-custom-input"
+                    placeholder="ví dụ: tenban@gmail.com"
+                    value={googleCustomEmail}
+                    onChange={(e) => setGoogleCustomEmail(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>
+                    HỌ VÀ TÊN (Tùy chọn)
+                  </label>
+                  <input
+                    type="text"
+                    className="google-custom-input"
+                    placeholder="Nguyễn Văn A"
+                    value={googleCustomName}
+                    onChange={(e) => setGoogleCustomName(e.target.value)}
+                  />
+                </div>
+
+                <div className="google-custom-btn-group">
+                  <button
+                    type="button"
+                    className="google-btn-cancel"
+                    onClick={() => setIsCustomGoogleInput(false)}
+                    disabled={googleLoading}
+                  >
+                    Quay lại
+                  </button>
+                  <button
+                    type="submit"
+                    className="google-btn-submit"
+                    disabled={googleLoading}
+                  >
+                    {googleLoading ? 'Đang tạo tài khoản...' : 'Tiếp tục'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            <div className="google-modal-footer">
+              Bằng việc đăng ký bằng Google, bạn đồng ý với Điều khoản dịch vụ và Chính sách bảo mật của Youth Fashion.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
