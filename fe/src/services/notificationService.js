@@ -2,6 +2,7 @@
  * notificationService.js
  * Quản lý và đồng bộ thông báo đơn hàng theo thời gian thực cho người mua
  */
+import axiosClient from './axiosClient';
 
 // Định dạng thời gian tương đối thân thiện bằng tiếng Việt
 export const formatNotificationTime = (timestampOrIso) => {
@@ -191,6 +192,46 @@ export const sendOrderStatusNotification = (order, newStatus, extraData = {}) =>
     bc.postMessage({ type: 'NEW_NOTIFICATION', notif: newNotif });
     bc.close();
   } catch (e) {}
+
+  // 3. Đồng bộ gửi thông báo về Gmail của khách hàng qua Backend API
+  try {
+    const recipientEmail =
+      newNotif.customer_email ||
+      order.recipient_email ||
+      order.customer?.email ||
+      order.email ||
+      '';
+
+    if (recipientEmail && recipientEmail.includes('@')) {
+      axiosClient
+        .post('/orders/notify-email', {
+          orderId: newNotif.order_id,
+          orderNumber: newNotif.order_number,
+          recipientEmail,
+          newStatus,
+          extraData: {
+            ...extraData,
+            recipientName: order.recipient_name || order.customer?.full_name,
+            recipientPhone: order.recipient_phone || order.phone,
+            shippingAddress: [
+              order.shipping_address_line,
+              order.shipping_ward,
+              order.shipping_district,
+              order.shipping_city,
+            ]
+              .filter(Boolean)
+              .join(', '),
+            totalAmount: order.total_amount,
+            items: order.order_items || [],
+          },
+        })
+        .catch((err) => {
+          console.warn('Lỗi khi gửi email thông báo tự động:', err?.message);
+        });
+    }
+  } catch (e) {
+    console.warn('Lỗi kích hoạt gửi email thông báo:', e);
+  }
 
   return newNotif;
 };

@@ -40,6 +40,9 @@ router.delete('/:id', optionalAuth, orderController.deleteOrder);
 router.patch('/:id/cancel', optionalAuth, orderController.cancelOrder);
 router.post('/:id/cancel', optionalAuth, orderController.cancelOrder);
 
+// Gửi email thông báo đơn hàng trực tiếp
+router.post('/notify-email', optionalAuth, orderController.notifyOrderEmail);
+
 // Tra cứu thông tin đơn hàng theo mã đơn
 router.get('/:orderNumber', optionalAuth, orderController.getOrderByNumber);
 

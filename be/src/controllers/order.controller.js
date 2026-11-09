@@ -139,3 +139,20 @@ export const deleteOrder = async (req, res, next) => {
   }
 };
 
+export const notifyOrderEmail = async (req, res, next) => {
+  try {
+    const { orderId, orderNumber, recipientEmail, newStatus, extraData } = req.body;
+    const result = await orderService.notifyOrderEmailService({
+      orderId,
+      orderNumber,
+      recipientEmail,
+      newStatus,
+      extraData,
+    });
+    return BaseResponse.success(res, 'Gửi email thông báo đơn hàng thành công', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+
