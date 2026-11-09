@@ -357,6 +357,7 @@ export default function CartPage() {
                             type="button"
                             className="qty-btn"
                             onClick={() => handleQuantityChange(item.id, 1)}
+                            disabled={item.stock !== undefined && item.quantity >= item.stock}
                           >
                             +
                           </button>

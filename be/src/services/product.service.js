@@ -22,6 +22,7 @@ const formatProduct = (product) => {
           variant_id: String(v.variant_id),
           product_id: String(v.product_id),
           price: Number(v.price),
+          stock: Number(v.stock !== undefined && v.stock !== null ? v.stock : 0),
         }))
       : [],
     images: product.images
