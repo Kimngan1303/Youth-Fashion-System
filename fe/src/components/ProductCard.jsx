@@ -40,8 +40,10 @@ const ProductCard = ({ product }) => {
           className="product-img"
         />
 
-        {/* MỚI Badge */}
-        <span className="product-tag">{product.tag || 'MỚI'}</span>
+        {/* Product Tag (Bỏ chữ MỚI theo yêu cầu giao diện tối giản) */}
+        {product.tag && product.tag !== 'MỚI' && (
+          <span className="product-tag">{product.tag}</span>
+        )}
 
         {/* Favorite heart button */}
         <button 

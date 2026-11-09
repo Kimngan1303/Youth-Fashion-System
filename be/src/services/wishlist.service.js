@@ -26,7 +26,7 @@ export const formatWishlistItem = (item) => {
     title: p ? p.product_name : 'Sản phẩm',
     product_name: p ? p.product_name : 'Sản phẩm',
     sku: variants[0]?.sku || (p ? `YF-${p.product_id}` : ''),
-    category: p?.category?.category_name || 'COAT_BLAZER',
+    category: p?.category?.category_name || 'Thời Trang',
     categoryName: p?.category?.category_name || 'Thời Trang',
     category_id: p?.category_id ? p.category_id.toString() : null,
     brand_name: p?.brand?.brand_name || null,

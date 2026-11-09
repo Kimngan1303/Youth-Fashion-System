@@ -119,7 +119,7 @@ const HomePage = ({ onOpenAISearch }) => {
               id: p.product_id,
               name: p.product_name,
               price: priceVal > 0 ? priceVal.toLocaleString('vi-VN') + 'đ' : 'Liên hệ',
-              tag: 'MỚI',
+              tag: null,
               image: primaryImg,
             };
           });

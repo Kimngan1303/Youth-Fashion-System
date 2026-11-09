@@ -75,23 +75,51 @@ export default function WishlistPage() {
     toggleWishlist(prod);
   };
 
-  // Hàm xác định category chuẩn cho bộ lọc
+  // Hàm xác định category chuẩn cho bộ lọc dựa trên tên, danh mục và từ khóa
   const getItemCategory = (item) => {
-    if (item.category === 'COAT_BLAZER' || item.category === 'DRESS' || item.category === 'PANTS_SKIRT') {
-      return item.category;
+    const title = (item.title || item.name || item.product_name || '').toLowerCase();
+    const cat = (item.categoryName || item.category_name || (typeof item.category === 'string' && item.category !== 'COAT_BLAZER' ? item.category : '') || '').toLowerCase();
+    const text = `${title} ${cat}`;
+
+    // 1. Quần (Tách riêng với váy)
+    if (text.includes('quần') && !text.includes('chân váy') && !text.includes('quần áo')) {
+      return 'PANTS';
     }
-    const title = (item.title || item.name || '').toLowerCase();
-    const cat = (item.categoryName || item.category || '').toLowerCase();
-    if (title.includes('áo khoác') || title.includes('blazer') || title.includes('măng tô') || title.includes('tweed') || cat.includes('khoác') || cat.includes('blazer')) {
-      return 'COAT_BLAZER';
+    if (text.includes('trouser') || text.includes('jeans') || text.includes('kaki') || text.includes('jogger') || (text.includes('short') && !text.includes('áo'))) {
+      return 'PANTS';
     }
-    if (title.includes('đầm') || title.includes('váy') || cat.includes('đầm') || cat.includes('váy')) {
+
+    // 2. Chân váy / Váy (Tách riêng với quần)
+    if (text.includes('chân váy') || text.includes('chan vay') || (text.includes('skirt') && !text.includes('pants'))) {
+      return 'SKIRT';
+    }
+    if ((text.includes('váy') || text.includes('vay ')) && !text.includes('đầm') && !text.includes('dam ')) {
+      return 'SKIRT';
+    }
+
+    // 3. Đầm (Đầm dạ hội, đầm lụa, đầm tiệc, gown, dress)
+    if (text.includes('đầm') || text.includes('dam ') || text.includes('gown') || text.includes('dạ tiệc') || text.includes('dạ hội') || text.includes('dress')) {
       return 'DRESS';
     }
-    if (title.includes('quần') || cat.includes('quần')) {
-      return 'PANTS_SKIRT';
+
+    // 4. Áo khoác & Blazer (Áo khoác, blazer, vest, măng tô, tweed, jacket, bomber)
+    if (text.includes('áo khoác') || text.includes('khoác') || text.includes('blazer') || text.includes('vest') || text.includes('măng tô') || text.includes('tweed') || text.includes('jacket') || text.includes('bomber')) {
+      return 'COAT_BLAZER';
     }
-    return 'COAT_BLAZER';
+
+    // 5. Áo & Áo len (Áo len, knitwear, sweater, sơ mi, áo polo, áo thun, hoodie)
+    if (text.includes('áo len') || text.includes('len ') || text.includes('knitwear') || text.includes('sweater') || text.includes('sơ mi') || text.includes('so mi') || text.includes('áo thun') || text.includes('polo') || text.includes('hoodie') || text.includes('áo') || text.includes('ao ')) {
+      return 'TOPS_KNIT';
+    }
+
+    // Nếu object đã có category chuẩn
+    if (item.category === 'PANTS') return 'PANTS';
+    if (item.category === 'SKIRT') return 'SKIRT';
+    if (item.category === 'DRESS') return 'DRESS';
+    if (item.category === 'COAT_BLAZER') return 'COAT_BLAZER';
+    if (item.category === 'TOPS_KNIT') return 'TOPS_KNIT';
+
+    return 'OTHER';
   };
 
   // Filter items based on selected category tab
@@ -102,8 +130,11 @@ export default function WishlistPage() {
 
   const countAll = wishlist.length;
   const countCoat = wishlist.filter(i => getItemCategory(i) === 'COAT_BLAZER').length;
+  const countKnit = wishlist.filter(i => getItemCategory(i) === 'TOPS_KNIT').length;
   const countDress = wishlist.filter(i => getItemCategory(i) === 'DRESS').length;
-  const countPants = wishlist.filter(i => getItemCategory(i) === 'PANTS_SKIRT').length;
+  const countPants = wishlist.filter(i => getItemCategory(i) === 'PANTS').length;
+  const countSkirt = wishlist.filter(i => getItemCategory(i) === 'SKIRT').length;
+  const countOther = wishlist.filter(i => getItemCategory(i) === 'OTHER').length;
 
   return (
     <div className="wishlist-page-container">
@@ -151,18 +182,41 @@ export default function WishlistPage() {
               </button>
               <button
                 type="button"
-                className={`filter-tab-btn ${activeCategory === 'DRESS' ? 'active' : ''}`}
-                onClick={() => setActiveCategory('DRESS')}
+                className={`filter-tab-btn ${activeCategory === 'TOPS_KNIT' ? 'active' : ''}`}
+                onClick={() => setActiveCategory('TOPS_KNIT')}
               >
-                ĐẦM DẠ TIỆC ({countDress})
+                ÁO &amp; ÁO LEN ({countKnit})
               </button>
               <button
                 type="button"
-                className={`filter-tab-btn ${activeCategory === 'PANTS_SKIRT' ? 'active' : ''}`}
-                onClick={() => setActiveCategory('PANTS_SKIRT')}
+                className={`filter-tab-btn ${activeCategory === 'DRESS' ? 'active' : ''}`}
+                onClick={() => setActiveCategory('DRESS')}
               >
-                QUẦN &amp; CHÂN VÁY ({countPants})
+                ĐẦM ({countDress})
               </button>
+              <button
+                type="button"
+                className={`filter-tab-btn ${activeCategory === 'PANTS' ? 'active' : ''}`}
+                onClick={() => setActiveCategory('PANTS')}
+              >
+                QUẦN ({countPants})
+              </button>
+              <button
+                type="button"
+                className={`filter-tab-btn ${activeCategory === 'SKIRT' ? 'active' : ''}`}
+                onClick={() => setActiveCategory('SKIRT')}
+              >
+                CHÂN VÁY ({countSkirt})
+              </button>
+              {countOther > 0 && (
+                <button
+                  type="button"
+                  className={`filter-tab-btn ${activeCategory === 'OTHER' ? 'active' : ''}`}
+                  onClick={() => setActiveCategory('OTHER')}
+                >
+                  PHỤ KIỆN &amp; KHÁC ({countOther})
+                </button>
+              )}
             </div>
 
             <button 
@@ -200,8 +254,8 @@ export default function WishlistPage() {
 
                 const skuText = product.sku || (product.id ? `YF-${product.id}` : 'YF-COAT-CAMEL-01');
                 const statusText = product.status || 'CÒN HÀNG';
-                const badgeTopText = product.badgeTop || product.tag || '-18% ƯU ĐÃI';
-                const badgeSubText = product.badgeSub || (badgeTopText.includes('18%') || !product.badgeSub ? 'CASHMERE 100%' : product.badgeSub);
+                const badgeTopText = (product.badgeTop && product.badgeTop !== 'MỚI' && product.badgeTop !== '-18% ƯU ĐÃI') ? product.badgeTop : null;
+                const badgeSubText = (product.badgeSub && product.badgeSub !== 'CASHMERE 100%') ? product.badgeSub : null;
                 const sizes = product.availableSizes || ['S', 'M', 'L'];
 
                 // Badge top background color
@@ -227,24 +281,26 @@ export default function WishlistPage() {
                         <img src={product.image} alt={product.title || product.name} className="wishlist-card-img" />
                       </Link>
 
-                      <div className="wishlist-card-badges">
-                        {badgeTopText && (
-                          <span 
-                            className="badge-discount"
-                            style={{ backgroundColor: badgeTopBg, color: badgeTopColor }}
-                          >
-                            {badgeTopText}
-                          </span>
-                        )}
-                        {badgeSubText && (
-                          <span 
-                            className="badge-material"
-                            style={{ backgroundColor: badgeSubBg, color: badgeSubColor }}
-                          >
-                            {badgeSubText}
-                          </span>
-                        )}
-                      </div>
+                      {(badgeTopText || badgeSubText) && (
+                        <div className="wishlist-card-badges">
+                          {badgeTopText && (
+                            <span 
+                              className="badge-discount"
+                              style={{ backgroundColor: badgeTopBg, color: badgeTopColor }}
+                            >
+                              {badgeTopText}
+                            </span>
+                          )}
+                          {badgeSubText && (
+                            <span 
+                              className="badge-material"
+                              style={{ backgroundColor: badgeSubBg, color: badgeSubColor }}
+                            >
+                              {badgeSubText}
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       <button
                         type="button"
@@ -385,9 +441,6 @@ export default function WishlistPage() {
                   <div className="similar-card-price-row">
                     <span className="similar-card-price">
                       {priceVal > 0 ? priceVal.toLocaleString('vi-VN') + '₫' : 'Liên hệ'}
-                    </span>
-                    <span className="similar-card-badge-right">
-                      MỚI
                     </span>
                   </div>
                 </div>
