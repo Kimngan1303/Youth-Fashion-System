@@ -809,15 +809,68 @@ export default function Register() {
 
   const handleOpenGoogle = () => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (clientId && window.google?.accounts?.id) {
-      window.google.accounts.id.prompt((notification) => {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          setShowGoogleModal(true);
-        }
-      });
-    } else {
-      setShowGoogleModal(true);
+
+    // Ưu tiên mở cửa sổ Popup chính thức của Google (Google OAuth2 Token Client)
+    if (clientId && window.google?.accounts?.oauth2) {
+      try {
+        setGoogleLoading(true);
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'email profile openid',
+          callback: async (tokenResponse) => {
+            if (tokenResponse?.error) {
+              setGoogleLoading(false);
+              if (tokenResponse.error !== 'popup_closed_by_user') {
+                showError('Đăng ký Google thất bại: ' + (tokenResponse.error_description || tokenResponse.error));
+              }
+              return;
+            }
+
+            if (tokenResponse?.access_token) {
+              try {
+                // Lấy thông tin hồ sơ thật từ Google UserInfo API
+                const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                  headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+                });
+                const googleProfile = await userInfoRes.json();
+
+                if (!googleProfile?.email) {
+                  throw new Error('Không lấy được email từ tài khoản Google');
+                }
+
+                const res = await loginWithGoogle({
+                  email: googleProfile.email,
+                  name: googleProfile.name || googleProfile.email.split('@')[0],
+                  picture: googleProfile.picture || null,
+                  google_id: googleProfile.sub,
+                });
+
+                if (res.success) {
+                  showSuccess(`Đăng ký Google thành công! Chào mừng ${res.data?.user?.full_name || googleProfile.name}`);
+                  navigate('/');
+                } else {
+                  showError(res.message || 'Đăng ký Google thất bại');
+                }
+              } catch (err) {
+                showError('Lỗi xác thực thông tin tài khoản Google: ' + err.message);
+              } finally {
+                setGoogleLoading(false);
+              }
+            }
+          },
+        });
+
+        // Bật ngay cửa sổ popup chính thức của Google
+        tokenClient.requestAccessToken({ prompt: 'select_account' });
+        return;
+      } catch (err) {
+        console.warn('Lỗi mở popup Google OAuth2, mở modal dự phòng:', err);
+        setGoogleLoading(false);
+      }
     }
+
+    // Mở modal dự phòng nếu script Google chưa tải hoặc không có Client ID
+    setShowGoogleModal(true);
   };
 
   const handleSelectGoogleAccount = async (account) => {
