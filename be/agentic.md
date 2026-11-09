@@ -438,7 +438,7 @@ Rate limiting for sensitive endpoints.
 
 7. Database Model
 
-The current relational database design contains 19 tables.
+The relational database design contains 24 tables, strictly separating Customers from Employees, and integrating a dedicated AI Search and Keyword sub-system.
 
 7.1 Core tables
 
@@ -466,9 +466,15 @@ order_items
 
 payments
 
+vouchers
+
 conversations
 
 messages
+
+notifications
+
+lookbooks
 
 refresh_tokens
 
@@ -478,7 +484,11 @@ password_reset_tokens
 
 ai_search_configs
 
-website_configs
+product_embeddings
+
+user_search_histories
+
+ai_keywords
 
 7.2 Product rules
 
