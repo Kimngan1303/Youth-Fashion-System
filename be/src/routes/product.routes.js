@@ -10,6 +10,7 @@ const router = express.Router();
  * Public Routes
  */
 router.get('/meta', productController.getCategoriesAndBrands);
+router.get('/:id/similar', productController.getSimilarProducts);
 router.get('/', productController.getProducts);
 router.get('/:id', productController.getProductById);
 

@@ -21,6 +21,14 @@ export const productService = {
   },
 
   /**
+   * Lấy danh sách sản phẩm tương tự (cùng category hoặc vector AI)
+   */
+  getSimilarProducts: async (id, limit = 4) => {
+    const response = await axiosClient.get(`/products/${id}/similar`, { params: { limit } });
+    return response.data;
+  },
+
+  /**
    * Lấy danh sách Categories và Brands cho bộ lọc dropdown
    */
   getMeta: async () => {

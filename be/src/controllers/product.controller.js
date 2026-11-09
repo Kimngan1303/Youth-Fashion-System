@@ -23,6 +23,16 @@ export const getProductById = async (req, res, next) => {
   }
 };
 
+export const getSimilarProducts = async (req, res, next) => {
+  try {
+    const limit = Math.max(1, parseInt(req.query.limit, 10) || 4);
+    const products = await productService.getSimilarProductsService(req.params.id, limit);
+    return BaseResponse.success(res, 'Lấy danh sách sản phẩm tương tự thành công', products);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const createProduct = async (req, res, next) => {
   try {
     const files = req.files || [];

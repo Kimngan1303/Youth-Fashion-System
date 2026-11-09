@@ -1,4 +1,5 @@
 import * as productRepo from '../repositories/product.repository.js';
+import { prisma } from '../repositories/prisma.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
 import { vectorSearchService } from './ai/vectorSearch.service.js';
 
@@ -83,6 +84,129 @@ export const getProductByIdService = async (productId) => {
     throw error;
   }
   return formatProduct(product);
+};
+
+/**
+ * Lấy danh sách sản phẩm tương tự dựa theo Danh mục (category_id) và Vector AI similarity
+ */
+export const getSimilarProductsService = async (productId, limit = 4) => {
+  const currentProduct = await productRepo.findProductById(productId);
+  if (!currentProduct) {
+    return [];
+  }
+
+  const targetIdStr = String(productId);
+  const targetCatId = currentProduct.category_id;
+  let similarProducts = [];
+
+  // 1. Thử tìm kiếm theo Vector AI Similarity nếu có vector trong cache
+  try {
+    if (!vectorSearchService.isLoaded) {
+      vectorSearchService.loadVectors();
+    }
+
+    const currentVectorItem = vectorSearchService.vectorsCache.find(
+      (v) => String(v.product_id) === targetIdStr
+    );
+
+    if (currentVectorItem?.embedding) {
+      const vectorMatches = vectorSearchService.searchSimilar(
+        currentVectorItem.embedding,
+        limit * 3,
+        0.10
+      );
+
+      const matchingIds = vectorMatches
+        .filter((item) => String(item.product_id) !== targetIdStr)
+        .map((item) => BigInt(item.product_id));
+
+      if (matchingIds.length > 0) {
+        const found = await prisma.product.findMany({
+          where: {
+            product_id: { in: matchingIds },
+            status: 'ACTIVE',
+          },
+          include: {
+            category: true,
+            brand: true,
+            variants: true,
+            images: true,
+          },
+        });
+
+        // Sắp xếp ưu tiên: cùng category_id lên trước, tiếp đến theo thứ tự similarity
+        const idRankMap = new Map(matchingIds.map((id, idx) => [String(id), idx]));
+        found.sort((a, b) => {
+          const aSameCat = a.category_id === targetCatId ? 1 : 0;
+          const bSameCat = b.category_id === targetCatId ? 1 : 0;
+          if (aSameCat !== bSameCat) return bSameCat - aSameCat;
+          return (idRankMap.get(String(a.product_id)) || 0) - (idRankMap.get(String(b.product_id)) || 0);
+        });
+
+        similarProducts = found.map(formatProduct);
+      }
+    }
+  } catch (vectorErr) {
+    console.warn('[SimilarProducts] Vector search fallback to category query:', vectorErr.message);
+  }
+
+  // 2. Nếu vector search chưa đủ số lượng, lấy sản phẩm cùng category_id từ Database
+  if (similarProducts.length < limit) {
+    const existingIds = new Set([targetIdStr, ...similarProducts.map((p) => String(p.product_id))]);
+    const needed = limit - similarProducts.length;
+
+    const categorySameProducts = await prisma.product.findMany({
+      where: {
+        category_id: targetCatId,
+        product_id: { not: BigInt(productId) },
+        status: 'ACTIVE',
+      },
+      take: needed + 4,
+      include: {
+        category: true,
+        brand: true,
+        variants: true,
+        images: true,
+      },
+    });
+
+    for (const p of categorySameProducts) {
+      if (!existingIds.has(String(p.product_id)) && similarProducts.length < limit) {
+        similarProducts.push(formatProduct(p));
+        existingIds.add(String(p.product_id));
+      }
+    }
+  }
+
+  // 3. Fallback cuối cùng: Nếu danh mục ít sản phẩm, lấy thêm các sản phẩm ACTIVE khác
+  if (similarProducts.length < limit) {
+    const existingIds = new Set([targetIdStr, ...similarProducts.map((p) => String(p.product_id))]);
+    const needed = limit - similarProducts.length;
+
+    const otherProducts = await prisma.product.findMany({
+      where: {
+        product_id: { not: BigInt(productId) },
+        status: 'ACTIVE',
+      },
+      take: needed + 2,
+      include: {
+        category: true,
+        brand: true,
+        variants: true,
+        images: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    for (const p of otherProducts) {
+      if (!existingIds.has(String(p.product_id)) && similarProducts.length < limit) {
+        similarProducts.push(formatProduct(p));
+        existingIds.add(String(p.product_id));
+      }
+    }
+  }
+
+  return similarProducts.slice(0, limit);
 };
 
 /**
