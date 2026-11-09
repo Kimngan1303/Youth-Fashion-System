@@ -16,12 +16,14 @@ import { Scan, X, Check, RotateCcw, ChevronRight, Sparkles } from 'lucide-react'
  */
 export default function ImageCropperModal({
   isOpen,
+  imageFile,
   imageSrc,
   initialFocusBox,
   onClose,
   onCropComplete,
   onKeepOriginal,
 }) {
+  const [resolvedSrc, setResolvedSrc] = useState(imageSrc || null);
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
   const [cropBox, setCropBox] = useState({ x: 0, y: 0, width: 0, height: 0 });
@@ -29,9 +31,45 @@ export default function ImageCropperModal({
   const [isDragging, setIsDragging] = useState(false);
   const [activeHandle, setActiveHandle] = useState(null); // 'move' | 'tl' | 'tr' | 'bl' | 'br' | 't' | 'b' | 'l' | 'r'
   const [dragStart, setDragStart] = useState({ mouseX: 0, mouseY: 0, boxX: 0, boxY: 0, boxW: 0, boxH: 0 });
+  const [isImgLoaded, setIsImgLoaded] = useState(false);
+  const [imgLoadError, setImgLoadError] = useState(false);
 
   const containerRef = useRef(null);
   const imageRef = useRef(null);
+
+  // Luôn đảm bảo có Object URL hợp lệ từ file gốc nếu có
+  useEffect(() => {
+    if (!isOpen) {
+      setIsImgLoaded(false);
+      setImgLoadError(false);
+      return;
+    }
+    let localUrl = null;
+    if (imageFile instanceof Blob) {
+      localUrl = URL.createObjectURL(imageFile);
+      setResolvedSrc(localUrl);
+    } else if (imageSrc) {
+      setResolvedSrc(imageSrc);
+    }
+
+    return () => {
+      if (localUrl) {
+        URL.revokeObjectURL(localUrl);
+      }
+    };
+  }, [isOpen, imageFile, imageSrc]);
+
+  // Nếu ảnh đã complete trong cache trước khi event onLoad kịp kích hoạt
+  useEffect(() => {
+    if (!isOpen || !resolvedSrc) return;
+    const timer = setTimeout(() => {
+      const img = imageRef.current;
+      if (img && img.complete && img.naturalWidth > 0 && !isImgLoaded) {
+        handleImageLoaded({ target: img });
+      }
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [isOpen, resolvedSrc, isImgLoaded]);
 
   // Danh sách các vùng focus thông minh theo tỉ lệ trang phục
   const getPresets = useCallback((dispW, dispH) => {
@@ -116,13 +154,18 @@ export default function ImageCropperModal({
   // Khởi tạo kích thước khung cắt mặc định khi ảnh nạp xong
   const handleImageLoaded = (e) => {
     const img = e.target;
+    if (!img) return;
     const naturalW = img.naturalWidth;
     const naturalH = img.naturalHeight;
+    if (!naturalW || !naturalH) return;
+
     setImageSize({ width: naturalW, height: naturalH });
 
-    const displayedW = img.clientWidth;
-    const displayedH = img.clientHeight;
+    const displayedW = img.clientWidth || naturalW;
+    const displayedH = img.clientHeight || naturalH;
     setDisplaySize({ width: displayedW, height: displayedH });
+    setIsImgLoaded(true);
+    setImgLoadError(false);
 
     // Nếu đã có initialFocusBox từ trước (tỉ lệ 0-1)
     if (initialFocusBox && initialFocusBox.width > 0 && initialFocusBox.height > 0) {
@@ -356,7 +399,7 @@ export default function ImageCropperModal({
   // Xác định vị trí hiển thị hợp lý cho nút pill "Tìm sản phẩm >"
   const isPillOnRight = displaySize.width - (cropBox.x + cropBox.width) >= 140;
 
-  if (!isOpen || !imageSrc) return null;
+  if (!isOpen || (!resolvedSrc && !imageSrc && !imageFile)) return null;
 
   const presets = displaySize.width > 0 ? getPresets(displaySize.width, displaySize.height) : [];
 
@@ -406,12 +449,22 @@ export default function ImageCropperModal({
           >
             <img
               ref={imageRef}
-              src={imageSrc}
+              src={resolvedSrc || imageSrc}
               alt="Focus target"
               className="shopee-crop-source-image"
               onLoad={handleImageLoaded}
+              onError={() => {
+                console.warn('[ImageCropperModal] Không thể tải ảnh từ URL:', resolvedSrc);
+                setImgLoadError(true);
+              }}
               draggable={false}
             />
+
+            {imgLoadError && (
+              <div className="crop-load-error-box">
+                <p>Không thể hiển thị ảnh xem trước. Vui lòng thử tải lại ảnh.</p>
+              </div>
+            )}
 
             {/* Khung Focus Shopee / Lens Bounding Box */}
             {displaySize.width > 0 && (
