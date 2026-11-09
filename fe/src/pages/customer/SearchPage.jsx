@@ -63,25 +63,33 @@ export default function SearchPage() {
   const [recommendations, setRecommendations] = useState([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
-  // 1. Cleanup image preview & original blob URL to prevent memory leaks
+  // Quản lý Blob URLs an toàn, tránh bị thu hồi sớm trong quá trình re-render
+  const blobUrlsRef = useRef([]);
+
+  const createManagedBlobUrl = (blobOrFile) => {
+    if (!blobOrFile) return null;
+    const url = URL.createObjectURL(blobOrFile);
+    blobUrlsRef.current.push(url);
+    return url;
+  };
+
+  const cleanupBlobUrls = () => {
+    blobUrlsRef.current.forEach((url) => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        // Ignore revocation errors
+      }
+    });
+    blobUrlsRef.current = [];
+  };
+
+  // Chỉ thu hồi toàn bộ Blob URL khi người dùng rời khỏi trang
   useEffect(() => {
     return () => {
-      if (
-        imagePreview &&
-        typeof imagePreview === "string" &&
-        imagePreview.startsWith("blob:")
-      ) {
-        URL.revokeObjectURL(imagePreview);
-      }
-      if (
-        rawOriginalUrl &&
-        typeof rawOriginalUrl === "string" &&
-        rawOriginalUrl.startsWith("blob:")
-      ) {
-        URL.revokeObjectURL(rawOriginalUrl);
-      }
+      cleanupBlobUrls();
     };
-  }, [imagePreview, rawOriginalUrl]);
+  }, []);
 
   // 2. Load Search History (from API for logged in, from localStorage for guest)
   const fetchSearchHistory = async () => {
@@ -340,23 +348,10 @@ export default function SearchPage() {
       return;
     }
 
-    if (
-      imagePreview &&
-      typeof imagePreview === "string" &&
-      imagePreview.startsWith("blob:") &&
-      imagePreview !== rawOriginalUrl
-    ) {
-      URL.revokeObjectURL(imagePreview);
-    }
-    if (
-      rawOriginalUrl &&
-      typeof rawOriginalUrl === "string" &&
-      rawOriginalUrl.startsWith("blob:")
-    ) {
-      URL.revokeObjectURL(rawOriginalUrl);
-    }
+    // Dọn dẹp URL ảnh cũ trước khi nạp ảnh mới
+    cleanupBlobUrls();
 
-    const originalUrl = URL.createObjectURL(file);
+    const originalUrl = createManagedBlobUrl(file);
     setRawOriginalFile(file);
     setRawOriginalUrl(originalUrl);
     setErrorMessage("");
@@ -392,7 +387,7 @@ export default function SearchPage() {
             type: "image/jpeg",
             lastModified: Date.now(),
           });
-          const focusedUrl = URL.createObjectURL(blob);
+          const focusedUrl = createManagedBlobUrl(blob);
           setSelectedImage(focusedFile);
           setImagePreview(focusedUrl);
           // Tự động tìm kiếm luôn với sản phẩm đã auto-focus
@@ -414,14 +409,6 @@ export default function SearchPage() {
 
   // Xác nhận chuyển vùng focus từ modal (ví dụ từ Áo sang Quần)
   const handleCropComplete = (croppedFile, croppedUrl, normalizedBox) => {
-    if (
-      imagePreview &&
-      typeof imagePreview === "string" &&
-      imagePreview.startsWith("blob:") &&
-      imagePreview !== rawOriginalUrl
-    ) {
-      URL.revokeObjectURL(imagePreview);
-    }
     setSelectedImage(croppedFile);
     setImagePreview(croppedUrl);
     setCurrentFocusBox(normalizedBox);
@@ -433,14 +420,6 @@ export default function SearchPage() {
   // Giữ ảnh gốc: đặt lại tìm kiếm theo toàn bộ ảnh gốc không cắt
   const handleKeepOriginal = () => {
     if (rawOriginalFile && rawOriginalUrl) {
-      if (
-        imagePreview &&
-        typeof imagePreview === "string" &&
-        imagePreview.startsWith("blob:") &&
-        imagePreview !== rawOriginalUrl
-      ) {
-        URL.revokeObjectURL(imagePreview);
-      }
       setSelectedImage(rawOriginalFile);
       setImagePreview(rawOriginalUrl);
       setCurrentFocusBox({ x: 0, y: 0, width: 1.0, height: 1.0 });
@@ -515,24 +494,10 @@ export default function SearchPage() {
 
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [imagePreview, rawOriginalUrl]);
+  }, []);
 
   const removeImage = () => {
-    if (
-      imagePreview &&
-      typeof imagePreview === "string" &&
-      imagePreview.startsWith("blob:") &&
-      imagePreview !== rawOriginalUrl
-    ) {
-      URL.revokeObjectURL(imagePreview);
-    }
-    if (
-      rawOriginalUrl &&
-      typeof rawOriginalUrl === "string" &&
-      rawOriginalUrl.startsWith("blob:")
-    ) {
-      URL.revokeObjectURL(rawOriginalUrl);
-    }
+    cleanupBlobUrls();
     setSelectedImage(null);
     setImagePreview(null);
     setRawOriginalFile(null);
@@ -939,6 +904,7 @@ export default function SearchPage() {
       {/* Shopee / Google Lens Visual Focus Cropper Modal */}
       <ImageCropperModal
         isOpen={isCropperOpen}
+        imageFile={rawOriginalFile}
         imageSrc={rawOriginalUrl || imagePreview}
         initialFocusBox={currentFocusBox}
         onClose={() => setIsCropperOpen(false)}
