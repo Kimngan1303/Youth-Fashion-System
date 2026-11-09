@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import ProductCard from "../../components/ProductCard";
 import ImageCropperModal from "../../components/ImageCropperModal";
-import ImageViewerModal from "../../components/ImageViewerModal";
 import { aiService } from "../../services/aiService";
 import { useAuth } from "../../context/AuthContext";
 import { useConfirmModal } from "../../context/ConfirmModalContext";
@@ -46,8 +45,10 @@ export default function SearchPage() {
   const [queryText, setQueryText] = useState(urlQuery);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [rawOriginalFile, setRawOriginalFile] = useState(null);
+  const [rawOriginalUrl, setRawOriginalUrl] = useState(null);
+  const [currentFocusBox, setCurrentFocusBox] = useState(null);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
-  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   // Execution state
   const [isSearching, setIsSearching] = useState(false);
@@ -62,7 +63,7 @@ export default function SearchPage() {
   const [recommendations, setRecommendations] = useState([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
-  // 1. Cleanup image preview blob URL to prevent memory leaks
+  // 1. Cleanup image preview & original blob URL to prevent memory leaks
   useEffect(() => {
     return () => {
       if (
@@ -72,8 +73,15 @@ export default function SearchPage() {
       ) {
         URL.revokeObjectURL(imagePreview);
       }
+      if (
+        rawOriginalUrl &&
+        typeof rawOriginalUrl === "string" &&
+        rawOriginalUrl.startsWith("blob:")
+      ) {
+        URL.revokeObjectURL(rawOriginalUrl);
+      }
     };
-  }, [imagePreview]);
+  }, [imagePreview, rawOriginalUrl]);
 
   // 2. Load Search History (from API for logged in, from localStorage for guest)
   const fetchSearchHistory = async () => {
@@ -335,38 +343,113 @@ export default function SearchPage() {
     if (
       imagePreview &&
       typeof imagePreview === "string" &&
-      imagePreview.startsWith("blob:")
+      imagePreview.startsWith("blob:") &&
+      imagePreview !== rawOriginalUrl
     ) {
       URL.revokeObjectURL(imagePreview);
     }
+    if (
+      rawOriginalUrl &&
+      typeof rawOriginalUrl === "string" &&
+      rawOriginalUrl.startsWith("blob:")
+    ) {
+      URL.revokeObjectURL(rawOriginalUrl);
+    }
 
-    setSelectedImage(file);
-    const newPreviewUrl = URL.createObjectURL(file);
-    setImagePreview(newPreviewUrl);
+    const originalUrl = URL.createObjectURL(file);
+    setRawOriginalFile(file);
+    setRawOriginalUrl(originalUrl);
     setErrorMessage("");
-    // Tự động mở modal cắt ảnh Shopee Style để khách hàng khoanh vùng trang phục
-    setIsCropperOpen(true);
+
+    // Tự động nhận diện và focus vào sản phẩm trang phục (Áo hoặc sản phẩm chính)
+    const img = new Image();
+    img.onload = () => {
+      const ratio = img.naturalHeight / (img.naturalWidth || 1);
+      let initBox;
+      if (ratio >= 1.15) {
+        // Ảnh người mẫu / toàn thân: Tự động focus vào Áo (nửa trên)
+        initBox = { x: 0.15, y: 0.10, width: 0.70, height: 0.44 };
+      } else {
+        // Ảnh vuông / flatlay: Focus vào sản phẩm ở giữa
+        initBox = { x: 0.10, y: 0.10, width: 0.80, height: 0.80 };
+      }
+      setCurrentFocusBox(initBox);
+
+      // Cắt ảnh theo vùng focus tự động bằng Canvas trong background
+      const canvas = document.createElement("canvas");
+      const sx = Math.max(0, Math.round(initBox.x * img.naturalWidth));
+      const sy = Math.max(0, Math.round(initBox.y * img.naturalHeight));
+      const sw = Math.min(img.naturalWidth - sx, Math.round(initBox.width * img.naturalWidth));
+      const sh = Math.min(img.naturalHeight - sy, Math.round(initBox.height * img.naturalHeight));
+      canvas.width = Math.max(1, sw);
+      canvas.height = Math.max(1, sh);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const focusedFile = new File([blob], "focused_fashion_product.jpg", {
+            type: "image/jpeg",
+            lastModified: Date.now(),
+          });
+          const focusedUrl = URL.createObjectURL(blob);
+          setSelectedImage(focusedFile);
+          setImagePreview(focusedUrl);
+          // Tự động tìm kiếm luôn với sản phẩm đã auto-focus
+          executeSearch(queryText, focusedFile);
+        } else {
+          setSelectedImage(file);
+          setImagePreview(originalUrl);
+          executeSearch(queryText, file);
+        }
+      }, "image/jpeg", 0.95);
+    };
+    img.onerror = () => {
+      setSelectedImage(file);
+      setImagePreview(originalUrl);
+      executeSearch(queryText, file);
+    };
+    img.src = originalUrl;
   };
 
-  // Xác nhận cắt ảnh xong
-  const handleCropComplete = (croppedFile, croppedUrl) => {
+  // Xác nhận chuyển vùng focus từ modal (ví dụ từ Áo sang Quần)
+  const handleCropComplete = (croppedFile, croppedUrl, normalizedBox) => {
     if (
       imagePreview &&
       typeof imagePreview === "string" &&
-      imagePreview.startsWith("blob:")
+      imagePreview.startsWith("blob:") &&
+      imagePreview !== rawOriginalUrl
     ) {
       URL.revokeObjectURL(imagePreview);
     }
     setSelectedImage(croppedFile);
     setImagePreview(croppedUrl);
+    setCurrentFocusBox(normalizedBox);
     setIsCropperOpen(false);
-    showSuccess("Đã cắt khung trang phục thành công! Nhấn 'TÌM KIẾM' để AI phân tích.");
+    executeSearch(queryText, croppedFile);
+    showSuccess("Đã cập nhật vùng focus sản phẩm!");
   };
 
-  // Bỏ qua cắt, giữ ảnh gốc
+  // Giữ ảnh gốc: đặt lại tìm kiếm theo toàn bộ ảnh gốc không cắt
   const handleKeepOriginal = () => {
-    setIsCropperOpen(false);
-    showInfo("Giữ nguyên ảnh gốc để tìm kiếm.");
+    if (rawOriginalFile && rawOriginalUrl) {
+      if (
+        imagePreview &&
+        typeof imagePreview === "string" &&
+        imagePreview.startsWith("blob:") &&
+        imagePreview !== rawOriginalUrl
+      ) {
+        URL.revokeObjectURL(imagePreview);
+      }
+      setSelectedImage(rawOriginalFile);
+      setImagePreview(rawOriginalUrl);
+      setCurrentFocusBox({ x: 0, y: 0, width: 1.0, height: 1.0 });
+      setIsCropperOpen(false);
+      executeSearch(queryText, rawOriginalFile);
+      showInfo("Đã đặt lại tìm kiếm theo toàn bộ ảnh gốc!");
+    } else {
+      setIsCropperOpen(false);
+    }
   };
 
   const handleImageFileChange = (e) => {
@@ -432,18 +515,29 @@ export default function SearchPage() {
 
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [imagePreview]);
+  }, [imagePreview, rawOriginalUrl]);
 
   const removeImage = () => {
     if (
       imagePreview &&
       typeof imagePreview === "string" &&
-      imagePreview.startsWith("blob:")
+      imagePreview.startsWith("blob:") &&
+      imagePreview !== rawOriginalUrl
     ) {
       URL.revokeObjectURL(imagePreview);
     }
+    if (
+      rawOriginalUrl &&
+      typeof rawOriginalUrl === "string" &&
+      rawOriginalUrl.startsWith("blob:")
+    ) {
+      URL.revokeObjectURL(rawOriginalUrl);
+    }
     setSelectedImage(null);
     setImagePreview(null);
+    setRawOriginalFile(null);
+    setRawOriginalUrl(null);
+    setCurrentFocusBox(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -577,14 +671,14 @@ export default function SearchPage() {
                 </div>
               )}
 
-              {/* Preview ảnh tinh gọn chuẩn Shopee: Bỏ text "Ảnh mẫu tìm kiếm" và tên file, hỗ trợ click xem chi tiết & cắt ảnh */}
+              {/* Preview ảnh thông minh chuẩn Shopee/Lens: Tự động focus sản phẩm, bấm vào xem chi tiết để đổi focus hoặc reset ảnh */}
               {imagePreview && (
                 <div className="selected-image-bar animate-fade-in">
                   <div className="selected-img-left">
                     <div
                       className="selected-thumb-wrapper"
-                      onClick={() => setIsViewerOpen(true)}
-                      title="Nhấn để xem chi tiết ảnh vừa tải lên"
+                      onClick={() => setIsCropperOpen(true)}
+                      title="Nhấn để xem chi tiết ảnh và điều chỉnh vùng focus sản phẩm"
                     >
                       <img
                         src={imagePreview}
@@ -598,22 +692,14 @@ export default function SearchPage() {
                     <button
                       type="button"
                       className="view-detail-img-text"
-                      onClick={() => setIsViewerOpen(true)}
-                      title="Xem phóng to ảnh mẫu"
+                      onClick={() => setIsCropperOpen(true)}
+                      title="Xem chi tiết ảnh & điều chỉnh vùng focus sản phẩm"
                     >
                       Xem chi tiết ảnh
                     </button>
                   </div>
 
                   <div className="selected-img-actions">
-                    <button
-                      type="button"
-                      className="crop-selected-img-btn"
-                      onClick={() => setIsCropperOpen(true)}
-                      title="Cắt khung trang phục (Shopee Style) để loại bỏ nền"
-                    >
-                      <Crop size={14} /> Cắt ảnh
-                    </button>
                     <button
                       type="button"
                       className="remove-selected-img-btn"
@@ -850,21 +936,14 @@ export default function SearchPage() {
         </div>
       </section>
 
-      {/* Shopee-style Image Cropper Modal */}
+      {/* Shopee / Google Lens Visual Focus Cropper Modal */}
       <ImageCropperModal
         isOpen={isCropperOpen}
-        imageSrc={imagePreview}
+        imageSrc={rawOriginalUrl || imagePreview}
+        initialFocusBox={currentFocusBox}
         onClose={() => setIsCropperOpen(false)}
         onCropComplete={handleCropComplete}
         onKeepOriginal={handleKeepOriginal}
-      />
-
-      {/* Full-size Image Detail Viewer Lightbox */}
-      <ImageViewerModal
-        isOpen={isViewerOpen}
-        imageSrc={imagePreview}
-        onClose={() => setIsViewerOpen(false)}
-        onOpenCropper={() => setIsCropperOpen(true)}
       />
 
       {/* Page Styles */}
