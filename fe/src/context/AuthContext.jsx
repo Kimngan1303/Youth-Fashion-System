@@ -206,7 +206,7 @@ export function AuthProvider({ children }) {
           sku: product.sku || `YF-${targetId}`,
           title: product.title || product.name || product.product_name || `Thiết kế #${targetId}`,
           name: product.name || product.title || product.product_name || `Thiết kế #${targetId}`,
-          category: product.category || 'COAT_BLAZER',
+          category: product.category || product.categoryName || '',
           categoryName: product.categoryName || product.category || 'Thời Trang',
           price: typeof product.price === 'number' 
             ? product.price 
@@ -226,7 +226,7 @@ export function AuthProvider({ children }) {
           sku: `YF-${targetId}`,
           title: `Sản phẩm #${targetId}`,
           name: `Sản phẩm #${targetId}`,
-          category: 'COAT_BLAZER',
+          category: '',
           categoryName: 'Thời Trang',
           price: 0,
           image: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=800',
