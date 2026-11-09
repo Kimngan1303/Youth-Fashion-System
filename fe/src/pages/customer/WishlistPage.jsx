@@ -200,8 +200,8 @@ export default function WishlistPage() {
 
                 const skuText = product.sku || (product.id ? `YF-${product.id}` : 'YF-COAT-CAMEL-01');
                 const statusText = product.status || 'CÒN HÀNG';
-                const badgeTopText = product.badgeTop || product.tag || '-18% ƯU ĐÃI';
-                const badgeSubText = product.badgeSub || (badgeTopText.includes('18%') || !product.badgeSub ? 'CASHMERE 100%' : product.badgeSub);
+                const badgeTopText = (product.badgeTop && product.badgeTop !== 'MỚI' && product.badgeTop !== '-18% ƯU ĐÃI') ? product.badgeTop : null;
+                const badgeSubText = (product.badgeSub && product.badgeSub !== 'CASHMERE 100%') ? product.badgeSub : null;
                 const sizes = product.availableSizes || ['S', 'M', 'L'];
 
                 // Badge top background color
@@ -227,24 +227,26 @@ export default function WishlistPage() {
                         <img src={product.image} alt={product.title || product.name} className="wishlist-card-img" />
                       </Link>
 
-                      <div className="wishlist-card-badges">
-                        {badgeTopText && (
-                          <span 
-                            className="badge-discount"
-                            style={{ backgroundColor: badgeTopBg, color: badgeTopColor }}
-                          >
-                            {badgeTopText}
-                          </span>
-                        )}
-                        {badgeSubText && (
-                          <span 
-                            className="badge-material"
-                            style={{ backgroundColor: badgeSubBg, color: badgeSubColor }}
-                          >
-                            {badgeSubText}
-                          </span>
-                        )}
-                      </div>
+                      {(badgeTopText || badgeSubText) && (
+                        <div className="wishlist-card-badges">
+                          {badgeTopText && (
+                            <span 
+                              className="badge-discount"
+                              style={{ backgroundColor: badgeTopBg, color: badgeTopColor }}
+                            >
+                              {badgeTopText}
+                            </span>
+                          )}
+                          {badgeSubText && (
+                            <span 
+                              className="badge-material"
+                              style={{ backgroundColor: badgeSubBg, color: badgeSubColor }}
+                            >
+                              {badgeSubText}
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       <button
                         type="button"
@@ -385,9 +387,6 @@ export default function WishlistPage() {
                   <div className="similar-card-price-row">
                     <span className="similar-card-price">
                       {priceVal > 0 ? priceVal.toLocaleString('vi-VN') + '₫' : 'Liên hệ'}
-                    </span>
-                    <span className="similar-card-badge-right">
-                      MỚI
                     </span>
                   </div>
                 </div>
