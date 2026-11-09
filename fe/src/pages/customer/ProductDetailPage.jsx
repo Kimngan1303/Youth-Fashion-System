@@ -444,6 +444,25 @@ export default function ProductDetailPage() {
   ) || product.rawVariants?.[0];
 
   const currentDisplayPrice = matchedVariant?.price ? Number(matchedVariant.price) : product.price;
+  const currentStock = matchedVariant?.stock !== undefined ? Number(matchedVariant.stock) : (product.rawVariants?.length ? 0 : 50);
+  const isOutOfStock = currentStock <= 0;
+
+  const stockAlertText = isOutOfStock
+    ? 'Hết hàng trong kho'
+    : currentStock <= 5
+      ? `Chỉ còn ${currentStock} sản phẩm trong kho`
+      : `Còn ${currentStock} sản phẩm sẵn sàng giao ngay`;
+
+  const stockDotColor = isOutOfStock ? '#EF4444' : currentStock <= 5 ? '#F59E0B' : '#10B981';
+
+  // Tự động điều chỉnh số lượng chọn không vượt quá tồn kho thực tế
+  useEffect(() => {
+    if (currentStock <= 0) {
+      setQuantity(1);
+    } else if (quantity > currentStock) {
+      setQuantity(currentStock);
+    }
+  }, [currentStock]);
 
   const handleToggleWishlist = () => {
     if (!user) {
@@ -477,6 +496,16 @@ export default function ProductDetailPage() {
       return;
     }
 
+    if (isOutOfStock) {
+      showError('Sản phẩm với phân loại kích thước/màu sắc này hiện đã hết hàng!');
+      return;
+    }
+
+    if (quantity > currentStock) {
+      showError(`Số lượng chọn vượt quá tồn kho (chỉ còn ${currentStock} sản phẩm)!`);
+      return;
+    }
+
     const sizeToAdd = categoryType === 'accessory' ? 'Tiêu chuẩn' : (selectedSize || product.sizes?.[0] || 'Tiêu chuẩn');
 
     addToCart(
@@ -488,6 +517,7 @@ export default function ProductDetailPage() {
         name: product.product_name,
         price: currentDisplayPrice,
         originalPrice: null,
+        stock: currentStock,
         image: activeImage,
         colorName: currentColorObj?.name || 'Mặc định',
         colorDot: currentColorObj?.hex || getColorHex(currentColorObj?.name || ''),
@@ -512,6 +542,16 @@ export default function ProductDetailPage() {
       return;
     }
 
+    if (isOutOfStock) {
+      showError('Sản phẩm với phân loại kích thước/màu sắc này hiện đã hết hàng!');
+      return;
+    }
+
+    if (quantity > currentStock) {
+      showError(`Số lượng chọn vượt quá tồn kho (chỉ còn ${currentStock} sản phẩm)!`);
+      return;
+    }
+
     const sizeToAdd = categoryType === 'accessory' ? 'Tiêu chuẩn' : (selectedSize || product.sizes?.[0] || 'Tiêu chuẩn');
     const unitPrice = currentDisplayPrice;
 
@@ -526,6 +566,7 @@ export default function ProductDetailPage() {
       name: product.product_name,
       price: unitPrice,
       originalPrice: null,
+      stock: currentStock,
       image: activeImage,
       size: sizeToAdd,
       color: currentColorObj?.name || 'Mặc định',
@@ -760,15 +801,16 @@ export default function ProductDetailPage() {
                     type="button"
                     className="qty-step-btn"
                     onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
-                    disabled={quantity <= 1}
+                    disabled={quantity <= 1 || isOutOfStock}
                   >
                     -
                   </button>
-                  <span className="qty-step-value">{quantity}</span>
+                  <span className="qty-step-value">{isOutOfStock ? 0 : quantity}</span>
                   <button
                     type="button"
                     className="qty-step-btn"
-                    onClick={() => setQuantity(prev => prev + 1)}
+                    onClick={() => setQuantity(prev => Math.min(currentStock, prev + 1))}
+                    disabled={isOutOfStock || quantity >= currentStock}
                   >
                     +
                   </button>
@@ -776,8 +818,10 @@ export default function ProductDetailPage() {
 
                 {/* Stock alert pill */}
                 <div className="stock-alert-pill">
-                  <span className="stock-dot"></span>
-                  <span className="stock-text">{product.stock_alert}</span>
+                  <span className="stock-dot" style={{ backgroundColor: stockDotColor }}></span>
+                  <span className="stock-text" style={{ color: isOutOfStock ? '#DC2626' : undefined }}>
+                    {stockAlertText}
+                  </span>
                 </div>
               </div>
 
@@ -789,9 +833,11 @@ export default function ProductDetailPage() {
                     type="button"
                     className="btn-add-to-cart"
                     onClick={handleAddToCart}
+                    disabled={isOutOfStock}
+                    style={isOutOfStock ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: '#6B7280' } : undefined}
                   >
                     <ShoppingBag size={15} color="#FFFFFF" />
-                    <span>THÊM VÀO GIỎ HÀNG</span>
+                    <span>{isOutOfStock ? 'HẾT HÀNG' : 'THÊM VÀO GIỎ HÀNG'}</span>
                   </button>
 
                   <button
@@ -813,8 +859,10 @@ export default function ProductDetailPage() {
                   type="button"
                   className="btn-buy-now"
                   onClick={handleBuyNow}
+                  disabled={isOutOfStock}
+                  style={isOutOfStock ? { opacity: 0.6, cursor: 'not-allowed', borderColor: '#D1D5DB', color: '#9CA3AF' } : undefined}
                 >
-                  MUA NGAY
+                  {isOutOfStock ? 'TẠM HẾT HÀNG' : 'MUA NGAY'}
                 </button>
 
                 {/* Row 3: Liên hệ người bán */}

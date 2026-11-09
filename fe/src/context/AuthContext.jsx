@@ -392,7 +392,8 @@ export function AuthProvider({ children }) {
   const updateCartQuantity = async (cartItemId, delta) => {
     if (!user) return;
     const currentItem = cart.find((item) => item.id === cartItemId || item.cartItemId === cartItemId);
-    const newQty = Math.max(1, (currentItem?.quantity || 1) + delta);
+    const maxStock = currentItem?.stock !== undefined ? Number(currentItem.stock) : Infinity;
+    const newQty = Math.min(maxStock, Math.max(1, (currentItem?.quantity || 1) + delta));
 
     // Đồng bộ API nếu mục có variant_id
     const targetVariantId = currentItem?.variant_id || (currentItem && !isNaN(Number(currentItem.id)) ? currentItem.id : null);
