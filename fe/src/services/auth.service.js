@@ -18,6 +18,15 @@ export const authService = {
   },
 
   /**
+   * Login with Google
+   * @param {Object} googleData - { credential, email, name, picture, google_id }
+   */
+  loginWithGoogle: async (googleData) => {
+    const response = await axiosClient.post('/auth/google', googleData);
+    return response.data;
+  },
+
+  /**
    * Register new customer (sends verification OTP)
    * @param {Object} userData - { full_name, email, password, phone }
    */

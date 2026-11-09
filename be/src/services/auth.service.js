@@ -341,6 +341,122 @@ export const loginService = async ({ email, password, user_type }) => {
 };
 
 /**
+ * Giải mã Google ID Token JWT payload
+ */
+const decodeGoogleCredential = (credential) => {
+  if (!credential || typeof credential !== 'string') return null;
+  try {
+    const parts = credential.split('.');
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = Buffer.from(base64, 'base64').toString('utf8');
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+};
+
+/**
+ * Xử lý nghiệp vụ Đăng nhập / Đăng ký nhanh bằng Google
+ */
+export const googleLoginService = async ({ credential, email: directEmail, name: directName, picture: directPicture }) => {
+  let googleEmail = directEmail;
+  let googleName = directName;
+  let googlePicture = directPicture;
+
+  if (credential) {
+    const decoded = decodeGoogleCredential(credential);
+    if (decoded?.email) {
+      googleEmail = decoded.email;
+      googleName = decoded.name || googleName;
+      googlePicture = decoded.picture || googlePicture;
+    }
+  }
+
+  if (!googleEmail || !googleEmail.includes('@')) {
+    throw { statusCode: 400, message: 'Thông tin xác thực Google không hợp lệ hoặc thiếu email' };
+  }
+
+  const normalizedEmail = googleEmail.trim().toLowerCase();
+
+  // 1. Tìm tài khoản khách hàng theo email
+  let customer = await findCustomerByEmail(normalizedEmail);
+
+  if (customer) {
+    if (customer.status !== 'ACTIVE') {
+      throw { statusCode: 403, message: 'Tài khoản khách hàng này đang bị khóa hoặc ngưng hoạt động' };
+    }
+    // Tự động đánh dấu email đã xác thực
+    if (!customer.email_verified_at) {
+      await markCustomerEmailVerified(customer.customer_id);
+    }
+    // Cập nhật avatar nếu chưa có
+    if (!customer.avatar_url && googlePicture) {
+      await prisma.customer.update({
+        where: { customer_id: customer.customer_id },
+        data: { avatar_url: googlePicture },
+      });
+      customer.avatar_url = googlePicture;
+    }
+  } else {
+    // Tạo mới tài khoản khách hàng từ Google
+    const randomPassword = crypto.randomBytes(16).toString('hex');
+    const passwordHash = await bcrypt.hash(randomPassword, 10);
+
+    customer = await prisma.customer.create({
+      data: {
+        email: normalizedEmail,
+        full_name: googleName || normalizedEmail.split('@')[0],
+        avatar_url: googlePicture || null,
+        password_hash: passwordHash,
+        status: 'ACTIVE',
+        email_verified_at: new Date(),
+      },
+    });
+  }
+
+  // 2. Sinh cặp Token
+  const tokenPayload = {
+    id: customer.customer_id.toString(),
+    email: customer.email,
+    role: 'CUSTOMER',
+    user_type: 'CUSTOMER',
+  };
+
+  const accessToken = generateAccessToken(tokenPayload);
+  const refreshToken = generateRefreshToken({ id: customer.customer_id.toString(), user_type: 'CUSTOMER' });
+
+  // 3. Lưu Refresh Token vào CSDL
+  const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  await saveRefreshToken({
+    customer_id: customer.customer_id,
+    employee_id: null,
+    token_hash: tokenHash,
+    expires_at: expiresAt,
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+    user: {
+      customer_id: customer.customer_id.toString(),
+      id: customer.customer_id.toString(),
+      email: customer.email,
+      full_name: customer.full_name,
+      avatar_url: customer.avatar_url || null,
+      phone: customer.phone || null,
+      gender: customer.gender || null,
+      dob: customer.dob || null,
+      role: 'CUSTOMER',
+      user_type: 'CUSTOMER',
+    },
+  };
+};
+
+/**
  * Xử lý nghiệp vụ Đăng xuất (Thu hồi Refresh Token)
  * @param {String} refreshToken
  */

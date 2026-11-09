@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   registerController,
   loginController,
+  googleLoginController,
   logoutController,
   refreshController,
   verifyEmailController,
@@ -57,6 +58,9 @@ router.post('/reset-password', validateBody(resetPasswordSchema), resetPasswordC
 
 // POST /api/auth/login - Đăng nhập (Customer hoặc Employee)
 router.post('/login', validateBody(loginSchema), loginController);
+
+// POST /api/auth/google - Đăng nhập / Đăng ký qua Google OAuth
+router.post('/google', googleLoginController);
 
 // POST /api/auth/logout - Đăng xuất
 router.post('/logout', logoutController);
