@@ -167,14 +167,19 @@ export async function searchByImageService({ imageBuffer, topK = 10, minThreshol
       categoryMultiplier = isMatch ? 1.0 : 0.20;
     }
 
-    // Hệ số màu sắc thị giác
+    // Hệ số màu sắc thị giác:
+    // Lưu ý: Trong tìm kiếm thuần bằng hình ảnh, vector CLIP đã tự so sánh trực tiếp màu sắc và pixel.
+    // Nếu ảnh khớp thị giác cao (visualSim >= 0.80), không bao giờ phạt lệch màu theo text metadata CSDL.
     let colorMultiplier = 1.0;
     if (detectedColor) {
-      colorMultiplier = calculateColorMultiplier(detectedColor, item.colors, item.product_name, 1.05, 0.70);
+      const penalty = visualSim >= 0.80 ? 1.0 : 0.85;
+      colorMultiplier = calculateColorMultiplier(detectedColor, item.colors, item.product_name, 1.05, penalty);
     }
 
+    // Đảm bảo nguyên tắc ưu tiên thị giác: không bị kéo tụt dưới điểm visualSim nếu cùng danh mục
+    const visualFloor = (visualSim >= 0.80 && categoryMultiplier > 0) ? visualSim : 0.0;
     const finalSimilarity = Number(
-      Math.min(1.0, Math.max(0.0, visualSim * categoryMultiplier * colorMultiplier)).toFixed(4)
+      Math.min(1.0, Math.max(0.0, Math.max(visualFloor, visualSim * categoryMultiplier * colorMultiplier))).toFixed(4)
     );
 
     return {
@@ -399,14 +404,22 @@ export async function searchHybridService({
     const combinedSim = wI * normImgSim + wT * normTxtSim;
 
     // 6. Hệ số Màu sắc
+    // Visual Vector Primacy: Khi vector ảnh khớp rất cao (normImgSim >= 0.80),
+    // vector thị giác chính là sự thật khách quan (ground truth) về sản phẩm thực tế.
+    // Tuyệt đối không áp dụng mức phạt lệch màu 0.70 dựa trên text metadata có thể bị thiếu sót trong CSDL.
     let colorMultiplier = 1.0;
     if (effectiveColor) {
-      colorMultiplier = calculateColorMultiplier(effectiveColor, item.colors, item.product_name, 1.05, 0.70);
+      const mismatchPenalty = normImgSim >= 0.80 ? 1.0 : 0.70;
+      colorMultiplier = calculateColorMultiplier(effectiveColor, item.colors, item.product_name, 1.05, mismatchPenalty);
     }
 
-    // Điểm số tương đồng cuối cùng sau khi tinh chỉnh
+    // Điểm số tương đồng cuối cùng sau khi tinh chỉnh:
+    // Đảm bảo nguyên tắc ưu tiên Vector Thị giác: Nếu ảnh khớp chuẩn xác (>= 80%) và cùng danh mục hợp lệ,
+    // điểm số không được phép bị text kéo tụt xuống dưới điểm thị giác (normImgSim)
+    const fusedSim = combinedSim * categoryMultiplier * colorMultiplier;
+    const visualFloor = (normImgSim >= 0.80 && categoryMultiplier > 0) ? normImgSim : 0.0;
     const finalSimilarity = Number(
-      Math.min(1.0, Math.max(0.0, combinedSim * categoryMultiplier * colorMultiplier)).toFixed(4)
+      Math.min(1.0, Math.max(0.0, Math.max(visualFloor, fusedSim))).toFixed(4)
     );
 
     return {
