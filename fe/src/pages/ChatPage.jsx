@@ -1194,8 +1194,44 @@ export default function ChatPage() {
         const convList = res.data || [];
         setConversations(convList);
 
-        // Check if navigated from Product Detail with initial product
-        if (location.state?.initialProduct) {
+        // Check if navigated from Cart Page with order inquiry
+        if (location.state?.inquiryType === 'ORDER_INQUIRY') {
+          const title = location.state.initialTitle || 'Tư vấn đơn hàng & giỏ hàng';
+          const msg = location.state.initialMessage || 'Chào shop, mình cần tư vấn về các sản phẩm trong giỏ hàng!';
+          const prod = location.state.initialProduct || null;
+
+          let targetConv = convList.find(
+            (c) => c.title?.toLowerCase().includes('đơn hàng') || c.title?.toLowerCase().includes('giỏ hàng')
+          );
+
+          if (!targetConv && convList.length > 0) {
+            targetConv = convList[0];
+          }
+
+          if (targetConv) {
+            setActiveConversationId(targetConv.conversation_id);
+            setMobileDetailView(true);
+            await loadMessages(targetConv.conversation_id);
+            await conversationService.sendMessage(
+              targetConv.conversation_id,
+              {
+                content: msg,
+                product_card: prod,
+              },
+              user
+            );
+            await loadMessages(targetConv.conversation_id);
+            if (messagesScrollContainerRef.current) {
+              messagesScrollContainerRef.current.scrollTop = 0;
+            }
+          } else {
+            setNewConvType('ORDER_INQUIRY');
+            if (prod) setNewConvProduct(prod);
+            setNewConvTitle(title);
+            setNewConvInitialMsg(msg);
+            setShowNewConvModal(true);
+          }
+        } else if (location.state?.initialProduct) {
           const prod = location.state.initialProduct;
           let targetConv = convList.find(
             (c) => c.attached_product && (String(c.attached_product.id) === String(prod.id) || c.attached_product.name === prod.name)

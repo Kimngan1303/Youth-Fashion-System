@@ -12,6 +12,7 @@ import { getColorHex } from '../../utils/colorUtils';
 
 export default function CartPage() {
   const { 
+    user,
     cart, 
     cartCount, 
     updateCartQuantity, 
@@ -223,6 +224,40 @@ export default function CartPage() {
     }
     return sum;
   }, 0) + voucherDiscount;
+
+  // Điều hướng sang Chat để tư vấn đơn hàng kèm thông tin giỏ hàng hiện tại
+  const handleContactOrderInquiry = (e) => {
+    e.preventDefault();
+    if (!user) {
+      showInfo('Vui lòng đăng nhập để kết nối với chuyên viên tư vấn!');
+      navigate('/login', { state: { from: '/cart' } });
+      return;
+    }
+
+    const itemsSummary = (cart || [])
+      .map((i) => `${i.title || i.name} (SL: ${i.quantity}, Size: ${i.size || 'M'})`)
+      .join(', ');
+    const firstItem = (cart || [])[0];
+
+    navigate('/chat', {
+      state: {
+        inquiryType: 'ORDER_INQUIRY',
+        initialTitle: 'Tư vấn đơn hàng & giỏ hàng',
+        initialMessage: `Chào shop, mình cần tư vấn về các sản phẩm đang có trong giỏ hàng: ${itemsSummary || 'giỏ hàng hiện tại'}. Tổng tiền tạm tính: ${finalTotal?.toLocaleString('vi-VN')}₫. Đội ngũ tư vấn hỗ trợ giúp mình nhé!`,
+        initialProduct: firstItem
+          ? {
+              id: firstItem.product_id || firstItem.id,
+              name: firstItem.title || firstItem.name,
+              price: firstItem.price,
+              image: firstItem.image,
+              category: firstItem.categoryTag || 'Thời trang',
+              sku: firstItem.sku || `YF-${firstItem.id || 'PROD'}`,
+              description: `Sản phẩm trong giỏ hàng (${firstItem.quantity} cái - ${firstItem.colorName || firstItem.color || 'Camel'})`,
+            }
+          : null,
+      },
+    });
+  };
 
   return (
     <div className="cart-page-container">
@@ -544,14 +579,14 @@ export default function CartPage() {
                   TIẾN HÀNH THANH TOÁN &rarr;
                 </button>
 
-                <a 
-                  href="tel:19001234" 
+                <button 
+                  type="button" 
                   className="btn-contact-consult"
-                  onClick={(e) => { e.preventDefault(); showInfo('Hotline tư vấn VIP 24/7: 1900 1234'); }}
+                  onClick={handleContactOrderInquiry}
                 >
                   <MessageSquare size={14} />
                   <span>LIÊN HỆ TƯ VẤN ĐƠN HÀNG</span>
-                </a>
+                </button>
               </div>
 
               {/* Guarantees */}
