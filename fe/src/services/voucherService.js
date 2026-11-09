@@ -154,10 +154,32 @@ export const voucherService = {
     }
   },
 
-  // Lấy danh sách Voucher đang kích hoạt hiển thị trong Ví Khách hàng (Trang cá nhân)
+  // Lấy danh sách Voucher đang kích hoạt hiển thị trong Ví Khách hàng (Trang cá nhân & Checkout)
   getCustomerVouchers: () => {
     const all = voucherService.getVouchers();
-    const activeVouchers = all.filter((v) => v.statusTab === 'active' || !v.statusTab || v.status === 'ACTIVE');
+    const now = new Date();
+
+    const activeVouchers = all.filter((v) => {
+      // 1. Phải ở trạng thái ACTIVE (không chấp nhận INACTIVE, EXPIRED, UPCOMING)
+      const isActive = v.status === 'ACTIVE' || (!v.status && v.statusTab === 'active');
+      if (!isActive) return false;
+      if (v.status === 'INACTIVE' || v.statusTab === 'inactive' || v.statusTab === 'expired' || v.statusTab === 'upcoming') {
+        return false;
+      }
+
+      // 2. Kiểm tra khoảng thời gian hiệu lực
+      if (v.start_date && new Date(v.start_date) > now) return false;
+      if (v.startDate && new Date(v.startDate) > now) return false;
+      if (v.end_date && new Date(v.end_date) < now) return false;
+      if (v.endDate && new Date(v.endDate) < now) return false;
+
+      // 3. Kiểm tra số lượt sử dụng
+      const totalLimit = Number(v.total_limit || v.totalLimit) || 0;
+      const usedCount = Number(v.used_count || v.usedCount) || 0;
+      if (totalLimit > 0 && usedCount >= totalLimit) return false;
+
+      return true;
+    });
 
     return activeVouchers.map((v) => ({
       id: String(v.id || v.voucher_id),
@@ -181,9 +203,9 @@ export const voucherService = {
   findVoucherByCode: (inputCode) => {
     if (!inputCode) return null;
     const clean = String(inputCode).trim().toUpperCase().replace(/\s+/g, '');
-    const all = voucherService.getVouchers();
+    const activeList = voucherService.getCustomerVouchers();
 
-    return all.find((v) => {
+    return activeList.find((v) => {
       const vClean = String(v.code || '').trim().toUpperCase().replace(/\s+/g, '');
       return vClean === clean;
     });

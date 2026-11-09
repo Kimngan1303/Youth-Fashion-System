@@ -200,7 +200,7 @@ export const applyVoucherService = async ({ code, subtotal = 0 }) => {
   }
 
   if (voucher.status !== 'ACTIVE') {
-    const error = new Error('Mã giảm giá này hiện không còn hiệu lực');
+    const error = new Error('Mã giảm giá này hiện không còn hiệu lực hoặc chưa được kích hoạt (INACTIVE)');
     error.statusCode = 400;
     throw error;
   }

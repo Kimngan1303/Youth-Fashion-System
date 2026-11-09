@@ -107,6 +107,26 @@ export default function CheckoutPage() {
     }
   }, [user]);
 
+  // Luôn đồng bộ danh sách voucher ACTIVE từ backend và kiểm tra voucher đã áp dụng
+  useEffect(() => {
+    voucherService.fetchVouchers().then(() => {
+      const activeList = voucherService.getCustomerVouchers();
+      setAvailableVouchers(activeList);
+      setAppliedVoucher((current) => {
+        if (!current) return null;
+        const stillValid = activeList.some(
+          (v) => String(v.code).trim().toUpperCase() === String(current.code).trim().toUpperCase()
+        );
+        if (!stillValid) {
+          sessionStorage.removeItem('yf_checkout_voucher');
+          showError(`Mã ưu đãi ${current.code} hiện không còn hiệu lực hoặc chưa được kích hoạt.`);
+          return null;
+        }
+        return current;
+      });
+    }).catch(() => {});
+  }, []);
+
   // Các hàm validate trường nhập liệu
   const validateFullName = (name) => {
     if (!name || !name.trim()) return 'Họ và tên không được để trống';
