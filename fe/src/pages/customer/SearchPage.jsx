@@ -207,7 +207,12 @@ export default function SearchPage() {
       }
 
       if (response && response.status) {
-        setSearchResults(response.data?.products || []);
+        // Chỉ chấp nhận sản phẩm có độ khớp trên 80% (>= 0.80)
+        const rawProducts = response.data?.products || [];
+        const validProducts = rawProducts.filter((p) =>
+          typeof p.similarity === "number" ? p.similarity >= 0.80 : true
+        );
+        setSearchResults(validProducts);
         const actualType =
           response.data?.search_type ||
           (targetImage && targetText
@@ -223,7 +228,7 @@ export default function SearchPage() {
             text: txtWeight,
           },
           query: targetText,
-          total: response.data?.total || response.data?.products?.length || 0,
+          total: validProducts.length,
         });
 
         if (response.data?.was_corrected && response.data?.suggested_query) {

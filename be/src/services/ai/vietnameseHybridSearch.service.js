@@ -336,7 +336,7 @@ class VietnameseHybridSearchService {
    * 4. MAIN HYBRID SEARCH PIPELINE
    * Thực thi tìm kiếm đa nguồn và xếp hạng thông minh
    */
-  async search({ queryText, topK = 10, minThreshold = 0.10, customerId = null }) {
+  async search({ queryText, topK = 10, minThreshold = 0.80, customerId = null }) {
     if (!queryText || typeof queryText !== 'string' || queryText.trim() === '') {
       const error = new Error('Vui lòng nhập từ khóa hoặc câu mô tả sản phẩm cần tìm');
       error.statusCode = 400;
@@ -488,36 +488,56 @@ class VietnameseHybridSearchService {
       // Tuyệt đối không giả định cận dưới giả tạo; Color Mismatch và CLIP fallback không thể phá vỡ thứ tự.
       let finalScore = 0;
 
-      if (parsed.category) {
+      // Kiểm tra loại trừ phân nhóm trang phục cụ thể nếu người dùng tìm kiếm từ khóa mang tính độc quyền danh mục
+      // Ví dụ: tìm "áo sơ mi" thì chỉ hiện áo sơ mi, nghiêm cấm "áo polo", "áo thun", "áo khoác"...
+      const qLower = (rawQuery || '').toLowerCase();
+      const pNameLower = (item.product_name || '').toLowerCase();
+      const pCatLower = (item.category_name || '').toLowerCase();
+
+      let isGarmentExcluded = false;
+      if (qLower.includes('sơ mi') || qLower.includes('so mi')) {
+        const isSomi = pNameLower.includes('sơ mi') || pCatLower.includes('sơ mi') || pNameLower.includes('shirt') || pNameLower.includes('oxford');
+        if (!isSomi || pNameLower.includes('polo') || pNameLower.includes('áo thun') || pNameLower.includes('ao thun')) {
+          isGarmentExcluded = true;
+        }
+      } else if (qLower.includes('polo')) {
+        const isPolo = pNameLower.includes('polo') || pCatLower.includes('polo');
+        if (!isPolo || pNameLower.includes('sơ mi') || pNameLower.includes('so mi')) {
+          isGarmentExcluded = true;
+        }
+      } else if (qLower.includes('thun') || qLower.includes('áo phông') || qLower.includes('ao phong')) {
+        const isThun = pNameLower.includes('thun') || pNameLower.includes('phông') || pCatLower.includes('thun');
+        if (!isThun || pNameLower.includes('sơ mi') || pNameLower.includes('polo')) {
+          isGarmentExcluded = true;
+        }
+      }
+
+      if (isGarmentExcluded) {
+        finalScore = 0.0;
+      } else if (parsed.category) {
         const rel = getCategoryRelationship(parsed.category, item.category_name);
 
         if (catalogHasExactCategory) {
-          // Ưu tiên: EXACT > RELATED > UNRELATED
+          // Ưu tiên cao nhất: EXACT. Khi catalog có danh mục chính xác, nghiêm cấm trả về danh mục khác
           if (rel.type === 'EXACT') {
-            // Tier 1 (EXACT): Dải điểm [0.5500, 1.0000]
-            finalScore = 0.55 + 0.45 * matchQuality;
-          } else if (rel.type === 'RELATED') {
-            // Tier 2 (RELATED): Dải điểm [0.2000, 0.5000]
-            finalScore = 0.20 + 0.30 * matchQuality;
+            // Tier 1 (EXACT): Dải điểm [0.8000, 1.0000] - Đảm bảo tỷ lệ khớp trên 80%
+            finalScore = 0.80 + 0.20 * matchQuality;
           } else {
-            // Tier 3 (UNRELATED hoặc UNKNOWN): Dải điểm [0.0000, 0.1500]
-            finalScore = 0.15 * matchQuality;
+            // Loại bỏ hoàn toàn các sản phẩm thuộc danh mục khác (như Áo Polo, Áo thun khi tìm Áo sơ mi)
+            finalScore = 0.0;
           }
         } else if (catalogHasRelatedCategory) {
-          // Ưu tiên: RELATED > UNRELATED
           if (rel.type === 'RELATED') {
-            // Tier 1 (RELATED): Dải điểm [0.3000, 0.9000]
-            finalScore = 0.30 + 0.60 * matchQuality;
+            finalScore = 0.80 * matchQuality;
           } else {
-            // Tier 2 (UNRELATED hoặc UNKNOWN): Dải điểm [0.0000, 0.1500]
-            finalScore = 0.15 * matchQuality;
+            finalScore = 0.0;
           }
         } else {
-          // Fallback có kiểm soát: Dải điểm [0.0000, 0.5000]
+          // Fallback có kiểm soát
           finalScore = 0.50 * matchQuality;
         }
       } else {
-        // Truy vấn không xác định danh mục: Điểm chất lượng trực tiếp [0.0000, 1.0000]
+        // Truy vấn không xác định danh mục cụ thể (tìm theo màu sắc, phong cách...)
         finalScore = matchQuality;
       }
 
@@ -546,14 +566,14 @@ class VietnameseHybridSearchService {
       };
     });
 
-    // Bước 6: Giới hạn và chuẩn hóa tham số topK, minThreshold
+    // Bước 6: Giới hạn và chuẩn hóa tham số topK, minThreshold (tối thiểu 0.80)
     const parsedTopK = parseInt(topK, 10);
     const clampedTopK = isNaN(parsedTopK) ? 10 : Math.max(1, Math.min(50, parsedTopK));
 
     const parsedThreshold = parseFloat(minThreshold);
-    const clampedThreshold = isNaN(parsedThreshold) ? 0.10 : Math.max(-1.0, Math.min(1.0, parsedThreshold));
+    const clampedThreshold = isNaN(parsedThreshold) ? 0.80 : Math.max(0.80, parsedThreshold);
 
-    // Bước 7: Lọc và Sắp xếp giảm dần
+    // Bước 7: Lọc và Sắp xếp giảm dần (Chỉ giữ lại các kết quả có tỷ lệ khớp >= 80%)
     const filteredResults = scoredProducts
       .filter((p) => p.similarity >= clampedThreshold)
       .sort((a, b) => b.similarity - a.similarity)

@@ -25,7 +25,7 @@ export async function searchByTextController(req, res, next) {
     const data = await searchByTextService({
       queryText: query,
       topK: top_k ? parseInt(top_k, 10) : 10,
-      minThreshold: threshold ? parseFloat(threshold) : 0.10,
+      minThreshold: threshold ? Math.max(0.80, parseFloat(threshold)) : 0.80,
       customerId,
     });
 
@@ -48,7 +48,7 @@ export async function searchByImageController(req, res, next) {
     const data = await searchByImageService({
       imageBuffer,
       topK: top_k ? parseInt(top_k, 10) : 10,
-      minThreshold: threshold ? parseFloat(threshold) : 0.10,
+      minThreshold: threshold ? Math.max(0.80, parseFloat(threshold)) : 0.80,
       customerId,
     });
 
@@ -72,7 +72,7 @@ export async function searchHybridController(req, res, next) {
       imageBuffer,
       queryText: query,
       topK: top_k ? parseInt(top_k, 10) : 10,
-      minThreshold: threshold ? parseFloat(threshold) : 0.10,
+      minThreshold: threshold ? Math.max(0.80, parseFloat(threshold)) : 0.80,
       customerId,
       imgWeight: image_weight !== undefined && image_weight !== null && !isNaN(parseFloat(image_weight))
         ? parseFloat(image_weight)
