@@ -315,6 +315,20 @@ async function main() {
     ],
     "variants": [
       {
+        "sku": "YOUTH-7644-RED-S",
+        "size": "S",
+        "color": "Đỏ",
+        "price": 250000,
+        "stock": 50
+      },
+      {
+        "sku": "YOUTH-7644-RED-M",
+        "size": "M",
+        "color": "Đỏ",
+        "price": 250000,
+        "stock": 50
+      },
+      {
         "sku": "YOUTH-7644-S",
         "size": "S",
         "color": "Đen",
@@ -1242,6 +1256,20 @@ async function main() {
       }
     ],
     "variants": [
+      {
+        "sku": "YOUTH-7370-RED-S",
+        "size": "S",
+        "color": "Đỏ",
+        "price": 250000,
+        "stock": 50
+      },
+      {
+        "sku": "YOUTH-7370-RED-M",
+        "size": "M",
+        "color": "Đỏ",
+        "price": 250000,
+        "stock": 50
+      },
       {
         "sku": "YOUTH-7370-S",
         "size": "S",

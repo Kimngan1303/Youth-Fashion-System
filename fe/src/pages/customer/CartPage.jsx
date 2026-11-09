@@ -217,13 +217,8 @@ export default function CartPage() {
 
   const finalTotal = Math.max(0, rawProductTotal - voucherDiscount);
 
-  // Original saved calculation
-  const totalOriginalSaving = selectedItems.reduce((sum, item) => {
-    if (item.originalPrice && item.originalPrice > item.price) {
-      return sum + (item.originalPrice - item.price) * item.quantity;
-    }
-    return sum;
-  }, 0) + voucherDiscount;
+  // Voucher saved calculation
+  const totalOriginalSaving = voucherDiscount;
 
   // Điều hướng sang Chat để tư vấn đơn hàng kèm thông tin giỏ hàng hiện tại
   const handleContactOrderInquiry = (e) => {
@@ -364,16 +359,11 @@ export default function CartPage() {
                         </div>
                       </div>
 
-                      {/* Unit Price */}
+                      {/* Unit Price (Chỉ hiển thị giá tiền thật) */}
                       <div className="item-price-col">
                         <span className="item-price-current">
                           {item.price.toLocaleString('vi-VN')}₫
                         </span>
-                        {item.originalPrice && item.originalPrice > item.price && (
-                          <span className="item-price-original">
-                            {item.originalPrice.toLocaleString('vi-VN')}₫
-                          </span>
-                        )}
                       </div>
 
                       {/* Quantity Controller */}
@@ -499,9 +489,9 @@ export default function CartPage() {
                 </div>
                 <div className="total-right">
                   <span className="total-amount">{finalTotal.toLocaleString('vi-VN')}₫</span>
-                  {totalOriginalSaving > 0 && (
+                  {voucherDiscount > 0 && (
                     <span className="total-savings">
-                      Tiết kiệm {totalOriginalSaving.toLocaleString('vi-VN')}₫ so với giá gốc
+                      Tiết kiệm {voucherDiscount.toLocaleString('vi-VN')}₫ từ mã giảm giá
                     </span>
                   )}
                 </div>
