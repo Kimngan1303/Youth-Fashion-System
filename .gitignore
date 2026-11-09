@@ -27,6 +27,7 @@ Thumbs.db
 .idea/
 
 # Reports & Documentation
+docs/
 ai-log.md
 README.md
 ReadmeN.md
