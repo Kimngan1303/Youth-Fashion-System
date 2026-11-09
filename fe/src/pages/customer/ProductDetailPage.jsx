@@ -31,8 +31,8 @@ const FIGMA_COAT_DATA = {
   badge: 'BEST SELLER',
   collection: 'ATELIER COLLECTION SS25',
   price: 3450000,
-  original_price: 4200000,
-  discount: '-18% ƯU ĐÃI',
+  original_price: null,
+  discount: null,
   rating: 4.9,
   reviews_count: 128,
   stock_alert: 'Chỉ còn 4 sản phẩm trong kho',
@@ -335,8 +335,7 @@ export default function ProductDetailPage() {
             : FIGMA_COAT_DATA.images;
 
           const variantPrices = data.variants?.map(v => Number(v.price)).filter(p => p > 0) || [];
-          const primaryPrice = variantPrices.length > 0 ? Math.min(...variantPrices) : FIGMA_COAT_DATA.price;
-          const origPrice = Math.round(primaryPrice * 1.22);
+          const primaryPrice = variantPrices.length > 0 ? variantPrices[0] : (Number(data.price) || FIGMA_COAT_DATA.price);
 
           const cat = String(data.category?.category_name || '').toLowerCase();
           const name = String(data.product_name || '').toLowerCase();
@@ -373,7 +372,8 @@ export default function ProductDetailPage() {
             category_name: data.category?.category_name || FIGMA_COAT_DATA.category_name,
             brand_name: data.brand?.brand_name || FIGMA_COAT_DATA.brand_name,
             price: primaryPrice,
-            original_price: origPrice,
+            original_price: null,
+            discount: null,
             images: imagesList,
             sizes: uniqueSizes,
             colors: uniqueColors,
@@ -437,6 +437,14 @@ export default function ProductDetailPage() {
   const activeImage = product.images?.[activeImageIndex]?.url || product.images?.[0]?.url;
   const isWishlisted = Boolean(user && wishlist.some(item => (typeof item === 'object' ? (item.id === product.id || item.product_id === product.id) : item === product.id)));
 
+  const currentColorObj = product.colors?.find(c => c.id === selectedColor) || product.colors?.[0];
+  const matchedVariant = product.rawVariants?.find(v => 
+    String(v.color || '').trim().toLowerCase() === String(currentColorObj?.name || '').trim().toLowerCase() &&
+    (!selectedSize || String(v.size || '').trim().toUpperCase() === String(selectedSize || '').trim().toUpperCase())
+  ) || product.rawVariants?.[0];
+
+  const currentDisplayPrice = matchedVariant?.price ? Number(matchedVariant.price) : product.price;
+
   const handleToggleWishlist = () => {
     if (!user) {
       showInfo('Vui lòng đăng nhập để thêm sản phẩm vào danh sách yêu thích!');
@@ -469,12 +477,6 @@ export default function ProductDetailPage() {
       return;
     }
 
-    const currentColorObj = product.colors.find(c => c.id === selectedColor);
-    const matchedVariant = product.rawVariants?.find(v => 
-      String(v.color || '').trim().toLowerCase() === String(currentColorObj?.name || '').trim().toLowerCase() &&
-      (!selectedSize || String(v.size || '').trim().toUpperCase() === String(selectedSize || '').trim().toUpperCase())
-    ) || product.rawVariants?.[0];
-
     const sizeToAdd = categoryType === 'accessory' ? 'Tiêu chuẩn' : (selectedSize || product.sizes?.[0] || 'Tiêu chuẩn');
 
     addToCart(
@@ -484,8 +486,8 @@ export default function ProductDetailPage() {
         variant_id: matchedVariant?.variant_id,
         title: product.product_name,
         name: product.product_name,
-        price: matchedVariant ? Number(matchedVariant.price) : product.price,
-        originalPrice: product.original_price,
+        price: currentDisplayPrice,
+        originalPrice: null,
         image: activeImage,
         colorName: currentColorObj?.name || 'Mặc định',
         colorDot: currentColorObj?.hex || getColorHex(currentColorObj?.name || ''),
@@ -506,12 +508,39 @@ export default function ProductDetailPage() {
   const handleBuyNow = () => {
     if (!user) {
       showInfo('Vui lòng đăng nhập để mua hàng!');
-      navigate('/login');
+      navigate('/login', { state: { from: location.pathname } });
       return;
     }
 
-    handleAddToCart();
-    navigate('/cart');
+    const sizeToAdd = categoryType === 'accessory' ? 'Tiêu chuẩn' : (selectedSize || product.sizes?.[0] || 'Tiêu chuẩn');
+    const unitPrice = currentDisplayPrice;
+
+    const buyNowItem = {
+      id: `${product.id}-${sizeToAdd}-${selectedColor}`,
+      product_id: product.id,
+      productId: product.id,
+      variant_id: matchedVariant?.variant_id || null,
+      sku: matchedVariant?.sku_code || 'SKU-001',
+      title: product.product_name,
+      product_name: product.product_name,
+      name: product.product_name,
+      price: unitPrice,
+      originalPrice: null,
+      image: activeImage,
+      size: sizeToAdd,
+      color: currentColorObj?.name || 'Mặc định',
+      colorName: currentColorObj?.name || 'Mặc định',
+      colorDot: currentColorObj?.hex || getColorHex(currentColorObj?.name || ''),
+      quantity: Number(quantity) || 1,
+      selected: true,
+      isBuyNow: true,
+    };
+
+    try {
+      sessionStorage.setItem('yf_buy_now_item', JSON.stringify(buyNowItem));
+    } catch (e) {}
+
+    navigate('/checkout', { state: { buyNowItem } });
   };
 
   const handleHelpfulClick = (reviewId) => {
@@ -640,18 +669,8 @@ export default function ProductDetailPage() {
               {/* Price row */}
               <div className="price-container-row">
                 <span className="current-price font-serif">
-                  {product.price?.toLocaleString('vi-VN')}₫
+                  {currentDisplayPrice?.toLocaleString('vi-VN')}₫
                 </span>
-                {product.original_price && (
-                  <span className="original-price">
-                    {product.original_price?.toLocaleString('vi-VN')}₫
-                  </span>
-                )}
-                {product.discount && (
-                  <span className="discount-pill">
-                    {product.discount}
-                  </span>
-                )}
               </div>
             </div>
 

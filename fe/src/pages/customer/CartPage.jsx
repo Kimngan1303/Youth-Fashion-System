@@ -35,12 +35,26 @@ export default function CartPage() {
 
   // Lắng nghe cập nhật danh sách voucher từ Trang cá nhân / Quản lý và CSDL MySQL
   useEffect(() => {
-    voucherService.fetchVouchers().then(() => {
-      setAvailableVouchers(voucherService.getCustomerVouchers());
-    }).catch(() => {});
-    const unsubscribe = voucherService.subscribe(() => {
-      setAvailableVouchers(voucherService.getCustomerVouchers());
-    });
+    const syncActiveVouchers = () => {
+      const activeList = voucherService.getCustomerVouchers();
+      setAvailableVouchers(activeList);
+      setAppliedVoucher((current) => {
+        if (!current) return null;
+        const stillValid = activeList.some(
+          (v) => String(v.code).trim().toUpperCase() === String(current.code).trim().toUpperCase()
+        );
+        if (!stillValid) {
+          sessionStorage.removeItem('yf_checkout_voucher');
+          setVoucherCode('');
+          showError(`Mã ưu đãi ${current.code} hiện không còn hiệu lực hoặc chưa được kích hoạt.`);
+          return null;
+        }
+        return current;
+      });
+    };
+
+    voucherService.fetchVouchers().then(syncActiveVouchers).catch(() => {});
+    const unsubscribe = voucherService.subscribe(syncActiveVouchers);
     return unsubscribe;
   }, []);
 
