@@ -384,6 +384,8 @@ export const clearAllOrders = async () => {
 export const deleteOrderById = async (orderIdOrNumber) => {
   try {
     const rawStr = String(orderIdOrNumber || '').trim();
+    if (!rawStr) return { count: 0 };
+
     const digitsOnly = rawStr.replace(/\D/g, '');
     const variants = [rawStr, `YF-${rawStr}`, `YF - ${rawStr}`];
     if (digitsOnly) variants.push(digitsOnly, `YF-${digitsOnly}`, `YF - ${digitsOnly}`);
@@ -400,7 +402,6 @@ export const deleteOrderById = async (orderIdOrNumber) => {
 
     const foundOrders = await prisma.order.findMany({
       where: { OR: orConditions },
-      select: { order_id: true, voucher_code: true },
       include: { order_items: true },
     });
 
@@ -415,16 +416,12 @@ export const deleteOrderById = async (orderIdOrNumber) => {
           }
         }
       }
-      if (ord.voucher_code) {
-        await prisma.voucher.updateMany({
-          where: { code: ord.voucher_code.toUpperCase().trim() },
-          data: { used_count: { decrement: 1 } },
-        }).catch(() => {});
-      }
     }
 
-    const ids = foundOrders.map(o => o.order_id);
+    const ids = foundOrders.map((o) => o.order_id);
     if (ids.length > 0) {
+      await prisma.returnRequest.deleteMany({ where: { order_id: { in: ids } } });
+      await prisma.orderStatusHistory.deleteMany({ where: { order_id: { in: ids } } });
       await prisma.payment.deleteMany({ where: { order_id: { in: ids } } });
       await prisma.orderItem.deleteMany({ where: { order_id: { in: ids } } });
       return await prisma.order.deleteMany({ where: { order_id: { in: ids } } });
