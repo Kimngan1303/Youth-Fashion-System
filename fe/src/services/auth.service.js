@@ -70,6 +70,14 @@ export const authService = {
   },
 
   /**
+   * Get current user profile from database
+   */
+  getProfile: async () => {
+    const response = await axiosClient.get('/auth/profile');
+    return response.data;
+  },
+
+  /**
    * Update customer profile in database
    */
   updateProfile: async (profileData) => {

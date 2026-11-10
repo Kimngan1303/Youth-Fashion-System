@@ -336,6 +336,7 @@ export const loginService = async ({ email, password, user_type }) => {
       dob: user.dob || null,
       role,
       user_type,
+      created_at: user.created_at,
     },
   };
 };
@@ -452,6 +453,7 @@ export const googleLoginService = async ({ credential, email: directEmail, name:
       dob: customer.dob || null,
       role: 'CUSTOMER',
       user_type: 'CUSTOMER',
+      created_at: customer.created_at,
     },
   };
 };
@@ -576,6 +578,7 @@ export const updateProfileService = async ({ customer_id, user_type, full_name, 
       dob: dob || null,
       role: updated.employee_role,
       user_type: 'EMPLOYEE',
+      created_at: updated.created_at,
     };
   }
 
@@ -597,6 +600,7 @@ export const updateProfileService = async ({ customer_id, user_type, full_name, 
     dob: updatedCustomer.dob,
     role: 'CUSTOMER',
     user_type: 'CUSTOMER',
+    created_at: updatedCustomer.created_at,
   };
 };
 
@@ -727,5 +731,65 @@ export const resetPasswordService = async ({ email, otp, new_password }) => {
     message: 'Đặt lại mật khẩu thành công! Quý khách có thể đăng nhập ngay với mật khẩu mới.',
   };
 };
+
+/**
+ * Lấy thông tin hồ sơ người dùng hiện tại kèm ngày đăng ký created_at
+ */
+export const getProfileService = async ({ customer_id, user_type }) => {
+  const isEmployee = user_type === 'EMPLOYEE' || user_type === 'ADMIN' || user_type === 'MANAGER';
+  if (isEmployee) {
+    const emp = await prisma.employee.findUnique({
+      where: { employee_id: BigInt(customer_id) },
+    });
+    if (emp) {
+      return {
+        id: emp.employee_id.toString(),
+        customer_id: emp.employee_id.toString(),
+        email: emp.email,
+        full_name: emp.full_name,
+        phone: emp.phone || '',
+        avatar_url: emp.avatar_url || null,
+        role: emp.employee_role,
+        user_type: 'EMPLOYEE',
+        created_at: emp.created_at,
+      };
+    }
+  }
+
+  const cust = await findCustomerById(customer_id);
+  if (cust) {
+    return {
+      id: cust.customer_id.toString(),
+      customer_id: cust.customer_id.toString(),
+      email: cust.email,
+      full_name: cust.full_name,
+      phone: cust.phone || '',
+      avatar_url: cust.avatar_url,
+      gender: cust.gender,
+      dob: cust.dob,
+      role: 'CUSTOMER',
+      user_type: 'CUSTOMER',
+      created_at: cust.created_at,
+    };
+  }
+
+  const empFallback = await prisma.employee.findUnique({ where: { employee_id: BigInt(customer_id) } });
+  if (empFallback) {
+    return {
+      id: empFallback.employee_id.toString(),
+      customer_id: empFallback.employee_id.toString(),
+      email: empFallback.email,
+      full_name: empFallback.full_name,
+      phone: empFallback.phone || '',
+      avatar_url: empFallback.avatar_url || null,
+      role: empFallback.employee_role,
+      user_type: 'EMPLOYEE',
+      created_at: empFallback.created_at,
+    };
+  }
+
+  throw { statusCode: 404, message: 'Không tìm thấy tài khoản người dùng' };
+};
+
 
 
