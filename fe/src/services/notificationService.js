@@ -108,6 +108,27 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
         badgeColor: '#7E22CE',
         badgeBg: '#F3E8FF',
       };
+    case 'DELIVERY_FAILED':
+    case 'FAILED_DELIVERY':
+      if (extraData.willRetry || extraData.retryDate) {
+        const formattedDate = extraData.retryDate ? new Date(extraData.retryDate).toLocaleDateString('vi-VN') : 'ngày tiếp theo';
+        return {
+          type: 'ORDER_DELIVERY_FAILED_RETRY',
+          title: `Giao hàng chưa thành công #${code} - Hẹn giao lại`,
+          message: `Đơn vị vận chuyển đã cố gắng phát đơn hàng #${code} nhưng chưa thành công. Lý do: "${reason || 'Không liên lạc được với người nhận'}". Đơn vị sẽ giao lại vào ${formattedDate}. Vui lòng chú ý điện thoại.`,
+          badge: 'HẸN GIAO LẠI',
+          badgeColor: '#D97706',
+          badgeBg: '#FEF3C7',
+        };
+      }
+      return {
+        type: 'ORDER_DELIVERY_FAILED',
+        title: `Giao hàng không thành công #${code}`,
+        message: `Đơn hàng #${code} giao không thành công. Lý do: "${reason || 'Không thể liên lạc hoặc khách từ chối nhận'}". Đơn hàng sẽ được chuyển hoàn về kho.`,
+        badge: 'GIAO THẤT BẠI',
+        badgeColor: '#B91C1C',
+        badgeBg: '#FEE2E2',
+      };
     default:
       return {
         type: 'ORDER_STATUS_CHANGED',

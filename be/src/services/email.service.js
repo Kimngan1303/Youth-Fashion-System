@@ -476,6 +476,27 @@ export const sendOrderNotificationEmail = async ({
       bg: '#FEF2F2',
       border: '#FCA5A5',
     };
+  } else if (s === 'DELIVERY_FAILED' || s === 'FAILED_DELIVERY') {
+    const willRetry = extraData?.willRetry || extraData?.retryDate;
+    subject = willRetry
+      ? `Youth Fashion - Thông báo hẹn giao lại đơn hàng #${orderNumber}`
+      : `Youth Fashion - Thông báo giao hàng không thành công đơn hàng #${orderNumber}`;
+    badgeText = willRetry ? 'HẸN GIAO LẠI' : 'GIAO THẤT BẠI';
+    badgeBg = willRetry ? '#FEF3C7' : '#FEE2E2';
+    badgeColor = willRetry ? '#D97706' : '#B91C1C';
+    headline = willRetry
+      ? 'Đơn hàng giao chưa thành công - Sẽ tiến hành giao lại'
+      : 'Đơn hàng giao không thành công';
+    messageBody = willRetry
+      ? `Đối tác vận chuyển của Youth Fashion đã cố gắng phát đơn hàng <strong>#${orderNumber}</strong> nhưng chưa thể liên hệ hoặc giao tận tay Quý khách. Đơn vị sẽ <strong>tiến hành giao lại vào ngày ${extraData?.retryDate ? new Date(extraData.retryDate).toLocaleDateString('vi-VN') : 'làm việc tiếp theo'}</strong>. Quý khách vui lòng lưu ý điện thoại.`
+      : `Đối tác vận chuyển thông báo không thể giao đơn hàng <strong>#${orderNumber}</strong> đến Quý khách. Đơn hàng sẽ được chuyển hoàn về kho của Youth Fashion.`;
+    alertBox = {
+      title: 'Lý do giao hàng chưa thành công',
+      content: reason || extraData?.reason || 'Không thể liên lạc được với người nhận hoặc khách hẹn ngày khác.',
+      color: willRetry ? '#B45309' : '#991B1B',
+      bg: willRetry ? '#FFFBEB' : '#FEF2F2',
+      border: willRetry ? '#FCD34D' : '#FCA5A5',
+    };
   }
 
   // Danh sách sản phẩm (OrderItem)
