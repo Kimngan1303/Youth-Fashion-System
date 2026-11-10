@@ -567,6 +567,10 @@ const applyStatusOverrides = (ordersList) => {
           refund_bank: ov.refund_bank || ord.refund_bank,
           refund_reason: ov.refund_reason || ord.refund_reason,
           reject_reason: resolvedRejectReason,
+          delivery_status: ov.delivery_status || ord.delivery_status,
+          delivery_fail_reason: ov.delivery_fail_reason || ord.delivery_fail_reason,
+          retry_date: ov.retry_date || ord.retry_date,
+          delivery_attempts: ov.delivery_attempts || ord.delivery_attempts,
           note: ov.note || ord.note,
         };
       }
@@ -1192,6 +1196,10 @@ const ProfilePage = () => {
                 refund_decision: detail.refund_decision || ord.refund_decision,
                 refund_bank: detail.refund_bank || ord.refund_bank,
                 reject_reason: detail.reject_reason || ord.reject_reason,
+                delivery_status: detail.delivery_status !== undefined ? detail.delivery_status : ord.delivery_status,
+                delivery_fail_reason: detail.delivery_fail_reason !== undefined ? detail.delivery_fail_reason : ord.delivery_fail_reason,
+                retry_date: detail.retry_date !== undefined ? detail.retry_date : ord.retry_date,
+                delivery_attempts: detail.delivery_attempts !== undefined ? detail.delivery_attempts : ord.delivery_attempts,
                 note: detail.note || ord.note,
               };
             }
@@ -1229,6 +1237,10 @@ const ProfilePage = () => {
               refund_decision: detail.refund_decision || prev.refund_decision,
               refund_bank: detail.refund_bank || prev.refund_bank,
               reject_reason: detail.reject_reason || prev.reject_reason,
+              delivery_status: detail.delivery_status !== undefined ? detail.delivery_status : prev.delivery_status,
+              delivery_fail_reason: detail.delivery_fail_reason !== undefined ? detail.delivery_fail_reason : prev.delivery_fail_reason,
+              retry_date: detail.retry_date !== undefined ? detail.retry_date : prev.retry_date,
+              delivery_attempts: detail.delivery_attempts !== undefined ? detail.delivery_attempts : prev.delivery_attempts,
               note: detail.note || prev.note,
             };
           }
@@ -2831,6 +2843,10 @@ const ProfilePage = () => {
                                 <span className="status-badge-pill badge-cancelled">
                                   <X size={14} strokeWidth={2.5} /> {ord.status_label || 'ĐÃ HỦY'}
                                 </span>
+                              ) : (ord.delivery_status === 'FAILED_RETRY' || String(ord.status_label || '').toUpperCase().includes('GIAO THẤT BẠI') || String(ord.status_label || '').toUpperCase().includes('HẸN GIAO LẠI')) ? (
+                                <span className="status-badge-pill" style={{ background: '#FFFBEB', color: '#B45309', border: '1px solid #FDE68A', fontWeight: 700 }}>
+                                  <Clock size={14} /> {ord.status_label || 'GIAO THẤT BẠI - HẸN GIAO LẠI'}
+                                </span>
                               ) : (statusCat === 'SHIPPING' || ord.status === 'SHIPPING' || ord.status_label === 'ĐANG GIAO HÀNG HỎA TỐC' || ord.status_label === 'ĐANG VẬN CHUYỂN') ? (
                                 <span className="status-badge-pill badge-shipping">
                                   <Truck size={14} /> {ord.status_label === 'CHỜ GIAO HÀNG' ? 'ĐANG VẬN CHUYỂN' : (ord.status_label || 'ĐANG VẬN CHUYỂN')}
@@ -3003,6 +3019,46 @@ const ProfilePage = () => {
                               </div>
                             );
                           })()}
+
+                          {/* Khối cảnh báo nếu giao hàng thất bại / hẹn giao lại */}
+                          {(ord.delivery_status === 'FAILED_RETRY' || ord.delivery_status === 'FAILED_RETURN' || (ord.delivery_fail_reason && statusCat !== 'COMPLETED')) && (
+                            <div style={{
+                              margin: '0 0 12px',
+                              padding: '12px 14px',
+                              background: '#FFFBEB',
+                              border: '1.5px solid #FDE68A',
+                              borderRadius: '8px',
+                              fontSize: '12.5px',
+                              color: '#92400E',
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '10px',
+                              width: '100%',
+                              boxSizing: 'border-box'
+                            }}>
+                              <AlertCircle size={16} style={{ color: '#D97706', flexShrink: 0, marginTop: '2px' }} />
+                              <div style={{ flex: 1, lineHeight: '1.5' }}>
+                                <div>
+                                  <strong style={{ color: '#B45309' }}>Cập nhật giao hàng:</strong>{' '}
+                                  <span>Giao hàng chưa thành công{ord.delivery_attempts ? ` (Lần ${ord.delivery_attempts})` : ''}.</span>
+                                </div>
+                                {ord.delivery_fail_reason && (
+                                  <div style={{ marginTop: '2px', color: '#78350F' }}>
+                                    Lý do shipper báo: <strong>"{ord.delivery_fail_reason}"</strong>
+                                  </div>
+                                )}
+                                {ord.retry_date ? (
+                                  <div style={{ marginTop: '4px', fontWeight: 600, color: '#B45309' }}>
+                                    Hệ thống đã lên lịch giao lại vào ngày: <span style={{ textDecoration: 'underline' }}>{new Date(ord.retry_date).toLocaleDateString('vi-VN')}</span>. Vui lòng chú ý điện thoại để nhận hàng.
+                                  </div>
+                                ) : (ord.delivery_status === 'FAILED_RETURN' || statusCat === 'CANCELLED') ? (
+                                  <div style={{ marginTop: '4px', color: '#B91C1C', fontWeight: 600 }}>
+                                    Đơn hàng đã được chuyển hoàn về kho do giao không thành công nhiều lần hoặc theo yêu cầu.
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          )}
 
                           {/* Footer & Action Buttons */}
                           <div className="order-card-footer">
@@ -3348,7 +3404,13 @@ const ProfilePage = () => {
         const recipientPhone = trackingModalOrder.recipient_phone || trackingModalOrder.customer?.phone || trackingModalOrder.phone || user?.phone || '';
         const recipientAddress = trackingModalOrder.shipping_address || trackingModalOrder.address || trackingModalOrder.customer?.address || (typeof user?.address === 'string' ? user.address : [user?.address?.detail, user?.address?.ward, user?.address?.district, user?.address?.province].filter(Boolean).join(', ')) || '';
 
-        const statusBadgeStyle = modalCat === 'COMPLETED'
+        const isDeliveryRetry = trackingModalOrder.delivery_status === 'FAILED_RETRY' ||
+          String(trackingModalOrder.status_label || '').toUpperCase().includes('GIAO THẤT BẠI') ||
+          String(trackingModalOrder.status_label || '').toUpperCase().includes('HẸN GIAO LẠI');
+
+        const statusBadgeStyle = isDeliveryRetry
+          ? { background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }
+          : (modalCat === 'COMPLETED'
           ? { background: '#dcfce7', color: '#15803d' }
           : (modalCat === 'SHIPPING'
             ? { background: '#dbeafe', color: '#1d4ed8' }
@@ -3362,9 +3424,11 @@ const ProfilePage = () => {
                     : (isRejected
                       ? { background: '#fee2e2', color: '#b91c1c' }
                       : { background: '#f3e8ff', color: '#7e22ce' }))
-                  : { background: '#fef3c7', color: '#b45309' }))));
+                  : { background: '#fef3c7', color: '#b45309' })))));
 
-        const statusText = modalCat === 'COMPLETED'
+        const statusText = isDeliveryRetry
+          ? (trackingModalOrder.status_label || 'GIAO THẤT BẠI - HẸN GIAO LẠI')
+          : (modalCat === 'COMPLETED'
           ? 'ĐÃ GIAO HÀNG'
           : (modalCat === 'SHIPPING'
             ? 'ĐANG VẬN CHUYỂN'
@@ -3374,7 +3438,7 @@ const ProfilePage = () => {
                 ? 'ĐÃ HỦY'
                 : (modalCat === 'RETURNED'
                   ? (isApproved ? 'ĐÃ HOÀN TIỀN' : (isRejected ? 'TỪ CHỐI HOÀN TIỀN' : 'ĐỔI TRẢ'))
-                  : 'CHỜ XÁC NHẬN'))));
+                  : 'CHỜ XÁC NHẬN')))));
 
         return (
           <div className="profile-modal-overlay animate-fade-in" onClick={() => setTrackingModalOrder(null)}>
@@ -3586,11 +3650,38 @@ const ProfilePage = () => {
                   </div>
                 </div>
               ) : (
-                <div className="tracking-modal-card">
-                  <div className="carrier-badge-row">
-                    <span className="carrier-name">🚚 Giao Hàng Nhanh (Express VIP)</span>
-                    <span className="carrier-code">Mã bưu cục: GHN-VFP-{String(trackingModalOrder.order_code || trackingModalOrder.order_id).replace(/\D/g, '').slice(-6) || '494124'}</span>
-                  </div>
+                <>
+                  {isDeliveryRetry && (
+                    <div style={{
+                      background: '#FFFBEB',
+                      border: '1.5px solid #FDE68A',
+                      borderRadius: '10px',
+                      padding: '12px 16px',
+                      marginBottom: '14px',
+                      fontSize: '13px',
+                      color: '#92400E'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                        <AlertCircle size={16} style={{ color: '#D97706' }} />
+                        <strong style={{ color: '#B45309' }}>Giao hàng chưa thành công{trackingModalOrder.delivery_attempts ? ` (Lần ${trackingModalOrder.delivery_attempts})` : ''}</strong>
+                      </div>
+                      {trackingModalOrder.delivery_fail_reason && (
+                        <div style={{ color: '#78350F', marginBottom: '4px' }}>
+                          Lý do shipper báo: <strong>"{trackingModalOrder.delivery_fail_reason}"</strong>
+                        </div>
+                      )}
+                      {trackingModalOrder.retry_date && (
+                        <div style={{ color: '#B45309', fontWeight: 600 }}>
+                          Lịch hẹn giao lại dự kiến: <u>{new Date(trackingModalOrder.retry_date).toLocaleDateString('vi-VN')}</u>. Shipper sẽ liên hệ trước khi đến.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="tracking-modal-card">
+                    <div className="carrier-badge-row">
+                      <span className="carrier-name">🚚 Giao Hàng Nhanh (Express VIP)</span>
+                      <span className="carrier-code">Mã bưu cục: GHN-VFP-{String(trackingModalOrder.order_code || trackingModalOrder.order_id).replace(/\D/g, '').slice(-6) || '494124'}</span>
+                    </div>
                   {isShippingOrDelivered ? (
                     <div className="shipper-info-box">
                       <User size={15} />
@@ -3602,7 +3693,8 @@ const ProfilePage = () => {
                       <span className="pending-note">Thông tin tài xế sẽ hiển thị khi đơn hàng chuyển sang trạng thái <strong>Đang vận chuyển</strong>.</span>
                     </div>
                   )}
-                </div>
+                  </div>
+                </>
               )}
 
               {/* 3. Nhật ký hành trình đơn hàng */}
@@ -3647,7 +3739,21 @@ const ProfilePage = () => {
                   if (modalCat === 'SHIPPING') {
                     return (
                       <>
-                        <div className="history-step active">
+                        {isDeliveryRetry && (
+                          <div className="history-step active">
+                            <div className="history-dot" style={{ background: '#D97706' }} />
+                            <div className="history-content">
+                              <span className="history-time" style={{ color: '#D97706' }}>
+                                Giao chưa thành công{trackingModalOrder.delivery_attempts ? ` (Lần ${trackingModalOrder.delivery_attempts})` : ''} - Hẹn giao lại
+                              </span>
+                              <p className="history-text" style={{ color: '#78350F' }}>
+                                {trackingModalOrder.delivery_fail_reason ? `Lý do: "${trackingModalOrder.delivery_fail_reason}".` : 'Chưa giao được cho người nhận.'}
+                                {trackingModalOrder.retry_date ? ` Đơn vị vận chuyển đã lên lịch phát lại vào ngày ${new Date(trackingModalOrder.retry_date).toLocaleDateString('vi-VN')}.` : ' Sẽ liên hệ lại để giao hàng.'}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        <div className={`history-step ${!isDeliveryRetry ? 'active' : ''}`}>
                           <div className="history-dot" />
                           <div className="history-content">
                             <span className="history-time">{orderDate} - Đã bàn giao shipper</span>

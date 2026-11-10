@@ -2,6 +2,7 @@
  * notificationService.js
  * Quản lý và đồng bộ thông báo đơn hàng theo thời gian thực cho người mua
  */
+import axiosClient from './axiosClient';
 
 // Định dạng thời gian tương đối thân thiện bằng tiếng Việt
 export const formatNotificationTime = (timestampOrIso) => {
@@ -107,6 +108,27 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
         badgeColor: '#7E22CE',
         badgeBg: '#F3E8FF',
       };
+    case 'DELIVERY_FAILED':
+    case 'FAILED_DELIVERY':
+      if (extraData.willRetry || extraData.retryDate) {
+        const formattedDate = extraData.retryDate ? new Date(extraData.retryDate).toLocaleDateString('vi-VN') : 'ngày tiếp theo';
+        return {
+          type: 'ORDER_DELIVERY_FAILED_RETRY',
+          title: `Giao hàng chưa thành công #${code} - Hẹn giao lại`,
+          message: `Đơn vị vận chuyển đã cố gắng phát đơn hàng #${code} nhưng chưa thành công. Lý do: "${reason || 'Không liên lạc được với người nhận'}". Đơn vị sẽ giao lại vào ${formattedDate}. Vui lòng chú ý điện thoại.`,
+          badge: 'HẸN GIAO LẠI',
+          badgeColor: '#D97706',
+          badgeBg: '#FEF3C7',
+        };
+      }
+      return {
+        type: 'ORDER_DELIVERY_FAILED',
+        title: `Giao hàng không thành công #${code}`,
+        message: `Đơn hàng #${code} giao không thành công. Lý do: "${reason || 'Không thể liên lạc hoặc khách từ chối nhận'}". Đơn hàng sẽ được chuyển hoàn về kho.`,
+        badge: 'GIAO THẤT BẠI',
+        badgeColor: '#B91C1C',
+        badgeBg: '#FEE2E2',
+      };
     default:
       return {
         type: 'ORDER_STATUS_CHANGED',
@@ -191,6 +213,46 @@ export const sendOrderStatusNotification = (order, newStatus, extraData = {}) =>
     bc.postMessage({ type: 'NEW_NOTIFICATION', notif: newNotif });
     bc.close();
   } catch (e) {}
+
+  // 3. Đồng bộ gửi thông báo về Gmail của khách hàng qua Backend API
+  try {
+    const recipientEmail =
+      newNotif.customer_email ||
+      order.recipient_email ||
+      order.customer?.email ||
+      order.email ||
+      '';
+
+    if (recipientEmail && recipientEmail.includes('@')) {
+      axiosClient
+        .post('/orders/notify-email', {
+          orderId: newNotif.order_id,
+          orderNumber: newNotif.order_number,
+          recipientEmail,
+          newStatus,
+          extraData: {
+            ...extraData,
+            recipientName: order.recipient_name || order.customer?.full_name,
+            recipientPhone: order.recipient_phone || order.phone,
+            shippingAddress: [
+              order.shipping_address_line,
+              order.shipping_ward,
+              order.shipping_district,
+              order.shipping_city,
+            ]
+              .filter(Boolean)
+              .join(', '),
+            totalAmount: order.total_amount,
+            items: order.order_items || [],
+          },
+        })
+        .catch((err) => {
+          console.warn('Lỗi khi gửi email thông báo tự động:', err?.message);
+        });
+    }
+  } catch (e) {
+    console.warn('Lỗi kích hoạt gửi email thông báo:', e);
+  }
 
   return newNotif;
 };

@@ -1,6 +1,7 @@
 import * as orderRepo from '../repositories/order.repository.js';
 import * as payosService from './payos.service.js';
 import { prisma } from '../repositories/prisma.js';
+import { sendOrderNotificationEmail } from './email.service.js';
 
 /**
  * Service xử lý toàn bộ luồng nghiệp vụ tạo đơn hàng, tính tiền, và kết nối cổng PayOS
@@ -143,6 +144,17 @@ export const createOrderService = async ({
   }
 
   // Với phương thức COD:
+  // Tự động gửi email thông báo đặt hàng thành công đến Gmail của khách
+  if (recipientEmail) {
+    sendOrderNotificationEmail({
+      toEmail: recipientEmail,
+      order: createdOrder,
+      status: 'ORDER_CREATED',
+    }).catch((emailErr) => {
+      console.error('Lỗi khi gửi email xác nhận đặt hàng COD:', emailErr.message);
+    });
+  }
+
   return {
     order: createdOrder,
     orderCode,
@@ -196,6 +208,18 @@ export const checkPayosStatusService = async (orderCode) => {
     await orderRepo.updatePaymentStatus(order.order_id, 'SUCCESS', {
       transactionId: payosInfo.reference || `TXN_${orderCode}`,
     });
+
+    // Gửi email xác nhận thanh toán thành công về Gmail của khách
+    const targetEmail = order.recipient_email || order.customer?.email;
+    if (targetEmail) {
+      sendOrderNotificationEmail({
+        toEmail: targetEmail,
+        order,
+        status: 'CONFIRMED',
+      }).catch((emailErr) => {
+        console.error('Lỗi khi gửi email xác nhận thanh toán PayOS:', emailErr.message);
+      });
+    }
 
     // Xóa các sản phẩm đã thanh toán khỏi giỏ hàng MySQL của khách
     if (order.customer_id && order.order_items?.length > 0) {
@@ -257,6 +281,18 @@ export const handlePayosWebhookService = async (webhookBody) => {
       transactionId: reference,
     });
 
+    // Gửi email thông báo thanh toán thành công qua Webhook
+    const targetEmail = order.recipient_email || order.customer?.email;
+    if (targetEmail) {
+      sendOrderNotificationEmail({
+        toEmail: targetEmail,
+        order,
+        status: 'CONFIRMED',
+      }).catch((emailErr) => {
+        console.error('Lỗi khi gửi email webhook PayOS:', emailErr.message);
+      });
+    }
+
     if (order.customer_id && order.order_items?.length > 0) {
       const customerCart = await prisma.cart.findUnique({
         where: { customer_id: order.customer_id },
@@ -279,10 +315,30 @@ export const handlePayosWebhookService = async (webhookBody) => {
 };
 
 /**
- * Hủy đơn hàng và lưu lý do hủy
+ * Hủy đơn hàng và lưu lý do hủy, đồng thời gửi email thông báo
  */
 export const cancelOrderService = async (orderIdOrNumber, reason) => {
-  return await orderRepo.cancelOrder(orderIdOrNumber, reason);
+  const result = await orderRepo.cancelOrder(orderIdOrNumber, reason);
+
+  // Gửi email thông báo hủy đơn đến người nhận
+  try {
+    const fullOrder = await orderRepo.findOrderAny(orderIdOrNumber);
+    const targetEmail = fullOrder?.recipient_email || fullOrder?.customer?.email;
+    if (targetEmail) {
+      sendOrderNotificationEmail({
+        toEmail: targetEmail,
+        order: fullOrder,
+        status: 'CANCELLED',
+        extraData: { reason, note: reason },
+      }).catch((emailErr) => {
+        console.error('Lỗi gửi email thông báo hủy đơn hàng:', emailErr.message);
+      });
+    }
+  } catch (err) {
+    console.error('Lỗi tìm kiếm đơn để gửi email hủy đơn:', err.message);
+  }
+
+  return result;
 };
 
 /**
@@ -293,7 +349,7 @@ export const getAllOrdersService = async () => {
 };
 
 /**
- * Cập nhật trạng thái đơn hàng từ trang Quản trị
+ * Cập nhật trạng thái đơn hàng từ trang Quản trị và gửi email thông báo đến người mua
  */
 export const updateOrderStatusService = async (orderId, status, note) => {
   let mappedStatus = 'PENDING';
@@ -311,7 +367,78 @@ export const updateOrderStatusService = async (orderId, status, note) => {
   } else if (['CANCELLED', 'FAILED'].includes(s)) {
     mappedStatus = 'CANCELLED';
   }
-  return await orderRepo.updateOrderStatus(orderId, mappedStatus, note);
+
+  const result = await orderRepo.updateOrderStatus(orderId, mappedStatus, note);
+
+  // Tự động gửi email thông báo cập nhật trạng thái đơn hàng
+  try {
+    const fullOrder = await orderRepo.findOrderAny(orderId);
+    const targetEmail = fullOrder?.recipient_email || fullOrder?.customer?.email;
+    if (targetEmail) {
+      sendOrderNotificationEmail({
+        toEmail: targetEmail,
+        order: fullOrder,
+        status: mappedStatus,
+        extraData: { note, reason: note },
+      }).catch((emailErr) => {
+        console.error('Lỗi khi gửi email cập nhật trạng thái đơn hàng:', emailErr.message);
+      });
+    }
+  } catch (err) {
+    console.error('Lỗi tìm kiếm đơn hàng để gửi email thông báo:', err.message);
+  }
+
+  return result;
+};
+
+/**
+ * Service xử lý gửi email thông báo đơn hàng trực tiếp theo yêu cầu từ Controller/Frontend
+ */
+export const notifyOrderEmailService = async ({
+  orderId,
+  orderNumber,
+  recipientEmail,
+  newStatus,
+  extraData = {},
+}) => {
+  const targetId = orderNumber || orderId;
+  let fullOrder = null;
+  if (targetId) {
+    fullOrder = await orderRepo.findOrderAny(targetId);
+  }
+
+  const emailToUse = (
+    recipientEmail ||
+    fullOrder?.recipient_email ||
+    fullOrder?.customer?.email ||
+    extraData?.recipientEmail ||
+    ''
+  ).trim();
+
+  if (!emailToUse || !emailToUse.includes('@')) {
+    return { success: false, message: 'Không tìm thấy địa chỉ email hợp lệ để gửi thông báo' };
+  }
+
+  const orderPayload = fullOrder || {
+    order_id: orderId,
+    order_number: orderNumber || `YF-${orderId}`,
+    recipient_email: emailToUse,
+    recipient_name: extraData?.recipientName || 'Quý khách',
+    recipient_phone: extraData?.recipientPhone || '',
+    shipping_address_line: extraData?.shippingAddress || '',
+    total_amount: extraData?.totalAmount || 0,
+    order_status: newStatus,
+    order_items: extraData?.items || [],
+  };
+
+  const emailResult = await sendOrderNotificationEmail({
+    toEmail: emailToUse,
+    order: orderPayload,
+    status: newStatus,
+    extraData,
+  });
+
+  return emailResult;
 };
 
 /**
