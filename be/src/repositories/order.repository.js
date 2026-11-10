@@ -432,7 +432,7 @@ export const deleteOrderById = async (orderIdOrNumber) => {
   return { count: 0 };
 };
 
-export const updateOrderStatus = async (orderIdOrNumber, status, note, options = {}) => {
+export const updateOrderStatus = async (orderIdOrNumber, status, note = null, options = {}) => {
   try {
     const existingOrder = await findOrderByIdOrNumber(orderIdOrNumber);
     if (!existingOrder) return null;

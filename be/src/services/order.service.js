@@ -288,7 +288,7 @@ export const VALID_ORDER_STATUS_TRANSITIONS = {
 /**
  * Hủy đơn hàng và lưu lý do hủy
  */
-export const cancelOrderService = async (orderIdOrNumber, reason) => {
+export const cancelOrderService = async (orderIdOrNumber, reason = undefined) => {
   const existingOrder = await orderRepo.findOrderByIdOrNumber(orderIdOrNumber);
   if (existingOrder) {
     const allowedNext = VALID_ORDER_STATUS_TRANSITIONS[existingOrder.order_status] || [];
@@ -309,7 +309,7 @@ export const getAllOrdersService = async () => {
 /**
  * Cập nhật trạng thái đơn hàng từ trang Quản trị (có kiểm tra quy tắc chuyển trạng thái)
  */
-export const updateOrderStatusService = async (orderId, status, note, options = {}) => {
+export const updateOrderStatusService = async (orderId, status, note = null, options = {}) => {
   const s = String(status || '').trim().toUpperCase();
   let mappedStatus = null;
   if (['PENDING'].includes(s)) {
@@ -368,6 +368,8 @@ export const deleteOrderService = async (orderId) => {
     if (digitsOnly) {
       await payosService.cancelPaymentLink(digitsOnly).catch(() => {});
     }
-  } catch (e) {}
+  } catch {
+    // Bỏ qua lỗi PayOS khi xóa đơn
+  }
   return await orderRepo.deleteOrderById(orderId);
 };
