@@ -279,9 +279,32 @@ export const handlePayosWebhookService = async (webhookBody) => {
 };
 
 /**
+ * Quy tắc chuyển trạng thái đơn hàng hợp lệ (Order State Machine)
+ * Ngăn chặn việc chuyển nhảy cóc sai quy trình (ví dụ: từ PENDING nhảy thẳng sang DELIVERED)
+ */
+export const VALID_ORDER_STATUS_TRANSITIONS = {
+  PENDING: ['CONFIRMED', 'CANCELLED'],
+  CONFIRMED: ['PROCESSING', 'SHIPPED', 'CANCELLED'],
+  PROCESSING: ['SHIPPED', 'CANCELLED'],
+  SHIPPED: ['DELIVERED', 'RETURNED'],
+  DELIVERED: ['RETURNED'],
+  CANCELLED: [],
+  RETURNED: [],
+};
+
+/**
  * Hủy đơn hàng và lưu lý do hủy
  */
 export const cancelOrderService = async (orderIdOrNumber, reason) => {
+  const existingOrder = await orderRepo.findOrderByIdOrNumber(orderIdOrNumber);
+  if (existingOrder) {
+    const allowedNext = VALID_ORDER_STATUS_TRANSITIONS[existingOrder.order_status] || [];
+    if (!allowedNext.includes('CANCELLED') && existingOrder.order_status !== 'CANCELLED') {
+      const error = new Error(`Không thể hủy đơn hàng đang ở trạng thái "${existingOrder.order_status}".`);
+      error.statusCode = 400;
+      throw error;
+    }
+  }
   return await orderRepo.cancelOrder(orderIdOrNumber, reason);
 };
 
@@ -293,9 +316,9 @@ export const getAllOrdersService = async () => {
 };
 
 /**
- * Cập nhật trạng thái đơn hàng từ trang Quản trị
+ * Cập nhật trạng thái đơn hàng từ trang Quản trị (có kiểm tra quy tắc chuyển trạng thái)
  */
-export const updateOrderStatusService = async (orderId, status, note) => {
+export const updateOrderStatusService = async (orderId, status, note, options = {}) => {
   let mappedStatus = 'PENDING';
   const s = String(status || '').toUpperCase();
   if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s)) {
@@ -311,7 +334,26 @@ export const updateOrderStatusService = async (orderId, status, note) => {
   } else if (['CANCELLED', 'FAILED'].includes(s)) {
     mappedStatus = 'CANCELLED';
   }
-  return await orderRepo.updateOrderStatus(orderId, mappedStatus, note);
+
+  const existingOrder = await orderRepo.findOrderByIdOrNumber(orderId);
+  if (existingOrder) {
+    const currentStatus = existingOrder.order_status;
+    // Cho phép giữ nguyên trạng thái để cập nhật ghi chú hoặc quyết định xử lý đổi trả
+    if (currentStatus !== mappedStatus) {
+      const allowedNext = VALID_ORDER_STATUS_TRANSITIONS[currentStatus] || [];
+      if (!allowedNext.includes(mappedStatus)) {
+        const error = new Error(
+          `Không thể chuyển trạng thái đơn hàng từ "${currentStatus}" sang "${mappedStatus}". Các trạng thái hợp lệ tiếp theo: ${
+            allowedNext.length > 0 ? allowedNext.join(', ') : 'Không thể chuyển tiếp (Trạng thái cuối)'
+          }`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+  }
+
+  return await orderRepo.updateOrderStatus(orderId, mappedStatus, note, options);
 };
 
 /**
