@@ -6,6 +6,7 @@ import {
   Search, Truck, Check, X, Star, RefreshCw, FileText, ShieldCheck, ChevronLeft, ArrowRight, Phone, RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { authService } from '../services/auth.service';
 import ProductCard from '../components/ProductCard';
 import { voucherService } from '../services/voucherService';
 import { orderService } from '../services/orderService';
@@ -1348,6 +1349,43 @@ const ProfilePage = () => {
     return DEFAULT_AVATAR;
   };
 
+  // Định dạng ngày tham gia / đăng ký hệ thống chuẩn DD/MM/YYYY
+  const formatRegistrationDate = (dateVal) => {
+    if (dateVal) {
+      const d = new Date(dateVal);
+      if (!isNaN(d.getTime())) {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        return `${day}/${month}/${d.getFullYear()}`;
+      }
+    }
+    // Fallback 1: Lấy ngày từ đơn hàng sớm nhất của khách hàng
+    if (customerOrders && customerOrders.length > 0) {
+      const sorted = [...customerOrders].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+      if (sorted[0]?.created_at) {
+        const d = new Date(sorted[0].created_at);
+        if (!isNaN(d.getTime())) {
+          const day = String(d.getDate()).padStart(2, '0');
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          return `${day}/${month}/${d.getFullYear()}`;
+        }
+      }
+    }
+    // Fallback 2: Lấy ngày lưu cục bộ khi tài khoản được tạo
+    const storedReg = user?.email && localStorage.getItem(`yf_user_registered_at_${user.email}`);
+    if (storedReg) {
+      const d = new Date(storedReg);
+      if (!isNaN(d.getTime())) {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        return `${day}/${month}/${d.getFullYear()}`;
+      }
+    }
+    // Fallback 3: Ngày hiện tại
+    const now = new Date();
+    return `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+  };
+
   const [formData, setFormData] = useState({
     full_name: user?.full_name || '',
     phone: user?.phone || '',
@@ -2416,12 +2454,11 @@ const ProfilePage = () => {
 
             <div className="hero-info-content">
               <div className="hero-subtitle">
-                <span className="gold-text-hero">THÀNH VIÊN ĐẶC QUYỀN</span> <span className="dot">•</span> {user?.member_since || 'TỪ THÁNG 03/2023'}
+                <span className="gold-text-hero">THÀNH VIÊN TỪ NGÀY</span> <span className="dot">•</span> {formatRegistrationDate(user?.created_at || user?.createdAt)}
               </div>
               <h1 className="hero-user-name font-serif">{user?.full_name || (isManagerOrAdmin ? 'Quản Lý Youth Fashion' : 'Khách hàng Youth Fashion')}</h1>
               <div className="hero-tier-pill">
-                <span className="tier-medal">🥇</span>
-                <span>{user?.tier || 'VIP GOLD ATELIER MEMBER'}</span>
+                <span>{user?.tier || 'Member'}</span>
               </div>
             </div>
           </div>
