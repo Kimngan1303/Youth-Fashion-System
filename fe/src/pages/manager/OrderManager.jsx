@@ -524,6 +524,15 @@ export default function OrderManager() {
   });
   const [deliveryNote, setDeliveryNote] = useState('');
 
+  // Modal Kết quả Đổi trả & Hoàn tiền (Đã hoàn tiền HOẶC Từ chối hoàn kèm lý do)
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [returnOrder, setReturnOrder] = useState(null);
+  const [returnResult, setReturnResult] = useState('APPROVED'); // 'APPROVED' | 'REJECTED'
+  const [returnRejectReason, setReturnRejectReason] = useState('Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop');
+  const [customReturnRejectReason, setCustomReturnRejectReason] = useState('');
+  const [returnBankInfo, setReturnBankInfo] = useState('');
+  const [returnNote, setReturnNote] = useState('');
+
   // Form tạo đơn hàng mới
   const [newOrderForm, setNewOrderForm] = useState({
     recipient_name: '',
@@ -2123,19 +2132,20 @@ export default function OrderManager() {
   };
 
   // Xác nhận hoàn tiền đơn hàng
-  const handleConfirmRefund = async (targetOrder) => {
+  const handleConfirmRefund = async (targetOrder, overrideBank = '', overrideNote = '') => {
     if (!targetOrder) return;
     const tId = String(targetOrder.order_id || '').trim();
     const tNum = String(targetOrder.order_number || targetOrder.order_code || '').trim();
     const digits = (tNum || tId).replace(/\D/g, '');
 
-    const bankInfo = targetOrder.refund_bank || (targetOrder.note && targetOrder.note.includes('STK:') ? targetOrder.note.split('STK:')[1]?.trim() : '');
+    const bankInfo = (overrideBank && String(overrideBank).trim()) || targetOrder.refund_bank || (targetOrder.note && targetOrder.note.includes('STK:') ? targetOrder.note.split('STK:')[1]?.trim() : '');
     const refundAmt = Number(targetOrder.total_amount || 0).toLocaleString('vi-VN');
 
     const newStatus = 'RETURNED';
     const newStatusLabel = 'Đã hoàn tiền';
     const customerLabel = 'ĐÃ HOÀN TIỀN';
-    const updatedNote = `Đã xác nhận hoàn tiền: ${refundAmt}₫ | ${targetOrder.refund_reason ? `Lý do: ${targetOrder.refund_reason} | ` : ''}STK: ${bankInfo}`;
+    const extraNote = overrideNote && String(overrideNote).trim() ? ` | Ghi chú: ${String(overrideNote).trim()}` : '';
+    const updatedNote = `Đã xác nhận hoàn tiền: ${refundAmt}₫ | ${targetOrder.refund_reason ? `Lý do: ${targetOrder.refund_reason} | ` : ''}STK: ${bankInfo}${extraNote}`;
 
     // 1. Lưu overrides vĩnh viễn với tất cả biến thể mã đơn
     try {
@@ -2387,6 +2397,37 @@ export default function OrderManager() {
     setShowRejectInput(false);
     setIsEditModalOpen(false);
     showSuccess(`Đã từ chối hoàn tiền cho đơn hàng #${tNum || tId} thành công!`);
+  };
+
+  // Mở modal xác nhận kết quả đổi trả & hoàn tiền (Đã hoàn tiền HOẶC Từ chối hoàn kèm lý do)
+  const handleOpenReturnModal = (ord) => {
+    if (!ord) return;
+    setReturnOrder(ord);
+    const isRej = ord.refund_decision === 'REJECTED' || String(ord.status_label || '').toUpperCase().includes('TỪ CHỐI') || String(ord.note || '').toLowerCase().includes('từ chối hoàn tiền');
+    setReturnResult(isRej ? 'REJECTED' : 'APPROVED');
+    setReturnRejectReason(ord.reject_reason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop');
+    setCustomReturnRejectReason('');
+    const bank = ord.refund_bank || (ord.note && ord.note.includes('STK:') ? ord.note.split('STK:')[1]?.trim() : '');
+    setReturnBankInfo(bank || '');
+    setReturnNote('');
+    setIsReturnModalOpen(true);
+  };
+
+  // Xác nhận kết quả đổi trả & hoàn tiền từ Modal
+  const handleConfirmReturnOutcome = async () => {
+    if (!returnOrder) return;
+    const targetOrder = returnOrder;
+    if (returnResult === 'APPROVED') {
+      await handleConfirmRefund(targetOrder, returnBankInfo, returnNote);
+    } else {
+      const finalReason = returnRejectReason === 'Lý do khác'
+        ? (customReturnRejectReason.trim() || 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop')
+        : (returnRejectReason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop');
+      await handleConfirmRejectWithReason(targetOrder, finalReason);
+    }
+    setIsReturnModalOpen(false);
+    setReturnOrder(null);
+    if (isEditModalOpen) setIsEditModalOpen(false);
   };
 
   // Cập nhật lại lý do từ chối hoàn tiền khi Shop muốn thay đổi
@@ -2971,40 +3012,40 @@ export default function OrderManager() {
                                   const isRej = ord.refund_decision === 'REJECTED' || String(ord.status_label || '').toUpperCase().includes('TỪ CHỐI') || String(ord.note || '').toLowerCase().includes('từ chối hoàn tiền');
                                   const isApp = !isRej && (ord.refund_decision === 'APPROVED' || String(ord.status_label || '').toUpperCase().includes('ĐÃ HOÀN') || String(ord.note || '').toLowerCase().includes('đã xác nhận hoàn tiền'));
                                   return (
-                                    <select
-                                      className={`status-select-pill ${
-                                        isRej
-                                          ? 'status-pill-rejected status-pill-cancelled'
-                                          : (isApp ? 'status-pill-approved status-pill-completed' : 'status-pill-returned')
-                                      }`}
-                                      style={{
-                                        fontWeight: 700,
-                                        cursor: 'pointer',
-                                        padding: '5px 32px 5px 14px',
-                                        borderRadius: '20px',
-                                        fontSize: '11.5px',
-                                        textAlign: 'left',
-                                        border: isRej ? '1.5px solid #FECACA' : (isApp ? '1.5px solid #BBF7D0' : '1.5px solid #E9D5FF'),
-                                        backgroundColor: isRej ? '#FEF2F2' : (isApp ? '#DCFCE7' : '#FAF5FF'),
-                                        color: isRej ? '#DC2626' : (isApp ? '#15803D' : '#9333EA')
-                                      }}
-                                      value={isRej ? 'REJECTED' : (isApp ? 'APPROVED' : 'RETURNED')}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        if (val === 'REJECTED') {
-                                          handleConfirmRejectWithReason(ord, ord.reject_reason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop');
-                                        } else if (val === 'APPROVED') {
-                                          handleConfirmRefund(ord);
-                                        } else if (val === 'RETURNED') {
-                                          updateSingleOrderStatus(ord, 'RETURNED');
-                                        }
-                                      }}
-                                      title="Chuyển trạng thái: Đổi trả / Từ chối hoàn / Đã hoàn tiền"
-                                    >
-                                      <option value="RETURNED">Đổi trả</option>
-                                      <option value="REJECTED">Từ chối hoàn</option>
-                                      <option value="APPROVED">Đã hoàn tiền</option>
-                                    </select>
+                                    <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenReturnModal(ord)}
+                                        className={`status-select-pill ${
+                                          isRej
+                                            ? 'status-pill-rejected status-pill-cancelled'
+                                            : (isApp ? 'status-pill-approved status-pill-completed' : 'status-pill-returned')
+                                        }`}
+                                        style={{
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          padding: '5px 14px',
+                                          borderRadius: '20px',
+                                          fontSize: '11.5px',
+                                          textAlign: 'center',
+                                          border: isRej ? '1.5px solid #FECACA' : (isApp ? '1.5px solid #BBF7D0' : '1.5px solid #E9D5FF'),
+                                          backgroundColor: isRej ? '#FEF2F2' : (isApp ? '#DCFCE7' : '#FAF5FF'),
+                                          color: isRej ? '#DC2626' : (isApp ? '#15803D' : '#9333EA'),
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '5px'
+                                        }}
+                                        title="Bấm để mở bảng chọn kết quả đổi trả & hoàn tiền"
+                                      >
+                                        <RotateCcw size={12} />
+                                        {isRej ? 'Từ chối hoàn' : (isApp ? 'Đã hoàn tiền' : 'Đổi trả')}
+                                      </button>
+                                      {isRej && ord.reject_reason && (
+                                        <span style={{ fontSize: '10.5px', color: '#DC2626', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ord.reject_reason}>
+                                          Lý do: {ord.reject_reason}
+                                        </span>
+                                      )}
+                                    </div>
                                   );
                                 })()
                               ) : (
@@ -3018,6 +3059,8 @@ export default function OrderManager() {
                                         handleOpenShopCancelModal(ord);
                                       } else if (val === 'COMPLETED') {
                                         handleOpenDeliveryModal(ord);
+                                      } else if (val === 'RETURNED') {
+                                        handleOpenReturnModal(ord);
                                       } else {
                                         updateSingleOrderStatus(ord, val);
                                       }
@@ -3028,6 +3071,7 @@ export default function OrderManager() {
                                     <option value="CONFIRMED">Đã xác nhận</option>
                                     <option value="SHIPPING">Đang vận chuyển</option>
                                     <option value="COMPLETED">Đã giao</option>
+                                    <option value="RETURNED">Đổi trả</option>
                                     <option value="CANCELLED">Đã hủy</option>
                                   </select>
 
@@ -3089,6 +3133,17 @@ export default function OrderManager() {
                                   onClick={() => handleOpenDeliveryModal(ord)}
                                 >
                                   <Truck size={14} />
+                                </button>
+                              )}
+                              {cat === 'RETURNED' && (
+                                <button
+                                  type="button"
+                                  className="action-icon-btn"
+                                  style={{ color: '#7E22CE', background: '#FAF5FF', border: '1px solid #E9D5FF' }}
+                                  title="Xử lý đổi trả (Đã hoàn tiền / Từ chối hoàn)"
+                                  onClick={() => handleOpenReturnModal(ord)}
+                                >
+                                  <RotateCcw size={14} />
                                 </button>
                               )}
                               <button
@@ -3597,6 +3652,8 @@ export default function OrderManager() {
                             handleOpenShopCancelModal(editingOrder);
                           } else if (val === 'COMPLETED') {
                             handleOpenDeliveryModal(editingOrder);
+                          } else if (val === 'RETURNED') {
+                            handleOpenReturnModal(editingOrder);
                           } else {
                             setEditingOrder({ ...editingOrder, order_status: val });
                           }
@@ -3606,6 +3663,7 @@ export default function OrderManager() {
                         <option value="CONFIRMED">Đã xác nhận</option>
                         <option value="SHIPPING">Đang vận chuyển</option>
                         <option value="COMPLETED">Đã giao</option>
+                        <option value="RETURNED">Đổi trả</option>
                         <option value="CANCELLED">Đã hủy</option>
                       </select>
 
@@ -3661,53 +3719,28 @@ export default function OrderManager() {
                 </button>
                 {isRetModal ? (
                   <div style={{ display: 'inline-flex', gap: '10px' }}>
-                    {editingOrder.refund_decision !== 'APPROVED' && (
-                      <button
-                        type="button"
-                        className="btn-modal-reject"
-                        onClick={() => handleRejectRefund(editingOrder)}
-                        style={{
-                          padding: '8px 18px',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          background: '#FEF2F2',
-                          color: '#DC2626',
-                          border: '1.5px solid #FECACA',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        ✕ Từ chối hoàn
-                      </button>
-                    )}
-                    {editingOrder.refund_decision !== 'APPROVED' && (
-                      <button
-                        type="button"
-                        className="btn-modal-confirm"
-                        onClick={() => handleConfirmRefund(editingOrder)}
-                        style={{
-                          padding: '8px 20px',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          background: '#15803D',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          boxShadow: '0 2px 5px rgba(21, 128, 61, 0.25)',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        ✓ Xác nhận hoàn
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="btn-modal-confirm"
+                      onClick={() => handleOpenReturnModal(editingOrder)}
+                      style={{
+                        padding: '8px 20px',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        background: '#7E22CE',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 5px rgba(126, 34, 206, 0.25)',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <RotateCcw size={14} /> Bảng Chọn Xử Lý Đổi Trả & Hoàn Tiền
+                    </button>
                   </div>
                 ) : !isCancModal && (
                   <button type="button" className="btn-modal-save" onClick={handleSaveEdit}>
@@ -4339,6 +4372,300 @@ export default function OrderManager() {
                 ) : (
                   <>
                     <Truck size={16} /> {willRetry ? 'Lưu Giao Thất Bại & Hẹn Giao Lại' : 'Xác Nhận Chuyển Hoàn'}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: XÁC NHẬN KẾT QUẢ ĐỔI TRẢ & HOÀN TIỀN (ĐÃ HOÀN TIỀN / TỪ CHỐI HOÀN KÈM LÝ DO) */}
+      {isReturnModalOpen && returnOrder && (
+        <div className="modal-backdrop-custom" onClick={() => setIsReturnModalOpen(false)}>
+          <div className="modal-box-card modal-small" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header-custom">
+              <div>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#7E22CE', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+                  QUẢN LÝ ĐỔI TRẢ & HOÀN TIỀN
+                </span>
+                <h3 className="modal-title font-serif" style={{ fontSize: '18px', color: '#111827', margin: '4px 0 0 0' }}>
+                  Kết Quả Đổi Trả #{returnOrder.order_number || returnOrder.order_code || returnOrder.order_id}
+                </h3>
+              </div>
+              <button type="button" className="btn-close-modal" onClick={() => setIsReturnModalOpen(false)}>
+                <X size={17} />
+              </button>
+            </div>
+
+            <div className="modal-body-custom" style={{ padding: '16px 20px', maxHeight: '75vh', overflowY: 'auto' }}>
+              {/* Tóm tắt đơn hàng đổi trả */}
+              <div style={{
+                background: '#FAF5FF',
+                borderRadius: '10px',
+                padding: '12px 14px',
+                border: '1px solid #E9D5FF',
+                marginBottom: '16px',
+                fontSize: '13px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ color: '#6B7280' }}>Khách hàng:</span>
+                  <strong style={{ color: '#1F2937' }}>
+                    {returnOrder.customer?.name || returnOrder.recipient_name || 'Khách hàng'} &bull; {returnOrder.customer?.phone || returnOrder.recipient_phone || ''}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ color: '#6B7280' }}>Lý do khách gửi:</span>
+                  <span style={{ color: '#7E22CE', fontWeight: 600, textAlign: 'right', maxWidth: '65%' }}>
+                    "{returnOrder.refund_reason || (returnOrder.note && returnOrder.note.includes('Khách yêu cầu hoàn tiền:') ? returnOrder.note.split('Khách yêu cầu hoàn tiền:')[1]?.split('|')[0]?.trim() : 'Đổi trả sản phẩm')}"
+                  </span>
+                </div>
+                {Boolean(returnBankInfo || returnOrder.refund_bank) && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ color: '#6B7280' }}>TK ngân hàng nhận:</span>
+                    <strong style={{ color: '#15803D' }}>
+                      {returnBankInfo || returnOrder.refund_bank}
+                    </strong>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #D8B4FE', paddingTop: '6px' }}>
+                  <span style={{ color: '#6B7280' }}>Số tiền hoàn trả:</span>
+                  <strong style={{ color: '#7E22CE', fontSize: '15px' }}>
+                    {Number(returnOrder.total_amount || 0).toLocaleString('vi-VN')} ₫
+                  </strong>
+                </div>
+              </div>
+
+              {/* Lựa chọn kết quả: Đã hoàn tiền HOẶC Từ chối hoàn */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '8px', textTransform: 'uppercase' }}>
+                  Chọn Quyết Định Xử Lý <span style={{ color: '#DC2626' }}>*</span>
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  {/* Option 1: Đã hoàn tiền */}
+                  <div
+                    onClick={() => setReturnResult('APPROVED')}
+                    style={{
+                      border: returnResult === 'APPROVED' ? '2px solid #16A34A' : '1.5px solid #E5E7EB',
+                      background: returnResult === 'APPROVED' ? '#F0FDF4' : '#FFFFFF',
+                      borderRadius: '10px',
+                      padding: '12px 14px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '10px'
+                    }}
+                  >
+                    <div style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      border: returnResult === 'APPROVED' ? '6px solid #16A34A' : '2px solid #D1D5DB',
+                      marginTop: '2px',
+                      flexShrink: 0
+                    }} />
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '13.5px', color: returnResult === 'APPROVED' ? '#15803D' : '#1F2937' }}>
+                        ✓ Đã Hoàn Tiền
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px', lineHeight: 1.4 }}>
+                        Đồng ý đổi trả và đã hoàn tất chuyển tiền cho khách.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Option 2: Từ chối hoàn */}
+                  <div
+                    onClick={() => setReturnResult('REJECTED')}
+                    style={{
+                      border: returnResult === 'REJECTED' ? '2px solid #DC2626' : '1.5px solid #E5E7EB',
+                      background: returnResult === 'REJECTED' ? '#FEF2F2' : '#FFFFFF',
+                      borderRadius: '10px',
+                      padding: '12px 14px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '10px'
+                    }}
+                  >
+                    <div style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      border: returnResult === 'REJECTED' ? '6px solid #DC2626' : '2px solid #D1D5DB',
+                      marginTop: '2px',
+                      flexShrink: 0
+                    }} />
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '13.5px', color: returnResult === 'REJECTED' ? '#B91C1C' : '#1F2937' }}>
+                        ✕ Từ Chối Hoàn
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px', lineHeight: 1.4 }}>
+                        Từ chối yêu cầu, gửi lý do thông báo cho khách.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Khối cấu hình chi tiết nếu chọn Đã hoàn tiền */}
+              {returnResult === 'APPROVED' && (
+                <div style={{
+                  background: '#F0FDF4',
+                  border: '1.5px solid #BBF7D0',
+                  borderRadius: '10px',
+                  padding: '14px',
+                  marginBottom: '16px',
+                }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#15803D', marginBottom: '8px', textTransform: 'uppercase' }}>
+                    Chi Tiết Chuyển Khoản Hoàn Tiền
+                  </div>
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                      Số tài khoản & Ngân hàng nhận tiền:
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control-input"
+                      placeholder="Ví dụ: MB Bank - 0987654321 - NGUYEN VAN A"
+                      value={returnBankInfo}
+                      onChange={(e) => setReturnBankInfo(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid #D1D5DB',
+                        fontSize: '13px',
+                        background: '#FFFFFF',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Ghi chú hoàn tiền / Mã giao dịch ngân hàng (tùy chọn)..."
+                      value={returnNote}
+                      onChange={(e) => setReturnNote(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '7px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid #D1D5DB',
+                        fontSize: '12.5px',
+                        background: '#FFFFFF',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Khối cấu hình chi tiết nếu chọn Từ Chối Hoàn */}
+              {returnResult === 'REJECTED' && (
+                <div style={{
+                  background: '#FEF2F2',
+                  border: '1.5px solid #FECACA',
+                  borderRadius: '10px',
+                  padding: '14px',
+                  marginBottom: '16px',
+                }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#B91C1C', marginBottom: '8px', textTransform: 'uppercase' }}>
+                    Chi Tiết Từ Chối Yêu Cầu Hoàn Tiền
+                  </div>
+
+                  {/* Chọn Lý do từ chối */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                      Lý do từ chối hoàn tiền:
+                    </label>
+                    <select
+                      className="form-control-input"
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid #D1D5DB',
+                        fontSize: '13px',
+                        background: '#FFFFFF'
+                      }}
+                      value={returnRejectReason}
+                      onChange={(e) => setReturnRejectReason(e.target.value)}
+                    >
+                      <option value="Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop">
+                        Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop
+                      </option>
+                      <option value="Sản phẩm đã qua sử dụng, giặt ủi hoặc mất tem mác niêm phong">
+                        Sản phẩm đã qua sử dụng, giặt ủi hoặc mất tem mác niêm phong
+                      </option>
+                      <option value="Đã quá thời hạn đổi trả theo quy định của Youth Fashion (quá 7 ngày)">
+                        Đã quá thời hạn đổi trả theo quy định của Youth Fashion (quá 7 ngày)
+                      </option>
+                      <option value="Sản phẩm bị rách, ố bẩn hoặc hư hại do lỗi sử dụng từ phía khách hàng">
+                        Sản phẩm bị rách, ố bẩn hoặc hư hại do lỗi sử dụng từ phía khách hàng
+                      </option>
+                      <option value="Sản phẩm thuộc nhóm xả kho / sale đặc biệt không áp dụng đổi trả">
+                        Sản phẩm thuộc nhóm xả kho / sale đặc biệt không áp dụng đổi trả
+                      </option>
+                      <option value="Khách hàng không cung cấp đủ video mở kiện hàng / hình ảnh đối chứng">
+                        Khách hàng không cung cấp đủ video mở kiện hàng / hình ảnh đối chứng
+                      </option>
+                      <option value="Lý do khác">Lý do khác (Tự nhập chi tiết)</option>
+                    </select>
+                  </div>
+
+                  {returnRejectReason === 'Lý do khác' && (
+                    <div style={{ marginBottom: '8px' }}>
+                      <textarea
+                        rows={2}
+                        className="form-control-input"
+                        style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '13px', boxSizing: 'border-box' }}
+                        placeholder="Nhập lý do từ chối yêu cầu đổi trả hoàn tiền..."
+                        value={customReturnRejectReason}
+                        onChange={(e) => setCustomReturnRejectReason(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer-custom">
+              <button
+                type="button"
+                className="btn-modal-cancel"
+                onClick={() => setIsReturnModalOpen(false)}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReturnOutcome}
+                style={{
+                  background: returnResult === 'APPROVED' ? '#15803D' : '#DC2626',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  border: 'none',
+                  padding: '9px 22px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '13.5px',
+                  boxShadow: returnResult === 'APPROVED' ? '0 2px 6px rgba(21, 128, 61, 0.3)' : '0 2px 6px rgba(220, 38, 38, 0.3)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {returnResult === 'APPROVED' ? (
+                  <>
+                    <Check size={16} strokeWidth={2.5} /> Xác Nhận Đã Hoàn Tiền
+                  </>
+                ) : (
+                  <>
+                    <X size={16} strokeWidth={2.5} /> Xác Nhận Từ Chối Hoàn
                   </>
                 )}
               </button>
