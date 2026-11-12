@@ -653,10 +653,10 @@ export default function ManagerDashboard() {
   const [orders, setOrders] = useState([]);
   const [userMetrics, setUserMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [chartMode, setChartMode] = useState('30d');
+  const [chartMode, setChartMode] = useState('month');
   const [hoveredIdx, setHoveredIdx] = useState(null);
 
-  const prevYear = useMemo(() => new Date().getFullYear() - 1, []);
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
 
   // Kiểm tra quyền truy cập dành cho Admin và Manager
   useEffect(() => {
@@ -787,7 +787,7 @@ export default function ManagerDashboard() {
     : 12;
 
   const renderXAxisLabel = (pt, total) => {
-    if (chartMode === 'week' || chartMode === 'quarter') return true;
+    if (chartMode === 'week' || chartMode === 'year') return true;
     const step = Math.max(1, Math.floor(total / 6));
     return pt.idx === 0 || pt.idx === total - 1 || pt.idx % step === 0 || pt.idx === chartData.peakIndex;
   };
@@ -969,7 +969,11 @@ export default function ManagerDashboard() {
                   Biểu Đồ Doanh Thu &amp; Xu Hướng Đơn Hàng Theo Thời Gian
                 </h2>
                 <p className="md-section-subtitle">
-                  Thống kê chi tiết doanh thu từng ngày từ đơn hoàn thành kết hợp lượng đơn hàng phát sinh
+                  {chartMode === 'week'
+                    ? 'Thống kê chi tiết doanh thu 7 ngày gần nhất từ đơn hoàn thành kết hợp lượng đơn hàng phát sinh'
+                    : chartMode === 'year'
+                      ? `Thống kê chi tiết doanh thu 12 tháng trong năm ${currentYear} từ đơn hoàn thành kết hợp lượng đơn hàng phát sinh`
+                      : 'Thống kê chi tiết doanh thu 30 ngày gần nhất từ đơn hoàn thành kết hợp lượng đơn hàng phát sinh'}
                 </p>
               </div>
 
@@ -988,16 +992,6 @@ export default function ManagerDashboard() {
                 <div className="md-tabs-segmented">
                   <button
                     type="button"
-                    className={`md-tab-btn ${chartMode === '30d' ? 'active' : ''}`}
-                    onClick={() => {
-                      setChartMode('30d');
-                      setHoveredIdx(null);
-                    }}
-                  >
-                    30 ngày gần nhất
-                  </button>
-                  <button
-                    type="button"
                     className={`md-tab-btn ${chartMode === 'week' ? 'active' : ''}`}
                     onClick={() => {
                       setChartMode('week');
@@ -1008,23 +1002,23 @@ export default function ManagerDashboard() {
                   </button>
                   <button
                     type="button"
-                    className={`md-tab-btn ${chartMode === 'quarter' ? 'active' : ''}`}
+                    className={`md-tab-btn ${chartMode === 'month' ? 'active' : ''}`}
                     onClick={() => {
-                      setChartMode('quarter');
+                      setChartMode('month');
                       setHoveredIdx(null);
                     }}
                   >
-                    Theo quý
+                    Theo tháng
                   </button>
                   <button
                     type="button"
-                    className={`md-tab-btn ${chartMode === 'prev_year' ? 'active' : ''}`}
+                    className={`md-tab-btn ${chartMode === 'year' ? 'active' : ''}`}
                     onClick={() => {
-                      setChartMode('prev_year');
+                      setChartMode('year');
                       setHoveredIdx(null);
                     }}
                   >
-                    Cùng kỳ {prevYear}
+                    Theo năm
                   </button>
                 </div>
               </div>
@@ -1154,7 +1148,12 @@ export default function ManagerDashboard() {
                   const isActive = activePoint && activePoint.idx === pt.idx;
                   const showMilestone =
                     hasAnyChartRevenue &&
-                    (isActive || idx === 0 || idx === chartPoints.length - 1 || idx % 5 === 0);
+                    (isActive ||
+                      chartMode === 'week' ||
+                      chartMode === 'year' ||
+                      idx === 0 ||
+                      idx === chartPoints.length - 1 ||
+                      idx % 5 === 0);
 
                   if (!showMilestone) return null;
 

@@ -458,9 +458,9 @@ export const summarizePeriod = (allOrders, startKey, endKey, prevStartKey, prevE
 
 /**
  * Tạo chuỗi dữ liệu cho biểu đồ kết hợp Doanh thu & Xu hướng Đơn hàng (chỉ tính đơn đã hoàn thành).
- * mode: '30d' | 'week' | 'quarter' | 'prev_year'
+ * mode: 'week' | 'month' | 'year'
  */
-export const buildOverviewChartSeries = (allOrders = [], mode = '30d') => {
+export const buildOverviewChartSeries = (allOrders = [], mode = 'month') => {
   const completedOrders = allOrders.filter((o) => o.isRevenueEligible);
   const now = new Date();
   const todayStr = toLocalDateInputValue(now);
@@ -468,6 +468,7 @@ export const buildOverviewChartSeries = (allOrders = [], mode = '30d') => {
   const buckets = [];
 
   if (mode === 'week') {
+    // 7 ngày gần nhất
     for (let offset = 6; offset >= 0; offset -= 1) {
       const dateStr = shiftDateString(todayStr, -offset);
       const [, mm, dd] = dateStr.split('-');
@@ -481,41 +482,25 @@ export const buildOverviewChartSeries = (allOrders = [], mode = '30d') => {
         ordersCount: 0,
       });
     }
-  } else if (mode === 'quarter') {
-    // 12 tuần gần nhất đại diện xu hướng theo quý
-    for (let w = 11; w >= 0; w -= 1) {
-      const endKey = shiftDateString(todayStr, -(w * 7));
-      const startKey = shiftDateString(endKey, -6);
-      const [, sm, sd] = startKey.split('-');
-      const [, em, ed] = endKey.split('-');
+  } else if (mode === 'year') {
+    // 12 tháng trong năm hiện tại
+    const currentYear = now.getFullYear();
+    for (let m = 0; m < 12; m += 1) {
+      const startKey = toLocalDateInputValue(new Date(currentYear, m, 1));
+      const endKey = toLocalDateInputValue(new Date(currentYear, m + 1, 0));
+      const mm = String(m + 1).padStart(2, '0');
       buckets.push({
-        key: `${startKey}_${endKey}`,
+        key: `${currentYear}-${mm}`,
         startKey,
         endKey,
-        axisLabel: `${sd}/${sm}`,
-        tooltipTitle: `TUẦN ${sd}/${sm} - ${ed}/${em}`,
-        revenue: 0,
-        ordersCount: 0,
-      });
-    }
-  } else if (mode === 'prev_year') {
-    const prevYearBase = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-    const prevTodayStr = toLocalDateInputValue(prevYearBase);
-    for (let offset = 29; offset >= 0; offset -= 1) {
-      const dateStr = shiftDateString(prevTodayStr, -offset);
-      const [yy, mm, dd] = dateStr.split('-');
-      buckets.push({
-        key: dateStr,
-        startKey: dateStr,
-        endKey: dateStr,
-        axisLabel: `${dd} Th${Number(mm)}`,
-        tooltipTitle: `NGÀY ${dd}/${mm}/${yy}`,
+        axisLabel: `Th${m + 1}`,
+        tooltipTitle: `THÁNG ${mm}/${currentYear}`,
         revenue: 0,
         ordersCount: 0,
       });
     }
   } else {
-    // Mặc định: 30 ngày gần nhất
+    // Mặc định ('month'): 30 ngày gần nhất
     for (let offset = 29; offset >= 0; offset -= 1) {
       const dateStr = shiftDateString(todayStr, -offset);
       const [, mm, dd] = dateStr.split('-');
