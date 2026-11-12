@@ -12,7 +12,7 @@ import {
   Search,
   Download,
   Trash2,
-  Edit3,
+  Eye,
   Lock,
   Unlock,
   Loader2,
@@ -577,9 +577,12 @@ const userStyles = `
 
   .um-modal-card {
     background: #FFFFFF;
-    border-radius: 12px;
+    border-radius: 14px;
     width: 100%;
-    max-width: 520px;
+    max-width: 600px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
   }
@@ -594,10 +597,56 @@ const userStyles = `
   }
 
   .um-modal-body {
-    padding: 24px;
+    padding: 22px 24px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 18px;
+    overflow-y: auto;
+  }
+
+  .um-detail-section-title {
+    margin: 0 0 10px 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: #8C857B;
+  }
+
+  .um-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .um-detail-box {
+    padding: 11px 14px;
+    border: 1px solid #EDE8DE;
+    border-radius: 8px;
+    background: #FFFFFF;
+  }
+
+  .um-detail-label {
+    font-size: 10.5px;
+    color: #8C857B;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .um-detail-value {
+    font-weight: 600;
+    font-size: 13px;
+    color: #111111;
+    margin-top: 4px;
+    word-break: break-word;
+  }
+
+  .um-permission-panel {
+    padding: 16px;
+    border: 1px solid #E5E0D5;
+    border-radius: 10px;
+    background: #FAF9F6;
   }
 
   .um-modal-footer {
@@ -663,10 +712,15 @@ export default function UserManagement() {
   const [selectedIds, setSelectedIds] = useState([]);
 
   // Modals
-  const [roleModalUser, setRoleModalUser] = useState(null);
   const [detailModalUser, setDetailModalUser] = useState(null);
-  const [lockModalUser, setLockModalUser] = useState(null);
   const [selectedRole, setSelectedRole] = useState('CUSTOMER');
+  const [savingRole, setSavingRole] = useState(false);
+
+  const openUserDetailModal = useCallback((targetUser) => {
+    if (!targetUser) return;
+    setDetailModalUser(targetUser);
+    setSelectedRole(targetUser.role === 'ADMIN' ? 'ADMIN' : (targetUser.role === 'MANAGER' ? 'MANAGER' : 'CUSTOMER'));
+  }, []);
 
   // Fetch users & metrics
   const fetchData = useCallback(async () => {
@@ -806,21 +860,23 @@ export default function UserManagement() {
     }
   };
 
-  // Cập nhật vai trò người dùng
+  // Cập nhật vai trò người dùng trong mục Xem chi tiết & Phân quyền
   const handleSaveRole = async () => {
-    if (!roleModalUser) return;
-    if (roleModalUser.role === 'ADMIN') {
+    if (!detailModalUser) return;
+    if (detailModalUser.role === 'ADMIN') {
       showError('Tài khoản Quản trị viên (Admin) là cố định duy nhất, không thể thay đổi vai trò');
-      setRoleModalUser(null);
       return;
     }
+    setSavingRole(true);
     try {
-      await adminService.updateUserRole(roleModalUser.type, roleModalUser.id, selectedRole);
+      await adminService.updateUserRole(detailModalUser.type, detailModalUser.id, selectedRole);
       await fetchData();
-      showSuccess(`Đã cập nhật vai trò cho "${roleModalUser.full_name}" thành công!`);
-      setRoleModalUser(null);
+      showSuccess(`Đã cập nhật phân quyền cho "${detailModalUser.full_name}" thành công!`);
+      setDetailModalUser(null);
     } catch (err) {
-      showError('Lỗi khi cập nhật vai trò');
+      showError(err?.response?.data?.message || 'Lỗi khi cập nhật vai trò');
+    } finally {
+      setSavingRole(false);
     }
   };
 
@@ -1253,16 +1309,10 @@ export default function UserManagement() {
                               <button
                                 type="button"
                                 className="um-action-btn"
-                                title={u.role === 'ADMIN' ? 'Tài khoản Quản trị viên Admin cố định duy nhất' : 'Phân quyền / Đổi vai trò'}
-                                disabled={u.role === 'ADMIN'}
-                                style={u.role === 'ADMIN' ? { opacity: 0.35, cursor: 'not-allowed' } : {}}
-                                onClick={() => {
-                                  if (u.role === 'ADMIN') return;
-                                  setRoleModalUser(u);
-                                  setSelectedRole(u.role === 'MANAGER' ? 'MANAGER' : 'CUSTOMER');
-                                }}
+                                title="Xem chi tiết tài khoản & phân quyền"
+                                onClick={() => openUserDetailModal(u)}
                               >
-                                <Edit3 size={15} />
+                                <Eye size={15} />
                               </button>
                               <button
                                 type="button"
@@ -1360,111 +1410,266 @@ export default function UserManagement() {
         </div>
       </main>
 
-      {/* MODAL PHÂN QUYỀN VAI TRÒ */}
-      {roleModalUser && (
-        <div className="um-modal-overlay" onClick={() => setRoleModalUser(null)}>
-          <div className="um-modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="um-modal-head">
-              <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700 }}>Phân Quyền Vai Trò Người Dùng</h3>
-              <button type="button" onClick={() => setRoleModalUser(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="um-modal-body">
-              <div style={{ padding: '12px 16px', background: '#F8F7F4', borderRadius: '8px' }}>
-                <div style={{ fontWeight: 700, fontSize: '14px', color: '#111' }}>{roleModalUser.full_name}</div>
-                <div style={{ fontSize: '12px', color: '#78716C', marginTop: 2 }}>{roleModalUser.email}</div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 700, color: '#78716C', textTransform: 'uppercase' }}>
-                  Chọn Vai Trò Hệ Thống
-                </label>
-                <select
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #E2DFD7', marginTop: 6, fontSize: '13px' }}
-                  value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value)}
-                >
-                  <option value="CUSTOMER">Khách Hàng</option>
-                  <option value="MANAGER">Manager</option>
-                </select>
-                <div style={{ fontSize: '11.5px', color: '#A8A29E', marginTop: 6, lineHeight: 1.4 }}>
-                  * Lưu ý: Tài khoản Quản trị viên (Admin) là cố định duy nhất, không thể cấp phát thêm.
-                </div>
-              </div>
-            </div>
-
-            <div className="um-modal-footer">
-              <button
-                type="button"
-                style={{ padding: '8px 16px', border: '1px solid #E2DFD7', background: '#FFF', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12.5px' }}
-                onClick={() => setRoleModalUser(null)}
-              >
-                Hủy Bỏ
-              </button>
-              <button
-                type="button"
-                style={{ padding: '8px 18px', background: '#111', color: '#FFF', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12.5px' }}
-                onClick={handleSaveRole}
-              >
-                Lưu Phân Quyền
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL CHI TIẾT HỒ SƠ */}
+      {/* MODAL XEM CHI TIẾT TÀI KHOẢN & PHÂN QUYỀN */}
       {detailModalUser && (
         <div className="um-modal-overlay" onClick={() => setDetailModalUser(null)}>
           <div className="um-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="um-modal-head">
-              <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700 }}>Chi Tiết Hồ Sơ Người Dùng</h3>
-              <button type="button" onClick={() => setDetailModalUser(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#111111' }}>
+                  Xem Chi Tiết Tài Khoản Người Dùng
+                </h3>
+                <div style={{ fontSize: '12px', color: '#78716C', marginTop: 2 }}>
+                  Thông tin tài khoản và thiết lập phân quyền hệ thống
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailModalUser(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#57534E' }}
+                aria-label="Đóng"
+              >
                 <X size={18} />
               </button>
             </div>
 
             <div className="um-modal-body">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <div style={{ padding: 12, border: '1px solid #EDE8DE', borderRadius: 8 }}>
-                  <div style={{ fontSize: '11px', color: '#8C857B', fontWeight: 700, textTransform: 'uppercase' }}>Họ Và Tên</div>
-                  <div style={{ fontWeight: 700, color: '#111', marginTop: 4 }}>{detailModalUser.full_name}</div>
-                </div>
-                <div style={{ padding: 12, border: '1px solid #EDE8DE', borderRadius: 8 }}>
-                  <div style={{ fontSize: '11px', color: '#8C857B', fontWeight: 700, textTransform: 'uppercase' }}>Mã Người Dùng</div>
-                  <div style={{ fontWeight: 700, color: '#111', marginTop: 4 }}>{detailModalUser.user_code}</div>
-                </div>
-                <div style={{ padding: 12, border: '1px solid #EDE8DE', borderRadius: 8 }}>
-                  <div style={{ fontSize: '11px', color: '#8C857B', fontWeight: 700, textTransform: 'uppercase' }}>Email</div>
-                  <div style={{ fontWeight: 600, color: '#111', marginTop: 4, wordBreak: 'break-all' }}>{detailModalUser.email}</div>
-                </div>
-                <div style={{ padding: 12, border: '1px solid #EDE8DE', borderRadius: 8 }}>
-                  <div style={{ fontSize: '11px', color: '#8C857B', fontWeight: 700, textTransform: 'uppercase' }}>Số Điện Thoại</div>
-                  <div style={{ fontWeight: 600, color: '#111', marginTop: 4 }}>{detailModalUser.phone || 'Chưa cập nhật'}</div>
-                </div>
-                <div style={{ padding: 12, border: '1px solid #EDE8DE', borderRadius: 8 }}>
-                  <div style={{ fontSize: '11px', color: '#8C857B', fontWeight: 700, textTransform: 'uppercase' }}>Vai Trò Hiện Tại</div>
-                  <div style={{ fontWeight: 700, color: '#2563EB', marginTop: 4 }}>{detailModalUser.role_label}</div>
-                </div>
-                <div style={{ padding: 12, border: '1px solid #EDE8DE', borderRadius: 8 }}>
-                  <div style={{ fontSize: '11px', color: '#8C857B', fontWeight: 700, textTransform: 'uppercase' }}>Trạng Thái</div>
-                  <div style={{ fontWeight: 700, color: detailModalUser.status === 'ACTIVE' ? '#059669' : '#DC2626', marginTop: 4 }}>
-                    {detailModalUser.status === 'ACTIVE' ? 'Đang Hoạt Động' : 'Đang Tạm Khóa'}
+              {/* Thẻ tóm tắt tài khoản */}
+              <div
+                style={{
+                  padding: '14px 16px',
+                  background: '#F8F7F4',
+                  border: '1px solid #EDE8DE',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '15px', color: '#111111' }}>
+                    {detailModalUser.full_name}
+                  </div>
+                  <div style={{ fontSize: '12.5px', color: '#78716C', marginTop: 2 }}>
+                    {detailModalUser.email}
                   </div>
                 </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span
+                    className={`um-status-pill ${detailModalUser.status === 'ACTIVE' ? 'active' : 'locked'}`}
+                    style={{ cursor: 'default' }}
+                  >
+                    <span style={{ fontSize: '9px' }}>●</span>
+                    {detailModalUser.status === 'ACTIVE' ? 'Hoạt động' : 'Tạm khóa'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Mục 1: Thông tin tài khoản người dùng */}
+              <div>
+                <p className="um-detail-section-title">Thông Tin Tài Khoản Người Dùng</p>
+                <div className="um-detail-grid">
+                  <div className="um-detail-box">
+                    <div className="um-detail-label">Họ Và Tên</div>
+                    <div className="um-detail-value">{detailModalUser.full_name}</div>
+                  </div>
+                  <div className="um-detail-box">
+                    <div className="um-detail-label">Mã Tài Khoản</div>
+                    <div className="um-detail-value">
+                      {detailModalUser.user_code}{' '}
+                      <span style={{ fontWeight: 400, color: '#78716C', fontSize: '12px' }}>
+                        ({detailModalUser.type === 'EMPLOYEE' ? 'Nhân sự' : 'Khách hàng'})
+                      </span>
+                    </div>
+                  </div>
+                  <div className="um-detail-box">
+                    <div className="um-detail-label">Email</div>
+                    <div className="um-detail-value">
+                      {detailModalUser.email}
+                      {detailModalUser.type === 'CUSTOMER' && detailModalUser.email_verified !== undefined && (
+                        <span
+                          style={{
+                            marginLeft: 6,
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            color: detailModalUser.email_verified ? '#059669' : '#D97706',
+                          }}
+                        >
+                          ({detailModalUser.email_verified ? 'Đã xác thực' : 'Chưa xác thực'})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="um-detail-box">
+                    <div className="um-detail-label">Số Điện Thoại</div>
+                    <div className="um-detail-value">{detailModalUser.phone || 'Chưa cập nhật'}</div>
+                  </div>
+                  <div className="um-detail-box">
+                    <div className="um-detail-label">Vai Trò Hiện Tại</div>
+                    <div className="um-detail-value" style={{ color: '#2563EB' }}>
+                      {detailModalUser.role_label}
+                    </div>
+                  </div>
+                  <div className="um-detail-box">
+                    <div className="um-detail-label">Trạng Thái Tài Khoản</div>
+                    <div
+                      className="um-detail-value"
+                      style={{ color: detailModalUser.status === 'ACTIVE' ? '#059669' : '#DC2626' }}
+                    >
+                      {detailModalUser.status === 'ACTIVE' ? 'Đang Hoạt Động' : 'Đang Tạm Khóa'}
+                    </div>
+                  </div>
+
+                  {detailModalUser.type === 'CUSTOMER' ? (
+                    <>
+                      <div className="um-detail-box">
+                        <div className="um-detail-label">Chi Tiêu &amp; Đơn Hàng</div>
+                        <div className="um-detail-value">
+                          {detailModalUser.spending_display} ({detailModalUser.orders_display})
+                          {detailModalUser.customer_tier && (
+                            <span style={{ marginLeft: 6, fontSize: '11px', color: '#B45309', fontWeight: 700 }}>
+                              • {detailModalUser.customer_tier}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="um-detail-box">
+                        <div className="um-detail-label">Giới Tính / Ngày Sinh</div>
+                        <div className="um-detail-value">
+                          {[detailModalUser.gender, detailModalUser.dob].filter(Boolean).join(' • ') ||
+                            'Chưa cập nhật'}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="um-detail-box">
+                      <div className="um-detail-label">Phạm Vi Phụ Trách</div>
+                      <div className="um-detail-value">
+                        {detailModalUser.sub_role || detailModalUser.orders_display || 'Nhân sự nội bộ'}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="um-detail-box">
+                    <div className="um-detail-label">Đăng Nhập Gần Nhất</div>
+                    <div className="um-detail-value">{detailModalUser.last_login || 'Chưa đăng nhập'}</div>
+                  </div>
+                  <div className="um-detail-box">
+                    <div className="um-detail-label">Ngày Tạo Tài Khoản</div>
+                    <div className="um-detail-value">
+                      {detailModalUser.created_at
+                        ? new Date(detailModalUser.created_at).toLocaleString('vi-VN')
+                        : 'Chưa cập nhật'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mục 2: Phân quyền vai trò */}
+              <div className="um-permission-panel">
+                <p className="um-detail-section-title" style={{ marginBottom: 8 }}>
+                  Phân Quyền Vai Trò Hệ Thống
+                </p>
+                <label
+                  htmlFor="um-detail-role-select"
+                  style={{ fontSize: '12px', fontWeight: 600, color: '#44403C', display: 'block' }}
+                >
+                  Chọn vai trò áp dụng cho tài khoản này
+                </label>
+
+                {detailModalUser.role === 'ADMIN' ? (
+                  <>
+                    <select
+                      id="um-detail-role-select"
+                      disabled
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #E2DFD7',
+                        marginTop: 8,
+                        fontSize: '13px',
+                        background: '#F3F4F6',
+                        color: '#6B7280',
+                        cursor: 'not-allowed',
+                      }}
+                      value="ADMIN"
+                    >
+                      <option value="ADMIN">Quản Trị Viên (Admin)</option>
+                    </select>
+                    <div style={{ fontSize: '11.5px', color: '#78716C', marginTop: 8, lineHeight: 1.45 }}>
+                      * Tài khoản Quản trị viên (Admin) là cố định duy nhất, không thể thay đổi hoặc hạ quyền.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <select
+                      id="um-detail-role-select"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #E2DFD7',
+                        marginTop: 8,
+                        fontSize: '13px',
+                        background: '#FFFFFF',
+                        color: '#111111',
+                      }}
+                      value={selectedRole}
+                      onChange={(e) => setSelectedRole(e.target.value)}
+                    >
+                      <option value="CUSTOMER">Khách Hàng</option>
+                      <option value="MANAGER">Manager</option>
+                    </select>
+                    <div style={{ fontSize: '11.5px', color: '#A8A29E', marginTop: 8, lineHeight: 1.45 }}>
+                      * Lưu ý: Tài khoản Quản trị viên (Admin) là cố định duy nhất, không thể cấp phát thêm.
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
             <div className="um-modal-footer">
               <button
                 type="button"
-                style={{ padding: '8px 20px', background: '#111', color: '#FFF', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12.5px' }}
+                style={{
+                  padding: '8px 18px',
+                  border: '1px solid #E2DFD7',
+                  background: '#FFF',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '12.5px',
+                  color: '#111111',
+                }}
                 onClick={() => setDetailModalUser(null)}
               >
-                Đóng
+                {detailModalUser.role === 'ADMIN' ? 'Đóng' : 'Hủy Bỏ'}
               </button>
+
+              {detailModalUser.role !== 'ADMIN' && (
+                <button
+                  type="button"
+                  disabled={savingRole}
+                  style={{
+                    padding: '8px 18px',
+                    background: '#111',
+                    color: '#FFF',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: savingRole ? 'not-allowed' : 'pointer',
+                    opacity: savingRole ? 0.65 : 1,
+                    fontWeight: 600,
+                    fontSize: '12.5px',
+                  }}
+                  onClick={handleSaveRole}
+                >
+                  {savingRole ? 'Đang Lưu...' : 'Lưu Phân Quyền'}
+                </button>
+              )}
             </div>
           </div>
         </div>
