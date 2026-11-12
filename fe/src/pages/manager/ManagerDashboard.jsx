@@ -272,13 +272,6 @@ const dashboardStyles = `
     max-width: 520px;
   }
 
-  .md-chart-title-line {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
   .md-section-title {
     font-family: 'Playfair Display', serif;
     font-weight: 700;
@@ -286,17 +279,6 @@ const dashboardStyles = `
     line-height: 26px;
     color: #111111;
     margin: 0;
-  }
-
-  .md-live-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 3px 9px;
-    border-radius: 6px;
-    background: #ECFDF5;
-    color: #15803D;
-    font-size: 11px;
-    font-weight: 700;
   }
 
   .md-section-subtitle {
@@ -983,12 +965,9 @@ export default function ManagerDashboard() {
           <section className="md-card">
             <div className="md-chart-header">
               <div className="md-chart-title-wrap">
-                <div className="md-chart-title-line">
-                  <h2 className="md-section-title">
-                    Biểu Đồ Doanh Thu &amp; Xu Hướng Đơn Hàng Theo Thời Gian
-                  </h2>
-                  <span className="md-live-badge">Live Data</span>
-                </div>
+                <h2 className="md-section-title">
+                  Biểu Đồ Doanh Thu &amp; Xu Hướng Đơn Hàng Theo Thời Gian
+                </h2>
                 <p className="md-section-subtitle">
                   Thống kê chi tiết doanh thu từng ngày từ đơn hoàn thành kết hợp lượng đơn hàng phát sinh
                 </p>
