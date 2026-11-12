@@ -272,6 +272,41 @@ export const normalizeReportOrder = (rawOrder, overrides = {}) => {
   const explicitDiscount = Number(ord.discount_amount ?? ord.voucher_discount ?? 0) || 0;
   const grossAmount = Math.max(netAmount, explicitDiscount > 0 ? netAmount + explicitDiscount : itemsGross);
   const voucherAmount = Math.max(0, grossAmount - netAmount);
+  const itemsRawTotal = itemsGross > 0 ? itemsGross : netAmount;
+  const revenueScale = itemsRawTotal > 0 && netAmount < itemsRawTotal ? netAmount / itemsRawTotal : 1;
+
+  const normalizedItems = rawItems.map((item) => {
+    const qty = Math.max(1, Number(item?.quantity ?? 1) || 1);
+    const unitPrice = Number(item?.unit_price ?? item?.price ?? 0) || 0;
+    const rawSub = item?.subtotal != null ? Number(item.subtotal) : unitPrice * qty;
+    const productObj = item?.variant?.product || item?.product || {};
+    const productId = String(
+      productObj?.product_id || item?.product_id || item?.id || item?.variant_id || ''
+    ).trim();
+    const name = String(
+      item?.product_name || item?.name || item?.title || productObj?.product_name || 'Sản phẩm Youth Fashion'
+    ).trim();
+    const sku = String(
+      item?.variant?.sku || item?.sku || (productId ? `YF-SP-${productId}` : 'YF-SKU')
+    ).trim();
+    const categoryTag = String(
+      productObj?.category?.category_name || item?.category_name || item?.category || 'YOUTH FASHION'
+    )
+      .trim()
+      .toUpperCase();
+
+    return {
+      key: productId || name.toLowerCase(),
+      productId,
+      sku,
+      name,
+      categoryTag,
+      rawItem: item,
+      unitPrice: unitPrice > 0 ? unitPrice : Math.round(rawSub / qty),
+      quantity: qty,
+      lineRevenue: Math.max(0, (Number.isFinite(rawSub) ? rawSub : 0) * revenueScale),
+    };
+  });
 
   const statusInfo = normalizeOrderStatus(ord.order_status || ord.status, ord.status_label, ord);
   const isCompletedOrder = statusInfo.code === 'COMPLETED';
@@ -305,6 +340,7 @@ export const normalizeReportOrder = (rawOrder, overrides = {}) => {
     netAmount,
     grossAmount,
     voucherAmount,
+    items: normalizedItems,
   };
 };
 
@@ -415,8 +451,156 @@ export const summarizePeriod = (allOrders, startKey, endKey, prevStartKey, prevE
     minOrder,
     completionRate,
     revenueGrowth: computeGrowth(totalRevenue, prevRevenue),
+    allOrdersGrowth: computeGrowth(inCurrentAll.length, inPrevAll.length),
     aovGrowth: computeGrowth(aov, prevAov),
   };
+};
+
+/**
+ * Tạo chuỗi dữ liệu cho biểu đồ kết hợp Doanh thu & Xu hướng Đơn hàng (chỉ tính đơn đã hoàn thành).
+ * mode: '30d' | 'week' | 'quarter' | 'prev_year'
+ */
+export const buildOverviewChartSeries = (allOrders = [], mode = '30d') => {
+  const completedOrders = allOrders.filter((o) => o.isRevenueEligible);
+  const now = new Date();
+  const todayStr = toLocalDateInputValue(now);
+
+  const buckets = [];
+
+  if (mode === 'week') {
+    for (let offset = 6; offset >= 0; offset -= 1) {
+      const dateStr = shiftDateString(todayStr, -offset);
+      const [, mm, dd] = dateStr.split('-');
+      buckets.push({
+        key: dateStr,
+        startKey: dateStr,
+        endKey: dateStr,
+        axisLabel: `${dd} Th${Number(mm)}`,
+        tooltipTitle: `NGÀY ${dd}/${mm}`,
+        revenue: 0,
+        ordersCount: 0,
+      });
+    }
+  } else if (mode === 'quarter') {
+    // 12 tuần gần nhất đại diện xu hướng theo quý
+    for (let w = 11; w >= 0; w -= 1) {
+      const endKey = shiftDateString(todayStr, -(w * 7));
+      const startKey = shiftDateString(endKey, -6);
+      const [, sm, sd] = startKey.split('-');
+      const [, em, ed] = endKey.split('-');
+      buckets.push({
+        key: `${startKey}_${endKey}`,
+        startKey,
+        endKey,
+        axisLabel: `${sd}/${sm}`,
+        tooltipTitle: `TUẦN ${sd}/${sm} - ${ed}/${em}`,
+        revenue: 0,
+        ordersCount: 0,
+      });
+    }
+  } else if (mode === 'prev_year') {
+    const prevYearBase = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    const prevTodayStr = toLocalDateInputValue(prevYearBase);
+    for (let offset = 29; offset >= 0; offset -= 1) {
+      const dateStr = shiftDateString(prevTodayStr, -offset);
+      const [yy, mm, dd] = dateStr.split('-');
+      buckets.push({
+        key: dateStr,
+        startKey: dateStr,
+        endKey: dateStr,
+        axisLabel: `${dd} Th${Number(mm)}`,
+        tooltipTitle: `NGÀY ${dd}/${mm}/${yy}`,
+        revenue: 0,
+        ordersCount: 0,
+      });
+    }
+  } else {
+    // Mặc định: 30 ngày gần nhất
+    for (let offset = 29; offset >= 0; offset -= 1) {
+      const dateStr = shiftDateString(todayStr, -offset);
+      const [, mm, dd] = dateStr.split('-');
+      buckets.push({
+        key: dateStr,
+        startKey: dateStr,
+        endKey: dateStr,
+        axisLabel: `${dd} Th${Number(mm)}`,
+        tooltipTitle: `NGÀY ${dd}/${mm}`,
+        revenue: 0,
+        ordersCount: 0,
+      });
+    }
+  }
+
+  completedOrders.forEach((ord) => {
+    const bucket = buckets.find((b) => ord.dateKey >= b.startKey && ord.dateKey <= b.endKey);
+    if (bucket) {
+      bucket.revenue += ord.netAmount;
+      bucket.ordersCount += 1;
+    }
+  });
+
+  let peakIndex = -1;
+  let maxRevenue = 0;
+  buckets.forEach((b, idx) => {
+    b.aov = b.ordersCount > 0 ? b.revenue / b.ordersCount : 0;
+    if (b.revenue > maxRevenue) {
+      maxRevenue = b.revenue;
+      peakIndex = idx;
+    }
+  });
+
+  return {
+    buckets,
+    peakIndex,
+    maxRevenue,
+    maxOrders: buckets.reduce((max, b) => Math.max(max, b.ordersCount), 0),
+  };
+};
+
+/**
+ * Xếp hạng sản phẩm đóng góp doanh thu cao nhất từ các đơn hàng đã hoàn thành.
+ */
+export const buildTopProducts = (allOrders = [], limit = 4) => {
+  const completedOrders = allOrders.filter((o) => o.isRevenueEligible && Array.isArray(o.items));
+  if (completedOrders.length === 0) {
+    return { items: [], isCurrentMonth: true };
+  }
+
+  const now = new Date();
+  const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonthCompleted = completedOrders.filter((o) => o.dateKey.startsWith(monthPrefix));
+  const useCurrentMonth = currentMonthCompleted.some((o) => o.items.length > 0);
+  const sourceOrders = useCurrentMonth ? currentMonthCompleted : completedOrders;
+
+  const aggMap = new Map();
+  sourceOrders.forEach((ord) => {
+    ord.items.forEach((item) => {
+      const existing = aggMap.get(item.key);
+      if (!existing) {
+        aggMap.set(item.key, {
+          key: item.key,
+          productId: item.productId,
+          sku: item.sku,
+          name: item.name,
+          categoryTag: item.categoryTag,
+          rawItem: item.rawItem,
+          unitPrice: item.unitPrice,
+          soldQty: item.quantity,
+          totalRevenue: item.lineRevenue,
+        });
+      } else {
+        existing.soldQty += item.quantity;
+        existing.totalRevenue += item.lineRevenue;
+        if (item.unitPrice > 0) existing.unitPrice = item.unitPrice;
+      }
+    });
+  });
+
+  const ranked = Array.from(aggMap.values())
+    .sort((a, b) => b.totalRevenue - a.totalRevenue || b.soldQty - a.soldQty)
+    .slice(0, limit);
+
+  return { items: ranked, isCurrentMonth: useCurrentMonth };
 };
 
 export const formatVND = (amount) => `${Math.round(Number(amount || 0)).toLocaleString('vi-VN')} đ`;

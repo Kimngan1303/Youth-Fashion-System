@@ -4,15 +4,17 @@ import { authenticateToken, authorizeRoles } from '../middlewares/auth.middlewar
 
 const router = Router();
 
-// Yêu cầu xác thực đăng nhập và quyền hạn ADMIN duy nhất
+// Yêu cầu xác thực đăng nhập cho tất cả endpoint quản trị
 router.use(authenticateToken);
+
+// Lấy các chỉ số thống kê tổng quan (cho phép Admin và Manager xem ở trang Tổng Quan)
+router.get('/metrics', authorizeRoles('ADMIN', 'MANAGER'), adminController.getAdminMetrics);
+
+// Các thao tác quản lý người dùng bên dưới chỉ dành cho ADMIN duy nhất
 router.use(authorizeRoles('ADMIN'));
 
 // Lấy danh sách toàn bộ người dùng
 router.get('/users', adminController.getAllUsers);
-
-// Lấy các chỉ số thống kê tổng quan
-router.get('/metrics', adminController.getAdminMetrics);
 
 // Tạo tài khoản Quản trị viên (Admin / Manager) mới
 router.post('/create-admin', adminController.createAdmin);

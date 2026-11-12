@@ -194,9 +194,25 @@ export const getAdminMetricsService = async () => {
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const newThisMonth = await prisma.customer.count({
-    where: { created_at: { gte: startOfMonth } },
-  });
+  const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+  const [newThisMonth, newPrevMonth] = await Promise.all([
+    prisma.customer.count({
+      where: { created_at: { gte: startOfMonth } },
+    }),
+    prisma.customer.count({
+      where: {
+        created_at: {
+          gte: startOfPrevMonth,
+          lt: startOfMonth,
+        },
+      },
+    }),
+  ]);
+
+  const newUserGrowth = newPrevMonth > 0
+    ? ((newThisMonth - newPrevMonth) / newPrevMonth) * 100
+    : null;
 
   return {
     totalUsers,
@@ -204,6 +220,8 @@ export const getAdminMetricsService = async () => {
     lockedTotal,
     vipCount: 0,
     newThisMonth,
+    newPrevMonth,
+    newUserGrowth,
     totalEmployees,
     adminEmployees,
     managerEmployees,
