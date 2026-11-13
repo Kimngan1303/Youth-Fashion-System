@@ -7,6 +7,7 @@ import ManagerHeader from '../../components/ManagerHeader';
 import { orderService } from '../../services/orderService';
 import { sendOrderStatusNotification } from '../../services/notificationService';
 import { resolveOrderItemImage } from '../../utils/productImageUtils';
+import { ensureOrderCacheReset } from '../../utils/orderCacheReset';
 import {
   ShoppingBag,
   Star,
@@ -455,22 +456,7 @@ export default function OrderManager() {
   // Danh sách đơn hàng (Bắt đầu hoàn toàn trống để chờ đơn thật từ tài khoản khách hàng)
   const [orders, setOrders] = useState(() => {
     try {
-      if (localStorage.getItem('yf_orders_reset_all_v3') !== 'true') {
-        orderService.clearAllOrders().catch(() => {});
-        localStorage.removeItem('yf_manager_orders');
-        localStorage.removeItem('yf_customer_orders');
-        localStorage.removeItem('yf_deleted_order_ids');
-        localStorage.removeItem('yf_order_status_overrides');
-        sessionStorage.removeItem('yf_last_completed_order');
-        const keysToRemove = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k && (k.startsWith('yf_customer_orders') || k.startsWith('yf_orders_reset_') || k === 'yf_manager_orders')) {
-            keysToRemove.push(k);
-          }
-        }
-        keysToRemove.forEach(k => localStorage.removeItem(k));
-        localStorage.setItem('yf_orders_reset_all_v3', 'true');
+      if (ensureOrderCacheReset()) {
         return [];
       }
 
@@ -679,21 +665,7 @@ export default function OrderManager() {
 
   // Tải dữ liệu từ database backend và đồng bộ với localStorage khi mount
   useEffect(() => {
-    if (localStorage.getItem('yf_orders_reset_all_v3') !== 'true') {
-      orderService.clearAllOrders().catch(() => {});
-      localStorage.removeItem('yf_manager_orders');
-      localStorage.removeItem('yf_customer_orders');
-      localStorage.removeItem('yf_deleted_order_ids');
-      sessionStorage.removeItem('yf_last_completed_order');
-      const keysToRemove = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && (k.startsWith('yf_customer_orders') || k.startsWith('yf_orders_reset_') || k === 'yf_manager_orders')) {
-          keysToRemove.push(k);
-        }
-      }
-      keysToRemove.forEach(k => localStorage.removeItem(k));
-      localStorage.setItem('yf_orders_reset_all_v3', 'true');
+    if (ensureOrderCacheReset()) {
       setOrders([]);
       return;
     }
@@ -1045,19 +1017,20 @@ export default function OrderManager() {
     };
   }, [orders]);
 
-  // Doanh thu và thống kê
+  // Doanh thu và thống kê (chỉ tính các đơn hàng đã hoàn thành / đã giao)
   const stats = useMemo(() => {
-    const totalRev = orders
-      .filter(o => getCategoryFromStatus(o.order_status, o.status_label) === 'COMPLETED' || o.payment_status === 'PAID')
-      .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const completedOrders = orders.filter(
+      o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'COMPLETED'
+    );
+    const totalRev = completedOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
     const pendingRevenue = orders
-      .filter(o => getCategoryFromStatus(o.order_status, o.status_label) === 'PENDING')
+      .filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'PENDING')
       .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
     const completedCount = counts.COMPLETED;
     const pendingCount = counts.PENDING;
-    const aov = orders.length > 0 ? Math.round(totalRev / Math.max(1, completedCount || 1)) : 0;
+    const aov = completedCount > 0 ? Math.round(totalRev / completedCount) : 0;
 
     const totalOrdersStr = String(orders.length).padStart(2, '0');
     const completedStr = String(completedCount).padStart(2, '0');

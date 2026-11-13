@@ -110,6 +110,10 @@ export const getAllUsersService = async ({ search = '', role = 'ALL', status = '
       role,
       role_label,
       sub_role: null,
+      gender: c.gender || null,
+      dob: c.dob || null,
+      customer_tier: c.customer_tier || null,
+      email_verified: Boolean(c.email_verified_at),
       total_spending: totalSpent,
       spending_display: displaySpending,
       orders_count: orderCount,
@@ -190,9 +194,25 @@ export const getAdminMetricsService = async () => {
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const newThisMonth = await prisma.customer.count({
-    where: { created_at: { gte: startOfMonth } },
-  });
+  const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+  const [newThisMonth, newPrevMonth] = await Promise.all([
+    prisma.customer.count({
+      where: { created_at: { gte: startOfMonth } },
+    }),
+    prisma.customer.count({
+      where: {
+        created_at: {
+          gte: startOfPrevMonth,
+          lt: startOfMonth,
+        },
+      },
+    }),
+  ]);
+
+  const newUserGrowth = newPrevMonth > 0
+    ? ((newThisMonth - newPrevMonth) / newPrevMonth) * 100
+    : null;
 
   return {
     totalUsers,
@@ -200,6 +220,8 @@ export const getAdminMetricsService = async () => {
     lockedTotal,
     vipCount: 0,
     newThisMonth,
+    newPrevMonth,
+    newUserGrowth,
     totalEmployees,
     adminEmployees,
     managerEmployees,

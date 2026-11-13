@@ -11,6 +11,7 @@ import ProductCard from '../components/ProductCard';
 import { voucherService } from '../services/voucherService';
 import { orderService } from '../services/orderService';
 import { resolveOrderItemImage } from '../utils/productImageUtils';
+import { ensureOrderCacheReset } from '../utils/orderCacheReset';
 
 // Chuẩn hóa ngày hiển thị sang dạng DD/MM/YYYY
 const normalizeDobToVn = (dob) => {
@@ -690,21 +691,7 @@ const ProfilePage = () => {
   // Lịch sử đơn hàng: Chỉ tải các đơn hàng thực tế mà người dùng đã đặt thành công
   const [customerOrders, setCustomerOrders] = useState(() => {
     try {
-      if (localStorage.getItem('yf_orders_reset_all_v3') !== 'true') {
-        orderService.clearAllOrders().catch(() => { });
-        localStorage.removeItem('yf_manager_orders');
-        localStorage.removeItem('yf_customer_orders');
-        localStorage.removeItem('yf_deleted_order_ids');
-        sessionStorage.removeItem('yf_last_completed_order');
-        const keysToRemove = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k && (k.startsWith('yf_customer_orders') || k.startsWith('yf_orders_reset_') || k === 'yf_manager_orders')) {
-            keysToRemove.push(k);
-          }
-        }
-        keysToRemove.forEach(k => localStorage.removeItem(k));
-        localStorage.setItem('yf_orders_reset_all_v3', 'true');
+      if (ensureOrderCacheReset()) {
         return [];
       }
 

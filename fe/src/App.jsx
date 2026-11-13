@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { ConfirmModalProvider } from './context/ConfirmModalContext';
-import { orderService } from './services/orderService';
+import { ensureOrderCacheReset } from './utils/orderCacheReset';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AISearchModal from './components/AISearchModal';
@@ -34,6 +34,7 @@ import OrderManager from './pages/manager/OrderManager';
 import UserManagement from './pages/manager/UserManagement';
 import SystemConfig from './pages/manager/SystemConfig';
 import ChatManagement from './pages/manager/ChatManagement';
+import RevenueReport from './pages/manager/RevenueReport';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useContext(AuthContext);
@@ -53,29 +54,9 @@ function AppContent() {
   const [isAISearchOpen, setIsAISearchOpen] = useState(false);
   const location = useLocation();
 
-  // Đảm bảo xóa sạch đơn hàng cũ từ tất cả tài khoản người dùng và backend khi khởi chạy
+  // Đảm bảo làm sạch một lần bộ nhớ đệm đơn hàng cũ trên trình duyệt
   useEffect(() => {
-    if (localStorage.getItem('yf_orders_reset_all_v3') !== 'true') {
-      try {
-        orderService.clearAllOrders().catch(() => {});
-        localStorage.removeItem('yf_manager_orders');
-        localStorage.removeItem('yf_customer_orders');
-        localStorage.removeItem('yf_deleted_order_ids');
-        sessionStorage.removeItem('yf_last_completed_order');
-
-        const keysToRemove = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k && (k.startsWith('yf_customer_orders') || k.startsWith('yf_orders_reset_') || k === 'yf_manager_orders')) {
-            keysToRemove.push(k);
-          }
-        }
-        keysToRemove.forEach(k => localStorage.removeItem(k));
-        localStorage.setItem('yf_orders_reset_all_v3', 'true');
-        window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: { action: 'CLEAR_ALL' } }));
-        window.dispatchEvent(new Event('order_status_updated'));
-      } catch (e) {}
-    }
+    ensureOrderCacheReset();
   }, []);
 
   // Xác định các trang không cần hiển thị Header và Footer của khách hàng
@@ -167,6 +148,14 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <ManagerDashboard />
+              </ProtectedRoute>
+            }
+          />
           
           <Route
             path="/manager/products"
@@ -221,6 +210,22 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <OrderManager />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/manager/reports"
+            element={
+              <ProtectedRoute>
+                <RevenueReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/reports"
+            element={
+              <ProtectedRoute>
+                <RevenueReport />
               </ProtectedRoute>
             }
           />
