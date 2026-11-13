@@ -107,6 +107,9 @@ export const createOrderService = async ({
     const returnUrl = `${clientUrl}/order-success`;
     const cancelUrl = `${clientUrl}/checkout`;
 
+    // Giới hạn thời gian thanh toán: đúng 5 phút (300 giây) theo yêu cầu
+    const expiredAt = Math.floor(Date.now() / 1000) + 5 * 60;
+
     try {
       const payosLink = await payosService.createPaymentLink({
         orderCode,
@@ -119,6 +122,7 @@ export const createOrderService = async ({
         })),
         returnUrl,
         cancelUrl,
+        expiredAt,
       });
 
       // Lưu mã liên kết thanh toán vào Payment
@@ -136,6 +140,13 @@ export const createOrderService = async ({
         checkoutUrl: payosLink.checkoutUrl,
         isSimulation: payosLink.isSimulation || false,
         paymentMethod: 'PAYOS',
+        expiredAt,
+        qrCode: payosLink.qrCode,
+        accountNumber: payosLink.accountNumber,
+        accountName: payosLink.accountName,
+        bin: payosLink.bin,
+        amount: totalAmount,
+        description: `Thanh toan ${orderNumber}`.slice(0, 25),
       };
     } catch (payosError) {
       console.error('❌ Lỗi khi khởi tạo liên kết PayOS:', payosError.message);
@@ -144,6 +155,31 @@ export const createOrderService = async ({
   }
 
   // Với phương thức COD:
+  // Xóa các sản phẩm đã đặt khỏi giỏ hàng MySQL của khách hàng
+  if (customerId && itemsData?.length > 0) {
+    try {
+      const customerCart = await prisma.cart.findUnique({
+        where: { customer_id: BigInt(customerId) },
+      });
+      if (customerCart) {
+        const variantIds = itemsData
+          .map((i) => i.variant_id)
+          .filter((v) => v !== null && v !== undefined && !isNaN(Number(v)))
+          .map((v) => BigInt(v));
+        if (variantIds.length > 0) {
+          await prisma.cartItem.deleteMany({
+            where: {
+              cart_id: customerCart.cart_id,
+              variant_id: { in: variantIds },
+            },
+          });
+        }
+      }
+    } catch (cartDelErr) {
+      console.warn('Lỗi xóa sản phẩm đã đặt khỏi giỏ hàng MySQL COD:', cartDelErr.message);
+    }
+  }
+
   // Tự động gửi email thông báo đặt hàng thành công đến Gmail của khách
   if (recipientEmail) {
     sendOrderNotificationEmail({
@@ -223,17 +259,26 @@ export const checkPayosStatusService = async (orderCode) => {
 
     // Xóa các sản phẩm đã thanh toán khỏi giỏ hàng MySQL của khách
     if (order.customer_id && order.order_items?.length > 0) {
-      const customerCart = await prisma.cart.findUnique({
-        where: { customer_id: order.customer_id },
-      });
-      if (customerCart) {
-        const variantIds = order.order_items.map((i) => i.variant_id);
-        await prisma.cartItem.deleteMany({
-          where: {
-            cart_id: customerCart.cart_id,
-            variant_id: { in: variantIds },
-          },
+      try {
+        const customerCart = await prisma.cart.findUnique({
+          where: { customer_id: BigInt(order.customer_id) },
         });
+        if (customerCart) {
+          const variantIds = order.order_items
+            .map((i) => i.variant_id)
+            .filter((v) => v !== null && v !== undefined && !isNaN(Number(v)))
+            .map((v) => BigInt(v));
+          if (variantIds.length > 0) {
+            await prisma.cartItem.deleteMany({
+              where: {
+                cart_id: customerCart.cart_id,
+                variant_id: { in: variantIds },
+              },
+            });
+          }
+        }
+      } catch (cartDelErr) {
+        console.warn('Lỗi xóa sản phẩm khỏi giỏ hàng MySQL PayOS status:', cartDelErr.message);
       }
     }
 
@@ -294,17 +339,26 @@ export const handlePayosWebhookService = async (webhookBody) => {
     }
 
     if (order.customer_id && order.order_items?.length > 0) {
-      const customerCart = await prisma.cart.findUnique({
-        where: { customer_id: order.customer_id },
-      });
-      if (customerCart) {
-        const variantIds = order.order_items.map((i) => i.variant_id);
-        await prisma.cartItem.deleteMany({
-          where: {
-            cart_id: customerCart.cart_id,
-            variant_id: { in: variantIds },
-          },
+      try {
+        const customerCart = await prisma.cart.findUnique({
+          where: { customer_id: BigInt(order.customer_id) },
         });
+        if (customerCart) {
+          const variantIds = order.order_items
+            .map((i) => i.variant_id)
+            .filter((v) => v !== null && v !== undefined && !isNaN(Number(v)))
+            .map((v) => BigInt(v));
+          if (variantIds.length > 0) {
+            await prisma.cartItem.deleteMany({
+              where: {
+                cart_id: customerCart.cart_id,
+                variant_id: { in: variantIds },
+              },
+            });
+          }
+        }
+      } catch (cartDelErr) {
+        console.warn('Lỗi xóa sản phẩm khỏi giỏ hàng MySQL PayOS webhook:', cartDelErr.message);
       }
     }
 
