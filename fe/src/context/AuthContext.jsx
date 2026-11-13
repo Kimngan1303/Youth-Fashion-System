@@ -508,6 +508,88 @@ export function AuthProvider({ children }) {
     });
   };
 
+  /**
+   * Xóa chính xác các sản phẩm vừa thanh toán thành công khỏi giỏ hàng
+   * Áp dụng cho cả MySQL Database, localStorage và React state
+   */
+  const removePurchasedItems = async (purchasedItems) => {
+    if (!purchasedItems || !Array.isArray(purchasedItems) || purchasedItems.length === 0) return;
+
+    // Nếu đơn hàng là Mua Ngay (isBuyNow) thì không ảnh hưởng giỏ hàng
+    if (purchasedItems.some((i) => i.isBuyNow)) {
+      try {
+        sessionStorage.removeItem('yf_buy_now_item');
+      } catch (e) {}
+      return;
+    }
+
+    const targetVariantIds = [];
+    const targetIds = new Set();
+    const targetNames = new Set();
+
+    purchasedItems.forEach((pItem) => {
+      const vId = pItem.variant_id || (pItem.id && !isNaN(Number(pItem.id)) && !String(pItem.id).includes('-') ? Number(pItem.id) : null);
+      if (vId) targetVariantIds.push(vId);
+      if (pItem.id) targetIds.add(String(pItem.id));
+      if (pItem.cartItemId) targetIds.add(String(pItem.cartItemId));
+      if (pItem.variant_id) targetIds.add(String(pItem.variant_id));
+      const name = pItem.title || pItem.product_name || pItem.name;
+      if (name) targetNames.add(String(name).toLowerCase().trim());
+    });
+
+    // 1. Gọi API Backend xóa các sản phẩm này khỏi giỏ hàng MySQL
+    targetVariantIds.forEach((vId) => {
+      cartService.removeFromCart(vId).catch((err) => {
+        console.warn('Lỗi xóa sản phẩm đã mua khỏi giỏ hàng qua API:', err.message);
+      });
+    });
+
+    // 2. Cập nhật state cart và đồng bộ localStorage
+    setCart((prev) => {
+      const remaining = (prev || []).filter((cItem) => {
+        const cVId = cItem.variant_id || (cItem.id && !isNaN(Number(cItem.id)) && !String(cItem.id).includes('-') ? Number(cItem.id) : null);
+        if (cVId && targetVariantIds.includes(cVId)) return false;
+        if (cItem.id && targetIds.has(String(cItem.id))) return false;
+        if (cItem.cartItemId && targetIds.has(String(cItem.cartItemId))) return false;
+        const cName = String(cItem.title || cItem.product_name || '').toLowerCase().trim();
+        if (cName && targetNames.has(cName)) return false;
+        return true;
+      });
+
+      const cartKey = getUserStorageKey('youth_fashion_cart', user);
+      if (cartKey) {
+        try {
+          localStorage.setItem(cartKey, JSON.stringify(remaining));
+        } catch (err) {}
+      }
+      return remaining;
+    });
+
+    // Dọn dẹp các session thanh toán
+    try {
+      sessionStorage.removeItem('yf_buy_now_item');
+      sessionStorage.removeItem('yf_pending_checkout_items');
+      sessionStorage.removeItem('yf_checkout_voucher');
+      sessionStorage.removeItem('yf_checkout_note');
+    } catch (e) {}
+  };
+
+  /**
+   * Cập nhật cart an toàn, luôn đồng bộ xuống localStorage
+   */
+  const updateCartState = (newCartOrFn) => {
+    setCart((prev) => {
+      const next = typeof newCartOrFn === 'function' ? newCartOrFn(prev) : newCartOrFn;
+      const cartKey = getUserStorageKey('youth_fashion_cart', user);
+      if (cartKey) {
+        try {
+          localStorage.setItem(cartKey, JSON.stringify(next || []));
+        } catch (err) {}
+      }
+      return next || [];
+    });
+  };
+
   // Số lượng giỏ hàng: Chỉ hiển thị khi đã đăng nhập
   const cartCount = user ? cart.reduce((sum, item) => sum + (item.quantity || 1), 0) : 0;
 
@@ -740,11 +822,13 @@ export function AuthProvider({ children }) {
         removeFromWishlist,
         clearWishlist,
         cart,
+        setCart: updateCartState,
         cartCount,
         addToCart,
         updateCartQuantity,
         removeFromCart,
         clearCart,
+        removePurchasedItems,
         toggleCartItemSelection,
         toggleSelectAllCart,
         orders,

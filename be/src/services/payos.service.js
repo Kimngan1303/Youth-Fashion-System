@@ -30,7 +30,7 @@ export const verifyWebhookSignature = (webhookData, signature, checksumKey) => {
 
 /**
  * Tạo link thanh toán PayOS
- * @param {Object} params { orderCode, amount, description, items, returnUrl, cancelUrl }
+ * @param {Object} params { orderCode, amount, description, items, returnUrl, cancelUrl, expiredAt }
  */
 export const createPaymentLink = async ({
   orderCode,
@@ -39,6 +39,7 @@ export const createPaymentLink = async ({
   items = [],
   returnUrl,
   cancelUrl,
+  expiredAt,
 }) => {
   const clientId = process.env.PAYOS_CLIENT_ID?.trim();
   const apiKey = process.env.PAYOS_API_KEY?.trim();
@@ -87,6 +88,11 @@ export const createPaymentLink = async ({
     signature,
   };
 
+  // Thiết lập thời gian hết hạn của link thanh toán (Unix timestamp theo giây)
+  if (expiredAt) {
+    payload.expiredAt = Number(expiredAt);
+  }
+
   try {
     const response = await fetch(PAYOS_API_URL, {
       method: 'POST',
@@ -108,6 +114,12 @@ export const createPaymentLink = async ({
         orderCode: result.data.orderCode,
         qrCode: result.data.qrCode,
         status: result.data.status,
+        accountNumber: result.data.accountNumber,
+        accountName: result.data.accountName,
+        bin: result.data.bin,
+        amount: result.data.amount,
+        description: result.data.description,
+        expiredAt: result.data.expiredAt,
       };
     } else {
       console.error('❌ [PayOS API Error]:', result);

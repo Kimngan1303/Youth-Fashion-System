@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   CheckCircle2,
   ShoppingBag,
@@ -19,13 +19,27 @@ import { useAuth } from '../../context/AuthContext';
 import { resolveOrderItemImage } from '../../utils/productImageUtils';
 
 export default function OrderSuccessPage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const orderCode = searchParams.get('orderCode');
   const orderNumberParam = searchParams.get('orderNumber');
   const isSimulated = searchParams.get('simulated') === 'true';
   const payosStatusParam = searchParams.get('status');
 
-  const { user, setCart } = useAuth();
+  // Nếu người dùng hủy thanh toán hoặc quá thời gian 5 phút bị điều hướng nhầm vào đây, tự động chuyển về trang checkout
+  useEffect(() => {
+    const isCanceled =
+      searchParams.get('cancel') === 'true' ||
+      searchParams.get('canceled') === 'true' ||
+      payosStatusParam === 'CANCELLED' ||
+      payosStatusParam === 'EXPIRED';
+
+    if (isCanceled) {
+      navigate(`/checkout?${searchParams.toString()}`, { replace: true });
+    }
+  }, [searchParams, payosStatusParam, navigate]);
+
+  const { user, setCart, removePurchasedItems } = useAuth();
   const [copied, setCopied] = useState(false);
 
   // Khởi tạo ngay lập tức từ sessionStorage (nếu có) để tránh màn hình bị chớp/trắng khi tải
@@ -104,33 +118,28 @@ export default function OrderSuccessPage() {
   // Xóa các sản phẩm đã thanh toán thành công khỏi giỏ hàng
   useEffect(() => {
     if (paymentStatus === 'PAID' || payosStatusParam === 'PAID' || paymentStatus === 'COD' || order?.payments?.[0]?.payment_method === 'COD') {
-      if (setCart) {
-        let boughtNames = new Set();
-        if (order?.order_items?.length > 0) {
-          boughtNames = new Set(order.order_items.map((i) => i.product_name || i.title));
+      let itemsToRemove = [];
+      try {
+        const pendingItems = JSON.parse(sessionStorage.getItem('yf_pending_checkout_items') || '[]');
+        if (Array.isArray(pendingItems) && pendingItems.length > 0) {
+          itemsToRemove = pendingItems;
         }
-        try {
-          const pendingItems = JSON.parse(sessionStorage.getItem('yf_pending_checkout_items') || '[]');
-          if (Array.isArray(pendingItems)) {
-            pendingItems.forEach((i) => {
-              if (i.title) boughtNames.add(i.title);
-              if (i.product_name) boughtNames.add(i.product_name);
-            });
-          }
-        } catch (e) {}
+      } catch (e) {}
 
-        if (boughtNames.size > 0) {
-          setCart((prev) => {
-            if (!prev || prev.length === 0) return [];
-            return prev.filter((item) => !boughtNames.has(item.title) && !boughtNames.has(item.product_name));
-          });
-        }
+      if (itemsToRemove.length === 0 && order?.order_items?.length > 0) {
+        itemsToRemove = order.order_items;
       }
+
+      if (itemsToRemove.length > 0 && removePurchasedItems) {
+        removePurchasedItems(itemsToRemove);
+      }
+
       sessionStorage.removeItem('yf_checkout_voucher');
       sessionStorage.removeItem('yf_checkout_note');
       sessionStorage.removeItem('yf_pending_checkout_items');
+      sessionStorage.removeItem('yf_buy_now_item');
     }
-  }, [paymentStatus, payosStatusParam, order, setCart]);
+  }, [paymentStatus, payosStatusParam, order, removePurchasedItems]);
 
   // Khi thanh toán PayOS thành công (Hình 2): Chính thức ghi nhận đơn hàng vào danh sách đơn của Khách hàng và Quản lý
   useEffect(() => {
@@ -493,13 +502,6 @@ export default function OrderSuccessPage() {
                 <div className="fin-row">
                   <span className="fin-label">Vận chuyển VIP</span>
                   <span className="fin-val text-emerald-700 font-semibold">MIỄN PHÍ (0đ)</span>
-                </div>
-
-                <div className="fin-row">
-                  <span className="fin-label">Thuế VAT (8%)</span>
-                  <span className="fin-val text-stone-500">
-                    {Number(Math.round((order.total_amount || 0) * 0.08 / 1.08)).toLocaleString('vi-VN')}đ
-                  </span>
                 </div>
 
                 <div className="fin-row fin-total-row">

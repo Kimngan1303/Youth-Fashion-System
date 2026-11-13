@@ -14,6 +14,7 @@ import SearchPage from './pages/customer/SearchPage';
 import WishlistPage from './pages/customer/WishlistPage';
 import CartPage from './pages/customer/CartPage';
 import CheckoutPage from './pages/customer/CheckoutPage';
+import PayOSPaymentPage from './pages/customer/PayOSPaymentPage';
 import OrderSuccessPage from './pages/customer/OrderSuccessPage';
 import ProfilePage from './pages/ProfilePage';
 import NotificationPage from './pages/customer/NotificationPage';
@@ -60,7 +61,10 @@ function AppContent() {
   }, []);
 
   // Xác định các trang không cần hiển thị Header và Footer của khách hàng
-  const hideHeaderFooter = ['/login', '/register', '/verify-email', '/forgot-password'].includes(location.pathname) || location.pathname.startsWith('/manager') || location.pathname.startsWith('/admin');
+  const hideHeaderFooter = ['/login', '/register', '/verify-email', '/forgot-password'].includes(location.pathname) || 
+    location.pathname.startsWith('/manager') || 
+    location.pathname.startsWith('/admin') ||
+    location.pathname.startsWith('/payment');
 
   return (
     <div className="app-layout">
@@ -133,6 +137,10 @@ function AppContent() {
                 <CheckoutPage />
               </ProtectedRoute>
             } 
+          />
+          <Route 
+            path="/payment/payos/:orderCode" 
+            element={<PayOSPaymentPage />} 
           />
           <Route 
             path="/order-success" 
