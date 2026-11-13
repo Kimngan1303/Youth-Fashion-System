@@ -934,6 +934,9 @@ export default function Register() {
 
     if (res.success) {
       const normalizedEmail = email.trim().toLowerCase();
+      try {
+        localStorage.setItem(`yf_user_registered_at_${normalizedEmail}`, new Date().toISOString());
+      } catch (e) {}
       const msg = res.message || 'Mã xác thực OTP đã được gửi đến email của bạn!';
       setSuccessMessage(msg);
       setTimeout(() => {

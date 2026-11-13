@@ -8,6 +8,7 @@ import {
   verifyEmailController,
   resendVerificationOtpController,
   updateProfileController,
+  getProfileController,
   changePasswordController,
   forgotPasswordController,
   resetPasswordController,
@@ -67,6 +68,9 @@ router.post('/logout', logoutController);
 
 // POST /api/auth/refresh - Cấp lại Access Token
 router.post('/refresh', refreshController);
+
+// GET /api/auth/profile - Lấy thông tin Hồ sơ cá nhân
+router.get('/profile', optionalAuthToken, getProfileController);
 
 // PUT /api/auth/profile - Cập nhật thông tin Hồ sơ cá nhân
 router.put('/profile', optionalAuthToken, validateBody(updateProfileSchema), updateProfileController);

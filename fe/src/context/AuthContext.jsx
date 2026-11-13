@@ -171,6 +171,28 @@ export function AuthProvider({ children }) {
       });
   }, [user?.customer_id, user?.id, user?.email]);
 
+  // Đồng bộ lại thông tin hồ sơ & ngày đăng ký created_at từ backend nếu chưa có
+  useEffect(() => {
+    const syncUserProfile = async () => {
+      const token = localStorage.getItem('accessToken');
+      if (token && user && !user.created_at) {
+        try {
+          const res = await authService.getProfile();
+          if (res?.data?.created_at) {
+            setUser(prev => {
+              const updated = { ...prev, ...res.data };
+              localStorage.setItem('user', JSON.stringify(updated));
+              return updated;
+            });
+          }
+        } catch (e) {
+          // ignore error
+        }
+      }
+    };
+    syncUserProfile();
+  }, [user?.customer_id, user?.id, user?.email]);
+
   useEffect(() => {
     const handleLogoutEvent = () => {
       setUser(null);
@@ -549,6 +571,11 @@ export function AuthProvider({ children }) {
         userData.avatar_url = savedAvatar;
       }
 
+      if (!userData?.created_at && userData?.email) {
+        const storedReg = localStorage.getItem(`yf_user_registered_at_${userData.email}`);
+        if (storedReg) userData.created_at = storedReg;
+      }
+
       setUser(userData);
       setAccessToken(token);
       localStorage.setItem('user', JSON.stringify(userData));
@@ -593,6 +620,11 @@ export function AuthProvider({ children }) {
       const savedAvatar = (userData?.email && localStorage.getItem(`avatar_url_${userData.email}`)) || localStorage.getItem('user_avatar_url');
       if (!isValidAvatarUrl(userData?.avatar_url) && isValidAvatarUrl(savedAvatar)) {
         userData.avatar_url = savedAvatar;
+      }
+
+      if (!userData?.created_at && userData?.email) {
+        const storedReg = localStorage.getItem(`yf_user_registered_at_${userData.email}`);
+        if (storedReg) userData.created_at = storedReg;
       }
 
       setUser(userData);
