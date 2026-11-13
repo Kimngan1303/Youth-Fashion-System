@@ -16,7 +16,7 @@ import { resolveOrderItemImage } from '../../utils/productImageUtils';
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, cart, setCart, updateUserProfile } = useAuth();
+  const { user, cart, setCart, removePurchasedItems, updateUserProfile } = useAuth();
   const { showSuccess, showError, showInfo } = useToast();
 
   // 1. Lấy sản phẩm được chọn từ Mua Ngay hoặc từ Giỏ hàng
@@ -161,7 +161,15 @@ export default function CheckoutPage() {
 
   // Phương thức vận chuyển & Thanh toán
   const [shippingMethod, setShippingMethod] = useState('EXPRESS'); // 'EXPRESS' | 'STANDARD'
-  const [paymentMethod, setPaymentMethod] = useState('COD'); // 'COD' | 'PAYOS'
+  const [paymentMethod, setPaymentMethod] = useState(() => {
+    try {
+      const search = window.location.search || '';
+      if (search.includes('cancel=') || search.includes('orderCode=') || sessionStorage.getItem('yf_pending_order_code')) {
+        return 'PAYOS';
+      }
+    } catch (e) {}
+    return 'COD';
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Cập nhật danh sách quận/huyện theo tỉnh/thành
@@ -223,7 +231,6 @@ export default function CheckoutPage() {
 
   // Giá trị tính toán chuẩn khớp với giao diện thiết kế
   const finalTotal = Math.max(0, rawProductTotal - voucherDiscount);
-  const vatAmount = Math.round((finalTotal * 8) / 108); // Thuế VAT 8% bao gồm trong tổng tiền
   
   // Tính tổng tiết kiệm
   const totalOriginalSaving = checkoutItems.reduce((sum, item) => {
@@ -274,10 +281,15 @@ export default function CheckoutPage() {
     showInfo('Đã gỡ mã ưu đãi');
   };
 
-  // Lắng nghe sự kiện nếu khách bấm nút "Hủy thanh toán" trên PayOS
+  // Lắng nghe sự kiện nếu khách bấm nút "Hủy thanh toán" hoặc quá thời hạn 5 phút trên PayOS
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const isCanceled = params.get('cancel') === 'true' || params.get('status') === 'CANCELLED' || params.get('canceled') === 'true';
+    const statusParam = (params.get('status') || '').toUpperCase();
+    const isCanceled =
+      params.get('cancel') === 'true' ||
+      params.get('canceled') === 'true' ||
+      statusParam === 'CANCELLED' ||
+      statusParam === 'EXPIRED';
     const orderCode = params.get('orderCode') || sessionStorage.getItem('yf_pending_order_code');
 
     if (isCanceled) {
@@ -330,15 +342,20 @@ export default function CheckoutPage() {
       sessionStorage.removeItem('yf_pending_payos_order');
       sessionStorage.removeItem('yf_pending_order_code');
       sessionStorage.removeItem('yf_last_completed_order');
-      sessionStorage.removeItem('yf_buy_now_item');
 
-      // 5. Khôi phục giỏ hàng
+      // 5. Khôi phục giỏ hàng hoặc sản phẩm Mua Ngay
       try {
         const cached = sessionStorage.getItem('yf_pending_checkout_items');
-        if (cached && setCart) {
+        if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setCart(parsed);
+            const hasBuyNow = parsed.some((it) => it.isBuyNow);
+            if (hasBuyNow) {
+              sessionStorage.setItem('yf_buy_now_item', JSON.stringify(parsed[0]));
+            }
+            if (setCart) {
+              setCart(parsed);
+            }
           }
         }
       } catch (e) {}
@@ -347,7 +364,11 @@ export default function CheckoutPage() {
       window.history.replaceState({}, '', window.location.pathname);
 
       // 7. Thông báo cho người dùng
-      showInfo('Bạn đã hủy thanh toán đơn hàng qua PayOS. Đơn hàng chưa được đặt, các sản phẩm đã được giữ lại trong giỏ hàng.');
+      if (statusParam === 'EXPIRED') {
+        showInfo('Đã hết thời gian thanh toán (5 phút). Đơn hàng chưa được tạo, các sản phẩm đã được giữ lại trong giỏ hàng để bạn tiếp tục.');
+      } else {
+        showInfo('Đã quá thời gian thanh toán 5 phút hoặc giao dịch đã được hủy. Các sản phẩm vẫn được giữ lại để bạn tiếp tục đặt hàng.');
+      }
 
       // 8. Kích hoạt custom event
       window.dispatchEvent(new Event('order_status_updated'));
@@ -564,12 +585,24 @@ export default function CheckoutPage() {
             sessionStorage.setItem('yf_pending_order_summary', JSON.stringify(orderSummary));
           } catch (e) {}
 
-          if (checkoutUrl) {
-            showSuccess('Đang chuyển hướng tới cổng thanh toán PayOS...');
-            window.location.href = checkoutUrl;
-          } else {
-            navigate(`/order-success?orderCode=${orderCode}&orderNumber=${orderNumber}`);
-          }
+          const payosPaymentInfo = {
+            orderNumber,
+            orderCode,
+            checkoutUrl,
+            qrCode: res.data.qrCode,
+            accountNumber: res.data.accountNumber || 'VQRQANOVP2204',
+            accountName: res.data.accountName || 'TRAN THI KIM NGAN',
+            bin: res.data.bin || '970422',
+            amount: finalTotal,
+            description: res.data.description || `Thanh toan ${orderNumber}`,
+            expiresAt: Date.now() + 5 * 60 * 1000,
+          };
+          try {
+            sessionStorage.setItem('yf_current_payos_payment', JSON.stringify(payosPaymentInfo));
+          } catch (e) {}
+
+          // Chuyển thẳng sang trang quét mã thanh toán PayOS (giữ nguyên toàn trang quét mã, không dùng popup)
+          navigate(`/payment/payos/${orderCode}`, { state: { paymentData: payosPaymentInfo } });
         } else {
           // Phương thức COD: Ghi nhận đơn hàng ngay lập tức
           try {
@@ -614,11 +647,8 @@ export default function CheckoutPage() {
 
           // Phương thức COD: Xóa các sản phẩm đã mua khỏi giỏ hàng frontend nếu mua từ giỏ hàng
           const isBuyNowOrder = checkoutItems.some((i) => i.isBuyNow);
-          if (!isBuyNowOrder) {
-            const remainingCart = (cart || []).filter(
-              (cItem) => !checkoutItems.some((bItem) => (bItem.variant_id || bItem.id) === (cItem.variant_id || cItem.id))
-            );
-            if (setCart) setCart(remainingCart);
+          if (!isBuyNowOrder && removePurchasedItems) {
+            removePurchasedItems(checkoutItems);
           }
 
           // Dọn dẹp session checkout
@@ -701,9 +731,6 @@ export default function CheckoutPage() {
             <h3 className="vip-customer-name">
               {user?.full_name ? user.full_name.toUpperCase() : 'HOÀNG KIM ANH'}
             </h3>
-            <p className="vip-privilege-desc">
-              Tài khoản được hưởng đặc quyền miễn phí giao hỏa tốc.
-            </p>
           </div>
         </div>
 
@@ -1126,11 +1153,6 @@ export default function CheckoutPage() {
               <div className="calc-row">
                 <span className="calc-label">Vận Chuyển VIP</span>
                 <span className="calc-value font-semibold text-amber-900">MIỄN PHÍ (0đ)</span>
-              </div>
-
-              <div className="calc-row">
-                <span className="calc-label">Thuế VAT (8%)</span>
-                <span className="calc-value">{vatAmount.toLocaleString('vi-VN')}đ</span>
               </div>
 
               <div className="calc-horizontal-divider" />
