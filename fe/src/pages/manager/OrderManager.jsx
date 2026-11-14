@@ -1177,6 +1177,34 @@ export default function OrderManager() {
       return;
     }
 
+    // Quy tắc chuyển trạng thái hợp lệ (đồng bộ với Backend Order State Machine)
+    const allowedTransitionsUI = {
+      PENDING: ['CONFIRMED', 'CANCELLED'],
+      CONFIRMED: ['SHIPPING', 'CANCELLED'],
+      PROCESSING: ['SHIPPING', 'CANCELLED'],
+      SHIPPING: ['COMPLETED', 'RETURNED'],
+      COMPLETED: ['RETURNED'],
+      CANCELLED: [],
+      RETURNED: ['RETURNED'],
+    };
+    const normalizedTarget = ['APPROVED', 'REJECTED', 'RETURNED'].includes(newStatus) ? 'RETURNED' : newStatus;
+    if (currentCat !== normalizedTarget) {
+      const allowedNext = allowedTransitionsUI[currentCat] || [];
+      if (!allowedNext.includes(normalizedTarget)) {
+        const labelMap = {
+          PENDING: 'Chờ xác nhận',
+          CONFIRMED: 'Đã xác nhận',
+          PROCESSING: 'Đang xử lý',
+          SHIPPING: 'Đang vận chuyển',
+          COMPLETED: 'Đã giao',
+          CANCELLED: 'Đã hủy',
+          RETURNED: 'Đổi trả',
+        };
+        showError(`Không thể chuyển nhảy trạng thái từ "${labelMap[currentCat] || currentCat}" sang "${labelMap[normalizedTarget] || normalizedTarget}"! Vui lòng chuyển theo đúng tuần tự.`);
+        return;
+      }
+    }
+
     let newStatusLabel = 'Chờ xác nhận';
     let customerLabel = 'CHỜ XÁC NHẬN';
     const formattedDate = new Date().toLocaleDateString('vi-VN');
@@ -1498,6 +1526,11 @@ export default function OrderManager() {
   // Mở modal Shop hủy đơn hàng
   const handleOpenShopCancelModal = (ord) => {
     if (!ord) return;
+    const cat = getCategoryFromStatus(ord.order_status, ord.status_label, ord.note, ord);
+    if (!['PENDING', 'CONFIRMED', 'PROCESSING'].includes(cat)) {
+      showError('Chỉ có thể hủy đơn hàng khi đang ở trạng thái Chờ xác nhận hoặc Đã xác nhận!');
+      return;
+    }
     setShopCancelOrder(ord);
     setShopCancelReason('Sản phẩm tạm thời hết hàng trong kho');
     setCustomShopCancelReason('');

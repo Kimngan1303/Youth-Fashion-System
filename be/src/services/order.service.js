@@ -4,6 +4,13 @@ import { prisma } from '../repositories/prisma.js';
 import { sendOrderNotificationEmail } from './email.service.js';
 
 /**
+ * Helper tạo Error kèm HTTP statusCode chuẩn mà không gây cảnh báo kiểu trên IDE
+ */
+const createServiceError = (message, statusCode = 400) => {
+  return Object.assign(new Error(message), { statusCode });
+};
+
+/**
  * Service xử lý toàn bộ luồng nghiệp vụ tạo đơn hàng, tính tiền, và kết nối cổng PayOS
  */
 
@@ -17,7 +24,6 @@ export const createOrderService = async ({
   shippingWard,
   shippingDistrict,
   shippingCity,
-  shippingMethod = 'EXPRESS',
   paymentMethod = 'COD',
   note = '',
   items = [],
@@ -25,23 +31,17 @@ export const createOrderService = async ({
   discountAmount = 0,
 }) => {
   if (!items || items.length === 0) {
-    const error = new Error('Đơn hàng không có sản phẩm nào để thanh toán');
-    error.statusCode = 400;
-    throw error;
+    throw createServiceError('Đơn hàng không có sản phẩm nào để thanh toán', 400);
   }
 
   if (!recipientName || !recipientPhone || !shippingCity) {
-    const error = new Error('Vui lòng cung cấp đầy đủ họ tên, số điện thoại và địa chỉ giao hàng');
-    error.statusCode = 400;
-    throw error;
+    throw createServiceError('Vui lòng cung cấp đầy đủ họ tên, số điện thoại và địa chỉ giao hàng', 400);
   }
 
-  const cleanPhone = recipientPhone.replace(/[\s.\-()]/g, '');
+  const cleanPhone = String(recipientPhone).replace(/[\s.\-()]/g, '');
   const vnPhoneRegex = /^(?:(?:\+84|84|0))(3[2-9]|5[25689]|7[06-9]|8[1-9]|9[0-9])\d{7}$/;
   if (!vnPhoneRegex.test(cleanPhone)) {
-    const error = new Error('Số điện thoại nhận hàng không hợp lệ (yêu cầu 10 số thuộc các mạng di động Việt Nam)');
-    error.statusCode = 400;
-    throw error;
+    throw createServiceError('Số điện thoại nhận hàng không hợp lệ (yêu cầu 10 số thuộc các mạng di động Việt Nam)', 400);
   }
 
   // 1. Tính toán giá trị đơn hàng
@@ -65,12 +65,9 @@ export const createOrderService = async ({
 
   const rawSubtotal = itemsData.reduce((sum, item) => sum + item.subtotal, 0);
   const discount = Math.min(rawSubtotal, Math.max(0, Number(discountAmount || 0)));
-  const totalAmount = Math.max(0, rawSubtotal - discount);
+  const totalAmount = Math.round(Math.max(0, rawSubtotal - discount));
 
   // 2. Sinh mã đơn hàng và mã PayOS OrderCode (Số nguyên an toàn)
-  const now = new Date();
-  const dateStr = now.toISOString().slice(2, 10).replace(/-/g, '');
-  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
   const orderCode = Number(String(Date.now()).slice(-6) + Math.floor(100 + Math.random() * 900));
   const orderNumber = `YF-${orderCode}`;
 
@@ -150,7 +147,7 @@ export const createOrderService = async ({
       };
     } catch (payosError) {
       console.error('❌ Lỗi khi khởi tạo liên kết PayOS:', payosError.message);
-      throw new Error(`Khởi tạo thanh toán PayOS thất bại: ${payosError.message}`);
+      throw createServiceError(`Khởi tạo thanh toán PayOS thất bại: ${payosError.message}`, 502);
     }
   }
 
@@ -216,9 +213,7 @@ export const getMyOrdersService = async (params) => {
 export const getOrderByNumberService = async (orderNumber) => {
   const order = await orderRepo.findOrderByNumber(orderNumber);
   if (!order) {
-    const error = new Error('Không tìm thấy đơn hàng');
-    error.statusCode = 404;
-    throw error;
+    throw createServiceError('Không tìm thấy đơn hàng', 404);
   }
   return order;
 };
@@ -231,9 +226,7 @@ export const checkPayosStatusService = async (orderCode) => {
   const order = await orderRepo.findOrderByNumber(orderNumber);
 
   if (!order) {
-    const error = new Error('Không tìm thấy đơn hàng với mã tương ứng');
-    error.statusCode = 404;
-    throw error;
+    throw createServiceError('Không tìm thấy đơn hàng với mã tương ứng', 404);
   }
 
   // Truy vấn trực tiếp từ cổng PayOS
@@ -369,9 +362,30 @@ export const handlePayosWebhookService = async (webhookBody) => {
 };
 
 /**
+ * Quy tắc chuyển trạng thái đơn hàng hợp lệ (Order State Machine)
+ * Ngăn chặn việc chuyển nhảy cóc sai quy trình (ví dụ: từ PENDING nhảy thẳng sang DELIVERED)
+ */
+export const VALID_ORDER_STATUS_TRANSITIONS = {
+  PENDING: ['CONFIRMED', 'CANCELLED'],
+  CONFIRMED: ['PROCESSING', 'SHIPPED', 'CANCELLED'],
+  PROCESSING: ['SHIPPED', 'CANCELLED'],
+  SHIPPED: ['DELIVERED', 'RETURNED'],
+  DELIVERED: ['RETURNED'],
+  CANCELLED: [],
+  RETURNED: [],
+};
+
+/**
  * Hủy đơn hàng và lưu lý do hủy, đồng thời gửi email thông báo
  */
-export const cancelOrderService = async (orderIdOrNumber, reason) => {
+export const cancelOrderService = async (orderIdOrNumber, reason = undefined) => {
+  const existingOrder = await orderRepo.findOrderByIdOrNumber(orderIdOrNumber);
+  if (existingOrder) {
+    const allowedNext = VALID_ORDER_STATUS_TRANSITIONS[existingOrder.order_status] || [];
+    if (!allowedNext.includes('CANCELLED') && existingOrder.order_status !== 'CANCELLED') {
+      throw createServiceError(`Không thể hủy đơn hàng đang ở trạng thái "${existingOrder.order_status}".`, 400);
+    }
+  }
   const result = await orderRepo.cancelOrder(orderIdOrNumber, reason);
 
   // Gửi email thông báo hủy đơn đến người nhận
@@ -403,12 +417,14 @@ export const getAllOrdersService = async () => {
 };
 
 /**
- * Cập nhật trạng thái đơn hàng từ trang Quản trị và gửi email thông báo đến người mua
+ * Cập nhật trạng thái đơn hàng từ trang Quản trị (có kiểm tra quy tắc chuyển trạng thái) và gửi email thông báo
  */
-export const updateOrderStatusService = async (orderId, status, note) => {
-  let mappedStatus = 'PENDING';
-  const s = String(status || '').toUpperCase();
-  if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s)) {
+export const updateOrderStatusService = async (orderId, status, note = null, options = {}) => {
+  const s = String(status || '').trim().toUpperCase();
+  let mappedStatus = null;
+  if (['PENDING'].includes(s)) {
+    mappedStatus = 'PENDING';
+  } else if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s)) {
     mappedStatus = 'DELIVERED';
   } else if (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s)) {
     mappedStatus = 'SHIPPED';
@@ -416,13 +432,34 @@ export const updateOrderStatusService = async (orderId, status, note) => {
     mappedStatus = 'PROCESSING';
   } else if (['CONFIRMED'].includes(s)) {
     mappedStatus = 'CONFIRMED';
-  } else if (['RETURNED', 'REFUNDED', 'EXCHANGE'].includes(s)) {
+  } else if (['RETURNED', 'REFUNDED', 'EXCHANGE', 'APPROVED', 'REJECTED'].includes(s)) {
     mappedStatus = 'RETURNED';
   } else if (['CANCELLED', 'FAILED'].includes(s)) {
     mappedStatus = 'CANCELLED';
   }
 
-  const result = await orderRepo.updateOrderStatus(orderId, mappedStatus, note);
+  if (!mappedStatus) {
+    throw createServiceError(`Trạng thái đơn hàng "${status}" không hợp lệ.`, 400);
+  }
+
+  const existingOrder = await orderRepo.findOrderByIdOrNumber(orderId);
+  if (existingOrder) {
+    const currentStatus = existingOrder.order_status;
+    // Cho phép giữ nguyên trạng thái để cập nhật ghi chú hoặc quyết định xử lý đổi trả
+    if (currentStatus !== mappedStatus) {
+      const allowedNext = VALID_ORDER_STATUS_TRANSITIONS[currentStatus] || [];
+      if (!allowedNext.includes(mappedStatus)) {
+        throw createServiceError(
+          `Không thể chuyển trạng thái đơn hàng từ "${currentStatus}" sang "${mappedStatus}". Các trạng thái hợp lệ tiếp theo: ${
+            allowedNext.length > 0 ? allowedNext.join(', ') : 'Không thể chuyển tiếp (Trạng thái cuối)'
+          }`,
+          400
+        );
+      }
+    }
+  }
+
+  const result = await orderRepo.updateOrderStatus(orderId, mappedStatus, note, options);
 
   // Tự động gửi email thông báo cập nhật trạng thái đơn hàng
   try {
@@ -511,6 +548,8 @@ export const deleteOrderService = async (orderId) => {
     if (digitsOnly) {
       await payosService.cancelPaymentLink(digitsOnly).catch(() => {});
     }
-  } catch (e) {}
+  } catch {
+    // Bỏ qua lỗi PayOS khi xóa đơn
+  }
   return await orderRepo.deleteOrderById(orderId);
 };
