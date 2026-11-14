@@ -474,7 +474,7 @@ export default function CartPage() {
 
                 <div className="summary-row shipping-row">
                   <div className="shipping-label-group">
-                    <span className="row-label">Vận chuyển hỏa tốc VIP</span>
+                    <span className="row-label">Vận chuyển hỏa tốc</span>
                     <span className="shipping-subtext">NHẬN HÀNG TRONG 2-4 GIỜ TẠI NỘI THÀNH</span>
                   </div>
                   <span className="row-value shipping-free">MIỄN PHÍ</span>

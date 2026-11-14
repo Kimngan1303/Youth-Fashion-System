@@ -455,7 +455,7 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
           <button
             type="button"
             className={`nav-menu-link ${activeMenu === 'reports' ? 'active' : ''}`}
-            onClick={() => navigate('/manager')}
+            onClick={() => navigate('/manager/reports')}
           >
             <div className="nav-item-inner">
               <BarChart2 size={16} />

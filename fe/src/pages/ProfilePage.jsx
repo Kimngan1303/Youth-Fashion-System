@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   User, Package, Lock, Heart, LogOut, CheckCircle,
@@ -6,10 +6,12 @@ import {
   Search, Truck, Check, X, Star, RefreshCw, FileText, ShieldCheck, ChevronLeft, ArrowRight, Phone, RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { authService } from '../services/auth.service';
 import ProductCard from '../components/ProductCard';
 import { voucherService } from '../services/voucherService';
 import { orderService } from '../services/orderService';
 import { resolveOrderItemImage } from '../utils/productImageUtils';
+import { ensureOrderCacheReset } from '../utils/orderCacheReset';
 
 // Chuẩn hóa ngày hiển thị sang dạng DD/MM/YYYY
 const normalizeDobToVn = (dob) => {
@@ -567,6 +569,10 @@ const applyStatusOverrides = (ordersList) => {
           refund_bank: ov.refund_bank || ord.refund_bank,
           refund_reason: ov.refund_reason || ord.refund_reason,
           reject_reason: resolvedRejectReason,
+          delivery_status: ov.delivery_status || ord.delivery_status,
+          delivery_fail_reason: ov.delivery_fail_reason || ord.delivery_fail_reason,
+          retry_date: ov.retry_date || ord.retry_date,
+          delivery_attempts: ov.delivery_attempts || ord.delivery_attempts,
           note: ov.note || ord.note,
         };
       }
@@ -685,21 +691,7 @@ const ProfilePage = () => {
   // Lịch sử đơn hàng: Chỉ tải các đơn hàng thực tế mà người dùng đã đặt thành công
   const [customerOrders, setCustomerOrders] = useState(() => {
     try {
-      if (localStorage.getItem('yf_orders_reset_all_v3') !== 'true') {
-        orderService.clearAllOrders().catch(() => { });
-        localStorage.removeItem('yf_manager_orders');
-        localStorage.removeItem('yf_customer_orders');
-        localStorage.removeItem('yf_deleted_order_ids');
-        sessionStorage.removeItem('yf_last_completed_order');
-        const keysToRemove = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k && (k.startsWith('yf_customer_orders') || k.startsWith('yf_orders_reset_') || k === 'yf_manager_orders')) {
-            keysToRemove.push(k);
-          }
-        }
-        keysToRemove.forEach(k => localStorage.removeItem(k));
-        localStorage.setItem('yf_orders_reset_all_v3', 'true');
+      if (ensureOrderCacheReset()) {
         return [];
       }
 
@@ -1192,6 +1184,10 @@ const ProfilePage = () => {
                 refund_decision: detail.refund_decision || ord.refund_decision,
                 refund_bank: detail.refund_bank || ord.refund_bank,
                 reject_reason: detail.reject_reason || ord.reject_reason,
+                delivery_status: detail.delivery_status !== undefined ? detail.delivery_status : ord.delivery_status,
+                delivery_fail_reason: detail.delivery_fail_reason !== undefined ? detail.delivery_fail_reason : ord.delivery_fail_reason,
+                retry_date: detail.retry_date !== undefined ? detail.retry_date : ord.retry_date,
+                delivery_attempts: detail.delivery_attempts !== undefined ? detail.delivery_attempts : ord.delivery_attempts,
                 note: detail.note || ord.note,
               };
             }
@@ -1229,6 +1225,10 @@ const ProfilePage = () => {
               refund_decision: detail.refund_decision || prev.refund_decision,
               refund_bank: detail.refund_bank || prev.refund_bank,
               reject_reason: detail.reject_reason || prev.reject_reason,
+              delivery_status: detail.delivery_status !== undefined ? detail.delivery_status : prev.delivery_status,
+              delivery_fail_reason: detail.delivery_fail_reason !== undefined ? detail.delivery_fail_reason : prev.delivery_fail_reason,
+              retry_date: detail.retry_date !== undefined ? detail.retry_date : prev.retry_date,
+              delivery_attempts: detail.delivery_attempts !== undefined ? detail.delivery_attempts : prev.delivery_attempts,
               note: detail.note || prev.note,
             };
           }
@@ -1334,6 +1334,43 @@ const ProfilePage = () => {
     const globalAvatar = localStorage.getItem('user_avatar_url');
     if (isValidAvatarUrl(globalAvatar)) return globalAvatar;
     return DEFAULT_AVATAR;
+  };
+
+  // Định dạng ngày tham gia / đăng ký hệ thống chuẩn DD/MM/YYYY
+  const formatRegistrationDate = (dateVal) => {
+    if (dateVal) {
+      const d = new Date(dateVal);
+      if (!isNaN(d.getTime())) {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        return `${day}/${month}/${d.getFullYear()}`;
+      }
+    }
+    // Fallback 1: Lấy ngày từ đơn hàng sớm nhất của khách hàng
+    if (customerOrders && customerOrders.length > 0) {
+      const sorted = [...customerOrders].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+      if (sorted[0]?.created_at) {
+        const d = new Date(sorted[0].created_at);
+        if (!isNaN(d.getTime())) {
+          const day = String(d.getDate()).padStart(2, '0');
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          return `${day}/${month}/${d.getFullYear()}`;
+        }
+      }
+    }
+    // Fallback 2: Lấy ngày lưu cục bộ khi tài khoản được tạo
+    const storedReg = user?.email && localStorage.getItem(`yf_user_registered_at_${user.email}`);
+    if (storedReg) {
+      const d = new Date(storedReg);
+      if (!isNaN(d.getTime())) {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        return `${day}/${month}/${d.getFullYear()}`;
+      }
+    }
+    // Fallback 3: Ngày hiện tại
+    const now = new Date();
+    return `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
   };
 
   const [formData, setFormData] = useState({
@@ -1757,6 +1794,23 @@ const ProfilePage = () => {
     CANCELLED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'CANCELLED').length,
     RETURNED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'RETURNED').length,
   };
+
+  // Chỉ tính những đơn hàng có trạng thái ĐÃ GIAO cho mục Tổng chi tiêu ở Profile
+  const deliveredOrders = useMemo(() => {
+    return customerOrders.filter((ord) => getOrderStatusCategory(ord.status, ord) === 'COMPLETED');
+  }, [customerOrders]);
+
+  const deliveredSpent = useMemo(() => {
+    return deliveredOrders.reduce((sum, ord) => sum + Number(ord.total_amount || 0), 0);
+  }, [deliveredOrders]);
+
+  const formattedDeliveredSpent = useMemo(() => {
+    if (deliveredSpent <= 0) return '0₫';
+    if (deliveredSpent >= 1000000) {
+      return `${(deliveredSpent / 1000000).toFixed(1).replace('.0', '')}tr`;
+    }
+    return `${deliveredSpent.toLocaleString('vi-VN')}₫`;
+  }, [deliveredSpent]);
 
   const filteredOrders = customerOrders.filter(ord => {
     if (orderStatusFilter !== 'ALL' && getOrderStatusCategory(ord.status, ord) !== orderStatusFilter) {
@@ -2387,12 +2441,11 @@ const ProfilePage = () => {
 
             <div className="hero-info-content">
               <div className="hero-subtitle">
-                <span className="gold-text-hero">THÀNH VIÊN ĐẶC QUYỀN</span> <span className="dot">•</span> {user?.member_since || 'TỪ THÁNG 03/2023'}
+                <span className="gold-text-hero">THÀNH VIÊN TỪ NGÀY</span> <span className="dot">•</span> {formatRegistrationDate(user?.created_at || user?.createdAt)}
               </div>
               <h1 className="hero-user-name font-serif">{user?.full_name || (isManagerOrAdmin ? 'Quản Lý Youth Fashion' : 'Khách hàng Youth Fashion')}</h1>
               <div className="hero-tier-pill">
-                <span className="tier-medal">🥇</span>
-                <span>{user?.tier || 'VIP GOLD ATELIER MEMBER'}</span>
+                <span>{user?.tier || 'Member'}</span>
               </div>
             </div>
           </div>
@@ -2402,14 +2455,12 @@ const ProfilePage = () => {
               <div className="stat-col">
                 <span className="stat-label">TỔNG CHI TIÊU</span>
                 <span className="stat-value">
-                  {user?.total_spent || (customerOrders.length > 0
-                    ? (customerOrders.reduce((sum, ord) => sum + Number(ord.total_amount || 0), 0) >= 1000000
-                      ? `${(customerOrders.reduce((sum, ord) => sum + Number(ord.total_amount || 0), 0) / 1000000).toFixed(1).replace('.0', '')}tr`
-                      : `${customerOrders.reduce((sum, ord) => sum + Number(ord.total_amount || 0), 0).toLocaleString('vi-VN')}₫`)
-                    : '0₫')}
+                  {deliveredOrders.length > 0 ? formattedDeliveredSpent : '0₫'}
                 </span>
                 <span className="stat-sub gold-sub">
-                  {user?.discount || (customerOrders.length > 0 ? `Chốt chẵn ${String(orderCounts.ALL).padStart(2, '0')} đơn đặt` : 'Chưa có đơn đặt')}
+                  {deliveredOrders.length > 0
+                    ? `Chốt chẵn ${String(deliveredOrders.length).padStart(2, '0')} đơn đã giao`
+                    : 'Chưa có đơn đã giao'}
                 </span>
               </div>
             </div>
@@ -2816,6 +2867,10 @@ const ProfilePage = () => {
                                 <span className="status-badge-pill badge-cancelled">
                                   <X size={14} strokeWidth={2.5} /> {ord.status_label || 'ĐÃ HỦY'}
                                 </span>
+                              ) : (ord.delivery_status === 'FAILED_RETRY' || String(ord.status_label || '').toUpperCase().includes('GIAO THẤT BẠI') || String(ord.status_label || '').toUpperCase().includes('HẸN GIAO LẠI')) ? (
+                                <span className="status-badge-pill" style={{ background: '#FFFBEB', color: '#B45309', border: '1px solid #FDE68A', fontWeight: 700 }}>
+                                  <Clock size={14} /> {ord.status_label || 'GIAO THẤT BẠI - HẸN GIAO LẠI'}
+                                </span>
                               ) : (statusCat === 'SHIPPING' || ord.status === 'SHIPPING' || ord.status_label === 'ĐANG GIAO HÀNG HỎA TỐC' || ord.status_label === 'ĐANG VẬN CHUYỂN') ? (
                                 <span className="status-badge-pill badge-shipping">
                                   <Truck size={14} /> {ord.status_label === 'CHỜ GIAO HÀNG' ? 'ĐANG VẬN CHUYỂN' : (ord.status_label || 'ĐANG VẬN CHUYỂN')}
@@ -2988,6 +3043,46 @@ const ProfilePage = () => {
                               </div>
                             );
                           })()}
+
+                          {/* Khối cảnh báo nếu giao hàng thất bại / hẹn giao lại */}
+                          {(ord.delivery_status === 'FAILED_RETRY' || ord.delivery_status === 'FAILED_RETURN' || (ord.delivery_fail_reason && statusCat !== 'COMPLETED')) && (
+                            <div style={{
+                              margin: '0 0 12px',
+                              padding: '12px 14px',
+                              background: '#FFFBEB',
+                              border: '1.5px solid #FDE68A',
+                              borderRadius: '8px',
+                              fontSize: '12.5px',
+                              color: '#92400E',
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '10px',
+                              width: '100%',
+                              boxSizing: 'border-box'
+                            }}>
+                              <AlertCircle size={16} style={{ color: '#D97706', flexShrink: 0, marginTop: '2px' }} />
+                              <div style={{ flex: 1, lineHeight: '1.5' }}>
+                                <div>
+                                  <strong style={{ color: '#B45309' }}>Cập nhật giao hàng:</strong>{' '}
+                                  <span>Giao hàng chưa thành công{ord.delivery_attempts ? ` (Lần ${ord.delivery_attempts})` : ''}.</span>
+                                </div>
+                                {ord.delivery_fail_reason && (
+                                  <div style={{ marginTop: '2px', color: '#78350F' }}>
+                                    Lý do shipper báo: <strong>"{ord.delivery_fail_reason}"</strong>
+                                  </div>
+                                )}
+                                {ord.retry_date ? (
+                                  <div style={{ marginTop: '4px', fontWeight: 600, color: '#B45309' }}>
+                                    Hệ thống đã lên lịch giao lại vào ngày: <span style={{ textDecoration: 'underline' }}>{new Date(ord.retry_date).toLocaleDateString('vi-VN')}</span>. Vui lòng chú ý điện thoại để nhận hàng.
+                                  </div>
+                                ) : (ord.delivery_status === 'FAILED_RETURN' || statusCat === 'CANCELLED') ? (
+                                  <div style={{ marginTop: '4px', color: '#B91C1C', fontWeight: 600 }}>
+                                    Đơn hàng đã được chuyển hoàn về kho do giao không thành công nhiều lần hoặc theo yêu cầu.
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          )}
 
                           {/* Footer & Action Buttons */}
                           <div className="order-card-footer">
@@ -3333,7 +3428,13 @@ const ProfilePage = () => {
         const recipientPhone = trackingModalOrder.recipient_phone || trackingModalOrder.customer?.phone || trackingModalOrder.phone || user?.phone || '';
         const recipientAddress = trackingModalOrder.shipping_address || trackingModalOrder.address || trackingModalOrder.customer?.address || (typeof user?.address === 'string' ? user.address : [user?.address?.detail, user?.address?.ward, user?.address?.district, user?.address?.province].filter(Boolean).join(', ')) || '';
 
-        const statusBadgeStyle = modalCat === 'COMPLETED'
+        const isDeliveryRetry = trackingModalOrder.delivery_status === 'FAILED_RETRY' ||
+          String(trackingModalOrder.status_label || '').toUpperCase().includes('GIAO THẤT BẠI') ||
+          String(trackingModalOrder.status_label || '').toUpperCase().includes('HẸN GIAO LẠI');
+
+        const statusBadgeStyle = isDeliveryRetry
+          ? { background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }
+          : (modalCat === 'COMPLETED'
           ? { background: '#dcfce7', color: '#15803d' }
           : (modalCat === 'SHIPPING'
             ? { background: '#dbeafe', color: '#1d4ed8' }
@@ -3347,9 +3448,11 @@ const ProfilePage = () => {
                     : (isRejected
                       ? { background: '#fee2e2', color: '#b91c1c' }
                       : { background: '#f3e8ff', color: '#7e22ce' }))
-                  : { background: '#fef3c7', color: '#b45309' }))));
+                  : { background: '#fef3c7', color: '#b45309' })))));
 
-        const statusText = modalCat === 'COMPLETED'
+        const statusText = isDeliveryRetry
+          ? (trackingModalOrder.status_label || 'GIAO THẤT BẠI - HẸN GIAO LẠI')
+          : (modalCat === 'COMPLETED'
           ? 'ĐÃ GIAO HÀNG'
           : (modalCat === 'SHIPPING'
             ? 'ĐANG VẬN CHUYỂN'
@@ -3359,7 +3462,7 @@ const ProfilePage = () => {
                 ? 'ĐÃ HỦY'
                 : (modalCat === 'RETURNED'
                   ? (isApproved ? 'ĐÃ HOÀN TIỀN' : (isRejected ? 'TỪ CHỐI HOÀN TIỀN' : 'ĐỔI TRẢ'))
-                  : 'CHỜ XÁC NHẬN'))));
+                  : 'CHỜ XÁC NHẬN')))));
 
         return (
           <div className="profile-modal-overlay animate-fade-in" onClick={() => setTrackingModalOrder(null)}>
@@ -3571,11 +3674,38 @@ const ProfilePage = () => {
                   </div>
                 </div>
               ) : (
-                <div className="tracking-modal-card">
-                  <div className="carrier-badge-row">
-                    <span className="carrier-name">🚚 Giao Hàng Nhanh (Express VIP)</span>
-                    <span className="carrier-code">Mã bưu cục: GHN-VFP-{String(trackingModalOrder.order_code || trackingModalOrder.order_id).replace(/\D/g, '').slice(-6) || '494124'}</span>
-                  </div>
+                <>
+                  {isDeliveryRetry && (
+                    <div style={{
+                      background: '#FFFBEB',
+                      border: '1.5px solid #FDE68A',
+                      borderRadius: '10px',
+                      padding: '12px 16px',
+                      marginBottom: '14px',
+                      fontSize: '13px',
+                      color: '#92400E'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                        <AlertCircle size={16} style={{ color: '#D97706' }} />
+                        <strong style={{ color: '#B45309' }}>Giao hàng chưa thành công{trackingModalOrder.delivery_attempts ? ` (Lần ${trackingModalOrder.delivery_attempts})` : ''}</strong>
+                      </div>
+                      {trackingModalOrder.delivery_fail_reason && (
+                        <div style={{ color: '#78350F', marginBottom: '4px' }}>
+                          Lý do shipper báo: <strong>"{trackingModalOrder.delivery_fail_reason}"</strong>
+                        </div>
+                      )}
+                      {trackingModalOrder.retry_date && (
+                        <div style={{ color: '#B45309', fontWeight: 600 }}>
+                          Lịch hẹn giao lại dự kiến: <u>{new Date(trackingModalOrder.retry_date).toLocaleDateString('vi-VN')}</u>. Shipper sẽ liên hệ trước khi đến.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="tracking-modal-card">
+                    <div className="carrier-badge-row">
+                      <span className="carrier-name">🚚 Giao Hàng Nhanh (Express VIP)</span>
+                      <span className="carrier-code">Mã bưu cục: GHN-VFP-{String(trackingModalOrder.order_code || trackingModalOrder.order_id).replace(/\D/g, '').slice(-6) || '494124'}</span>
+                    </div>
                   {isShippingOrDelivered ? (
                     <div className="shipper-info-box">
                       <User size={15} />
@@ -3587,7 +3717,8 @@ const ProfilePage = () => {
                       <span className="pending-note">Thông tin tài xế sẽ hiển thị khi đơn hàng chuyển sang trạng thái <strong>Đang vận chuyển</strong>.</span>
                     </div>
                   )}
-                </div>
+                  </div>
+                </>
               )}
 
               {/* 3. Nhật ký hành trình đơn hàng */}
@@ -3632,7 +3763,21 @@ const ProfilePage = () => {
                   if (modalCat === 'SHIPPING') {
                     return (
                       <>
-                        <div className="history-step active">
+                        {isDeliveryRetry && (
+                          <div className="history-step active">
+                            <div className="history-dot" style={{ background: '#D97706' }} />
+                            <div className="history-content">
+                              <span className="history-time" style={{ color: '#D97706' }}>
+                                Giao chưa thành công{trackingModalOrder.delivery_attempts ? ` (Lần ${trackingModalOrder.delivery_attempts})` : ''} - Hẹn giao lại
+                              </span>
+                              <p className="history-text" style={{ color: '#78350F' }}>
+                                {trackingModalOrder.delivery_fail_reason ? `Lý do: "${trackingModalOrder.delivery_fail_reason}".` : 'Chưa giao được cho người nhận.'}
+                                {trackingModalOrder.retry_date ? ` Đơn vị vận chuyển đã lên lịch phát lại vào ngày ${new Date(trackingModalOrder.retry_date).toLocaleDateString('vi-VN')}.` : ' Sẽ liên hệ lại để giao hàng.'}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        <div className={`history-step ${!isDeliveryRetry ? 'active' : ''}`}>
                           <div className="history-dot" />
                           <div className="history-content">
                             <span className="history-time">{orderDate} - Đã bàn giao shipper</span>

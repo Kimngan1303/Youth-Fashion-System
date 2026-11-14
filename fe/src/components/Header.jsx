@@ -494,13 +494,6 @@ const Header = ({ onOpenAISearch }) => {
                   Thông tin tài khoản
                 </Link>
                 <Link
-                  to="/wishlist"
-                  className="dropdown-item"
-                  onClick={() => setShowUserMenu(false)}
-                >
-                  Sản phẩm yêu thích
-                </Link>
-                <Link
                   to="/notifications"
                   className="dropdown-item"
                   onClick={() => setShowUserMenu(false)}

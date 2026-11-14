@@ -1,637 +1,1293 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useToast } from '../../context/ToastContext';
 import ManagerSidebar from '../../components/ManagerSidebar';
 import ManagerHeader from '../../components/ManagerHeader';
-import { 
-  LayoutGrid, 
-  Package, 
-  Folder, 
-  BookOpen, 
-  ShoppingBag, 
-  MessageSquare, 
-  Tag, 
-  BarChart2, 
-  Home, 
-  LogOut, 
-  Search, 
-  User 
+import { orderService } from '../../services/orderService';
+import { adminService } from '../../services/adminService';
+import { ensureOrderCacheReset } from '../../utils/orderCacheReset';
+import {
+  mergeAndNormalizeOrders,
+  summarizePeriod,
+  toLocalDateInputValue,
+  buildOverviewChartSeries,
+  buildTopProducts,
+} from '../../utils/orderReportUtils';
+import { resolveOrderItemImage } from '../../utils/productImageUtils';
+import {
+  Wallet,
+  ShoppingBag,
+  Users,
+  ArrowUp,
+  ArrowDown,
+  ArrowRight,
+  Loader2,
 } from 'lucide-react';
 
-/**
- * Manager Dashboard Component (Single-file JSX + Embedded CSS Method 1)
- * Built directly from Figma layout & CSS specs.
- */
+const MONTHLY_REVENUE_TARGET = 2_000_000_000;
+
+const CHART_WIDTH = 860;
+const CHART_HEIGHT = 270;
+const PAD_LEFT = 54;
+const PAD_RIGHT = 24;
+const PAD_TOP = 32;
+const PAD_BOTTOM = 38;
+const PLOT_W = CHART_WIDTH - PAD_LEFT - PAD_RIGHT;
+const PLOT_H = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
 
 const dashboardStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,400&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,400&display=swap');
 
-  .manager-layout {
+  .md-layout {
     display: flex;
     flex-direction: row;
     align-items: stretch;
-    padding: 0px;
     width: 100%;
     min-height: 100vh;
     background: #F7F6F3;
     font-family: 'Inter', sans-serif;
     box-sizing: border-box;
-  }
-
-  /* Aside - LeftSidebar */
-  .left-sidebar {
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: flex-start;
-    padding: 0px;
-    width: 268px;
-    min-width: 268px;
-    height: 100vh;
-    position: sticky;
-    top: 0;
-    left: 0;
-    align-self: stretch;
-    flex-shrink: 0;
-    background: #FFFFFF;
-    border-right: 1px solid #E8E6E1;
-    overflow-y: auto;
-    z-index: 100;
-  }
-
-  .sidebar-top-part {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 20px;
-    gap: 12px;
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .brand-logo-section {
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    padding: 0px 0px 20px;
-    gap: 12px;
-    width: 100%;
-    border-bottom: 1px solid #F0EEE9;
-  }
-
-  .brand-logo-text {
-    font-family: 'Playfair Display', serif;
-    font-weight: 900;
-    font-size: 15px;
-    line-height: 1.2;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: #111111;
-    white-space: nowrap;
-  }
-
-  .nav-section-label {
-    padding: 16px 0px 4px;
-    width: 100%;
-    font-weight: 700;
-    font-size: 9.5px;
-    line-height: 14px;
-    letter-spacing: 0.475px;
-    text-transform: uppercase;
-    color: #8C857B;
-  }
-
-  .nav-menu-items {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 0px;
-    gap: 4px;
-    width: 100%;
-  }
-
-  .nav-menu-link {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 14px;
-    width: 100%;
-    box-sizing: border-box;
-    border-radius: 8px;
-    font-weight: 500;
-    font-size: 13px;
-    line-height: 20px;
-    color: #57534E;
-    text-decoration: none;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: none;
-    background: transparent;
-  }
-
-  .nav-menu-link:hover {
-    background: #F5F4EF;
     color: #111111;
   }
 
-  .nav-menu-link.active {
-    background: #111111;
-    color: #FFFFFF;
-    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05);
-  }
-
-  .nav-item-inner {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .order-count-badge {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2px 8px;
-    background: #FACC15;
-    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05);
-    border-radius: 9999px;
-    font-weight: 600;
-    font-size: 11px;
-    color: #713F12;
-  }
-
-  .sidebar-bottom-part {
-    box-sizing: border-box;
+  .md-main-content {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    padding: 16px;
-    gap: 8px;
-    width: 100%;
-    border-top: 1px solid #F0EEE9;
-  }
-
-  .btn-store-status {
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    padding: 10px 16px;
-    gap: 10px;
-    width: 100%;
-    height: 38px;
-    border: 1px solid rgba(229, 229, 229, 0.8);
-    border-radius: 4px;
-    font-weight: 500;
-    font-size: 12px;
-    letter-spacing: 0.6px;
-    text-transform: uppercase;
-    color: #404040;
-    background: #FFFFFF;
-    cursor: pointer;
-  }
-
-  .btn-sidebar-logout {
-    display: flex;
-    align-items: center;
-    padding: 10px 16px;
-    gap: 10px;
-    width: 100%;
-    height: 36px;
-    border-radius: 4px;
-    font-weight: 500;
-    font-size: 12px;
-    letter-spacing: 0.6px;
-    text-transform: uppercase;
-    color: #DC2626;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-
-  .btn-sidebar-logout:hover {
-    background: #FEF2F2;
-  }
-
-  /* MainContentArea */
-  .main-content-area {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
     flex: 1;
+    min-width: 0;
     min-height: 100vh;
-    box-sizing: border-box;
-  }
-
-  /* Top Header Bar */
-  .top-header-bar {
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 28px;
-    width: 100%;
-    height: 57px;
-    background: #FFFFFF;
-    border-bottom: 1px solid #E8E6E1;
-    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.02);
-  }
-
-  .header-search-box {
-    display: flex;
-    align-items: center;
     background: #F7F6F3;
-    border: 1px solid #E2DFD7;
-    border-radius: 8px;
-    padding: 6px 14px;
-    width: 320px;
-    gap: 8px;
+    box-sizing: border-box;
   }
 
-  .header-search-input {
-    border: none;
-    background: transparent;
-    outline: none;
-    font-size: 13px;
-    width: 100%;
-    color: #1C1917;
-  }
-
-  .header-user-profile {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .user-avatar-circle {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 32px;
-    height: 32px;
-    background: #111111;
-    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05);
-    border-radius: 9999px;
-    color: #FFFFFF;
-    font-weight: 600;
-    font-size: 13px;
-  }
-
-  .user-info-text {
+  .md-scroll-body {
     display: flex;
     flex-direction: column;
-  }
-
-  .user-name {
-    font-weight: 600;
-    font-size: 12.5px;
-    line-height: 16px;
-    color: #1C1917;
-  }
-
-  .user-role-label {
-    font-weight: 400;
-    font-size: 10px;
-    line-height: 12px;
-    color: #78716C;
-  }
-
-  /* Scrollable Dashboard Body */
-  .dashboard-scroll-body {
-    display: flex;
-    flex-direction: column;
-    padding: 28px;
-    gap: 24px;
+    padding: 28px 36px 52px;
+    gap: 22px;
     width: 100%;
     box-sizing: border-box;
   }
 
-  /* Section Dashboard Header */
-  .dashboard-header-row {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: flex-end;
-    width: 100%;
-  }
-
-  .dashboard-header-sub {
+  /* Page Title */
+  .md-kicker {
+    font-size: 11px;
     font-weight: 700;
-    font-size: 11.5px;
-    line-height: 16px;
-    letter-spacing: 0.8px;
+    letter-spacing: 0.9px;
     text-transform: uppercase;
     color: #8C857B;
     margin: 0;
   }
 
-  .dashboard-header-title {
+  .md-page-title {
     font-family: 'Playfair Display', serif;
     font-weight: 700;
-    font-size: 26px;
-    line-height: 32px;
+    font-size: 30px;
+    line-height: 38px;
     color: #111111;
     margin: 4px 0 0 0;
   }
 
-  .btn-export-data {
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    padding: 10px 18px;
-    gap: 8px;
-    background: #FFFFFF;
-    border: 1px solid #E2DFD7;
-    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05);
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 13px;
-    color: #292524;
-    cursor: pointer;
-  }
-
-  /* KPI Cards Grid */
-  .kpi-cards-grid {
+  /* Top 3 KPI Summary Cards */
+  .md-kpi-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
     width: 100%;
   }
 
-  .kpi-card {
-    box-sizing: border-box;
+  .md-kpi-card {
+    background: #FFFFFF;
+    border: 1px solid #EAE7DF;
+    border-radius: 16px;
+    padding: 20px 22px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 20px 22px;
-    background: #FFFFFF;
-    border: 1px solid #EAE7DF;
-    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05);
-    border-radius: 12px;
+    min-height: 168px;
+    box-sizing: border-box;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   }
 
-  .kpi-card-header {
+  .md-kpi-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
+    align-items: flex-start;
+    gap: 12px;
   }
 
-  .kpi-title {
+  .md-kpi-label {
+    font-size: 11px;
     font-weight: 700;
-    font-size: 11.5px;
-    line-height: 16px;
     letter-spacing: 0.6px;
     text-transform: uppercase;
-    color: #8C857B;
+    color: #78716C;
+    margin: 0;
   }
 
-  .kpi-icon-badge {
+  .md-kpi-icon-gold {
+    width: 32px;
+    height: 32px;
+    border-radius: 9999px;
+    background: #FAF3E1;
+    color: #B48938;
     display: flex;
+    align-items: center;
     justify-content: center;
-    align-items: center;
-    width: 30px;
-    height: 30px;
-    background: #FBF9F4;
-    border-radius: 6px;
-    color: #A88A4B;
+    flex-shrink: 0;
   }
 
-  .kpi-value {
-    font-weight: 700;
-    font-size: 24px;
-    line-height: 30px;
-    color: #111111;
-    margin: 4px 0;
-  }
-
-  .kpi-growth-row {
+  .md-kpi-icon-neutral {
+    width: 32px;
+    height: 32px;
+    border-radius: 9999px;
+    background: #F4F3F0;
+    color: #57534E;
     display: flex;
     align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .md-kpi-value-row {
+    display: flex;
+    align-items: baseline;
     gap: 6px;
-    font-size: 12.5px;
-    margin-top: 4px;
-  }
-
-  .growth-badge-green {
+    margin-top: 10px;
     font-weight: 700;
-    color: #15803D;
-    display: flex;
-    align-items: center;
-    gap: 2px;
+    font-size: 26px;
+    line-height: 32px;
+    color: #111111;
+    letter-spacing: -0.4px;
   }
 
-  .growth-subtext {
+  .md-kpi-unit {
+    font-size: 12.5px;
+    font-weight: 600;
     color: #78716C;
   }
 
-  .kpi-progress-bg {
-    width: 100%;
-    height: 6px;
-    background: #F2EFE9;
+  .md-kpi-currency-mark {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .md-kpi-sub-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 12px;
+    color: #78716C;
+    flex-wrap: wrap;
+  }
+
+  .md-growth-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
     border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .md-growth-pill.up {
+    background: #ECFDF5;
+    color: #15803D;
+  }
+
+  .md-growth-pill.down {
+    background: #FEF2F2;
+    color: #DC2626;
+  }
+
+  .md-growth-pill.muted {
+    background: #F3F4F6;
+    color: #6B7280;
+  }
+
+  .md-kpi-footer {
     margin-top: 16px;
+  }
+
+  .md-kpi-footer-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11.5px;
+    color: #78716C;
+    margin-bottom: 7px;
+  }
+
+  .md-kpi-footer-meta strong {
+    color: #111111;
+    font-weight: 700;
+  }
+
+  .md-progress-track {
+    width: 100%;
+    height: 5px;
+    background: #F1EFEA;
+    border-radius: 9999px;
     overflow: hidden;
   }
 
-  .kpi-progress-bar {
+  .md-progress-fill-dark {
     height: 100%;
     background: #111111;
     border-radius: 9999px;
+    transition: width 0.35s ease;
   }
 
-  /* Charts Section Box */
-  .charts-section-card {
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    padding: 24px;
+  .md-progress-fill-amber {
+    height: 100%;
+    background: #EAB308;
+    border-radius: 9999px;
+    transition: width 0.35s ease;
+  }
+
+  /* Chart Card */
+  .md-card {
     background: #FFFFFF;
     border: 1px solid #EAE7DF;
-    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05);
-    border-radius: 12px;
+    border-radius: 18px;
+    padding: 24px 26px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    box-sizing: border-box;
     width: 100%;
   }
 
-  .chart-header {
+  .md-chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+
+  .md-chart-title-wrap {
+    max-width: 520px;
+  }
+
+  .md-section-title {
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    font-size: 19px;
+    line-height: 26px;
+    color: #111111;
+    margin: 0;
+  }
+
+  .md-section-subtitle {
+    font-size: 12.5px;
+    line-height: 18px;
+    color: #6B7280;
+    margin: 6px 0 0 0;
+  }
+
+  .md-chart-controls-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+  }
+
+  .md-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  .md-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .md-legend-dot-dark {
+    width: 9px;
+    height: 9px;
+    border-radius: 9999px;
+    background: #111111;
+  }
+
+  .md-legend-dot-gold {
+    width: 9px;
+    height: 9px;
+    border-radius: 9999px;
+    background: #EAB308;
+  }
+
+  .md-tabs-segmented {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    background: #F4F3F0;
+    border-radius: 10px;
+    flex-wrap: wrap;
+  }
+
+  .md-tab-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 14px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6B7280;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+
+  .md-tab-btn:hover {
+    color: #111111;
+  }
+
+  .md-tab-btn.active {
+    background: #FFFFFF;
+    color: #111111;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+
+  .md-chart-stage {
+    position: relative;
+    width: 100%;
+    padding-top: 12px;
+    user-select: none;
+  }
+
+  .md-tooltip-float {
+    position: absolute;
+    background: #18181B;
+    color: #FFFFFF;
+    border-radius: 10px;
+    padding: 11px 15px;
+    min-width: 215px;
+    pointer-events: none;
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
+    z-index: 20;
+    transition: left 0.12s ease, top 0.12s ease;
+  }
+
+  .md-tooltip-kicker {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    color: #FBBF24;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .md-tooltip-rev {
+    font-size: 18px;
+    font-weight: 700;
+    color: #FFFFFF;
+    line-height: 24px;
+  }
+
+  .md-tooltip-meta {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #F2EEE8;
+    gap: 14px;
+    margin-top: 6px;
+    font-size: 11.5px;
   }
 
-  .chart-title-tag {
+  .md-tooltip-orders {
+    color: #D4D4D8;
+  }
+
+  .md-tooltip-aov {
+    color: #34D399;
     font-weight: 700;
-    font-size: 10px;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    color: #B45309;
   }
 
-  .chart-heading {
-    font-family: 'Playfair Display', serif;
+  .md-empty-chart-overlay {
+    position: absolute;
+    left: 50%;
+    top: 44%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid #EAE7DF;
+    padding: 10px 18px;
+    border-radius: 9999px;
+    font-size: 12.5px;
     font-weight: 600;
-    font-size: 18px;
-    color: #111111;
-    margin: 2px 0 0 0;
-  }
-
-  .chart-pills {
-    display: flex;
-    background: #F5F4EF;
-    border: 1px solid #E8E6DF;
-    border-radius: 8px;
-    padding: 2px;
-    gap: 4px;
-  }
-
-  .chart-pill-btn {
-    padding: 4px 10px;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 11px;
     color: #78716C;
-    background: transparent;
-    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    pointer-events: none;
+    white-space: nowrap;
   }
 
-  .chart-pill-btn.active {
-    background: #111111;
-    color: #FFFFFF;
+  /* Top Products Card */
+  .md-top-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+
+  .md-view-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    color: #111111;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 4px 0;
+    white-space: nowrap;
+  }
+
+  .md-view-all-btn:hover {
+    text-decoration: underline;
+  }
+
+  .md-product-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .md-product-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 15px 0;
+    border-bottom: 1px solid #F3F1EC;
+  }
+
+  .md-product-row:last-child {
+    border-bottom: none;
+    padding-bottom: 4px;
+  }
+
+  .md-product-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .md-product-thumb {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    object-fit: cover;
+    background: #F4F3F0;
+    border: 1px solid #EAE7DF;
+    flex-shrink: 0;
+  }
+
+  .md-product-name {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #111111;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .md-product-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    font-size: 11.5px;
+    color: #8C857B;
+    flex-wrap: wrap;
+  }
+
+  .md-sku-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: #F3F4F6;
+    color: #4B5563;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+
+  .md-product-metrics {
+    display: flex;
+    align-items: center;
+    gap: 36px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .md-metric-primary {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #111111;
+  }
+
+  .md-metric-primary.green {
+    color: #15803D;
+  }
+
+  .md-metric-sub {
+    font-size: 11.5px;
+    color: #8C857B;
+    margin-top: 2px;
+  }
+
+  .md-empty-products {
+    padding: 32px 16px;
+    text-align: center;
+    color: #78716C;
+    font-size: 13px;
+  }
+
+  @media (max-width: 1100px) {
+    .md-kpi-grid {
+      grid-template-columns: 1fr;
+    }
+    .md-chart-controls-col {
+      align-items: flex-start;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .md-scroll-body {
+      padding: 20px 16px 40px;
+    }
+    .md-product-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .md-product-metrics {
+      width: 100%;
+      justify-content: space-between;
+      gap: 16px;
+      text-align: left;
+    }
+  }
+
+  @keyframes mdSpin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .md-spin {
+    animation: mdSpin 1s linear infinite;
   }
 `;
 
+const computeNiceAxisMax = (maxVal) => {
+  if (!maxVal || maxVal <= 0) return 100_000_000;
+  const padded = maxVal * 1.15;
+  const magnitude = 10 ** Math.floor(Math.log10(padded));
+  const normalized = padded / magnitude;
+  const steps = [1, 1.2, 1.6, 2, 2.5, 4, 5, 8, 10];
+  const niceFactor = steps.find((s) => normalized <= s) || 10;
+  return niceFactor * magnitude;
+};
+
+const formatAxisMoney = (value) => {
+  if (value === 0) return '0₫';
+  if (value >= 1_000_000_000) {
+    return `${(value / 1_000_000_000).toFixed(1).replace(/\.0$/, '')}B`;
+  }
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  }
+  if (value >= 1_000) {
+    return `${Math.round(value / 1_000)}k`;
+  }
+  return `${Math.round(value)}`;
+};
+
+const formatMoneyUnderline = (val) => Math.round(Number(val || 0)).toLocaleString('vi-VN');
+
+const buildSmoothLinePath = (points, yTop, yBottom) => {
+  if (!points.length) return '';
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+
+  const clampY = (val) => Math.max(yTop, Math.min(yBottom, val));
+  let path = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[i - 1] || points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] || p2;
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = clampY(p1.y + (p2.y - p0.y) / 6);
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = clampY(p2.y - (p3.y - p1.y) / 6);
+
+    path += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+
+  return path;
+};
+
 export default function ManagerDashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const { showError } = useToast();
   const navigate = useNavigate();
-  const location = useLocation();
 
-  const activeMenu = 'overview';
+  const [orders, setOrders] = useState([]);
+  const [userMetrics, setUserMetrics] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [chartMode, setChartMode] = useState('month');
+  const [hoveredIdx, setHoveredIdx] = useState(null);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
+
+  // Kiểm tra quyền truy cập dành cho Admin và Manager
+  useEffect(() => {
+    if (!user) return;
+    const role = String(user.role || '').toUpperCase();
+    const empRole = String(user.employee_role || '').toUpperCase();
+    const userType = String(user.type || '').toUpperCase();
+    const isStaff =
+      ['ADMIN', 'MANAGER', 'EMPLOYEE'].includes(role) ||
+      ['ADMIN', 'MANAGER'].includes(empRole) ||
+      userType === 'EMPLOYEE';
+
+    if (!isStaff) {
+      showError('Chỉ tài khoản Quản trị (Admin / Manager) mới có quyền truy cập Tổng quan.');
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate, showError]);
+
+  const loadDashboardData = useCallback(async () => {
+    ensureOrderCacheReset();
+    try {
+      const [ordersRes, metricsRes] = await Promise.allSettled([
+        orderService.getAllOrders(),
+        adminService.getMetrics(),
+      ]);
+
+      if (ordersRes.status === 'fulfilled' && ordersRes.value?.status && Array.isArray(ordersRes.value.data)) {
+        setOrders(mergeAndNormalizeOrders(ordersRes.value.data));
+      } else {
+        setOrders(mergeAndNormalizeOrders([]));
+      }
+
+      if (metricsRes.status === 'fulfilled' && metricsRes.value?.data) {
+        setUserMetrics(metricsRes.value.data);
+      }
+    } catch {
+      setOrders(mergeAndNormalizeOrders([]));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+
+    const handleSync = () => {
+      loadDashboardData();
+    };
+    window.addEventListener('order_status_updated', handleSync);
+    window.addEventListener('yf_order_status_changed', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      window.removeEventListener('order_status_updated', handleSync);
+      window.removeEventListener('yf_order_status_changed', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [loadDashboardData]);
+
+  // Chỉ số tháng hiện tại vs tháng trước (Doanh thu chỉ tính đơn đã hoàn thành)
+  const monthlyStats = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const todayKey = toLocalDateInputValue(now);
+
+    const monthStart = toLocalDateInputValue(new Date(year, month, 1));
+    const prevMonthStart = toLocalDateInputValue(new Date(year, month - 1, 1));
+    const prevMonthEnd = toLocalDateInputValue(new Date(year, month, 0));
+
+    return summarizePeriod(orders, monthStart, todayKey, prevMonthStart, prevMonthEnd);
+  }, [orders]);
+
+  // Dữ liệu biểu đồ theo tab được chọn
+  const chartData = useMemo(() => buildOverviewChartSeries(orders, chartMode), [orders, chartMode]);
+
+  // Top 4 sản phẩm đóng góp doanh thu cao nhất từ đơn hoàn thành
+  const topProductsResult = useMemo(() => buildTopProducts(orders, 4), [orders]);
+
+  const yAxisMax = useMemo(() => computeNiceAxisMax(chartData.maxRevenue), [chartData.maxRevenue]);
+  const maxBarOrders = Math.max(1, chartData.maxOrders);
+
+  const chartPoints = useMemo(() => {
+    const n = chartData.buckets.length;
+    if (n === 0) return [];
+    const slotW = PLOT_W / n;
+    const barW = Math.max(6, Math.min(22, slotW * 0.42));
+
+    return chartData.buckets.map((bucket, idx) => {
+      const cx = PAD_LEFT + slotW * idx + slotW / 2;
+      const revRatio = yAxisMax > 0 ? bucket.revenue / yAxisMax : 0;
+      const ordRatio = bucket.ordersCount / maxBarOrders;
+      const yLine = PAD_TOP + PLOT_H * (1 - revRatio);
+      const barH = bucket.ordersCount > 0 ? Math.max(8, PLOT_H * 0.86 * ordRatio) : 0;
+      const yBar = PAD_TOP + PLOT_H - barH;
+
+      return {
+        ...bucket,
+        idx,
+        x: cx,
+        yLine,
+        barX: cx - barW / 2,
+        barW,
+        yBar,
+        barH,
+      };
+    });
+  }, [chartData.buckets, yAxisMax, maxBarOrders]);
+
+  const smoothPath = useMemo(
+    () => buildSmoothLinePath(chartPoints.map((p) => ({ x: p.x, y: p.yLine })), PAD_TOP, PAD_TOP + PLOT_H),
+    [chartPoints]
+  );
+
+  // Mặc định highlight ngày đỉnh (Peak) khi có doanh thu và người dùng chưa rê chuột
+  const activePointIndex = hoveredIdx !== null ? hoveredIdx : chartData.peakIndex;
+  const activePoint = activePointIndex >= 0 ? chartPoints[activePointIndex] : null;
+  const hasAnyChartRevenue = chartData.maxRevenue > 0;
+
+  const revenueGoalPct = Math.min(100, (monthlyStats.totalRevenue / MONTHLY_REVENUE_TARGET) * 100);
+  const currentMonthNumber = new Date().getMonth() + 1;
+
+  const tooltipLeftPct = activePoint
+    ? Math.max(15, Math.min(85, (activePoint.x / CHART_WIDTH) * 100))
+    : 50;
+  const tooltipTopPct = activePoint
+    ? Math.max(4, Math.min(48, ((activePoint.yLine - 92) / CHART_HEIGHT) * 100))
+    : 12;
+
+  const renderXAxisLabel = (pt, total) => {
+    if (chartMode === 'week' || chartMode === 'year') return true;
+    const step = Math.max(1, Math.floor(total / 6));
+    return pt.idx === 0 || pt.idx === total - 1 || pt.idx % step === 0 || pt.idx === chartData.peakIndex;
   };
 
   return (
-    <div className="manager-layout">
+    <div className="md-layout">
       <style>{dashboardStyles}</style>
 
-      {/* LEFT SIDEBAR */}
-      <ManagerSidebar activeMenu={activeMenu} />
+      <ManagerSidebar activeMenu="overview" />
 
-      {/* MAIN CONTENT AREA */}
-      <main className="main-content-area">
-
-        {/* Top Header Bar */}
+      <main className="md-main-content">
         <ManagerHeader showSearch={false} />
 
-        {/* Scrollable Dashboard Body (Overview) */}
-        <div className="dashboard-scroll-body">
+        <div className="md-scroll-body">
+          {/* Header */}
+          <div>
+            <p className="md-kicker">YOUTHFASHION • TỔNG QUAN HỆ THỐNG</p>
+            <h1 className="md-page-title">Tổng Quan</h1>
+          </div>
 
-            {/* Header Row */}
-            <div className="dashboard-header-row">
+          {/* Top 3 KPI Summary Cards */}
+          <div className="md-kpi-grid">
+            {/* Card 1: TỔNG DOANH THU */}
+            <div className="md-kpi-card">
               <div>
-                <p className="dashboard-header-sub">KHU VỰC TỔNG QUAN</p>
-                <h1 className="dashboard-header-title">Bảng Điều Khiển Quản Trị</h1>
+                <div className="md-kpi-header">
+                  <p className="md-kpi-label">TỔNG DOANH THU</p>
+                  <span className="md-kpi-icon-gold">
+                    <Wallet size={15} />
+                  </span>
+                </div>
+
+                <div className="md-kpi-value-row">
+                  <span>
+                    {monthlyStats.orderCount > 0 ? formatMoneyUnderline(monthlyStats.totalRevenue) : '0'}
+                    <span className="md-kpi-currency-mark">đ</span>
+                  </span>
+                </div>
+
+                <div className="md-kpi-sub-row">
+                  {monthlyStats.revenueGrowth !== null ? (
+                    <>
+                      <span className={`md-growth-pill ${monthlyStats.revenueGrowth >= 0 ? 'up' : 'down'}`}>
+                        {monthlyStats.revenueGrowth >= 0 ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
+                        {monthlyStats.revenueGrowth >= 0 ? '+' : ''}
+                        {monthlyStats.revenueGrowth.toFixed(1)}%
+                      </span>
+                      <span>so với tháng trước</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="md-growth-pill muted">↑ —</span>
+                      <span>{monthlyStats.orderCount > 0 ? 'Phát sinh tháng này' : 'Chưa có dữ liệu'}</span>
+                    </>
+                  )}
+                </div>
               </div>
 
-              <button type="button" className="btn-export-data">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Xuất Dữ Liệu
+              <div className="md-kpi-footer">
+                <div className="md-kpi-footer-meta">
+                  <span>Mục tiêu {MONTHLY_REVENUE_TARGET.toLocaleString('vi-VN')}₫</span>
+                  <strong>{revenueGoalPct.toFixed(1)}%</strong>
+                </div>
+                <div className="md-progress-track">
+                  <div className="md-progress-fill-dark" style={{ width: `${revenueGoalPct}%` }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: TỔNG ĐƠN HÀNG */}
+            <div className="md-kpi-card">
+              <div>
+                <div className="md-kpi-header">
+                  <p className="md-kpi-label">TỔNG ĐƠN HÀNG</p>
+                  <span className="md-kpi-icon-neutral">
+                    <ShoppingBag size={15} />
+                  </span>
+                </div>
+
+                <div className="md-kpi-value-row">
+                  <span>{monthlyStats.allOrdersCount.toLocaleString('vi-VN')}</span>
+                  <span className="md-kpi-unit">ĐƠN</span>
+                </div>
+
+                <div className="md-kpi-sub-row">
+                  {monthlyStats.allOrdersGrowth !== null ? (
+                    <span className={`md-growth-pill ${monthlyStats.allOrdersGrowth >= 0 ? 'up' : 'down'}`}>
+                      {monthlyStats.allOrdersGrowth >= 0 ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
+                      {monthlyStats.allOrdersGrowth >= 0 ? '+' : ''}
+                      {monthlyStats.allOrdersGrowth.toFixed(1)}%
+                    </span>
+                  ) : (
+                    <span className="md-growth-pill muted">↑ —</span>
+                  )}
+                  <span>{monthlyStats.orderCount.toLocaleString('vi-VN')} đơn hoàn tất</span>
+                </div>
+              </div>
+
+              <div className="md-kpi-footer">
+                <div className="md-kpi-footer-meta">
+                  <span>Giao thành công</span>
+                  <strong>{monthlyStats.completionRate.toFixed(1)}%</strong>
+                </div>
+                <div className="md-progress-track">
+                  <div className="md-progress-fill-amber" style={{ width: `${monthlyStats.completionRate}%` }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: TỔNG NGƯỜI DÙNG */}
+            <div className="md-kpi-card">
+              <div>
+                <div className="md-kpi-header">
+                  <p className="md-kpi-label">TỔNG NGƯỜI DÙNG</p>
+                  <span className="md-kpi-icon-neutral">
+                    <Users size={15} />
+                  </span>
+                </div>
+
+                <div className="md-kpi-value-row">
+                  <span>
+                    {userMetrics ? Number(userMetrics.totalUsers || 0).toLocaleString('vi-VN') : '—'}
+                  </span>
+                  <span className="md-kpi-unit">người dùng</span>
+                </div>
+
+                <div className="md-kpi-sub-row">
+                  {userMetrics && userMetrics.newUserGrowth !== null && userMetrics.newUserGrowth !== undefined ? (
+                    <>
+                      <span className={`md-growth-pill ${userMetrics.newUserGrowth >= 0 ? 'up' : 'down'}`}>
+                        {userMetrics.newUserGrowth >= 0 ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
+                        {userMetrics.newUserGrowth >= 0 ? '+' : ''}
+                        {userMetrics.newUserGrowth.toFixed(1)}%
+                      </span>
+                      <span>so với tháng trước</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="md-growth-pill muted">↑ —</span>
+                      <span>
+                        {userMetrics && userMetrics.newThisMonth > 0
+                          ? `${userMetrics.newThisMonth} tài khoản mới tháng này`
+                          : 'Chưa có dữ liệu'}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="md-kpi-footer">
+                <div className="md-kpi-footer-meta">
+                  <span>Người dùng mới</span>
+                  <strong>
+                    {userMetrics && userMetrics.newThisMonth !== undefined
+                      ? `+${userMetrics.newThisMonth}`
+                      : '—'}
+                  </strong>
+                </div>
+                <div className="md-progress-track">
+                  <div
+                    className="md-progress-fill-dark"
+                    style={{
+                      width:
+                        userMetrics && userMetrics.totalUsers > 0
+                          ? `${Math.min(100, (userMetrics.newThisMonth / userMetrics.totalUsers) * 100)}%`
+                          : '0%',
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Chart Card */}
+          <section className="md-card">
+            <div className="md-chart-header">
+              <div className="md-chart-title-wrap">
+                <h2 className="md-section-title">
+                  Biểu Đồ Doanh Thu &amp; Xu Hướng Đơn Hàng Theo Thời Gian
+                </h2>
+                <p className="md-section-subtitle">
+                  {chartMode === 'week'
+                    ? 'Thống kê chi tiết doanh thu 7 ngày gần nhất từ đơn hoàn thành kết hợp lượng đơn hàng phát sinh'
+                    : chartMode === 'year'
+                      ? `Thống kê chi tiết doanh thu 12 tháng trong năm ${currentYear} từ đơn hoàn thành kết hợp lượng đơn hàng phát sinh`
+                      : 'Thống kê chi tiết doanh thu 30 ngày gần nhất từ đơn hoàn thành kết hợp lượng đơn hàng phát sinh'}
+                </p>
+              </div>
+
+              <div className="md-chart-controls-col">
+                <div className="md-legend-row">
+                  <span className="md-legend-item">
+                    <span className="md-legend-dot-dark" />
+                    Doanh thu (VNĐ)
+                  </span>
+                  <span className="md-legend-item">
+                    <span className="md-legend-dot-gold" />
+                    Số đơn hàng
+                  </span>
+                </div>
+
+                <div className="md-tabs-segmented">
+                  <button
+                    type="button"
+                    className={`md-tab-btn ${chartMode === 'week' ? 'active' : ''}`}
+                    onClick={() => {
+                      setChartMode('week');
+                      setHoveredIdx(null);
+                    }}
+                  >
+                    Theo tuần
+                  </button>
+                  <button
+                    type="button"
+                    className={`md-tab-btn ${chartMode === 'month' ? 'active' : ''}`}
+                    onClick={() => {
+                      setChartMode('month');
+                      setHoveredIdx(null);
+                    }}
+                  >
+                    Theo tháng
+                  </button>
+                  <button
+                    type="button"
+                    className={`md-tab-btn ${chartMode === 'year' ? 'active' : ''}`}
+                    onClick={() => {
+                      setChartMode('year');
+                      setHoveredIdx(null);
+                    }}
+                  >
+                    Theo năm
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="md-chart-stage" onMouseLeave={() => setHoveredIdx(null)}>
+              {activePoint && (hasAnyChartRevenue || hoveredIdx !== null) && (
+                <div
+                  className="md-tooltip-float"
+                  style={{
+                    left: `${tooltipLeftPct}%`,
+                    top: `${tooltipTopPct}%`,
+                    transform: 'translateX(-50%)',
+                  }}
+                >
+                  <div className="md-tooltip-kicker">
+                    ● {activePoint.tooltipTitle} •{' '}
+                    {activePoint.idx === chartData.peakIndex && hasAnyChartRevenue
+                      ? 'ĐỈNH DOANH THU'
+                      : 'CHI TIẾT TRONG KỲ'}
+                  </div>
+                  <div className="md-tooltip-rev">
+                    {formatMoneyUnderline(activePoint.revenue)}
+                    <span className="md-kpi-currency-mark">đ</span>
+                  </div>
+                  <div className="md-tooltip-meta">
+                    <span className="md-tooltip-orders">Số lượng: {activePoint.ordersCount} đơn</span>
+                    <span className="md-tooltip-aov">AOV: {formatMoneyUnderline(activePoint.aov)}đ</span>
+                  </div>
+                </div>
+              )}
+
+              {!loading && !hasAnyChartRevenue && hoveredIdx === null && (
+                <div className="md-empty-chart-overlay">
+                  Chưa có đơn hàng hoàn thành phát sinh trong giai đoạn này
+                </div>
+              )}
+
+              <svg
+                viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+                style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}
+                role="img"
+                aria-label="Biểu đồ doanh thu và xu hướng đơn hàng theo thời gian"
+              >
+                <defs>
+                  <linearGradient id="yfBarGoldGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#EAB308" stopOpacity="0.62" />
+                    <stop offset="100%" stopColor="#FEF3C7" stopOpacity="0.16" />
+                  </linearGradient>
+                  <linearGradient id="yfBarPeakGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#D97706" stopOpacity="0.92" />
+                    <stop offset="100%" stopColor="#FDE68A" stopOpacity="0.45" />
+                  </linearGradient>
+                </defs>
+
+                {/* Horizontal Gridlines & Y-Axis Labels */}
+                {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+                  const yPos = PAD_TOP + PLOT_H * (1 - ratio);
+                  const val = yAxisMax * ratio;
+                  return (
+                    <g key={ratio}>
+                      <line
+                        x1={PAD_LEFT}
+                        x2={CHART_WIDTH - PAD_RIGHT}
+                        y1={yPos}
+                        y2={yPos}
+                        stroke="#F1EFEA"
+                        strokeWidth="1"
+                      />
+                      <text
+                        x={PAD_LEFT - 10}
+                        y={yPos + 4}
+                        textAnchor="end"
+                        fill="#A8A29E"
+                        fontSize="10.5"
+                        fontFamily="Inter, sans-serif"
+                      >
+                        {formatAxisMoney(val)}
+                      </text>
+                    </g>
+                  );
+                })}
+
+                {/* Order Bars */}
+                {chartPoints.map((pt) => {
+                  const isHighlighted = activePoint && activePoint.idx === pt.idx;
+                  return (
+                    <g key={pt.key}>
+                      {pt.barH > 0 && (
+                        <rect
+                          x={pt.barX}
+                          y={pt.yBar}
+                          width={pt.barW}
+                          height={pt.barH}
+                          rx={4}
+                          fill={isHighlighted ? 'url(#yfBarPeakGrad)' : 'url(#yfBarGoldGrad)'}
+                        />
+                      )}
+                      {isHighlighted && (
+                        <line
+                          x1={pt.x}
+                          x2={pt.x}
+                          y1={pt.yLine}
+                          y2={PAD_TOP + PLOT_H}
+                          stroke="#B45309"
+                          strokeWidth="1.4"
+                          strokeDasharray="3 3"
+                        />
+                      )}
+                    </g>
+                  );
+                })}
+
+                {/* Revenue Smooth Spline Line */}
+                {smoothPath && (
+                  <path
+                    d={smoothPath}
+                    fill="none"
+                    stroke="#111111"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                  />
+                )}
+
+                {/* Key Milestones & Active Marker */}
+                {chartPoints.map((pt, idx) => {
+                  const isActive = activePoint && activePoint.idx === pt.idx;
+                  const showMilestone =
+                    hasAnyChartRevenue &&
+                    (isActive ||
+                      chartMode === 'week' ||
+                      chartMode === 'year' ||
+                      idx === 0 ||
+                      idx === chartPoints.length - 1 ||
+                      idx % 5 === 0);
+
+                  if (!showMilestone) return null;
+
+                  return (
+                    <circle
+                      key={`dot-${pt.key}`}
+                      cx={pt.x}
+                      cy={pt.yLine}
+                      r={isActive ? 5 : 3.5}
+                      fill={isActive ? '#111111' : '#FFFFFF'}
+                      stroke="#111111"
+                      strokeWidth="2"
+                    />
+                  );
+                })}
+
+                {/* X-Axis Labels */}
+                {chartPoints.map((pt) => {
+                  const isPeak = hasAnyChartRevenue && pt.idx === chartData.peakIndex;
+                  if (!renderXAxisLabel(pt, chartPoints.length)) return null;
+                  return (
+                    <text
+                      key={`lbl-${pt.key}`}
+                      x={pt.x}
+                      y={CHART_HEIGHT - 12}
+                      textAnchor="middle"
+                      fill={isPeak ? '#111111' : '#8C857B'}
+                      fontWeight={isPeak ? '700' : '500'}
+                      fontSize="10.5"
+                      fontFamily="Inter, sans-serif"
+                    >
+                      {isPeak ? `${pt.axisLabel} (Peak)` : pt.axisLabel}
+                    </text>
+                  );
+                })}
+
+                {/* Invisible Hover Hit Targets */}
+                {chartPoints.map((pt) => {
+                  const slotW = PLOT_W / Math.max(1, chartPoints.length);
+                  return (
+                    <rect
+                      key={`hit-${pt.key}`}
+                      x={pt.x - slotW / 2}
+                      y={PAD_TOP}
+                      width={slotW}
+                      height={PLOT_H + 16}
+                      fill="transparent"
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={() => setHoveredIdx(pt.idx)}
+                      onClick={() => setHoveredIdx(pt.idx)}
+                    />
+                  );
+                })}
+              </svg>
+            </div>
+          </section>
+
+          {/* Bottom Card: Sản Phẩm Đóng Góp Doanh Thu Cao Nhất */}
+          <section className="md-card">
+            <div className="md-top-header">
+              <div>
+                <h2 className="md-section-title">Sản Phẩm Đóng Góp Doanh Thu Cao Nhất</h2>
+                <p className="md-section-subtitle">
+                  {topProductsResult.isCurrentMonth
+                    ? `Top 4 thiết kế được tuyển chọn bán chạy nhất tháng ${currentMonthNumber}`
+                    : 'Top 4 thiết kế bán chạy nhất từ các đơn hàng hoàn thành'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="md-view-all-btn"
+                onClick={() => navigate('/manager/products')}
+              >
+                <span>Xem tất cả SKU</span>
+                <ArrowRight size={14} />
               </button>
             </div>
 
-            {/* KPI Cards Grid */}
-            <div className="kpi-cards-grid">
-              {/* KPI Card 1 */}
-              <div className="kpi-card">
-                <div className="kpi-card-header">
-                  <span className="kpi-title">Doanh Thu Tháng</span>
-                  <div className="kpi-icon-badge">
-                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+            {loading ? (
+              <div className="md-empty-products">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <Loader2 size={16} className="md-spin" />
+                  Đang tải dữ liệu sản phẩm bán chạy...
+                </span>
+              </div>
+            ) : topProductsResult.items.length === 0 ? (
+              <div className="md-empty-products">
+                Chưa có sản phẩm nào ghi nhận doanh thu từ đơn hàng hoàn thành.
+              </div>
+            ) : (
+              <div className="md-product-list">
+                {topProductsResult.items.map((item) => (
+                  <div key={item.key} className="md-product-row">
+                    <div className="md-product-left">
+                      <img
+                        src={resolveOrderItemImage(item.rawItem)}
+                        alt={item.name}
+                        className="md-product-thumb"
+                      />
+                      <div style={{ minWidth: 0 }}>
+                        <h3 className="md-product-name">{item.name}</h3>
+                        <div className="md-product-meta">
+                          <span>SKU: {item.sku}</span>
+                          <span className="md-sku-tag">{item.categoryTag}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="md-product-metrics">
+                      <div>
+                        <div className="md-metric-primary">
+                          {formatMoneyUnderline(item.unitPrice)}
+                          <span className="md-kpi-currency-mark">đ</span>
+                        </div>
+                        <div className="md-metric-sub">
+                          {item.soldQty.toLocaleString('vi-VN')} lượt bán
+                        </div>
+                      </div>
+
+                      <div style={{ minWidth: '126px' }}>
+                        <div className="md-metric-primary green">
+                          {formatMoneyUnderline(item.totalRevenue)}
+                          <span className="md-kpi-currency-mark">đ</span>
+                        </div>
+                        <div className="md-metric-sub">Doanh số thu về</div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="kpi-value">1.845.000.000₫</div>
-                <div className="kpi-growth-row">
-                  <span className="growth-badge-green">▲ 12.5%</span>
-                  <span className="growth-subtext">so với tháng trước</span>
-                </div>
-                <div className="kpi-progress-bg">
-                  <div className="kpi-progress-bar" style={{ width: '68%' }} />
-                </div>
+                ))}
               </div>
-
-              {/* KPI Card 2 */}
-              <div className="kpi-card">
-                <div className="kpi-card-header">
-                  <span className="kpi-title">Tổng Đơn Bán Lẻ</span>
-                  <div className="kpi-icon-badge">
-                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="kpi-value">1.248 <span style={{ fontSize: '15px', fontWeight: 400, color: '#57534E' }}>đơn</span></div>
-                <div className="kpi-growth-row">
-                  <span className="growth-badge-green">▲ 8.2%</span>
-                  <span className="growth-subtext">tăng trưởng tuần</span>
-                </div>
-                <div className="kpi-progress-bg">
-                  <div className="kpi-progress-bar" style={{ width: '75%', background: '#C5A059' }} />
-                </div>
-              </div>
-
-              {/* KPI Card 3 */}
-              <div className="kpi-card">
-                <div className="kpi-card-header">
-                  <span className="kpi-title">Giá Trị Trung Bình / Đơn</span>
-                  <div className="kpi-icon-badge">
-                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="kpi-value">1.290.000₫</div>
-                <div className="kpi-growth-row">
-                  <span className="growth-badge-green">▲ 4.1%</span>
-                  <span className="growth-subtext">AOV trung bình</span>
-                </div>
-                <div className="kpi-progress-bg">
-                  <div className="kpi-progress-bar" style={{ width: '60%', background: '#EAB308' }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Charts Section */}
-            <div className="charts-section-card">
-              <div className="chart-header">
-                <div>
-                  <span className="chart-title-tag">XU HƯỚNG TĂNG TRƯỞNG</span>
-                  <h3 className="chart-heading">Doanh Thu 4 Tuần Gần Nhất</h3>
-                </div>
-                <div className="chart-pills">
-                  <button type="button" className="chart-pill-btn">7 Ngày</button>
-                  <button type="button" className="chart-pill-btn active">4 Tuần</button>
-                  <button type="button" className="chart-pill-btn">12 Tháng</button>
-                </div>
-              </div>
-
-              <div style={{ padding: '40px 0', textAlign: 'center', color: '#78716C' }}>
-                📊 [Biểu đồ đường xu hướng doanh thu tích hợp Recharts / Chart.js]
-              </div>
-          </div>
+            )}
+          </section>
         </div>
-
       </main>
     </div>
   );

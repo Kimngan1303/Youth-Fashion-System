@@ -608,3 +608,53 @@ export const updatePaymentStatus = async (orderId, paymentStatus, extra = {}) =>
     },
   });
 };
+
+/**
+ * Tra cứu đơn hàng linh hoạt theo orderId hoặc orderNumber
+ */
+export const findOrderAny = async (orderIdOrNumber) => {
+  if (!orderIdOrNumber) return null;
+  const rawStr = String(orderIdOrNumber).trim();
+  const digitsOnly = rawStr.replace(/\D/g, '');
+  const variants = [rawStr, `YF-${rawStr}`, `YF - ${rawStr}`];
+  if (digitsOnly) {
+    variants.push(digitsOnly, `YF-${digitsOnly}`, `YF - ${digitsOnly}`);
+  }
+
+  const orConditions = [{ order_number: { in: variants } }];
+  if (digitsOnly && !isNaN(Number(digitsOnly))) {
+    orConditions.push({ order_id: BigInt(digitsOnly) });
+  }
+  if (!isNaN(Number(rawStr))) {
+    orConditions.push({ order_id: BigInt(rawStr) });
+  }
+
+  try {
+    return await prisma.order.findFirst({
+      where: { OR: orConditions },
+      include: {
+        order_items: {
+          include: {
+            variant: {
+              include: {
+                product: {
+                  include: {
+                    images: true,
+                    category: true,
+                    brand: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        payments: true,
+        customer: true,
+      },
+    });
+  } catch (e) {
+    console.error('Lỗi khi tra cứu đơn hàng linh hoạt:', e.message);
+    return null;
+  }
+};
+

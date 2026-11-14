@@ -7,6 +7,7 @@ import {
   verifyEmailService,
   resendVerificationOtpService,
   updateProfileService,
+  getProfileService,
   changePasswordService,
   forgotPasswordService,
   resetPasswordService,
@@ -149,6 +150,23 @@ export const refreshController = async (req, res, next) => {
     const result = await refreshAccessTokenService(refreshToken);
 
     return BaseResponse.success(res, 'Cấp lại Access Token thành công', result, 200);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Endpoint Lấy thông tin hồ sơ cá nhân hiện tại (GET /api/auth/profile)
+ */
+export const getProfileController = async (req, res, next) => {
+  try {
+    const customer_id = req.user?.id || req.query.id;
+    const user_type = req.user?.user_type || req.user?.role;
+    if (!customer_id) {
+      return BaseResponse.error(res, 'Chưa đăng nhập', [], 401);
+    }
+    const result = await getProfileService({ customer_id, user_type });
+    return BaseResponse.success(res, 'Lấy thông tin tài khoản thành công', result, 200);
   } catch (error) {
     next(error);
   }

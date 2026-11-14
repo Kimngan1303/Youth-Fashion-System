@@ -1,6 +1,7 @@
 import * as orderRepo from '../repositories/order.repository.js';
 import * as payosService from './payos.service.js';
 import { prisma } from '../repositories/prisma.js';
+import { sendOrderNotificationEmail } from './email.service.js';
 
 /**
  * Helper tạo Error kèm HTTP statusCode chuẩn mà không gây cảnh báo kiểu trên IDE
@@ -103,6 +104,9 @@ export const createOrderService = async ({
     const returnUrl = `${clientUrl}/order-success`;
     const cancelUrl = `${clientUrl}/checkout`;
 
+    // Giới hạn thời gian thanh toán: đúng 5 phút (300 giây) theo yêu cầu
+    const expiredAt = Math.floor(Date.now() / 1000) + 5 * 60;
+
     try {
       const payosLink = await payosService.createPaymentLink({
         orderCode,
@@ -115,6 +119,7 @@ export const createOrderService = async ({
         })),
         returnUrl,
         cancelUrl,
+        expiredAt,
       });
 
       // Lưu mã liên kết thanh toán vào Payment
@@ -132,6 +137,13 @@ export const createOrderService = async ({
         checkoutUrl: payosLink.checkoutUrl,
         isSimulation: payosLink.isSimulation || false,
         paymentMethod: 'PAYOS',
+        expiredAt,
+        qrCode: payosLink.qrCode,
+        accountNumber: payosLink.accountNumber,
+        accountName: payosLink.accountName,
+        bin: payosLink.bin,
+        amount: totalAmount,
+        description: `Thanh toan ${orderNumber}`.slice(0, 25),
       };
     } catch (payosError) {
       console.error('❌ Lỗi khi khởi tạo liên kết PayOS:', payosError.message);
@@ -140,6 +152,42 @@ export const createOrderService = async ({
   }
 
   // Với phương thức COD:
+  // Xóa các sản phẩm đã đặt khỏi giỏ hàng MySQL của khách hàng
+  if (customerId && itemsData?.length > 0) {
+    try {
+      const customerCart = await prisma.cart.findUnique({
+        where: { customer_id: BigInt(customerId) },
+      });
+      if (customerCart) {
+        const variantIds = itemsData
+          .map((i) => i.variant_id)
+          .filter((v) => v !== null && v !== undefined && !isNaN(Number(v)))
+          .map((v) => BigInt(v));
+        if (variantIds.length > 0) {
+          await prisma.cartItem.deleteMany({
+            where: {
+              cart_id: customerCart.cart_id,
+              variant_id: { in: variantIds },
+            },
+          });
+        }
+      }
+    } catch (cartDelErr) {
+      console.warn('Lỗi xóa sản phẩm đã đặt khỏi giỏ hàng MySQL COD:', cartDelErr.message);
+    }
+  }
+
+  // Tự động gửi email thông báo đặt hàng thành công đến Gmail của khách
+  if (recipientEmail) {
+    sendOrderNotificationEmail({
+      toEmail: recipientEmail,
+      order: createdOrder,
+      status: 'ORDER_CREATED',
+    }).catch((emailErr) => {
+      console.error('Lỗi khi gửi email xác nhận đặt hàng COD:', emailErr.message);
+    });
+  }
+
   return {
     order: createdOrder,
     orderCode,
@@ -190,19 +238,40 @@ export const checkPayosStatusService = async (orderCode) => {
       transactionId: payosInfo.reference || `TXN_${orderCode}`,
     });
 
+    // Gửi email xác nhận thanh toán thành công về Gmail của khách
+    const targetEmail = order.recipient_email || order.customer?.email;
+    if (targetEmail) {
+      sendOrderNotificationEmail({
+        toEmail: targetEmail,
+        order,
+        status: 'CONFIRMED',
+      }).catch((emailErr) => {
+        console.error('Lỗi khi gửi email xác nhận thanh toán PayOS:', emailErr.message);
+      });
+    }
+
     // Xóa các sản phẩm đã thanh toán khỏi giỏ hàng MySQL của khách
     if (order.customer_id && order.order_items?.length > 0) {
-      const customerCart = await prisma.cart.findUnique({
-        where: { customer_id: order.customer_id },
-      });
-      if (customerCart) {
-        const variantIds = order.order_items.map((i) => i.variant_id);
-        await prisma.cartItem.deleteMany({
-          where: {
-            cart_id: customerCart.cart_id,
-            variant_id: { in: variantIds },
-          },
+      try {
+        const customerCart = await prisma.cart.findUnique({
+          where: { customer_id: BigInt(order.customer_id) },
         });
+        if (customerCart) {
+          const variantIds = order.order_items
+            .map((i) => i.variant_id)
+            .filter((v) => v !== null && v !== undefined && !isNaN(Number(v)))
+            .map((v) => BigInt(v));
+          if (variantIds.length > 0) {
+            await prisma.cartItem.deleteMany({
+              where: {
+                cart_id: customerCart.cart_id,
+                variant_id: { in: variantIds },
+              },
+            });
+          }
+        }
+      } catch (cartDelErr) {
+        console.warn('Lỗi xóa sản phẩm khỏi giỏ hàng MySQL PayOS status:', cartDelErr.message);
       }
     }
 
@@ -250,18 +319,39 @@ export const handlePayosWebhookService = async (webhookBody) => {
       transactionId: reference,
     });
 
-    if (order.customer_id && order.order_items?.length > 0) {
-      const customerCart = await prisma.cart.findUnique({
-        where: { customer_id: order.customer_id },
+    // Gửi email thông báo thanh toán thành công qua Webhook
+    const targetEmail = order.recipient_email || order.customer?.email;
+    if (targetEmail) {
+      sendOrderNotificationEmail({
+        toEmail: targetEmail,
+        order,
+        status: 'CONFIRMED',
+      }).catch((emailErr) => {
+        console.error('Lỗi khi gửi email webhook PayOS:', emailErr.message);
       });
-      if (customerCart) {
-        const variantIds = order.order_items.map((i) => i.variant_id);
-        await prisma.cartItem.deleteMany({
-          where: {
-            cart_id: customerCart.cart_id,
-            variant_id: { in: variantIds },
-          },
+    }
+
+    if (order.customer_id && order.order_items?.length > 0) {
+      try {
+        const customerCart = await prisma.cart.findUnique({
+          where: { customer_id: BigInt(order.customer_id) },
         });
+        if (customerCart) {
+          const variantIds = order.order_items
+            .map((i) => i.variant_id)
+            .filter((v) => v !== null && v !== undefined && !isNaN(Number(v)))
+            .map((v) => BigInt(v));
+          if (variantIds.length > 0) {
+            await prisma.cartItem.deleteMany({
+              where: {
+                cart_id: customerCart.cart_id,
+                variant_id: { in: variantIds },
+              },
+            });
+          }
+        }
+      } catch (cartDelErr) {
+        console.warn('Lỗi xóa sản phẩm khỏi giỏ hàng MySQL PayOS webhook:', cartDelErr.message);
       }
     }
 
@@ -286,7 +376,7 @@ export const VALID_ORDER_STATUS_TRANSITIONS = {
 };
 
 /**
- * Hủy đơn hàng và lưu lý do hủy
+ * Hủy đơn hàng và lưu lý do hủy, đồng thời gửi email thông báo
  */
 export const cancelOrderService = async (orderIdOrNumber, reason = undefined) => {
   const existingOrder = await orderRepo.findOrderByIdOrNumber(orderIdOrNumber);
@@ -296,7 +386,27 @@ export const cancelOrderService = async (orderIdOrNumber, reason = undefined) =>
       throw createServiceError(`Không thể hủy đơn hàng đang ở trạng thái "${existingOrder.order_status}".`, 400);
     }
   }
-  return await orderRepo.cancelOrder(orderIdOrNumber, reason);
+  const result = await orderRepo.cancelOrder(orderIdOrNumber, reason);
+
+  // Gửi email thông báo hủy đơn đến người nhận
+  try {
+    const fullOrder = await orderRepo.findOrderAny(orderIdOrNumber);
+    const targetEmail = fullOrder?.recipient_email || fullOrder?.customer?.email;
+    if (targetEmail) {
+      sendOrderNotificationEmail({
+        toEmail: targetEmail,
+        order: fullOrder,
+        status: 'CANCELLED',
+        extraData: { reason, note: reason },
+      }).catch((emailErr) => {
+        console.error('Lỗi gửi email thông báo hủy đơn hàng:', emailErr.message);
+      });
+    }
+  } catch (err) {
+    console.error('Lỗi tìm kiếm đơn để gửi email hủy đơn:', err.message);
+  }
+
+  return result;
 };
 
 /**
@@ -307,7 +417,7 @@ export const getAllOrdersService = async () => {
 };
 
 /**
- * Cập nhật trạng thái đơn hàng từ trang Quản trị (có kiểm tra quy tắc chuyển trạng thái)
+ * Cập nhật trạng thái đơn hàng từ trang Quản trị (có kiểm tra quy tắc chuyển trạng thái) và gửi email thông báo
  */
 export const updateOrderStatusService = async (orderId, status, note = null, options = {}) => {
   const s = String(status || '').trim().toUpperCase();
@@ -349,7 +459,77 @@ export const updateOrderStatusService = async (orderId, status, note = null, opt
     }
   }
 
-  return await orderRepo.updateOrderStatus(orderId, mappedStatus, note, options);
+  const result = await orderRepo.updateOrderStatus(orderId, mappedStatus, note, options);
+
+  // Tự động gửi email thông báo cập nhật trạng thái đơn hàng
+  try {
+    const fullOrder = await orderRepo.findOrderAny(orderId);
+    const targetEmail = fullOrder?.recipient_email || fullOrder?.customer?.email;
+    if (targetEmail) {
+      sendOrderNotificationEmail({
+        toEmail: targetEmail,
+        order: fullOrder,
+        status: mappedStatus,
+        extraData: { note, reason: note },
+      }).catch((emailErr) => {
+        console.error('Lỗi khi gửi email cập nhật trạng thái đơn hàng:', emailErr.message);
+      });
+    }
+  } catch (err) {
+    console.error('Lỗi tìm kiếm đơn hàng để gửi email thông báo:', err.message);
+  }
+
+  return result;
+};
+
+/**
+ * Service xử lý gửi email thông báo đơn hàng trực tiếp theo yêu cầu từ Controller/Frontend
+ */
+export const notifyOrderEmailService = async ({
+  orderId,
+  orderNumber,
+  recipientEmail,
+  newStatus,
+  extraData = {},
+}) => {
+  const targetId = orderNumber || orderId;
+  let fullOrder = null;
+  if (targetId) {
+    fullOrder = await orderRepo.findOrderAny(targetId);
+  }
+
+  const emailToUse = (
+    recipientEmail ||
+    fullOrder?.recipient_email ||
+    fullOrder?.customer?.email ||
+    extraData?.recipientEmail ||
+    ''
+  ).trim();
+
+  if (!emailToUse || !emailToUse.includes('@')) {
+    return { success: false, message: 'Không tìm thấy địa chỉ email hợp lệ để gửi thông báo' };
+  }
+
+  const orderPayload = fullOrder || {
+    order_id: orderId,
+    order_number: orderNumber || `YF-${orderId}`,
+    recipient_email: emailToUse,
+    recipient_name: extraData?.recipientName || 'Quý khách',
+    recipient_phone: extraData?.recipientPhone || '',
+    shipping_address_line: extraData?.shippingAddress || '',
+    total_amount: extraData?.totalAmount || 0,
+    order_status: newStatus,
+    order_items: extraData?.items || [],
+  };
+
+  const emailResult = await sendOrderNotificationEmail({
+    toEmail: emailToUse,
+    order: orderPayload,
+    status: newStatus,
+    extraData,
+  });
+
+  return emailResult;
 };
 
 /**
