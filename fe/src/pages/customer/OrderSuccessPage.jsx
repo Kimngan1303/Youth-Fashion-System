@@ -360,7 +360,7 @@ export default function OrderSuccessPage() {
             <div className="estimate-left">
               <Clock size={18} className="text-stone-700" />
               <span>
-                Thời gian giao hàng dự kiến: <strong>2 - 4 giờ</strong> (Hỏa tốc nội thành Hà Nội &amp; TP.HCM) hoặc <strong>2 - 3 ngày</strong> (Toàn quốc).
+                Thời gian giao hàng dự kiến: <strong>2 - 4 giờ</strong> (Hỏa tốc nội thành Hà Nội) hoặc <strong>2 - 3 ngày</strong> (Toàn quốc).
               </span>
             </div>
             <span className="estimate-tag">Miễn Phí Vận Chuyển VIP</span>
