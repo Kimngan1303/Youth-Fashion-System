@@ -21,6 +21,20 @@ import { useToast } from '../../context/ToastContext';
 import ProductCard from '../../components/ProductCard';
 import { getColorHex, isLightColor } from '../../utils/colorUtils';
 
+// Helper lấy danh sách tag đã chọn của đánh giá
+const getReviewTags = (rev) => {
+  if (Array.isArray(rev?.tags) && rev.tags.length > 0) return rev.tags;
+  if (typeof rev?.tags === 'string' && rev.tags.trim()) {
+    return rev.tags.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  const knownTags = ['Chất liệu thượng hạng', 'Đường may tinh xảo', 'Chuẩn phom dáng', 'Đóng gói sang trọng'];
+  if (typeof rev?.content === 'string') {
+    const matched = knownTags.filter(t => rev.content.includes(t));
+    if (matched.length > 0) return matched;
+  }
+  return [];
+};
+
 // Dữ liệu mẫu chuẩn xác theo đúng Figma khi ID trùng hoặc fallback sản phẩm chính
 const FIGMA_COAT_DATA = {
   id: 'YF-COAT-CAMEL-01',
@@ -914,15 +928,21 @@ export default function ProductDetailPage() {
                     {/* Reviewer Name */}
                     <div className="reviewer-info-row">
                       <strong className="reviewer-name">{rev.author}</strong>
-                      {rev.is_verified && (
-                        <span style={{ fontSize: '11px', color: '#16A34A', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                          ✓ Đã mua hàng
-                        </span>
-                      )}
                     </div>
 
                     {/* Purchased Variant Tag */}
                     {rev.variant && <span className="review-variant-tag">{rev.variant}</span>}
+
+                    {/* Quick Tags đã tick chọn */}
+                    {getReviewTags(rev).length > 0 && (
+                      <div className="review-tags-chips">
+                        {getReviewTags(rev).map((tag, tIdx) => (
+                          <span key={tIdx} className="review-tag-badge">
+                            ✓ {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Review text */}
                     <p className="review-content-text">"{rev.content}"</p>
@@ -1248,6 +1268,15 @@ export default function ProductDetailPage() {
                     </div>
                   </div>
                   <span className="review-variant-tag">{rev.variant}</span>
+                  {getReviewTags(rev).length > 0 && (
+                    <div className="review-tags-chips">
+                      {getReviewTags(rev).map((tag, tIdx) => (
+                        <span key={tIdx} className="review-tag-badge">
+                          ✓ {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <p className="review-content-text">"{rev.content}"</p>
                 </div>
               ))}
@@ -2244,6 +2273,27 @@ export default function ProductDetailPage() {
         .review-variant-tag {
           font-size: 11.5px;
           color: #6b7280;
+        }
+
+        .review-tags-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin: 6px 0 2px;
+        }
+
+        .review-tag-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          background-color: #F9FAFB;
+          color: #1F2937;
+          border: 1px solid #E5E7EB;
+          border-radius: 9999px;
+          padding: 2.5px 9px;
+          font-size: 11px;
+          font-weight: 500;
+          letter-spacing: 0.1px;
         }
 
         .review-content-text {

@@ -3234,7 +3234,7 @@ const ProfilePage = () => {
                                     className="btn-order-action btn-neutral-outline"
                                     onClick={() => handleOpenTrackingModal(ord)}
                                   >
-                                    Xem Hành Trình
+                                    Xem Chi Tiết
                                   </button>
                                   {isOrderReviewed(ord) ? (
                                     <button
@@ -3575,7 +3575,7 @@ const ProfilePage = () => {
             <div className="profile-modal-box tracking-modal-box" onClick={e => e.stopPropagation()}>
               <div className="modal-header-row">
                 <div>
-                  <span className="modal-super-title">THEO DÕI HỎA TỐC 2H</span>
+                  <span className="modal-super-title">{modalCat === 'COMPLETED' ? 'CHI TIẾT ĐƠN HÀNG' : 'THEO DÕI HỎA TỐC 2H'}</span>
                   <h3 className="modal-title font-serif">Mã Đơn #{trackingModalOrder.order_code || trackingModalOrder.order_id}</h3>
                 </div>
                 <button className="modal-close-btn" onClick={() => setTrackingModalOrder(null)}>
@@ -4251,14 +4251,14 @@ const ProfilePage = () => {
                     bc.close();
                   } catch (e) {}
 
-                  setReviewSubmittedAlert(`Cảm ơn bạn! Đánh giá đã được ghi nhận thành công và bạn nhận được +100 điểm thưởng VIP. Đang chuyển đến trang đánh giá sản phẩm...`);
+                  setReviewSubmittedAlert(`Cảm ơn bạn! Đánh giá đã được ghi nhận thành công. Đang chuyển đến trang đánh giá sản phẩm...`);
                   setReviewModalOrder(null);
                   setTimeout(() => {
                     navigate(`/product/${prodId}#customer-reviews`);
                   }, 600);
                 }}
               >
-                GỬI ĐÁNH GIÁ & NHẬN ĐIỂM
+                GỬI ĐÁNH GIÁ
               </button>
             </div>
           </div>
