@@ -363,7 +363,7 @@ export default function OrderSuccessPage() {
                 Thời gian giao hàng dự kiến: <strong>2 - 4 giờ</strong> (Hỏa tốc nội thành Hà Nội) hoặc <strong>2 - 3 ngày</strong> (Toàn quốc).
               </span>
             </div>
-            <span className="estimate-tag">Miễn Phí Vận Chuyển VIP</span>
+            <span className="estimate-tag">Miễn Phí Vận Chuyển</span>
           </div>
 
           {/* 3 Cột Thông Tin Đơn Hàng */}
@@ -400,7 +400,7 @@ export default function OrderSuccessPage() {
                       .join(', ')}
                   </div>
                   <div className="field-val-sub text-emerald-800 font-medium">
-                    Giao Hàng Hỏa Tốc (Đặc quyền VIP miễn phí)
+                    Giao Hàng Hỏa Tốc (Miễn phí)
                   </div>
                 </div>
               </div>
