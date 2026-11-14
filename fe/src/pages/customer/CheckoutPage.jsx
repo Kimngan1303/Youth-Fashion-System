@@ -955,7 +955,7 @@ export default function CheckoutPage() {
                         <span className="option-title">Giao Hàng Hỏa Tốc</span>
                         <span className="badge-recommended">KHUYÊN DÙNG</span>
                       </div>
-                      <p className="option-desc">Giao trong 2-4 giờ tại nội thành Hà Nội &amp; TP.HCM.</p>
+                      <p className="option-desc">Giao trong 2-4 giờ tại nội thành Hà Nội.</p>
                     </div>
                   </div>
 
