@@ -87,6 +87,54 @@ const validateDob = (dobStr) => {
   return '';
 };
 
+// Chuẩn hóa thời gian đơn hàng (hỗ trợ cả định dạng DD/MM/YYYY, ISO, số và trích xuất mã đơn)
+const parseOrderTimestamp = (ord) => {
+  if (!ord) return 0;
+  if (ord.created_date) {
+    const t = new Date(ord.created_date).getTime();
+    if (!isNaN(t)) return t;
+  }
+  const rawDate = ord.created_at;
+  if (typeof rawDate === 'number') return rawDate;
+  if (typeof rawDate === 'string' && rawDate.trim()) {
+    const str = rawDate.trim();
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) {
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const y = parseInt(parts[2], 10);
+        if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+          const dt = new Date(y, m, d).getTime();
+          if (!isNaN(dt)) return dt;
+        }
+      }
+    }
+    const t = new Date(str).getTime();
+    if (!isNaN(t)) return t;
+  }
+  const digits = String(ord.order_code || ord.order_number || ord.order_id || '').replace(/\D/g, '');
+  if (digits && digits.length >= 8) {
+    const n = Number(digits);
+    if (!isNaN(n)) return n;
+  }
+  return 0;
+};
+
+// Sắp xếp đơn hàng theo thứ tự mới nhất lên đầu danh sách (ưu tiên ngày đặt mới nhất & mã đơn mới nhất)
+const sortOrdersDesc = (orders) => {
+  if (!Array.isArray(orders)) return [];
+  return [...orders].sort((a, b) => {
+    const timeA = parseOrderTimestamp(a);
+    const timeB = parseOrderTimestamp(b);
+    if (timeA !== timeB) return timeB - timeA;
+
+    const digitsA = Number(String(a.order_code || a.order_number || a.order_id || '').replace(/\D/g, '')) || 0;
+    const digitsB = Number(String(b.order_code || b.order_number || b.order_id || '').replace(/\D/g, '')) || 0;
+    return digitsB - digitsA;
+  });
+};
+
 // Hàm hỗ trợ lọc bỏ dữ liệu mẫu cũ và đơn hàng đã bị xóa nếu còn lưu trong bộ nhớ
 const purgeMockOrders = (list) => {
   if (!Array.isArray(list)) return [];
@@ -686,7 +734,7 @@ const ProfilePage = () => {
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [orderCurrentPage, setOrderCurrentPage] = useState(1);
-  const ordersPerPage = 3;
+  const ordersPerPage = 10;
 
   // Lịch sử đơn hàng: Chỉ tải các đơn hàng thực tế mà người dùng đã đặt thành công
   const [customerOrders, setCustomerOrders] = useState(() => {
@@ -768,13 +816,13 @@ const ProfilePage = () => {
         if (userKey) localStorage.setItem(userKey, JSON.stringify(cleaned));
         localStorage.setItem('yf_customer_orders', JSON.stringify(cleaned));
       } catch (e) { }
-      return applyStatusOverrides(cleaned).map(order => normalizeInitialOrderStatus({
+      return sortOrdersDesc(applyStatusOverrides(cleaned).map(order => normalizeInitialOrderStatus({
         ...order,
         items: (order.items || []).map(item => ({
           ...item,
           image: resolveOrderItemImage(item),
         }))
-      }));
+      })));
     } catch (e) {
       return [];
     }
@@ -964,9 +1012,9 @@ const ProfilePage = () => {
       localStorage.setItem('yf_customer_orders', JSON.stringify(local));
     } catch (e) { }
 
-    // Cập nhật giao diện ngay lập tức từ local storage
+    // Cập nhật giao diện ngay lập tức từ local storage (luôn sắp xếp đơn mới nhất lên đầu)
     if (local && local.length > 0) {
-      setCustomerOrders(local);
+      setCustomerOrders(sortOrdersDesc(local));
     }
 
     // Gọi API lấy các đơn hàng thực tế đã lưu trong MySQL
@@ -1065,7 +1113,7 @@ const ProfilePage = () => {
               String(m.order_code).replace(/\D/g, '') === String(item.order_code || item.order_id).replace(/\D/g, '')
             );
             if (idx === -1) {
-              merged.push(normalizeInitialOrderStatus({
+              merged.unshift(normalizeInitialOrderStatus({
                 ...item,
                 items: (item.items || []).map(it => ({
                   ...it,
@@ -1098,22 +1146,22 @@ const ProfilePage = () => {
               };
             }
           }
-          const finalOrders = applyStatusOverrides(purgeMockOrders(merged)).map(ord => normalizeInitialOrderStatus({
+          const finalOrders = sortOrdersDesc(applyStatusOverrides(purgeMockOrders(merged)).map(ord => normalizeInitialOrderStatus({
             ...ord,
             items: (ord.items || []).map(it => ({
               ...it,
               image: resolveOrderItemImage(it),
             }))
-          }));
+          })));
           setCustomerOrders(finalOrders);
           if (userKey) localStorage.setItem(userKey, JSON.stringify(finalOrders));
           localStorage.setItem('yf_customer_orders', JSON.stringify(finalOrders));
         } else {
-          setCustomerOrders(applyStatusOverrides(purgeMockOrders(local || [])).map(normalizeInitialOrderStatus));
+          setCustomerOrders(sortOrdersDesc(applyStatusOverrides(purgeMockOrders(local || [])).map(normalizeInitialOrderStatus)));
         }
       })
       .catch(() => {
-        setCustomerOrders(applyStatusOverrides(purgeMockOrders(local || [])).map(normalizeInitialOrderStatus));
+        setCustomerOrders(sortOrdersDesc(applyStatusOverrides(purgeMockOrders(local || [])).map(normalizeInitialOrderStatus)));
       });
   }, [user]);
 
@@ -1227,12 +1275,13 @@ const ProfilePage = () => {
             }
             return ord;
           });
+          const sorted = sortOrdersDesc(updated);
           try {
             const userKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : null;
-            if (userKey) localStorage.setItem(userKey, JSON.stringify(updated));
-            localStorage.setItem('yf_customer_orders', JSON.stringify(updated));
+            if (userKey) localStorage.setItem(userKey, JSON.stringify(sorted));
+            localStorage.setItem('yf_customer_orders', JSON.stringify(sorted));
           } catch (e) {}
-          return updated;
+          return sorted;
         });
 
         setTrackingModalOrder(prev => {
@@ -1846,20 +1895,29 @@ const ProfilePage = () => {
     return `${deliveredSpent.toLocaleString('vi-VN')}₫`;
   }, [deliveredSpent]);
 
-  const filteredOrders = customerOrders.filter(ord => {
-    if (orderStatusFilter !== 'ALL' && getOrderStatusCategory(ord.status, ord) !== orderStatusFilter) {
-      return false;
-    }
-    if (orderSearchQuery.trim()) {
-      const q = orderSearchQuery.toLowerCase().trim();
-      const codeMatch = String(ord.order_code || ord.order_number || ord.order_id).toLowerCase().includes(q);
-      const itemMatch = (ord.items || []).some(i => String(i.name || i.product_name).toLowerCase().includes(q));
-      return codeMatch || itemMatch;
-    }
-    return true;
-  });
+  const filteredOrders = useMemo(() => {
+    return sortOrdersDesc(customerOrders).filter(ord => {
+      if (orderStatusFilter !== 'ALL' && getOrderStatusCategory(ord.status, ord) !== orderStatusFilter) {
+        return false;
+      }
+      if (orderSearchQuery.trim()) {
+        const q = orderSearchQuery.toLowerCase().trim();
+        const codeMatch = String(ord.order_code || ord.order_number || ord.order_id).toLowerCase().includes(q);
+        const itemMatch = (ord.items || []).some(i => String(i.name || i.product_name).toLowerCase().includes(q));
+        return codeMatch || itemMatch;
+      }
+      return true;
+    });
+  }, [customerOrders, orderStatusFilter, orderSearchQuery]);
 
   const totalPages = Math.ceil(filteredOrders.length / ordersPerPage) || 1;
+
+  useEffect(() => {
+    if (orderCurrentPage > totalPages) {
+      setOrderCurrentPage(1);
+    }
+  }, [totalPages, orderCurrentPage]);
+
   const startIndex = (orderCurrentPage - 1) * ordersPerPage;
   const currentOrders = filteredOrders.slice(startIndex, startIndex + ordersPerPage);
 

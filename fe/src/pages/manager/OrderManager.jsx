@@ -93,6 +93,40 @@ const purgeMockOrders = (list) => {
   });
 };
 
+// Chuẩn hóa thời gian đơn hàng (hỗ trợ cả định dạng DD/MM/YYYY, ISO, số và trích xuất mã đơn)
+const parseOrderTimestamp = (ord) => {
+  if (!ord) return 0;
+  if (ord.created_date) {
+    const t = new Date(ord.created_date).getTime();
+    if (!isNaN(t)) return t;
+  }
+  const rawDate = ord.created_at || ord.date;
+  if (typeof rawDate === 'number') return rawDate;
+  if (typeof rawDate === 'string' && rawDate.trim()) {
+    const str = rawDate.trim();
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) {
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const y = parseInt(parts[2], 10);
+        if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+          const dt = new Date(y, m, d).getTime();
+          if (!isNaN(dt)) return dt;
+        }
+      }
+    }
+    const t = new Date(str).getTime();
+    if (!isNaN(t)) return t;
+  }
+  const digits = String(ord.order_number || ord.order_code || ord.order_id || '').replace(/\D/g, '');
+  if (digits && digits.length >= 8) {
+    const n = Number(digits);
+    if (!isNaN(n)) return n;
+  }
+  return 0;
+};
+
 const STATUS_RANK = {
   PENDING: 1,
   CONFIRMED: 2,
@@ -1078,9 +1112,21 @@ export default function OrderManager() {
 
     // Sắp xếp
     if (sortBy === 'NEWEST') {
-      result.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+      result.sort((a, b) => {
+        const timeDiff = parseOrderTimestamp(b) - parseOrderTimestamp(a);
+        if (timeDiff !== 0) return timeDiff;
+        const digitsA = Number(String(a.order_number || a.order_code || a.order_id || '').replace(/\D/g, '')) || 0;
+        const digitsB = Number(String(b.order_number || b.order_code || b.order_id || '').replace(/\D/g, '')) || 0;
+        return digitsB - digitsA;
+      });
     } else if (sortBy === 'OLDEST') {
-      result.sort((a, b) => new Date(a.created_date || 0) - new Date(b.created_date || 0));
+      result.sort((a, b) => {
+        const timeDiff = parseOrderTimestamp(a) - parseOrderTimestamp(b);
+        if (timeDiff !== 0) return timeDiff;
+        const digitsA = Number(String(a.order_number || a.order_code || a.order_id || '').replace(/\D/g, '')) || 0;
+        const digitsB = Number(String(b.order_number || b.order_code || b.order_id || '').replace(/\D/g, '')) || 0;
+        return digitsA - digitsB;
+      });
     } else if (sortBy === 'AMOUNT_DESC') {
       result.sort((a, b) => Number(b.total_amount || 0) - Number(a.total_amount || 0));
     } else if (sortBy === 'AMOUNT_ASC') {

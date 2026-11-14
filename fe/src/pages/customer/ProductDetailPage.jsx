@@ -13,8 +13,7 @@ import {
   Truck, 
   RotateCcw, 
   MessageSquare, 
-  Ruler, 
-  ThumbsUp
+  Ruler
 } from 'lucide-react';
 import { productService } from '../../services/productService';
 import { useAuth } from '../../context/AuthContext';
@@ -927,18 +926,6 @@ export default function ProductDetailPage() {
 
                     {/* Review text */}
                     <p className="review-content-text">"{rev.content}"</p>
-                  </div>
-
-                  {/* Helpful count button */}
-                  <div className="review-card-bottom">
-                    <button
-                      type="button"
-                      className="btn-helpful"
-                      onClick={() => handleHelpfulClick(rev.id)}
-                    >
-                      <ThumbsUp size={12} />
-                      <span>Hữu ích ({(rev.likes || 0) + (reviewHelpfulMap[rev.id] || 0)})</span>
-                    </button>
                   </div>
                 </div>
               ))
