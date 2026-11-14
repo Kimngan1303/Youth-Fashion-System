@@ -799,6 +799,40 @@ const ProfilePage = () => {
   const [selectedReviewTags, setSelectedReviewTags] = useState(['Chất liệu thượng hạng', 'Đường may tinh xảo']);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewSubmittedAlert, setReviewSubmittedAlert] = useState('');
+  const [reviewedOrdersMap, setReviewedOrdersMap] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('yf_reviewed_orders') || '{}');
+    } catch (e) {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    const handleSyncReviews = () => {
+      try {
+        setReviewedOrdersMap(JSON.parse(localStorage.getItem('yf_reviewed_orders') || '{}'));
+      } catch (e) {}
+    };
+    window.addEventListener('yf_reviews_updated', handleSyncReviews);
+    window.addEventListener('storage', handleSyncReviews);
+    return () => {
+      window.removeEventListener('yf_reviews_updated', handleSyncReviews);
+      window.removeEventListener('storage', handleSyncReviews);
+    };
+  }, []);
+
+  const isOrderReviewed = useCallback((ord) => {
+    if (!ord) return false;
+    const rawId = String(ord.order_id || ord.id || '').trim();
+    const rawCode = String(ord.order_code || ord.order_number || '').trim();
+    const digits = (rawCode || rawId).replace(/\D/g, '');
+    return Boolean(
+      (rawId && reviewedOrdersMap[rawId]) ||
+      (rawCode && reviewedOrdersMap[rawCode]) ||
+      (digits && reviewedOrdersMap[digits]) ||
+      ord.is_reviewed
+    );
+  }, [reviewedOrdersMap]);
 
   // Tự động chuyển tab khi URL thay đổi (VD: chuyển từ Đặt hàng thành công sang /profile?tab=orders)
   useEffect(() => {
@@ -3144,12 +3178,26 @@ const ProfilePage = () => {
                                   >
                                     Xem Hành Trình
                                   </button>
-                                  <button
-                                    className="btn-order-action btn-gold-outline"
-                                    onClick={() => setReviewModalOrder(ord)}
-                                  >
-                                    ★ Viết Đánh Giá
-                                  </button>
+                                  {isOrderReviewed(ord) ? (
+                                    <button
+                                      className="btn-order-action btn-gold-outline"
+                                      onClick={() => {
+                                        const firstItem = ord.items?.[0] || {};
+                                        const prodId = firstItem.product_id || firstItem.id || 'YF-COAT-CAMEL-01';
+                                        navigate(`/product/${prodId}#customer-reviews`);
+                                      }}
+                                      title="Xem đánh giá thực tế của bạn trên trang chi tiết sản phẩm"
+                                    >
+                                      ★ Đã Đánh Giá (Xem Feedback)
+                                    </button>
+                                  ) : (
+                                    <button
+                                      className="btn-order-action btn-gold-outline"
+                                      onClick={() => setReviewModalOrder(ord)}
+                                    >
+                                      ★ Viết Đánh Giá
+                                    </button>
+                                  )}
                                   <button
                                     className="btn-order-action btn-neutral-outline"
                                     onClick={() => {
@@ -4094,9 +4142,62 @@ const ProfilePage = () => {
               <button
                 className="btn-modal-primary"
                 onClick={() => {
-                  setReviewSubmittedAlert(`Cảm ơn bạn! Đánh giá đã được ghi nhận thành công và bạn nhận được +100 điểm thưởng VIP.`);
+                  const firstItem = reviewModalOrder?.items?.[0] || {};
+                  const prodId = String(firstItem.product_id || firstItem.id || 'YF-COAT-CAMEL-01');
+                  const prodName = firstItem.name || 'Áo Măng Tô Belted Dạ Camel Cashmere';
+                  const variantParts = [firstItem.size ? `Size ${firstItem.size}` : '', firstItem.color ? `${firstItem.color}` : ''].filter(Boolean);
+                  const variantStr = variantParts.length > 0 ? variantParts.join(' • ') : 'Tiêu chuẩn';
+
+                  const authorName = user?.full_name || user?.name || (user?.email ? user.email.split('@')[0] : 'Khách hàng VIP');
+                  const oId = String(reviewModalOrder?.order_id || reviewModalOrder?.id || '').trim();
+                  const oCode = String(reviewModalOrder?.order_code || reviewModalOrder?.order_number || reviewModalOrder?.order_id || '').trim();
+                  const digits = (oCode || oId).replace(/\D/g, '');
+
+                  const newReview = {
+                    id: 'rev_' + Date.now(),
+                    product_id: prodId,
+                    product_name: prodName,
+                    author: authorName,
+                    customer_id: String(user?.customer_id || user?.id || ''),
+                    is_verified: true,
+                    date: new Date().toLocaleDateString('vi-VN'),
+                    created_at: new Date().toISOString(),
+                    variant: variantStr,
+                    rating: Number(reviewRating || 5),
+                    content: reviewComment.trim() || (selectedReviewTags.length > 0 ? selectedReviewTags.join(', ') : 'Chất lượng sản phẩm rất tuyệt vời, đúng kỳ vọng và phom dáng chuẩn!'),
+                    tags: selectedReviewTags || [],
+                    likes: 0,
+                    order_id: oId,
+                    order_code: oCode,
+                  };
+
+                  try {
+                    const existing = JSON.parse(localStorage.getItem('yf_product_reviews') || '[]');
+                    const updated = [newReview, ...existing.filter(r => !(r.order_id === oId && r.product_id === prodId))];
+                    localStorage.setItem('yf_product_reviews', JSON.stringify(updated));
+                  } catch (e) {}
+
+                  try {
+                    const revMap = JSON.parse(localStorage.getItem('yf_reviewed_orders') || '{}');
+                    if (oId) revMap[oId] = true;
+                    if (oCode) revMap[oCode] = true;
+                    if (digits) revMap[digits] = true;
+                    localStorage.setItem('yf_reviewed_orders', JSON.stringify(revMap));
+                    setReviewedOrdersMap(revMap);
+                  } catch (e) {}
+
+                  try {
+                    window.dispatchEvent(new CustomEvent('yf_reviews_updated', { detail: newReview }));
+                    const bc = new BroadcastChannel('yf_reviews_sync_channel');
+                    bc.postMessage(newReview);
+                    bc.close();
+                  } catch (e) {}
+
+                  setReviewSubmittedAlert(`Cảm ơn bạn! Đánh giá đã được ghi nhận thành công và bạn nhận được +100 điểm thưởng VIP. Đang chuyển đến trang đánh giá sản phẩm...`);
                   setReviewModalOrder(null);
-                  setTimeout(() => setReviewSubmittedAlert(''), 5000);
+                  setTimeout(() => {
+                    navigate(`/product/${prodId}#customer-reviews`);
+                  }, 600);
                 }}
               >
                 GỬI ĐÁNH GIÁ & NHẬN ĐIỂM
