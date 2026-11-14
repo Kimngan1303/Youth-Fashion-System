@@ -141,8 +141,20 @@ export default function ProductDetailPage() {
   const getProductReviews = useCallback(() => {
     try {
       const stored = localStorage.getItem('yf_product_reviews');
-      const allReviews = stored ? JSON.parse(stored) : [];
-      if (!Array.isArray(allReviews)) return [];
+      const rawReviews = stored ? JSON.parse(stored) : [];
+      if (!Array.isArray(rawReviews)) return [];
+      const allReviews = rawReviews.map(r => {
+        if (!r) return r;
+        const c = String(r.content || '').trim();
+        const autoTexts = [
+          'Chất lượng sản phẩm rất tuyệt vời, đúng kỳ vọng và phom dáng chuẩn!',
+          'Chất lượng sản phẩm rất tuyệt vời, đúng với kỳ vọng và phom dáng chuẩn!'
+        ];
+        if (autoTexts.includes(c) || (Array.isArray(r.tags) && r.tags.length > 0 && c === r.tags.join(', '))) {
+          return { ...r, content: '' };
+        }
+        return r;
+      });
 
       const currentProdId = String(id || product?.id || 'YF-COAT-CAMEL-01').trim();
       const currentProdName = String(product?.product_name || '').toLowerCase().trim();
@@ -311,12 +323,47 @@ export default function ProductDetailPage() {
           if (isAccessoryProduct) {
             setSelectedSize('');
           } else if (uniqueSizes.length > 0) {
-            setSelectedSize(uniqueSizes[0]);
+            const rawSize = String(location.state?.preSelectedSize || '').replace(/size/i, '').trim();
+            const matchedSize = rawSize ? uniqueSizes.find(s => String(s).toLowerCase().trim() === rawSize.toLowerCase()) : null;
+            if (matchedSize) {
+              setSelectedSize(matchedSize);
+            } else {
+              setSelectedSize(uniqueSizes[0]);
+            }
           }
-          if (uniqueColors.length > 0) setSelectedColor(uniqueColors[0].id);
+
+          if (uniqueColors.length > 0) {
+            const rawColor = String(location.state?.preSelectedColor || '').replace(/màu|màu sắc/i, '').trim().toLowerCase();
+            const matchedColor = rawColor ? uniqueColors.find(c => String(c.name || '').toLowerCase().trim() === rawColor) : null;
+            if (matchedColor) {
+              setSelectedColor(matchedColor.id);
+            } else {
+              setSelectedColor(uniqueColors[0].id);
+            }
+          }
         }
       } catch (err) {
-        console.warn('API getProductById fallback to Figma Coat Data:', err.message);
+        console.warn('API getProductById fallback:', err.message);
+        if (location.state?.productName) {
+          try {
+            const searchRes = await productService.getProducts({ search: location.state.productName });
+            const list = searchRes.data?.products || searchRes.products || [];
+            const matched = list.find(p => p.product_name.toLowerCase().includes(location.state.productName.toLowerCase()));
+            if (matched && matched.product_id) {
+              const fullDetail = await productService.getProductById(matched.product_id);
+              const d = fullDetail?.data || fullDetail;
+              if (d && d.product_name) {
+                setProduct({
+                  ...d,
+                  images: d.images?.length > 0 ? d.images.map((img, idx) => ({ id: img.image_id || idx, url: img.image_url })) : FIGMA_COAT_DATA.images,
+                  colors: d.variants?.length > 0 ? Array.from(new Set(d.variants.map(v => v.color).filter(Boolean))).map((cName, idx) => ({ id: `col-${idx}`, name: cName, hex: getColorHex(cName) })) : FIGMA_COAT_DATA.colors,
+                  sizes: d.variants?.length > 0 ? Array.from(new Set(d.variants.map(v => v.size).filter(Boolean))) : FIGMA_COAT_DATA.sizes,
+                });
+                return;
+              }
+            }
+          } catch (e) {}
+        }
         setProduct(FIGMA_COAT_DATA);
       } finally {
         setLoading(false);
@@ -878,34 +925,11 @@ export default function ProductDetailPage() {
       {/* 4. Section: Customer Reviews ("FEEDBACK TỪ KHÁCH HÀNG") */}
       <section id="customer-reviews" className="section-customer-reviews">
         <div className="container reviews-container">
-          {/* Header Row: Title on Left, Rating Summary on Right */}
+          {/* Header Row: Title on Left */}
           <div className="reviews-header-row">
             <div className="reviews-title-block">
               <span className="reviews-gold-sub">FEEDBACK TỪ KHÁCH HÀNG</span>
               <h2 className="reviews-title font-serif">Đánh Giá Thực Tế</h2>
-            </div>
-
-            {/* Rating Summary Card */}
-            <div className="rating-summary-banner">
-              <div className="rating-score-col">
-                <span className="banner-score font-serif">{averageRating}</span>
-                <div className="banner-stars">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Star key={s} size={11} fill={s <= Math.round(Number(averageRating)) ? "#F59E0B" : "none"} color="#F59E0B" />
-                  ))}
-                </div>
-              </div>
-
-              <div className="rating-meta-col">
-                <span className="meta-verified-text">
-                  {reviewsCount} ĐÁNH GIÁ ĐÃ XÁC THỰC
-                </span>
-                <span className="meta-satisfaction">
-                  {reviewsCount > 0 
-                    ? `${satisfiedPercent}% khách hàng hài lòng về chất liệu & form dáng`
-                    : 'Chưa có đánh giá nào từ khách hàng'}
-                </span>
-              </div>
             </div>
           </div>
 
@@ -945,7 +969,17 @@ export default function ProductDetailPage() {
                     )}
 
                     {/* Review text */}
-                    <p className="review-content-text">"{rev.content}"</p>
+                    {(() => {
+                      const c = String(rev?.content || '').trim();
+                      const autoTexts = [
+                        'Chất lượng sản phẩm rất tuyệt vời, đúng kỳ vọng và phom dáng chuẩn!',
+                        'Chất lượng sản phẩm rất tuyệt vời, đúng với kỳ vọng và phom dáng chuẩn!'
+                      ];
+                      if (!c || autoTexts.includes(c) || (Array.isArray(rev.tags) && rev.tags.length > 0 && c === rev.tags.join(', '))) {
+                        return null;
+                      }
+                      return <p className="review-content-text">"{c}"</p>;
+                    })()}
                   </div>
                 </div>
               ))
@@ -1277,7 +1311,17 @@ export default function ProductDetailPage() {
                       ))}
                     </div>
                   )}
-                  <p className="review-content-text">"{rev.content}"</p>
+                  {(() => {
+                    const c = String(rev?.content || '').trim();
+                    const autoTexts = [
+                      'Chất lượng sản phẩm rất tuyệt vời, đúng kỳ vọng và phom dáng chuẩn!',
+                      'Chất lượng sản phẩm rất tuyệt vời, đúng với kỳ vọng và phom dáng chuẩn!'
+                    ];
+                    if (!c || autoTexts.includes(c) || (Array.isArray(rev.tags) && rev.tags.length > 0 && c === rev.tags.join(', '))) {
+                      return null;
+                    }
+                    return <p className="review-content-text">"{c}"</p>;
+                  })()}
                 </div>
               ))}
             </div>
