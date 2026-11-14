@@ -1151,7 +1151,7 @@ export default function CheckoutPage() {
               </div>
 
               <div className="calc-row">
-                <span className="calc-label">Vận Chuyển VIP</span>
+                <span className="calc-label">Vận Chuyển</span>
                 <span className="calc-value font-semibold text-amber-900">MIỄN PHÍ (0đ)</span>
               </div>
 
