@@ -500,7 +500,7 @@ export default function OrderSuccessPage() {
                 )}
 
                 <div className="fin-row">
-                  <span className="fin-label">Vận chuyển VIP</span>
+                  <span className="fin-label">Vận Chuyển</span>
                   <span className="fin-val text-emerald-700 font-semibold">MIỄN PHÍ (0đ)</span>
                 </div>
 
