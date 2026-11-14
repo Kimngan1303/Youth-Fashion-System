@@ -87,6 +87,54 @@ const validateDob = (dobStr) => {
   return '';
 };
 
+// Chuẩn hóa thời gian đơn hàng (hỗ trợ cả định dạng DD/MM/YYYY, ISO, số và trích xuất mã đơn)
+const parseOrderTimestamp = (ord) => {
+  if (!ord) return 0;
+  if (ord.created_date) {
+    const t = new Date(ord.created_date).getTime();
+    if (!isNaN(t)) return t;
+  }
+  const rawDate = ord.created_at;
+  if (typeof rawDate === 'number') return rawDate;
+  if (typeof rawDate === 'string' && rawDate.trim()) {
+    const str = rawDate.trim();
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) {
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const y = parseInt(parts[2], 10);
+        if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+          const dt = new Date(y, m, d).getTime();
+          if (!isNaN(dt)) return dt;
+        }
+      }
+    }
+    const t = new Date(str).getTime();
+    if (!isNaN(t)) return t;
+  }
+  const digits = String(ord.order_code || ord.order_number || ord.order_id || '').replace(/\D/g, '');
+  if (digits && digits.length >= 8) {
+    const n = Number(digits);
+    if (!isNaN(n)) return n;
+  }
+  return 0;
+};
+
+// Sắp xếp đơn hàng theo thứ tự mới nhất lên đầu danh sách (ưu tiên ngày đặt mới nhất & mã đơn mới nhất)
+const sortOrdersDesc = (orders) => {
+  if (!Array.isArray(orders)) return [];
+  return [...orders].sort((a, b) => {
+    const timeA = parseOrderTimestamp(a);
+    const timeB = parseOrderTimestamp(b);
+    if (timeA !== timeB) return timeB - timeA;
+
+    const digitsA = Number(String(a.order_code || a.order_number || a.order_id || '').replace(/\D/g, '')) || 0;
+    const digitsB = Number(String(b.order_code || b.order_number || b.order_id || '').replace(/\D/g, '')) || 0;
+    return digitsB - digitsA;
+  });
+};
+
 // Hàm hỗ trợ lọc bỏ dữ liệu mẫu cũ và đơn hàng đã bị xóa nếu còn lưu trong bộ nhớ
 const purgeMockOrders = (list) => {
   if (!Array.isArray(list)) return [];
@@ -686,7 +734,7 @@ const ProfilePage = () => {
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [orderCurrentPage, setOrderCurrentPage] = useState(1);
-  const ordersPerPage = 3;
+  const ordersPerPage = 10;
 
   // Lịch sử đơn hàng: Chỉ tải các đơn hàng thực tế mà người dùng đã đặt thành công
   const [customerOrders, setCustomerOrders] = useState(() => {
@@ -768,13 +816,13 @@ const ProfilePage = () => {
         if (userKey) localStorage.setItem(userKey, JSON.stringify(cleaned));
         localStorage.setItem('yf_customer_orders', JSON.stringify(cleaned));
       } catch (e) { }
-      return applyStatusOverrides(cleaned).map(order => normalizeInitialOrderStatus({
+      return sortOrdersDesc(applyStatusOverrides(cleaned).map(order => normalizeInitialOrderStatus({
         ...order,
         items: (order.items || []).map(item => ({
           ...item,
           image: resolveOrderItemImage(item),
         }))
-      }));
+      })));
     } catch (e) {
       return [];
     }
@@ -799,6 +847,40 @@ const ProfilePage = () => {
   const [selectedReviewTags, setSelectedReviewTags] = useState(['Chất liệu thượng hạng', 'Đường may tinh xảo']);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewSubmittedAlert, setReviewSubmittedAlert] = useState('');
+  const [reviewedOrdersMap, setReviewedOrdersMap] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('yf_reviewed_orders') || '{}');
+    } catch (e) {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    const handleSyncReviews = () => {
+      try {
+        setReviewedOrdersMap(JSON.parse(localStorage.getItem('yf_reviewed_orders') || '{}'));
+      } catch (e) {}
+    };
+    window.addEventListener('yf_reviews_updated', handleSyncReviews);
+    window.addEventListener('storage', handleSyncReviews);
+    return () => {
+      window.removeEventListener('yf_reviews_updated', handleSyncReviews);
+      window.removeEventListener('storage', handleSyncReviews);
+    };
+  }, []);
+
+  const isOrderReviewed = useCallback((ord) => {
+    if (!ord) return false;
+    const rawId = String(ord.order_id || ord.id || '').trim();
+    const rawCode = String(ord.order_code || ord.order_number || '').trim();
+    const digits = (rawCode || rawId).replace(/\D/g, '');
+    return Boolean(
+      (rawId && reviewedOrdersMap[rawId]) ||
+      (rawCode && reviewedOrdersMap[rawCode]) ||
+      (digits && reviewedOrdersMap[digits]) ||
+      ord.is_reviewed
+    );
+  }, [reviewedOrdersMap]);
 
   // Tự động chuyển tab khi URL thay đổi (VD: chuyển từ Đặt hàng thành công sang /profile?tab=orders)
   useEffect(() => {
@@ -930,9 +1012,9 @@ const ProfilePage = () => {
       localStorage.setItem('yf_customer_orders', JSON.stringify(local));
     } catch (e) { }
 
-    // Cập nhật giao diện ngay lập tức từ local storage
+    // Cập nhật giao diện ngay lập tức từ local storage (luôn sắp xếp đơn mới nhất lên đầu)
     if (local && local.length > 0) {
-      setCustomerOrders(local);
+      setCustomerOrders(sortOrdersDesc(local));
     }
 
     // Gọi API lấy các đơn hàng thực tế đã lưu trong MySQL
@@ -1031,7 +1113,7 @@ const ProfilePage = () => {
               String(m.order_code).replace(/\D/g, '') === String(item.order_code || item.order_id).replace(/\D/g, '')
             );
             if (idx === -1) {
-              merged.push(normalizeInitialOrderStatus({
+              merged.unshift(normalizeInitialOrderStatus({
                 ...item,
                 items: (item.items || []).map(it => ({
                   ...it,
@@ -1064,22 +1146,22 @@ const ProfilePage = () => {
               };
             }
           }
-          const finalOrders = applyStatusOverrides(purgeMockOrders(merged)).map(ord => normalizeInitialOrderStatus({
+          const finalOrders = sortOrdersDesc(applyStatusOverrides(purgeMockOrders(merged)).map(ord => normalizeInitialOrderStatus({
             ...ord,
             items: (ord.items || []).map(it => ({
               ...it,
               image: resolveOrderItemImage(it),
             }))
-          }));
+          })));
           setCustomerOrders(finalOrders);
           if (userKey) localStorage.setItem(userKey, JSON.stringify(finalOrders));
           localStorage.setItem('yf_customer_orders', JSON.stringify(finalOrders));
         } else {
-          setCustomerOrders(applyStatusOverrides(purgeMockOrders(local || [])).map(normalizeInitialOrderStatus));
+          setCustomerOrders(sortOrdersDesc(applyStatusOverrides(purgeMockOrders(local || [])).map(normalizeInitialOrderStatus)));
         }
       })
       .catch(() => {
-        setCustomerOrders(applyStatusOverrides(purgeMockOrders(local || [])).map(normalizeInitialOrderStatus));
+        setCustomerOrders(sortOrdersDesc(applyStatusOverrides(purgeMockOrders(local || [])).map(normalizeInitialOrderStatus)));
       });
   }, [user]);
 
@@ -1193,12 +1275,13 @@ const ProfilePage = () => {
             }
             return ord;
           });
+          const sorted = sortOrdersDesc(updated);
           try {
             const userKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : null;
-            if (userKey) localStorage.setItem(userKey, JSON.stringify(updated));
-            localStorage.setItem('yf_customer_orders', JSON.stringify(updated));
+            if (userKey) localStorage.setItem(userKey, JSON.stringify(sorted));
+            localStorage.setItem('yf_customer_orders', JSON.stringify(sorted));
           } catch (e) {}
-          return updated;
+          return sorted;
         });
 
         setTrackingModalOrder(prev => {
@@ -1812,20 +1895,29 @@ const ProfilePage = () => {
     return `${deliveredSpent.toLocaleString('vi-VN')}₫`;
   }, [deliveredSpent]);
 
-  const filteredOrders = customerOrders.filter(ord => {
-    if (orderStatusFilter !== 'ALL' && getOrderStatusCategory(ord.status, ord) !== orderStatusFilter) {
-      return false;
-    }
-    if (orderSearchQuery.trim()) {
-      const q = orderSearchQuery.toLowerCase().trim();
-      const codeMatch = String(ord.order_code || ord.order_number || ord.order_id).toLowerCase().includes(q);
-      const itemMatch = (ord.items || []).some(i => String(i.name || i.product_name).toLowerCase().includes(q));
-      return codeMatch || itemMatch;
-    }
-    return true;
-  });
+  const filteredOrders = useMemo(() => {
+    return sortOrdersDesc(customerOrders).filter(ord => {
+      if (orderStatusFilter !== 'ALL' && getOrderStatusCategory(ord.status, ord) !== orderStatusFilter) {
+        return false;
+      }
+      if (orderSearchQuery.trim()) {
+        const q = orderSearchQuery.toLowerCase().trim();
+        const codeMatch = String(ord.order_code || ord.order_number || ord.order_id).toLowerCase().includes(q);
+        const itemMatch = (ord.items || []).some(i => String(i.name || i.product_name).toLowerCase().includes(q));
+        return codeMatch || itemMatch;
+      }
+      return true;
+    });
+  }, [customerOrders, orderStatusFilter, orderSearchQuery]);
 
   const totalPages = Math.ceil(filteredOrders.length / ordersPerPage) || 1;
+
+  useEffect(() => {
+    if (orderCurrentPage > totalPages) {
+      setOrderCurrentPage(1);
+    }
+  }, [totalPages, orderCurrentPage]);
+
   const startIndex = (orderCurrentPage - 1) * ordersPerPage;
   const currentOrders = filteredOrders.slice(startIndex, startIndex + ordersPerPage);
 
@@ -3142,14 +3234,28 @@ const ProfilePage = () => {
                                     className="btn-order-action btn-neutral-outline"
                                     onClick={() => handleOpenTrackingModal(ord)}
                                   >
-                                    Xem Hành Trình
+                                    Xem Chi Tiết
                                   </button>
-                                  <button
-                                    className="btn-order-action btn-gold-outline"
-                                    onClick={() => setReviewModalOrder(ord)}
-                                  >
-                                    ★ Viết Đánh Giá
-                                  </button>
+                                  {isOrderReviewed(ord) ? (
+                                    <button
+                                      className="btn-order-action btn-gold-outline"
+                                      onClick={() => {
+                                        const firstItem = ord.items?.[0] || {};
+                                        const prodId = firstItem.product_id || firstItem.id || 'YF-COAT-CAMEL-01';
+                                        navigate(`/product/${prodId}#customer-reviews`);
+                                      }}
+                                      title="Xem đánh giá thực tế của bạn trên trang chi tiết sản phẩm"
+                                    >
+                                      ★ Đã Đánh Giá (Xem Feedback)
+                                    </button>
+                                  ) : (
+                                    <button
+                                      className="btn-order-action btn-gold-outline"
+                                      onClick={() => setReviewModalOrder(ord)}
+                                    >
+                                      ★ Viết Đánh Giá
+                                    </button>
+                                  )}
                                   <button
                                     className="btn-order-action btn-neutral-outline"
                                     onClick={() => {
@@ -3469,7 +3575,7 @@ const ProfilePage = () => {
             <div className="profile-modal-box tracking-modal-box" onClick={e => e.stopPropagation()}>
               <div className="modal-header-row">
                 <div>
-                  <span className="modal-super-title">THEO DÕI HỎA TỐC 2H</span>
+                  <span className="modal-super-title">{modalCat === 'COMPLETED' ? 'CHI TIẾT ĐƠN HÀNG' : 'THEO DÕI HỎA TỐC 2H'}</span>
                   <h3 className="modal-title font-serif">Mã Đơn #{trackingModalOrder.order_code || trackingModalOrder.order_id}</h3>
                 </div>
                 <button className="modal-close-btn" onClick={() => setTrackingModalOrder(null)}>
@@ -4094,12 +4200,65 @@ const ProfilePage = () => {
               <button
                 className="btn-modal-primary"
                 onClick={() => {
-                  setReviewSubmittedAlert(`Cảm ơn bạn! Đánh giá đã được ghi nhận thành công và bạn nhận được +100 điểm thưởng VIP.`);
+                  const firstItem = reviewModalOrder?.items?.[0] || {};
+                  const prodId = String(firstItem.product_id || firstItem.id || 'YF-COAT-CAMEL-01');
+                  const prodName = firstItem.name || 'Áo Măng Tô Belted Dạ Camel Cashmere';
+                  const variantParts = [firstItem.size ? `Size ${firstItem.size}` : '', firstItem.color ? `${firstItem.color}` : ''].filter(Boolean);
+                  const variantStr = variantParts.length > 0 ? variantParts.join(' • ') : 'Tiêu chuẩn';
+
+                  const authorName = user?.full_name || user?.name || (user?.email ? user.email.split('@')[0] : 'Khách hàng VIP');
+                  const oId = String(reviewModalOrder?.order_id || reviewModalOrder?.id || '').trim();
+                  const oCode = String(reviewModalOrder?.order_code || reviewModalOrder?.order_number || reviewModalOrder?.order_id || '').trim();
+                  const digits = (oCode || oId).replace(/\D/g, '');
+
+                  const newReview = {
+                    id: 'rev_' + Date.now(),
+                    product_id: prodId,
+                    product_name: prodName,
+                    author: authorName,
+                    customer_id: String(user?.customer_id || user?.id || ''),
+                    is_verified: true,
+                    date: new Date().toLocaleDateString('vi-VN'),
+                    created_at: new Date().toISOString(),
+                    variant: variantStr,
+                    rating: Number(reviewRating || 5),
+                    content: reviewComment.trim() || (selectedReviewTags.length > 0 ? selectedReviewTags.join(', ') : 'Chất lượng sản phẩm rất tuyệt vời, đúng kỳ vọng và phom dáng chuẩn!'),
+                    tags: selectedReviewTags || [],
+                    likes: 0,
+                    order_id: oId,
+                    order_code: oCode,
+                  };
+
+                  try {
+                    const existing = JSON.parse(localStorage.getItem('yf_product_reviews') || '[]');
+                    const updated = [newReview, ...existing.filter(r => !(r.order_id === oId && r.product_id === prodId))];
+                    localStorage.setItem('yf_product_reviews', JSON.stringify(updated));
+                  } catch (e) {}
+
+                  try {
+                    const revMap = JSON.parse(localStorage.getItem('yf_reviewed_orders') || '{}');
+                    if (oId) revMap[oId] = true;
+                    if (oCode) revMap[oCode] = true;
+                    if (digits) revMap[digits] = true;
+                    localStorage.setItem('yf_reviewed_orders', JSON.stringify(revMap));
+                    setReviewedOrdersMap(revMap);
+                  } catch (e) {}
+
+                  try {
+                    window.dispatchEvent(new CustomEvent('yf_reviews_updated', { detail: newReview }));
+                    const bc = new BroadcastChannel('yf_reviews_sync_channel');
+                    bc.postMessage(newReview);
+                    bc.close();
+                  } catch (e) {}
+
+                  setReviewSubmittedAlert(`Cảm ơn bạn! Đánh giá đã được ghi nhận thành công. Đang chuyển đến trang đánh giá sản phẩm...`);
                   setReviewModalOrder(null);
-                  setTimeout(() => setReviewSubmittedAlert(''), 5000);
+                  setTimeout(() => {
+                    navigate(`/product/${prodId}#customer-reviews`);
+                  }, 600);
                 }}
               >
-                GỬI ĐÁNH GIÁ & NHẬN ĐIỂM
+                GỬI ĐÁNH GIÁ
               </button>
             </div>
           </div>
