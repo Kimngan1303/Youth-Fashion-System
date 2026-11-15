@@ -103,15 +103,15 @@ export default function SearchPage() {
 
     if (user) {
       try {
-        const res = await aiService.getSearchHistory(15);
+        const res = await aiService.getSearchHistory(5);
         if (res.status && Array.isArray(res.data) && res.data.length > 0) {
           const apiKeywords = res.data
             .map((item) => item.query_text)
             .filter(Boolean);
-          // Hợp nhất API keywords với local items (loại trùng lặp)
+          // Hợp nhất API keywords với local items (loại trùng lặp, tối đa 5 mục gần nhất)
           const merged = Array.from(
             new Set([...apiKeywords, ...localItems]),
-          ).slice(0, 15);
+          ).slice(0, 5);
           setSearchHistory(merged);
           return merged;
         }
@@ -123,11 +123,11 @@ export default function SearchPage() {
       }
     }
 
-    setSearchHistory(localItems.slice(0, 15));
-    return localItems.slice(0, 15);
+    setSearchHistory(localItems.slice(0, 5));
+    return localItems.slice(0, 5);
   };
 
-  // 4. Save keyword to localStorage (always keep local cache fresh)
+  // 4. Save keyword to localStorage (always keep local cache fresh, tối đa 5 từ khóa gần nhất)
   const saveKeywordLocally = (keyword) => {
     if (!keyword || typeof keyword !== "string" || keyword.trim() === "")
       return;
@@ -139,7 +139,8 @@ export default function SearchPage() {
       const filtered = Array.isArray(current)
         ? current.filter((k) => k.toLowerCase() !== clean.toLowerCase())
         : [];
-      const updated = [clean, ...filtered].slice(0, 15);
+      // Đưa từ khóa mới nhất lên đầu, giới hạn tối đa 5 từ khóa gần nhất
+      const updated = [clean, ...filtered].slice(0, 5);
       localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(updated));
       setSearchHistory(updated);
     } catch (e) {
@@ -198,6 +199,14 @@ export default function SearchPage() {
       return;
     }
 
+    const words = (targetText || "").trim().split(/\s+/).filter(Boolean);
+    if (words.length > 30) {
+      setErrorMessage(
+        `Từ khóa tìm kiếm không được vượt quá 30 từ (hiện tại: ${words.length} từ). Vui lòng rút gọn nội dung.`,
+      );
+      return;
+    }
+
     setIsSearching(true);
     setErrorMessage("");
     setSuggestedQuery(null);
@@ -206,7 +215,6 @@ export default function SearchPage() {
     // Tự động tối ưu hóa trọng số Multimodal (Adaptive Auto-Weighting):
     // - Nếu từ khóa ngắn/chung chung (<= 2 từ): Ưu tiên hình ảnh (70% ảnh - 30% text)
     // - Nếu từ khóa mô tả chi tiết (>= 3 từ): Cân bằng tối ưu (50% ảnh - 50% text)
-    const words = (targetText || "").trim().split(/\s+/).filter(Boolean);
     const imgWeight = words.length <= 2 ? 0.7 : 0.5;
     const txtWeight = words.length <= 2 ? 0.3 : 0.5;
 
@@ -282,10 +290,30 @@ export default function SearchPage() {
   // Form submit
   const handleFormSubmit = (e) => {
     e.preventDefault();
+    const words = queryText.trim().split(/\s+/).filter(Boolean);
+    if (words.length > 30) {
+      setErrorMessage(
+        `Từ khóa tìm kiếm không được vượt quá 30 từ (hiện tại: ${words.length} từ). Vui lòng rút gọn nội dung.`,
+      );
+      return;
+    }
     if (queryText.trim()) {
       setSearchParams({ q: queryText.trim() });
     }
     executeSearch();
+  };
+
+  const handleQueryTextChange = (e) => {
+    const val = e.target.value;
+    const words = val.trim().split(/\s+/).filter(Boolean);
+    if (words.length > 30) {
+      setErrorMessage(
+        `Từ khóa tìm kiếm tối đa 30 từ (hiện tại: ${words.length} từ).`,
+      );
+    } else if (errorMessage && errorMessage.includes("30 từ")) {
+      setErrorMessage("");
+    }
+    setQueryText(val);
   };
 
   // Click on a history tag
@@ -511,7 +539,12 @@ export default function SearchPage() {
   const handleClearQueryText = () => {
     setQueryText("");
     setSearchParams({});
+    if (errorMessage && errorMessage.includes("30 từ")) {
+      setErrorMessage("");
+    }
   };
+
+  const queryWordsCount = queryText.trim().split(/\s+/).filter(Boolean).length;
 
   return (
     <div className="search-page-container">
@@ -571,7 +604,8 @@ export default function SearchPage() {
                   type="text"
                   placeholder="Nhập mô tả sản phẩm (VD: áo sơ mi trắng công sở, đầm dạ hội dài, quần jeans suông)..."
                   value={queryText}
-                  onChange={(e) => setQueryText(e.target.value)}
+                  onChange={handleQueryTextChange}
+                  maxLength={300}
                   className="search-main-input"
                 />
 
@@ -584,6 +618,19 @@ export default function SearchPage() {
                   >
                     <X size={16} />
                   </button>
+                )}
+
+                {queryWordsCount > 0 && (
+                  <span
+                    className={`search-word-count-badge ${queryWordsCount > 30 ? "exceeded" : ""}`}
+                    title={
+                      queryWordsCount > 30
+                        ? `Từ khóa vượt quá giới hạn 30 từ (${queryWordsCount}/30 từ)`
+                        : `Số lượng từ: ${queryWordsCount}/30`
+                    }
+                  >
+                    {queryWordsCount}/30 từ
+                  </span>
                 )}
 
                 <button
@@ -606,7 +653,9 @@ export default function SearchPage() {
                   type="submit"
                   className="search-submit-main-btn"
                   disabled={
-                    isSearching || (!queryText.trim() && !selectedImage)
+                    isSearching ||
+                    (!queryText.trim() && !selectedImage) ||
+                    queryWordsCount > 30
                   }
                 >
                   {isSearching ? (
@@ -726,14 +775,15 @@ export default function SearchPage() {
 
               {searchHistory.length > 0 ? (
                 <div className="history-tags-wrapper">
-                  {searchHistory.map((keyword, index) => (
+                  {searchHistory.slice(0, 5).map((keyword, index) => (
                     <button
                       key={index}
                       type="button"
                       className="history-tag-pill"
                       onClick={() => handleHistoryClick(keyword)}
+                      title={keyword}
                     >
-                      <span>{keyword}</span>
+                      <span className="history-tag-text">{keyword}</span>
                     </button>
                   ))}
                 </div>
@@ -1125,6 +1175,30 @@ export default function SearchPage() {
           color: #111827;
           background: transparent;
           padding: 10px 0;
+          min-width: 0;
+        }
+
+        .search-word-count-badge {
+          font-size: 11px;
+          color: #9ca3af;
+          font-weight: 600;
+          padding: 3px 8px;
+          border-radius: 6px;
+          background-color: #f3f4f6;
+          white-space: nowrap;
+          flex-shrink: 0;
+          user-select: none;
+          transition: all 0.2s ease;
+          display: inline-flex;
+          align-items: center;
+          margin-right: 4px;
+        }
+
+        .search-word-count-badge.exceeded {
+          color: #dc2626;
+          background-color: #fee2e2;
+          font-weight: 700;
+          border: 1px solid #fecaca;
         }
 
         .input-action-btn {
@@ -1313,9 +1387,11 @@ export default function SearchPage() {
         /* 2. Search History Section */
         .search-history-container {
           max-width: 820px;
+          width: 100%;
           margin: 22px auto 0;
           padding-top: 18px;
           border-top: 1px dashed #e5e7eb;
+          overflow: hidden;
         }
 
         .history-header-row {
@@ -1364,6 +1440,8 @@ export default function SearchPage() {
           display: flex;
           flex-wrap: wrap;
           gap: 8px;
+          max-width: 100%;
+          overflow: hidden;
         }
 
         .history-tag-pill {
@@ -1375,12 +1453,24 @@ export default function SearchPage() {
           border-radius: 20px;
           cursor: pointer;
           transition: all 0.15s ease;
+          max-width: 260px;
+          display: inline-flex;
+          align-items: center;
+          box-sizing: border-box;
         }
 
         .history-tag-pill:hover {
           background: #111827;
           color: #ffffff;
           border-color: #111827;
+        }
+
+        .history-tag-text {
+          display: inline-block;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .history-empty-text {

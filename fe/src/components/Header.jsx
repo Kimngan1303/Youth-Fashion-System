@@ -457,9 +457,31 @@ const Header = ({ onOpenAISearch }) => {
 
           {/* Messages */}
           <Link
-            to="/chat"
-            className={`action-icon ${location.pathname === '/chat' ? 'active' : ''}`}
-            title="Tin nhắn / Tư vấn"
+            to={
+              user &&
+              (user.role === 'MANAGER' ||
+                user.role === 'ADMIN' ||
+                user.user_type === 'EMPLOYEE' ||
+                user.employee_role === 'ADMIN' ||
+                user.employee_role === 'MANAGER')
+                ? '/manager/chat'
+                : '/chat'
+            }
+            className={`action-icon ${
+              location.pathname === '/chat' || location.pathname === '/manager/chat'
+                ? 'active'
+                : ''
+            }`}
+            title={
+              user &&
+              (user.role === 'MANAGER' ||
+                user.role === 'ADMIN' ||
+                user.user_type === 'EMPLOYEE' ||
+                user.employee_role === 'ADMIN' ||
+                user.employee_role === 'MANAGER')
+                ? 'Hộp thư tư vấn (Quản lý)'
+                : 'Tin nhắn / Tư vấn'
+            }
           >
             <MessageSquare size={18} />
           </Link>

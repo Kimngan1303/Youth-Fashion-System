@@ -333,6 +333,217 @@ class VietnameseHybridSearchService {
   }
 
   /**
+   * 3.1. TOKEN-SPLIT REGEX SEARCH (STAGE 2 FALLBACK)
+   * Khi tìm kiếm chuỗi/hybrid giai đoạn 1 không ra kết quả (0 sản phẩm):
+   * Tách câu truy vấn theo khoảng trắng thành từng từ (token).
+   * Dùng biểu thức chính quy (Regex) kiểm tra từng từ xem sản phẩm có hay không
+   * (Ví dụ: "quần dài nam" -> tìm "quần": có, cắt space đến "dài": có/không có, "nam": có).
+   * Áp dụng đồng bộ cho mọi sản phẩm trong hệ thống.
+   *
+   * @param {object} params
+   * @param {string} params.query - Câu truy vấn
+   * @param {Array} params.vectors - Danh sách sản phẩm trong RAM
+   * @param {number} params.topK - Số lượng kết quả tối đa
+   * @returns {Array} Danh sách sản phẩm khớp từ khóa
+   */
+  executeTokenSplitRegexFallback({ query, vectors, topK = 10 }) {
+    if (!query || typeof query !== 'string' || !vectors || vectors.length === 0) {
+      return [];
+    }
+
+    const normQuery = normalizeVietnameseText(query).toLowerCase();
+    // Tách query thành các từ (token) sau khi cắt bỏ khoảng trắng và dấu câu
+    const rawTokens = normQuery
+      .split(/[\s,./#!$%^&*;:{}=_`~()?"'\[\]+-]+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+
+    if (rawTokens.length === 0) return [];
+
+    // Lọc bỏ các hư từ tiếng Việt thông thường nếu câu có nhiều hơn 1 từ
+    const stopWords = new Set([
+      'la', 'là', 'va', 'và', 'cua', 'của', 'cho', 'cac', 'các', 'nhung', 'những',
+      'mot', 'một', 'co', 'có', 'o', 'ở', 'tai', 'tại', 'voi', 'với', 'nhu', 'như',
+      'de', 'để', 'duoc', 'được', 'nay', 'này', 'do', 'đó', 'tim', 'tìm', 'kiem', 'kiếm', 'xem'
+    ]);
+
+    let tokens = rawTokens.filter((t) => !stopWords.has(t) && !stopWords.has(removeVietnameseTones(t)));
+    if (tokens.length === 0) {
+      tokens = rawTokens;
+    }
+
+    // Nhận diện loại trang phục đặc thù trong tokens nếu có (quần, áo, váy/đầm)
+    // để đảm bảo tính nhất quán (ví dụ tìm quần thì ưu tiên quần, không lẫn sang áo)
+    const PANTS_INDICATORS = ['quần', 'quan', 'pant', 'pants', 'trousers', 'jean', 'jeans', 'kaki', 'jogger', 'short'];
+    const TOPS_INDICATORS = ['áo', 'ao', 'shirt', 'tee', 'tshirt', 'polo', 'hoodie', 'sweater', 'jacket', 'khoác', 'khoac', 'blazer', 'vest', 'len'];
+    const SKIRT_DRESS_INDICATORS = ['váy', 'vay', 'đầm', 'dam', 'skirt', 'dress'];
+
+    const hasPantsToken = tokens.some((t) => PANTS_INDICATORS.includes(t) || PANTS_INDICATORS.includes(removeVietnameseTones(t)));
+    const hasTopsToken = tokens.some((t) => TOPS_INDICATORS.includes(t) || TOPS_INDICATORS.includes(removeVietnameseTones(t)));
+    const hasDressToken = tokens.some((t) => SKIRT_DRESS_INDICATORS.includes(t) || SKIRT_DRESS_INDICATORS.includes(removeVietnameseTones(t)));
+
+    // Chuẩn bị Regex cho từng token (hỗ trợ cả có dấu và không dấu, ranh giới từ an toàn)
+    const tokenRegexes = tokens.map((token) => {
+      const tokenRaw = removeVietnameseTones(token);
+      const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return {
+        token,
+        tokenRaw,
+        regexNorm: new RegExp(`(?:^|[\\s,.-])${escapeRegex(token)}(?:$|[\\s,.-])`, 'i'),
+        regexRaw: new RegExp(`(?:^|[\\s,.-])${escapeRegex(tokenRaw)}(?:$|[\\s,.-])`, 'i'),
+      };
+    });
+
+    const fallbackScored = [];
+
+    for (const item of vectors) {
+      const description = this.descriptionsMap.get(item.product_id) || '';
+      const pNameNorm = normalizeVietnameseText(item.product_name || '').toLowerCase();
+      const pNameRaw = removeVietnameseTones(pNameNorm);
+
+      const pCatNorm = normalizeVietnameseText(item.category_name || '').toLowerCase();
+      const pCatRaw = removeVietnameseTones(pCatNorm);
+
+      const pDescNorm = normalizeVietnameseText(description).toLowerCase();
+      const pDescRaw = removeVietnameseTones(pDescNorm);
+
+      const colorsArr = Array.isArray(item.colors) ? item.colors.filter(Boolean) : [];
+      const pColorsNorm = colorsArr.map((c) => normalizeVietnameseText(c).toLowerCase()).join(' ');
+      const pColorsRaw = removeVietnameseTones(pColorsNorm);
+
+      const pBrandNorm = normalizeVietnameseText(item.brand_name || '').toLowerCase();
+      const pBrandRaw = removeVietnameseTones(pBrandNorm);
+
+      // Kiểm tra loại trừ phân nhóm trang phục (dùng regex boundary để tránh nhầm "quàng" thành "quần")
+      const isProductPants =
+        pCatNorm.includes('quần') ||
+        pNameNorm.includes('quần') ||
+        /(?:^|[\s,.-])quan(?:$|[\s,.-])/i.test(pCatRaw) ||
+        /(?:^|[\s,.-])quan(?:$|[\s,.-])/i.test(pNameRaw);
+
+      const isProductTops =
+        pCatNorm.includes('áo') ||
+        pNameNorm.includes('áo') ||
+        pCatNorm.includes('đông') ||
+        /(?:^|[\s,.-])ao(?:$|[\s,.-])/i.test(pCatRaw) ||
+        /(?:^|[\s,.-])ao(?:$|[\s,.-])/i.test(pNameRaw);
+
+      const isProductDress =
+        pCatNorm.includes('váy') ||
+        pCatNorm.includes('đầm') ||
+        pNameNorm.includes('váy') ||
+        pNameNorm.includes('đầm');
+
+      if (hasPantsToken && !isProductPants) continue;
+      if (hasTopsToken && !isProductTops) continue;
+      if (hasDressToken && !isProductDress) continue;
+
+      let matchedTokensCount = 0;
+      let nameMatchCount = 0;
+      let catMatchCount = 0;
+      let descMatchCount = 0;
+
+      for (const tObj of tokenRegexes) {
+        let isMatched = false;
+
+        // 1. Khớp Regex trong Tên sản phẩm
+        if (tObj.regexNorm.test(pNameNorm) || tObj.regexRaw.test(pNameRaw)) {
+          isMatched = true;
+          nameMatchCount++;
+        }
+        // 2. Khớp Regex trong Danh mục sản phẩm
+        else if (tObj.regexNorm.test(pCatNorm) || tObj.regexRaw.test(pCatRaw)) {
+          isMatched = true;
+          catMatchCount++;
+        }
+        // 3. Khớp Regex trong Màu sắc sản phẩm
+        else if (tObj.regexNorm.test(pColorsNorm) || tObj.regexRaw.test(pColorsRaw)) {
+          isMatched = true;
+          catMatchCount += 0.8;
+        }
+        // 4. Khớp Regex trong Thương hiệu
+        else if (tObj.regexNorm.test(pBrandNorm) || tObj.regexRaw.test(pBrandRaw)) {
+          isMatched = true;
+          catMatchCount += 0.5;
+        }
+        // 5. Khớp Regex trong Mô tả sản phẩm
+        else if (tObj.regexNorm.test(pDescNorm) || tObj.regexRaw.test(pDescRaw)) {
+          isMatched = true;
+          descMatchCount++;
+        }
+        // 6. Ngữ nghĩa mở rộng cho từ đơn cụ thể:
+        // Từ "dài" với quần -> khớp các loại quần dài (BOTTOMS_LONG)
+        else if (
+          (tObj.token === 'dài' || tObj.tokenRaw === 'dai') &&
+          isProductPants &&
+          !pCatNorm.includes('short') &&
+          !pNameNorm.includes('short') &&
+          !pNameNorm.includes('đùi')
+        ) {
+          isMatched = true;
+          catMatchCount += 0.8;
+        }
+        // Từ "ngắn" với quần -> khớp quần short
+        else if (
+          (tObj.token === 'ngắn' || tObj.tokenRaw === 'ngan') &&
+          (pCatNorm.includes('short') || pNameNorm.includes('short') || pNameNorm.includes('đùi'))
+        ) {
+          isMatched = true;
+          catMatchCount += 0.8;
+        }
+        // Từ "nam" -> sản phẩm nam / unisex, không phải đồ nữ chuyên biệt
+        else if (
+          (tObj.token === 'nam' || tObj.tokenRaw === 'nam') &&
+          (pNameNorm.includes('nam') || pDescNorm.includes('nam') || (!isProductDress && !pCatNorm.includes('chân váy')))
+        ) {
+          isMatched = true;
+          if (pNameNorm.includes('nam') || pDescNorm.includes('nam')) {
+            nameMatchCount += 0.5;
+          }
+        }
+
+        if (isMatched) {
+          matchedTokensCount++;
+        }
+      }
+
+      if (matchedTokensCount > 0) {
+        const tokenRatio = matchedTokensCount / tokens.length;
+        // Điểm chuẩn hóa dải [0.8000, 0.9800] cho fallback
+        const baseScore = 0.80 + 0.15 * tokenRatio + 0.03 * Math.min(1.0, (nameMatchCount * 2 + catMatchCount) / (tokens.length * 2));
+        const finalScore = Number(Math.min(0.98, Math.max(0.80, baseScore)).toFixed(4));
+
+        fallbackScored.push({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          category_name: item.category_name,
+          brand_name: item.brand_name,
+          price: item.price,
+          colors: item.colors,
+          image_url: item.image_url,
+          similarity: finalScore,
+          similarity_percent: `${(finalScore * 100).toFixed(1)}%`,
+          _tokenFallback: {
+            matchedTokensCount,
+            totalTokens: tokens.length,
+            tokenRatio,
+            nameMatchCount,
+          },
+        });
+      }
+    }
+
+    fallbackScored.sort((a, b) => {
+      if (b._tokenFallback.matchedTokensCount !== a._tokenFallback.matchedTokensCount) {
+        return b._tokenFallback.matchedTokensCount - a._tokenFallback.matchedTokensCount;
+      }
+      return b.similarity - a.similarity;
+    });
+
+    return fallbackScored.slice(0, topK);
+  }
+
+  /**
    * 4. MAIN HYBRID SEARCH PIPELINE
    * Thực thi tìm kiếm đa nguồn và xếp hạng thông minh
    */
@@ -510,6 +721,16 @@ class VietnameseHybridSearchService {
         if (!isThun || pNameLower.includes('sơ mi') || pNameLower.includes('polo')) {
           isGarmentExcluded = true;
         }
+      } else if (qLower.includes('quần') || qLower.startsWith('quan ') || qLower.includes(' quan ')) {
+        const isQuan = pNameLower.includes('quần') || pCatLower.includes('quần') || pNameLower.includes('jean') || pCatLower.includes('jean') || pNameLower.includes('kaki') || pCatLower.includes('kaki') || pNameLower.includes('jogger') || pCatLower.includes('jogger') || pNameLower.includes('short') || pCatLower.includes('short');
+        if (!isQuan) {
+          isGarmentExcluded = true;
+        }
+      } else if (qLower.startsWith('áo ') || qLower.includes(' áo ') || qLower.startsWith('ao ') || qLower.includes(' ao ')) {
+        const isAo = pNameLower.includes('áo') || pCatLower.includes('áo') || pCatLower.includes('đông') || pNameLower.includes('jacket') || pNameLower.includes('hoodie');
+        if (!isAo) {
+          isGarmentExcluded = true;
+        }
       }
 
       if (isGarmentExcluded) {
@@ -574,10 +795,22 @@ class VietnameseHybridSearchService {
     const clampedThreshold = isNaN(parsedThreshold) ? 0.80 : Math.max(0.80, parsedThreshold);
 
     // Bước 7: Lọc và Sắp xếp giảm dần (Chỉ giữ lại các kết quả có tỷ lệ khớp >= 80%)
-    const filteredResults = scoredProducts
+    let filteredResults = scoredProducts
       .filter((p) => p.similarity >= clampedThreshold)
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, clampedTopK);
+
+    // Bước 7.1: Giai đoạn 2 (Stage 2) - Token-Split Regex Fallback
+    // Nếu tìm kiếm theo chuỗi/ngữ nghĩa Giai đoạn 1 không tìm thấy sản phẩm nào (filteredResults.length === 0):
+    // Tách câu truy vấn theo khoảng trắng thành các token (ví dụ "quần dài nam" -> ["quần", "dài", "nam"]).
+    // Sử dụng biểu thức chính quy (Regex) quét toàn bộ sản phẩm trong hệ thống để tìm từng từ và xếp hạng.
+    if (filteredResults.length === 0 && vectors && vectors.length > 0) {
+      filteredResults = this.executeTokenSplitRegexFallback({
+        query: effectiveQuery,
+        vectors,
+        topK: clampedTopK,
+      });
+    }
 
     // Bước 8: Lưu lịch sử tìm kiếm vào MySQL (Deduplicated theo customer_id & query_text)
     if (customerId && rawQuery && rawQuery.trim().length > 0) {
@@ -614,8 +847,8 @@ class VietnameseHybridSearchService {
       }
     }
 
-    // Loại bỏ trường _debug trước khi trả về để đảm bảo API contract nguyên vẹn 100%
-    const finalProducts = filteredResults.map(({ _debug, ...rest }) => rest);
+    // Loại bỏ trường _debug và _tokenFallback trước khi trả về để đảm bảo API contract nguyên vẹn 100%
+    const finalProducts = filteredResults.map(({ _debug, _tokenFallback, ...rest }) => rest);
 
     return {
       query: rawQuery,

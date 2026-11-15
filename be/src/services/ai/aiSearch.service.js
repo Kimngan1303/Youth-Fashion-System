@@ -34,6 +34,33 @@ function isMatchingBroadCategory(broadCategory, categoryName, productName) {
   const name = (productName || '').toLowerCase();
 
   if (broadCategory === 'TOPS') {
+    // Không được thuộc các nhóm ngành hàng khác (quần, mũ, nón, giày dép, túi xách, phụ kiện, váy, đầm)
+    if (
+      cat.includes('quần') ||
+      name.includes('quần') ||
+      cat.includes('váy') ||
+      cat.includes('đầm') ||
+      name.includes('váy') ||
+      name.includes('đầm') ||
+      cat.includes('mũ') ||
+      cat.includes('nón') ||
+      name.includes('mũ') ||
+      name.includes('nón') ||
+      cat.includes('giày') ||
+      cat.includes('sandal') ||
+      cat.includes('dép') ||
+      name.includes('giày') ||
+      cat.includes('túi') ||
+      cat.includes('balo') ||
+      name.includes('túi') ||
+      name.includes('balo') ||
+      cat.includes('thắt lưng') ||
+      cat.includes('ví') ||
+      cat.includes('kính') ||
+      cat.includes('khăn')
+    ) {
+      return false;
+    }
     return (
       cat.includes('áo') ||
       cat.includes('sweater') ||
@@ -44,11 +71,36 @@ function isMatchingBroadCategory(broadCategory, categoryName, productName) {
       cat.includes('polo') ||
       cat.includes('len') ||
       cat.includes('gilet') ||
-      cat.includes('thể thao') ||
-      name.includes('áo')
+      name.includes('áo') ||
+      name.includes('sweater') ||
+      name.includes('hoodie') ||
+      name.includes('blazer') ||
+      name.includes('jacket') ||
+      name.includes('vest') ||
+      name.includes('polo') ||
+      name.includes('t-shirt') ||
+      name.includes('shirt')
     );
   }
   if (broadCategory === 'BOTTOMS') {
+    if (
+      cat.includes('áo') ||
+      name.includes('áo') ||
+      cat.includes('mũ') ||
+      cat.includes('nón') ||
+      name.includes('mũ') ||
+      name.includes('nón') ||
+      cat.includes('giày') ||
+      name.includes('giày') ||
+      cat.includes('túi') ||
+      cat.includes('balo') ||
+      cat.includes('thắt lưng') ||
+      cat.includes('ví') ||
+      cat.includes('kính') ||
+      cat.includes('khăn')
+    ) {
+      return false;
+    }
     return (
       cat.includes('quần') ||
       cat.includes('jean') ||
@@ -57,10 +109,14 @@ function isMatchingBroadCategory(broadCategory, categoryName, productName) {
       cat.includes('kaki') ||
       cat.includes('chino') ||
       cat.includes('trouser') ||
-      name.includes('quần')
+      name.includes('quần') ||
+      name.includes('short') ||
+      name.includes('jean') ||
+      name.includes('trouser')
     );
   }
   if (broadCategory === 'DRESSES_SKIRTS') {
+    if (cat.includes('quần') || name.includes('quần')) return false;
     return (
       cat.includes('váy') ||
       cat.includes('đầm') ||
@@ -70,15 +126,19 @@ function isMatchingBroadCategory(broadCategory, categoryName, productName) {
     );
   }
   if (broadCategory === 'HEADWEAR') {
+    if (cat.includes('áo') || cat.includes('quần') || cat.includes('giày') || cat.includes('túi')) return false;
     return cat.includes('mũ') || cat.includes('nón') || name.includes('mũ') || name.includes('nón');
   }
   if (broadCategory === 'FOOTWEAR') {
+    if (cat.includes('áo') || cat.includes('quần') || cat.includes('mũ')) return false;
     return (
       cat.includes('giày') ||
       cat.includes('sandal') ||
       cat.includes('dép') ||
       cat.includes('sneaker') ||
-      name.includes('giày')
+      name.includes('giày') ||
+      name.includes('sandal') ||
+      name.includes('dép')
     );
   }
   if (broadCategory === 'BAGS') {
@@ -88,29 +148,40 @@ function isMatchingBroadCategory(broadCategory, categoryName, productName) {
 }
 
 /**
- * Helper tính toán hệ số thưởng/phạt màu sắc
+ * Helper đánh giá mức độ khớp màu sắc giữa màu mục tiêu (từ query text hoặc visual color) và sản phẩm
+ * @returns {{ isMatch: boolean, isKnownMismatch: boolean, hasKnownColors: boolean }}
  */
-function calculateColorMultiplier(targetColor, itemColors, productName, matchBonus = 1.05, mismatchPenalty = 0.70) {
-  if (!targetColor || targetColor === 'Khác') return 1.0;
-  const target = targetColor.toLowerCase();
-  const hasKnownColors = Array.isArray(itemColors) && itemColors.filter(Boolean).length > 0;
-  const prodName = (productName || '').toLowerCase();
-
-  if (hasKnownColors) {
-    const hasColor = itemColors.some((c) => {
-      const cl = (c || '').toLowerCase();
-      return cl === target || cl.includes(target) || target.includes(cl);
-    });
-
-    if (hasColor || prodName.includes(target)) {
-      return matchBonus; // Thưởng khi khớp màu
-    } else {
-      return mismatchPenalty; // Phạt khi lệch màu
-    }
-  } else if (prodName.includes(target)) {
-    return matchBonus;
+export function evaluateColorMatch(targetColor, itemColors, productName) {
+  if (!targetColor || targetColor === 'Khác') {
+    return { isMatch: false, isKnownMismatch: false, hasKnownColors: false };
   }
-  return 0.90;
+  const target = targetColor.toLowerCase().trim();
+  if (!target) {
+    return { isMatch: false, isKnownMismatch: false, hasKnownColors: false };
+  }
+
+  // Regex khớp chính xác từ ngữ màu sắc có biên từ (tránh nhầm "đỏ" với "đồ", hoặc từ ghép)
+  const wordRegex = new RegExp('(^|[\\s,._-])' + target + '([\\s,._-]|$)', 'i');
+  const knownColors = Array.isArray(itemColors)
+    ? itemColors.filter(Boolean).map((c) => String(c).toLowerCase().trim())
+    : [];
+  const prodName = (productName || '').toLowerCase();
+  const hasKnownColors = knownColors.length > 0;
+
+  // 1. Kiểm tra khớp trong mảng colors của CSDL
+  const isMatchInColors = knownColors.some((c) => {
+    if (!c) return false;
+    return c === target || wordRegex.test(c) || c.includes(target) || target.includes(c);
+  });
+
+  // 2. Kiểm tra khớp trong tên sản phẩm
+  const isMatchInName = wordRegex.test(prodName);
+  const isMatch = isMatchInColors || isMatchInName;
+
+  // 3. Nếu sản phẩm đã xác định rõ mảng màu trong CSDL mà KHÔNG khớp với màu mục tiêu -> Lệch màu xác thực
+  const isKnownMismatch = hasKnownColors && !isMatch;
+
+  return { isMatch, isKnownMismatch, hasKnownColors };
 }
 
 /**
@@ -164,20 +235,43 @@ export async function searchByImageService({ imageBuffer, topK = 10, minThreshol
     let categoryMultiplier = 1.0;
     if (detectedBroadCategory) {
       const isMatch = isMatchingBroadCategory(detectedBroadCategory, item.category_name, item.product_name);
-      categoryMultiplier = isMatch ? 1.0 : 0.20;
+      categoryMultiplier = isMatch ? 1.0 : 0.0;
+    }
+
+    if (categoryMultiplier === 0) {
+      return {
+        product_id: item.product_id,
+        product_name: item.product_name,
+        category_name: item.category_name,
+        brand_name: item.brand_name,
+        price: item.price,
+        colors: item.colors,
+        image_url: item.image_url,
+        similarity: 0.0,
+        similarity_percent: '0.0%',
+      };
     }
 
     // Hệ số màu sắc thị giác:
-    // Lưu ý: Trong tìm kiếm thuần bằng hình ảnh, vector CLIP đã tự so sánh trực tiếp màu sắc và pixel.
-    // Nếu ảnh khớp thị giác cao (visualSim >= 0.80), không bao giờ phạt lệch màu theo text metadata CSDL.
+    // Nếu trích xuất được màu chủ đạo rõ ràng từ ảnh (detectedColor), kiểm tra tính tương hợp với sản phẩm
     let colorMultiplier = 1.0;
+    let isColorMismatch = false;
     if (detectedColor) {
-      const penalty = visualSim >= 0.80 ? 1.0 : 0.85;
-      colorMultiplier = calculateColorMultiplier(detectedColor, item.colors, item.product_name, 1.05, penalty);
+      const { isMatch, isKnownMismatch } = evaluateColorMatch(detectedColor, item.colors, item.product_name);
+      if (isMatch) {
+        colorMultiplier = 1.08;
+      } else if (isKnownMismatch) {
+        // Phạt khi màu nhận diện được từ ảnh lệch hoàn toàn với màu sản phẩm trong CSDL
+        colorMultiplier = 0.60;
+        isColorMismatch = true;
+      } else {
+        colorMultiplier = 0.90;
+      }
     }
 
-    // Đảm bảo nguyên tắc ưu tiên thị giác: không bị kéo tụt dưới điểm visualSim nếu cùng danh mục
-    const visualFloor = (visualSim >= 0.80 && categoryMultiplier > 0) ? visualSim : 0.0;
+    // Đảm bảo nguyên tắc ưu tiên thị giác:
+    // visualFloor chỉ được áp dụng khi KHÔNG có mâu thuẫn màu sắc rõ rệt
+    const visualFloor = (!isColorMismatch && visualSim >= 0.80 && categoryMultiplier >= 1.0) ? visualSim : 0.0;
     const finalSimilarity = Number(
       Math.min(1.0, Math.max(0.0, Math.max(visualFloor, visualSim * categoryMultiplier * colorMultiplier))).toFixed(4)
     );
@@ -368,7 +462,7 @@ export async function searchHybridService({
       }
     } else if (effectiveBroadCategory) {
       const isMatch = isMatchingBroadCategory(effectiveBroadCategory, item.category_name, item.product_name);
-      categoryMultiplier = isMatch ? 1.0 : 0.20;
+      categoryMultiplier = isMatch ? 1.0 : 0.0;
     }
 
     if (categoryMultiplier === 0) {
@@ -398,26 +492,62 @@ export async function searchHybridService({
     const normTxtSim = Math.min(1.0, 0.80 + 0.20 * textQuality);
 
     // 5. Kết hợp Đa phương thức (Multimodal Fusion)
-    const totalW = (parseFloat(imgWeight) || 0.7) + (parseFloat(txtWeight) || 0.3);
-    const wI = (parseFloat(imgWeight) || 0.7) / totalW;
-    const wT = (parseFloat(txtWeight) || 0.3) / totalW;
+    let effectiveImgWeight = parseFloat(imgWeight) || 0.7;
+    let effectiveTxtWeight = parseFloat(txtWeight) || 0.3;
+
+    // Khi người dùng có chủ đích rõ ràng bằng văn bản (ví dụ có màu sắc hoặc danh mục cụ thể),
+    // cân bằng trọng số tối thiểu 50% văn bản để ý đồ người dùng không bị chìm lấp bởi vector hình ảnh
+    if (parsed.color || parsed.category) {
+      if (effectiveTxtWeight < 0.5) {
+        effectiveTxtWeight = 0.5;
+        effectiveImgWeight = 0.5;
+      }
+    }
+
+    const totalW = effectiveImgWeight + effectiveTxtWeight;
+    const wI = effectiveImgWeight / totalW;
+    const wT = effectiveTxtWeight / totalW;
     const combinedSim = wI * normImgSim + wT * normTxtSim;
 
     // 6. Hệ số Màu sắc
-    // Visual Vector Primacy: Khi vector ảnh khớp rất cao (normImgSim >= 0.80),
-    // vector thị giác chính là sự thật khách quan (ground truth) về sản phẩm thực tế.
-    // Tuyệt đối không áp dụng mức phạt lệch màu 0.70 dựa trên text metadata có thể bị thiếu sót trong CSDL.
     let colorMultiplier = 1.0;
-    if (effectiveColor) {
-      const mismatchPenalty = normImgSim >= 0.80 ? 1.0 : 0.70;
-      colorMultiplier = calculateColorMultiplier(effectiveColor, item.colors, item.product_name, 1.05, mismatchPenalty);
+    let isColorMismatch = false;
+
+    // Ưu tiên màu sắc người dùng yêu cầu bằng văn bản (parsed.color), nếu không có mới dùng màu nhận diện từ thị giác
+    const targetColor = parsed.color || (visualColor?.colorGroup !== 'Khác' ? visualColor?.colorGroup : null);
+
+    if (targetColor) {
+      const { isMatch, isKnownMismatch } = evaluateColorMatch(targetColor, item.colors, item.product_name);
+
+      if (parsed.color) {
+        // Người dùng CHỦ ĐÍCH gõ màu trong query text (ví dụ "áo đỏ")
+        if (isMatch) {
+          colorMultiplier = 1.10; // Thưởng khi đúng màu yêu cầu
+        } else if (isKnownMismatch) {
+          colorMultiplier = 0.40; // Phạt nặng khi lệch màu rõ ràng (màu đen, trắng, xanh...)
+          isColorMismatch = true;
+        } else {
+          colorMultiplier = 0.80; // Phạt nhẹ khi không rõ màu
+        }
+      } else {
+        // Màu trích xuất tự động từ ảnh (visual color)
+        if (isMatch) {
+          colorMultiplier = 1.08;
+        } else if (isKnownMismatch) {
+          colorMultiplier = 0.60;
+          isColorMismatch = true;
+        } else {
+          colorMultiplier = 0.90;
+        }
+      }
     }
 
     // Điểm số tương đồng cuối cùng sau khi tinh chỉnh:
-    // Đảm bảo nguyên tắc ưu tiên Vector Thị giác: Nếu ảnh khớp chuẩn xác (>= 80%) và cùng danh mục hợp lệ,
-    // điểm số không được phép bị text kéo tụt xuống dưới điểm thị giác (normImgSim)
+    // visualFloor chỉ được kích hoạt khi KHÔNG có mâu thuẫn màu sắc (isColorMismatch === false).
+    // Nếu sản phẩm bị lệch màu rõ ràng so với query (ví dụ tìm "áo đỏ" mà ra "áo đen"),
+    // visualFloor KHÔNG ĐƯỢC PHÉP giữ lại điểm số cao cho sản phẩm đó.
     const fusedSim = combinedSim * categoryMultiplier * colorMultiplier;
-    const visualFloor = (normImgSim >= 0.80 && categoryMultiplier > 0) ? normImgSim : 0.0;
+    const visualFloor = (!isColorMismatch && normImgSim >= 0.80 && categoryMultiplier >= 1.0) ? normImgSim : 0.0;
     const finalSimilarity = Number(
       Math.min(1.0, Math.max(0.0, Math.max(visualFloor, fusedSim))).toFixed(4)
     );

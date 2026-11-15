@@ -227,7 +227,7 @@ model Conversation {
   employee        Employee           @relation(fields: [employee_id], references: [employee_id])
   messages        Message[]
 
-  @@unique([customer_id, employee_id])
+  @@index([customer_id], map: "conversations_customer_id_idx")
   @@index([employee_id], map: "conversations_employee_id_fkey")
   @@map("conversations")
 }

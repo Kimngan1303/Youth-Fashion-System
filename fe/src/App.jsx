@@ -7,6 +7,8 @@ import { ensureOrderCacheReset } from './utils/orderCacheReset';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AISearchModal from './components/AISearchModal';
+import CustomerChatNotification from './components/CustomerChatNotification';
+import ManagerChatNotification from './components/ManagerChatNotification';
 import HomePage from './pages/HomePage';
 import ProductListPage from './pages/customer/ProductListPage';
 import ProductDetailPage from './pages/customer/ProductDetailPage';
@@ -115,6 +117,8 @@ function AppContent() {
 
   return (
     <div className="app-layout">
+      <CustomerChatNotification />
+      <ManagerChatNotification />
       {!hideHeaderFooter && <Header onOpenAISearch={() => setIsAISearchOpen(true)} />}
 
       <main className="app-main">

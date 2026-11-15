@@ -5,6 +5,7 @@ import {
   sendMessageController,
   createConversationController,
   updateConversationStatusController,
+  markConversationReadController,
   streamConversationEventsController,
 } from '../controllers/conversation.controller.js';
 import { verifyAccessToken } from '../helpers/jwt.helper.js';
@@ -48,5 +49,8 @@ router.post('/:conversation_id/messages', optionalAuth, sendMessageController);
 
 // PUT /api/conversations/:conversation_id/status - Cập nhật trạng thái hội thoại
 router.put('/:conversation_id/status', optionalAuth, updateConversationStatusController);
+
+// PUT /api/conversations/:conversation_id/read - Đánh dấu đã đọc
+router.put('/:conversation_id/read', optionalAuth, markConversationReadController);
 
 export default router;

@@ -47,8 +47,39 @@ export default function WishlistPage() {
     toggleWishlist(product);
   };
 
-  const handleAddToCart = (product) => {
+  const isItemOutOfStock = (item, size) => {
+    if (!item) return false;
+    if (item.inStock === false) return true;
+    if (item.status === 'HẾT HÀNG' || String(item.status || '').toLowerCase().includes('hết hàng') || String(item.status || '').toUpperCase() === 'OUT_OF_STOCK') return true;
+    if (item.stock !== undefined && item.stock !== null && Number(item.stock) <= 0) return true;
+    if (Array.isArray(item.variants) && item.variants.length > 0) {
+      if (size) {
+        const matchVar = item.variants.find(v => String(v.size || '').trim().toUpperCase() === String(size).trim().toUpperCase());
+        if (matchVar && Number(matchVar.stock || 0) <= 0) return true;
+      }
+      const totalStock = item.variants.reduce((sum, v) => sum + Number(v.stock || 0), 0);
+      if (totalStock <= 0) return true;
+    }
+    return false;
+  };
+
+  const handleAddToCart = async (product) => {
     const chosenSize = selectedSizes[product.id] || product.selectedSize || 'M';
+
+    // Kiểm tra nếu sản phẩm hoặc phân loại kích cỡ đã hết hàng
+    if (isItemOutOfStock(product, chosenSize)) {
+      showError('Sản phẩm hiện đã hết hàng!');
+      return;
+    }
+
+    if (addToCart) {
+      const res = await addToCart(product, chosenSize, 1);
+      if (res && res.success === false) {
+        showError(res.message || 'Sản phẩm hiện đã hết hàng!');
+        return;
+      }
+    }
+
     const prodId = String(product.id || product.product_id || '').trim();
     const prodTitle = String(product.title || product.name || '').trim().toLowerCase();
     const isAlreadyInCart = cart && cart.some(item => {
@@ -59,10 +90,6 @@ export default function WishlistPage() {
       return false;
     });
 
-    if (addToCart) {
-      addToCart(product, chosenSize, 1);
-    }
-
     if (isAlreadyInCart) {
       showSuccess(`Đã thêm vào giỏ hàng sản phẩm này!`);
     } else {
@@ -71,7 +98,7 @@ export default function WishlistPage() {
   };
 
   const handleAddAllToCart = () => {
-    const inStockItems = wishlist.filter(item => item.inStock !== false);
+    const inStockItems = wishlist.filter(item => !isItemOutOfStock(item));
     if (inStockItems.length === 0) {
       showError('Hiện không có sản phẩm nào còn hàng để thêm.');
       return;
@@ -261,13 +288,14 @@ export default function WishlistPage() {
             <div className="wishlist-grid">
               {filteredItems.map((product) => {
                 const currentSize = selectedSizes[product.id] || product.selectedSize || (product.availableSizes ? product.availableSizes[0] : 'M');
+                const isOutOfStock = isItemOutOfStock(product, currentSize);
                 const priceNum = typeof product.price === 'number' 
                   ? product.price 
                   : (parseInt(String(product.price).replace(/\D/g, '')) || 3450000);
                 const originalPriceNum = product.originalPrice;
 
                 const skuText = product.sku || (product.id ? `YF-${product.id}` : 'YF-COAT-CAMEL-01');
-                const statusText = product.status || 'CÒN HÀNG';
+                const statusText = isOutOfStock ? 'HẾT HÀNG' : (product.status || 'CÒN HÀNG');
                 const badgeTopText = (product.badgeTop && product.badgeTop !== 'MỚI' && product.badgeTop !== '-18% ƯU ĐÃI') ? product.badgeTop : null;
                 const badgeSubText = (product.badgeSub && product.badgeSub !== 'CASHMERE 100%') ? product.badgeSub : null;
                 const sizes = product.availableSizes || ['S', 'M', 'L'];
@@ -281,7 +309,7 @@ export default function WishlistPage() {
                 const badgeSubColor = product.badgeSubColor || (badgeSubText === 'CHỈ CÒN 2 CHIẾC' ? '#ffffff' : (badgeSubText === 'CASHMERE 100%' ? '#713f12' : (badgeSubText === 'TWEED PHÁP' ? '#78350f' : '#44403c')));
 
                 // Status text color
-                const statusColor = product.statusColor || (statusText === 'SẮP HẾT HÀNG' ? '#c2410c' : (statusText === 'ĐẦY ĐỦ SIZE' ? '#0f766e' : '#15803d'));
+                const statusColor = isOutOfStock ? '#dc2626' : (product.statusColor || (statusText === 'SẮP HẾT HÀNG' ? '#c2410c' : (statusText === 'ĐẦY ĐỦ SIZE' ? '#0f766e' : '#15803d')));
 
                 return (
                   <div key={product.id} className="wishlist-card">
@@ -385,11 +413,11 @@ export default function WishlistPage() {
                       {/* 5. Nút Thêm vào giỏ hàng */}
                       <button
                         type="button"
-                        className="wishlist-add-cart-btn"
+                        className={`wishlist-add-cart-btn ${isOutOfStock ? 'out-of-stock' : ''}`}
                         onClick={() => handleAddToCart(product)}
                       >
                         <ShoppingBag size={14} strokeWidth={2} />
-                        <span>THÊM VÀO GIỎ HÀNG</span>
+                        <span>{isOutOfStock ? 'HẾT HÀNG' : 'THÊM VÀO GIỎ HÀNG'}</span>
                       </button>
                     </div>
                   </div>
@@ -855,11 +883,21 @@ export default function WishlistPage() {
           justify-content: center;
           gap: 8px;
           cursor: pointer;
-          transition: opacity 0.2s;
+          transition: all 0.2s ease;
         }
 
         .wishlist-add-cart-btn:hover {
           opacity: 0.88;
+        }
+
+        .wishlist-add-cart-btn.out-of-stock {
+          background-color: #6b7280;
+          color: #ffffff;
+          cursor: pointer;
+        }
+
+        .wishlist-add-cart-btn.out-of-stock:hover {
+          background-color: #4b5563;
         }
 
         /* Main Empty State */

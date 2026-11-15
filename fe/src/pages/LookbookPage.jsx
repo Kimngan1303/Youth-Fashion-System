@@ -125,7 +125,7 @@ export default function LookbookPage() {
   };
 
   // Thêm 1 sản phẩm gắn tag trực tiếp vào giỏ hàng (nếu đã có trong giỏ thì không thêm được nữa)
-  const handleAddToCartSingle = (e, product) => {
+  const handleAddToCartSingle = async (e, product) => {
     e.preventDefault();
     e.stopPropagation();
     if (!product) return;
@@ -133,6 +133,11 @@ export default function LookbookPage() {
     if (!user) {
       showToast('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!');
       navigate('/login');
+      return;
+    }
+
+    if (product.inStock === false || product.status === 'HẾT HÀNG' || (product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0)) {
+      showToast('Sản phẩm hiện đã hết hàng!');
       return;
     }
 
@@ -145,7 +150,7 @@ export default function LookbookPage() {
     const title = product.name || product.title || product.product_name || 'Sản phẩm Lookbook';
     const priceVal = product.price_num || (typeof product.price === 'number' ? product.price : parseInt(String(product.price).replace(/\D/g, '')) || 0);
 
-    addToCart({
+    const res = await addToCart({
       id: prodId,
       product_id: prodId,
       title: title,
@@ -155,6 +160,11 @@ export default function LookbookPage() {
       sku: product.sku || `YF-${prodId}`,
       categoryName: product.category_name || 'Lookbook Collection'
     });
+
+    if (res && res.success === false) {
+      showToast(res.message || 'Sản phẩm hiện đã hết hàng!');
+      return;
+    }
 
     showToast(`Đã thêm "${title}" vào giỏ hàng!`);
   };

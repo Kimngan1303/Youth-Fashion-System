@@ -460,6 +460,12 @@ export default function ProductDetailPage() {
       image: activeImage,
       selectedSize,
       colorName: product.colors.find(c => c.id === selectedColor)?.name || 'Camel Tự Nhiên',
+      inStock: !isOutOfStock,
+      status: isOutOfStock ? 'HẾT HÀNG' : (currentStock <= 5 ? 'SẮP HẾT HÀNG' : 'CÒN HÀNG'),
+      statusColor: isOutOfStock ? '#dc2626' : (currentStock <= 5 ? '#c2410c' : '#15803d'),
+      stock: currentStock,
+      availableSizes: product.sizes || ['S', 'M', 'L'],
+      variants: product.rawVariants || [],
     });
     if (res?.wasAdded) {
       showSuccess('Đã thêm sản phẩm vào danh sách yêu thích!');
@@ -476,7 +482,7 @@ export default function ProductDetailPage() {
     }
 
     if (isOutOfStock) {
-      showError('Sản phẩm với phân loại kích thước/màu sắc này hiện đã hết hàng!');
+      showError('Sản phẩm hiện đã hết hàng!');
       return;
     }
 
@@ -522,7 +528,7 @@ export default function ProductDetailPage() {
     }
 
     if (isOutOfStock) {
-      showError('Sản phẩm với phân loại kích thước/màu sắc này hiện đã hết hàng!');
+      showError('Sản phẩm hiện đã hết hàng!');
       return;
     }
 
@@ -812,8 +818,7 @@ export default function ProductDetailPage() {
                     type="button"
                     className="btn-add-to-cart"
                     onClick={handleAddToCart}
-                    disabled={isOutOfStock}
-                    style={isOutOfStock ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: '#6B7280' } : undefined}
+                    style={isOutOfStock ? { opacity: 0.8, cursor: 'pointer', backgroundColor: '#6B7280' } : undefined}
                   >
                     <ShoppingBag size={15} color="#FFFFFF" />
                     <span>{isOutOfStock ? 'HẾT HÀNG' : 'THÊM VÀO GIỎ HÀNG'}</span>
@@ -838,8 +843,7 @@ export default function ProductDetailPage() {
                   type="button"
                   className="btn-buy-now"
                   onClick={handleBuyNow}
-                  disabled={isOutOfStock}
-                  style={isOutOfStock ? { opacity: 0.6, cursor: 'not-allowed', borderColor: '#D1D5DB', color: '#9CA3AF' } : undefined}
+                  style={isOutOfStock ? { opacity: 0.8, cursor: 'pointer', borderColor: '#D1D5DB', color: '#9CA3AF' } : undefined}
                 >
                   {isOutOfStock ? 'TẠM HẾT HÀNG' : 'MUA NGAY'}
                 </button>
@@ -848,19 +852,44 @@ export default function ProductDetailPage() {
                 <button
                   type="button"
                   className="btn-contact-seller"
-                  onClick={() => navigate('/chat', {
-                    state: {
-                      initialProduct: {
-                        id: product.id || product.product_id,
-                        name: product.product_name || product.name,
-                        price: product.price,
-                        image: activeImage,
-                        category: product.category_name,
-                        sku: product.sku || `YF-${product.id || product.product_id || 'PROD'}`,
-                        description: product.description || product.short_description || 'Thiết kế thời trang cao cấp, chất liệu cao cấp và kiểu dáng hiện đại từ YOUTH FASHION.',
-                      }
+                  onClick={() => {
+                    if (!user) {
+                      showInfo('Vui lòng đăng nhập để kết nối với chuyên viên tư vấn!');
+                      navigate('/login', { state: { from: `/products/${product.id || product.product_id}` } });
+                      return;
                     }
-                  })}
+                    if (
+                      user.role === 'MANAGER' ||
+                      user.role === 'ADMIN' ||
+                      user.user_type === 'EMPLOYEE' ||
+                      user.employee_role === 'ADMIN' ||
+                      user.employee_role === 'MANAGER'
+                    ) {
+                      showInfo('Tài khoản Quản lý không thể tạo cuộc trò chuyện tư vấn với tư cách khách hàng.');
+                      return;
+                    }
+                    const pName = product.product_name || product.name || 'Sản phẩm';
+                    const prodObj = {
+                      id: String(product.id || product.product_id),
+                      name: pName,
+                      price: Number(product.price || 0),
+                      image: activeImage || product.images?.[0]?.image_url || 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800',
+                      category: product.category_name || 'Thời trang',
+                      sku: product.sku || `YF-${product.id || product.product_id || 'PROD'}`,
+                      description: product.description || product.short_description || 'Thiết kế thời trang cao cấp YOUTH FASHION.',
+                    };
+                    const inquiryKey = `prod_inq_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+                    navigate('/chat', {
+                      state: {
+                        inquiryType: 'PRODUCT_INQUIRY',
+                        inquiryKey,
+                        initialTitle: `Tư vấn ${pName}`,
+                        initialMessage: `Chào shop, mình quan tâm đến sản phẩm "${pName}". Shop tư vấn giúp mình nhé!`,
+                        initialProduct: prodObj,
+                        selectedProducts: [prodObj],
+                      }
+                    });
+                  }}
                 >
                   <MessageSquare size={15} color="#1A1C1A" />
                   <span>LIÊN HỆ NGƯỜI BÁN</span>

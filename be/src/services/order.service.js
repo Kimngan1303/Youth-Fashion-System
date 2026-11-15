@@ -556,7 +556,7 @@ export const customerCancelOrderService = async (orderIdOrNumber, customerId, re
 /**
  * Khách hàng yêu cầu hoàn tiền cho đơn PayOS bị shop hủy hoặc đổi trả đơn đã giao
  */
-export const customerRefundRequestService = async (orderIdOrNumber, customerId, { reason, bank_info, images, refund_amount, return_items, customerEmail, recipientEmail } = {}) => {
+export const customerRefundRequestService = async (orderIdOrNumber, customerId, { reason, bank_info, images, refund_amount, return_items, selected_items, customerEmail, recipientEmail } = {}) => {
   const existingOrder = await orderRepo.findOrderByIdOrNumber(orderIdOrNumber);
   if (!existingOrder) {
     throw createServiceError('Không tìm thấy đơn hàng', 404);
@@ -578,10 +578,11 @@ export const customerRefundRequestService = async (orderIdOrNumber, customerId, 
 
   const refundReason = reason ? String(reason).trim() : 'Khách yêu cầu hoàn tiền';
 
-  // Tính toán số tiền hoàn dự kiến dựa trên các sản phẩm đã chọn
+  // Tính toán số tiền hoàn dự kiến dựa trên các sản phẩm đã chọn (hỗ trợ cả return_items và selected_items)
   let calculatedAmount = 0;
   let itemsSummary = '';
-  const parsedItems = Array.isArray(return_items) ? return_items : [];
+  const rawItems = return_items || selected_items || [];
+  const parsedItems = Array.isArray(rawItems) ? rawItems : [];
 
   if (parsedItems.length > 0) {
     calculatedAmount = parsedItems.reduce((sum, item) => {
@@ -604,6 +605,7 @@ export const customerRefundRequestService = async (orderIdOrNumber, customerId, 
   const payloadImages = {
     ...(typeof images === 'object' && images !== null && !Array.isArray(images) ? images : { images: Array.isArray(images) ? images : [] }),
     return_items: parsedItems,
+    selected_items: parsedItems,
     refund_amount: finalRefundAmount,
   };
 

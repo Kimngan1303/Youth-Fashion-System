@@ -31,21 +31,21 @@ const ContactPage = () => {
             <div className="highlight-item">
               <span className="green-dot">•</span>
               <span className="hl-label">HOTLINE MUA HÀNG:</span>
-              <a href="tel:19008866" className="hl-value">1900 8866</a>
+              <a href="tel:+84325373369" className="hl-value">+84325373369</a>
             </div>
 
             <span className="hl-divider">|</span>
 
             <div className="highlight-item">
               <span className="hl-label">HỖ TRỢ ĐƠN HÀNG:</span>
-              <a href="tel:+842838228999" className="hl-value">+84 28 3822 8999</a>
+              <a href="tel:+84325373369" className="hl-value">+84325373369</a>
             </div>
 
             <span className="hl-divider">|</span>
 
             <div className="highlight-item">
               <span className="hl-label">EMAIL HỖ TRỢ:</span>
-              <a href="mailto:cskh@youthfashion.vn" className="hl-value">cskh@youthfashion.vn</a>
+              <a href="mailto:ssogarena7022@gmail.com" className="hl-value">ssogarena7022@gmail.com</a>
             </div>
           </div>
         </section>

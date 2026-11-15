@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../context/ToastContext';
 import { useConfirmModal } from '../context/ConfirmModalContext';
+import { conversationService } from '../services/conversation.service';
 import { 
   LayoutGrid, 
   Package, 
@@ -301,6 +302,55 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
     };
   }, []);
 
+  // Trạng thái có tin nhắn chưa đọc từ khách hàng cho mục "Tư Vấn & CSKH"
+  const [hasUnreadChat, setHasUnreadChat] = React.useState(false);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const checkUnreadMessages = async () => {
+      try {
+        const res = await conversationService.getManagerConversations(user);
+        if (res.data && Array.isArray(res.data) && isMounted) {
+          const hasUnread = res.data.some((c) => Boolean(c.is_unread || (c.unread_count > 0)));
+          setHasUnreadChat(hasUnread);
+        }
+      } catch (e) {}
+    };
+
+    checkUnreadMessages();
+
+    // Lắng nghe SSE realtime tin nhắn mới từ khách hàng
+    const unsubscribe = conversationService.subscribeToChatStream((newMsg) => {
+      if (newMsg.sender_type === 'CUSTOMER') {
+        if (isMounted) setHasUnreadChat(true);
+      }
+    });
+
+    // Lắng nghe sự kiện cập nhật trạng thái đọc tin nhắn từ trang ChatManagement
+    const handleUnreadUpdated = (e) => {
+      if (e?.detail?.hasUnread !== undefined) {
+        if (isMounted) setHasUnreadChat(e.detail.hasUnread);
+      } else {
+        checkUnreadMessages();
+      }
+    };
+
+    window.addEventListener('manager_chat:unread_updated', handleUnreadUpdated);
+    window.addEventListener('chat:unread_updated', handleUnreadUpdated);
+
+    // Polling định kỳ mỗi 4 giây
+    const pollTimer = setInterval(checkUnreadMessages, 4000);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+      window.removeEventListener('manager_chat:unread_updated', handleUnreadUpdated);
+      window.removeEventListener('chat:unread_updated', handleUnreadUpdated);
+      clearInterval(pollTimer);
+    };
+  }, [user]);
+
   const handleLogout = async () => {
     const confirmed = await confirmModal({
       title: 'Đăng xuất tài khoản',
@@ -435,7 +485,9 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
               <MessageSquare size={16} />
               <span>Tư Vấn & CSKH</span>
             </div>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#F97316', display: 'inline-block' }}></span>
+            {hasUnreadChat && (
+              <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#F97316', display: 'inline-block' }}></span>
+            )}
           </button>
 
           {/* 7. Voucher & Khuyến Mãi */}

@@ -1019,12 +1019,12 @@ const ProfilePage = () => {
   const [selectedReviewItemIndex, setSelectedReviewItemIndex] = useState(0);
   const [warrantyModalOpen, setWarrantyModalOpen] = useState(false);
   const [refundModalOrder, setRefundModalOrder] = useState(null);
+  const [selectedRefundItemIndices, setSelectedRefundItemIndices] = useState([]);
+  const [refundItemQuantities, setRefundItemQuantities] = useState({});
   const [refundReason, setRefundReason] = useState('Sản phẩm không vừa kích cỡ (Size)');
   const [customRefundReason, setCustomRefundReason] = useState('');
   const [refundBankInfo, setRefundBankInfo] = useState('');
   const [refundBankError, setRefundBankError] = useState('');
-  const [selectedRefundItemIndices, setSelectedRefundItemIndices] = useState([]);
-  const [refundItemQuantities, setRefundItemQuantities] = useState({});
   const [refundSelectError, setRefundSelectError] = useState('');
   const [isRefunding, setIsRefunding] = useState(false);
   const [cancelModalOrder, setCancelModalOrder] = useState(null);
@@ -2710,8 +2710,9 @@ const ProfilePage = () => {
     }
   };
 
-  const handleOpenRefundModal = (ord) => {
+  const handleOpenRefundModal = (ord, defaultReason = 'Sản phẩm không vừa kích cỡ (Size)') => {
     if (!ord) return;
+    setRefundReason(defaultReason);
     setCustomRefundReason('');
     setRefundBankInfo('');
     setRefundBankError('');
@@ -2726,6 +2727,7 @@ const ProfilePage = () => {
     setRefundItemQuantities(initialQtys);
     setRefundModalOrder(ord);
   };
+  const openRefundModal = handleOpenRefundModal;
 
   const handleToggleRefundItem = (idx) => {
     setRefundSelectError('');
@@ -2850,6 +2852,7 @@ const ProfilePage = () => {
           bank_info: bankTrimmed,
           refund_amount: finalRefundAmount,
           return_items: selectedItemsPayload,
+          selected_items: selectedItemsPayload,
           items: selectedItemsPayload,
           customerEmail: user?.email || ord.recipient_email || ord.customer?.email,
           recipientEmail: ord.recipient_email || user?.email,

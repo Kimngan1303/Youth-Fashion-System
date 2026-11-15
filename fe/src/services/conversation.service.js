@@ -21,6 +21,65 @@ export const getInitials = (name) => {
   return (first + last).toUpperCase();
 };
 
+// Quản lý kết nối Server-Sent Events (SSE) dùng chung (Singleton) chống tạo nhiều kết nối và phát lặp sự kiện
+let sharedEventSource = null;
+const streamMessageListeners = new Set();
+const streamStatusListeners = new Set();
+const recentDeliveredMessageIds = new Set();
+
+function initSharedStream() {
+  if (sharedEventSource) return;
+
+  try {
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const streamUrl = `${baseUrl}/conversations/stream`;
+    sharedEventSource = new EventSource(streamUrl);
+
+    sharedEventSource.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === 'NEW_MESSAGE' && payload.data) {
+          const msgId = String(payload.data.message_id || '');
+          if (msgId) {
+            // Chống phát trùng lặp sự kiện cùng 1 message_id trong vòng 4 giây
+            if (recentDeliveredMessageIds.has(msgId)) {
+              return;
+            }
+            recentDeliveredMessageIds.add(msgId);
+            setTimeout(() => {
+              recentDeliveredMessageIds.delete(msgId);
+            }, 4000);
+          }
+
+          streamMessageListeners.forEach((listener) => {
+            try {
+              listener(payload.data);
+            } catch (err) {
+              console.error('Lỗi trong message listener SSE:', err);
+            }
+          });
+        } else if (payload.type === 'STATUS_CHANGE' && payload.data) {
+          streamStatusListeners.forEach((listener) => {
+            try {
+              listener(payload.data);
+            } catch (err) {
+              console.error('Lỗi trong status listener SSE:', err);
+            }
+          });
+        }
+      } catch (e) {
+        // ignore heartbeat or parse errors
+      }
+    };
+
+    sharedEventSource.onerror = () => {
+      // EventSource tự động reconnect
+    };
+  } catch (err) {
+    console.warn('SSE stream error:', err);
+  }
+}
+
 export const conversationService = {
   /**
    * Lấy danh sách cuộc trò chuyện thật của Khách Hàng từ CSDL Backend
@@ -44,7 +103,8 @@ export const conversationService = {
           attached_product: c.attached_product || null,
           last_message: c.last_message || 'Bắt đầu cuộc trò chuyện...',
           last_message_at: c.last_message_at || c.updated_at || new Date().toISOString(),
-          unread_count: 0,
+          unread_count: c.unread_count || 0,
+          is_unread: Boolean(c.is_unread || (c.unread_count > 0)),
         })),
       };
     } catch (err) {
@@ -56,6 +116,18 @@ export const conversationService = {
   /**
    * Lấy danh sách toàn bộ khách hàng cần tư vấn cho Quản Lý từ CSDL Backend
    */
+  /**
+   * Đánh dấu cuộc hội thoại đã được đọc
+   */
+  markConversationAsRead: async (conversationId) => {
+    try {
+      await axiosClient.put(`/conversations/${conversationId}/read`);
+      return { status: true };
+    } catch (err) {
+      return { status: false };
+    }
+  },
+
   getManagerConversations: async (user = null) => {
     try {
       const response = await axiosClient.get('/conversations');
@@ -75,7 +147,8 @@ export const conversationService = {
           attached_product: c.attached_product || null,
           last_message: c.last_message || 'Bắt đầu cuộc trò chuyện...',
           last_message_at: c.last_message_at || c.updated_at || new Date().toISOString(),
-          unread_count: 0,
+          unread_count: c.unread_count || 0,
+          is_unread: Boolean(c.is_unread || (c.unread_count > 0)),
         })),
       };
     } catch (err) {
@@ -123,6 +196,7 @@ export const conversationService = {
           text: m.content || '',
           attachment_url: m.attachment_url || null,
           product_card: m.product_card || null,
+          product_cards: m.product_cards || (m.product_card ? (Array.isArray(m.product_card) ? m.product_card : [m.product_card]) : []),
         };
       });
 
@@ -138,15 +212,17 @@ export const conversationService = {
    */
   sendMessage: async (
     conversationId,
-    { content, attachment_url = null, message_type = 'TEXT', product_card = null },
+    { content, attachment_url = null, message_type = 'TEXT', product_card = null, product_cards = null },
     user = null
   ) => {
     try {
+      const pCards = product_cards || (product_card ? (Array.isArray(product_card) ? product_card : [product_card]) : null);
       const response = await axiosClient.post(`/conversations/${conversationId}/messages`, {
         content,
         attachment_url,
-        message_type: attachment_url ? 'IMAGE' : (product_card ? 'PRODUCT' : 'TEXT'),
-        product_card,
+        message_type: attachment_url ? 'IMAGE' : 'TEXT',
+        product_card: pCards ? pCards[0] : null,
+        product_cards: pCards,
       });
 
       const saved = response.data?.data;
@@ -158,7 +234,8 @@ export const conversationService = {
           authorName: user?.full_name || 'Bạn',
           text: content,
           attachment_url,
-          product_card: product_card || saved?.product_card || null,
+          product_card: pCards ? pCards[0] : null,
+          product_cards: pCards || [],
           time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           created_at: saved?.created_at || new Date().toISOString(),
         },
@@ -174,15 +251,17 @@ export const conversationService = {
    */
   managerSendMessage: async (
     conversationId,
-    { content, attachment_url = null, product_card = null },
+    { content, attachment_url = null, product_card = null, product_cards = null },
     user = null
   ) => {
     try {
+      const pCards = product_cards || (product_card ? (Array.isArray(product_card) ? product_card : [product_card]) : null);
       const response = await axiosClient.post(`/conversations/${conversationId}/messages`, {
         content,
         attachment_url,
-        message_type: attachment_url ? 'IMAGE' : (product_card ? 'PRODUCT' : 'TEXT'),
-        product_card,
+        message_type: attachment_url ? 'IMAGE' : (pCards ? 'PRODUCT' : 'TEXT'),
+        product_card: pCards ? pCards[0] : null,
+        product_cards: pCards,
       });
 
       const saved = response.data?.data;
@@ -194,7 +273,8 @@ export const conversationService = {
           authorName: user?.full_name || 'Bạn (Quản lý)',
           text: content,
           attachment_url,
-          product_card: product_card || saved?.product_card || null,
+          product_card: pCards ? pCards[0] : null,
+          product_cards: pCards || [],
           time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           created_at: saved?.created_at || new Date().toISOString(),
         },
@@ -208,11 +288,14 @@ export const conversationService = {
   /**
    * Khách hàng tạo cuộc hội thoại mới với CSDL MySQL
    */
-  createConversation: async ({ title, initial_message, attached_product = null }, user = null) => {
+  createConversation: async ({ title, initial_message, attached_product = null, product_card = null, product_cards = null }, user = null) => {
     try {
+      const pCards = product_cards || (product_card ? (Array.isArray(product_card) ? product_card : [product_card]) : (attached_product ? (Array.isArray(attached_product) ? attached_product : [attached_product]) : null));
       const response = await axiosClient.post('/conversations', {
         initial_message,
         title,
+        product_card: pCards ? pCards[0] : null,
+        product_cards: pCards,
       });
 
       return { status: true, data: response.data?.data };
@@ -223,37 +306,24 @@ export const conversationService = {
   },
 
   /**
-   * Đăng ký lắng nghe sự kiện Server-Sent Events (SSE) realtime
+   * Đăng ký lắng nghe sự kiện Server-Sent Events (SSE) realtime qua kết nối dùng chung (Singleton)
    */
   subscribeToChatStream: (onMessage, onStatusChange) => {
-    try {
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-      const streamUrl = `${baseUrl}/conversations/stream`;
-      const eventSource = new EventSource(streamUrl);
+    if (onMessage) streamMessageListeners.add(onMessage);
+    if (onStatusChange) streamStatusListeners.add(onStatusChange);
 
-      eventSource.onmessage = (event) => {
+    initSharedStream();
+
+    return () => {
+      if (onMessage) streamMessageListeners.delete(onMessage);
+      if (onStatusChange) streamStatusListeners.delete(onStatusChange);
+
+      if (streamMessageListeners.size === 0 && streamStatusListeners.size === 0 && sharedEventSource) {
         try {
-          const payload = JSON.parse(event.data);
-          if (payload.type === 'NEW_MESSAGE' && onMessage) {
-            onMessage(payload.data);
-          } else if (payload.type === 'STATUS_CHANGE' && onStatusChange) {
-            onStatusChange(payload.data);
-          }
-        } catch (e) {
-          // ignore heartbeat or parse errors
-        }
-      };
-
-      eventSource.onerror = () => {
-        // SSE tự động kết nối lại
-      };
-
-      return () => {
-        eventSource.close();
-      };
-    } catch (err) {
-      console.warn('SSE stream error:', err);
-      return () => {};
-    }
+          sharedEventSource.close();
+        } catch (e) {}
+        sharedEventSource = null;
+      }
+    };
   },
 };
