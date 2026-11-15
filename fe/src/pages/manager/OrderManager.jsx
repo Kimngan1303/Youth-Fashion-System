@@ -3253,73 +3253,29 @@ export default function OrderManager() {
                                   }
 
                                   return (
-                                    <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenReturnModal(ord)}
-                                        className="status-select-pill status-pill-returned"
-                                        style={{
-                                          fontWeight: 700,
-                                          cursor: 'pointer',
-                                          padding: '4px 12px',
-                                          borderRadius: '20px',
-                                          fontSize: '11.5px',
-                                          textAlign: 'center',
-                                          border: '1.5px solid #D8B4FE',
-                                          backgroundColor: '#FAF5FF',
-                                          color: '#7E22CE',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '5px'
-                                        }}
-                                        title="Khách yêu cầu hoàn tiền - Bấm để mở bảng xử lý"
-                                      >
-                                        <RotateCcw size={12} />
-                                        Chờ hoàn tiền
-                                      </button>
-                                      <div style={{ display: 'inline-flex', gap: '4px' }}>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleOpenReturnModal(ord, 'APPROVED')}
-                                          style={{
-                                            padding: '2px 8px',
-                                            borderRadius: '4px',
-                                            fontSize: '11px',
-                                            fontWeight: 600,
-                                            background: '#DCFCE7',
-                                            color: '#15803D',
-                                            border: '1px solid #86EFAC',
-                                            cursor: 'pointer',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '2px'
-                                          }}
-                                          title="Đồng ý hoàn tiền cho khách"
-                                        >
-                                          <Check size={11} strokeWidth={2.5} /> Đồng ý
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleOpenReturnModal(ord, 'REJECTED')}
-                                          style={{
-                                            padding: '2px 8px',
-                                            borderRadius: '4px',
-                                            fontSize: '11px',
-                                            fontWeight: 600,
-                                            background: '#FEE2E2',
-                                            color: '#DC2626',
-                                            border: '1px solid #FCA5A5',
-                                            cursor: 'pointer',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '2px'
-                                          }}
-                                          title="Từ chối yêu cầu hoàn tiền"
-                                        >
-                                          <X size={11} strokeWidth={2.5} /> Từ chối
-                                        </button>
-                                      </div>
-                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenReturnModal(ord)}
+                                      className="status-select-pill status-pill-returned"
+                                      style={{
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        padding: '5px 14px',
+                                        borderRadius: '20px',
+                                        fontSize: '11.5px',
+                                        textAlign: 'center',
+                                        border: '1.5px solid #D8B4FE',
+                                        backgroundColor: '#FAF5FF',
+                                        color: '#7E22CE',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px'
+                                      }}
+                                      title="Khách yêu cầu hoàn tiền - Bấm để mở form xử lý hoàn tiền hoặc từ chối"
+                                    >
+                                      <RotateCcw size={12} />
+                                      Chờ hoàn tiền
+                                    </button>
                                   );
                                 })()
                               ) : (
@@ -3456,71 +3412,6 @@ export default function OrderManager() {
                                   <Truck size={14} />
                                 </button>
                               )}
-                              {cat === 'RETURNED' && (() => {
-                                const isRej = ord.refund_decision === 'REJECTED' || String(ord.status_label || '').toUpperCase().includes('TỪ CHỐI') || String(ord.note || '').toLowerCase().includes('từ chối hoàn tiền');
-                                const isApp = !isRej && (ord.refund_decision === 'APPROVED' || String(ord.status_label || '').toUpperCase().includes('ĐÃ HOÀN') || String(ord.note || '').toLowerCase().includes('đã xác nhận hoàn tiền'));
-
-                                if (!isApp && !isRej) {
-                                  return (
-                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                      <button
-                                        type="button"
-                                        style={{
-                                          padding: '4px 8px',
-                                          background: '#DCFCE7',
-                                          color: '#15803D',
-                                          border: '1.5px solid #86EFAC',
-                                          borderRadius: '6px',
-                                          fontSize: '11.5px',
-                                          fontWeight: 700,
-                                          cursor: 'pointer',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '3px',
-                                          whiteSpace: 'nowrap'
-                                        }}
-                                        title="Đồng ý hoàn tiền đơn hàng này"
-                                        onClick={() => handleOpenReturnModal(ord, 'APPROVED')}
-                                      >
-                                        <Check size={13} strokeWidth={2.5} /> Đồng ý hoàn
-                                      </button>
-                                      <button
-                                        type="button"
-                                        style={{
-                                          padding: '4px 8px',
-                                          background: '#FEE2E2',
-                                          color: '#DC2626',
-                                          border: '1.5px solid #FCA5A5',
-                                          borderRadius: '6px',
-                                          fontSize: '11.5px',
-                                          fontWeight: 700,
-                                          cursor: 'pointer',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '3px',
-                                          whiteSpace: 'nowrap'
-                                        }}
-                                        title="Từ chối hoàn tiền đơn hàng này"
-                                        onClick={() => handleOpenReturnModal(ord, 'REJECTED')}
-                                      >
-                                        <X size={13} strokeWidth={2.5} /> Từ chối
-                                      </button>
-                                    </div>
-                                  );
-                                }
-
-                                return (
-                                  <button
-                                    type="button"
-                                    className="action-icon-btn"
-                                    style={{ color: isApp ? '#15803D' : '#DC2626', background: isApp ? '#F0FDF4' : '#FEF2F2', border: `1px solid ${isApp ? '#BBF7D0' : '#FECACA'}` }}
-                                    title={isApp ? "Xem chi tiết đã hoàn tiền" : "Xem chi tiết từ chối hoàn"}
-                                    onClick={() => handleOpenReturnModal(ord)}
-                                  >
-                                    <RotateCcw size={14} />
-                                  </button>
-                                );
-                              })()}
                               <button
                                 type="button"
                                 className="action-icon-btn edit-btn"
