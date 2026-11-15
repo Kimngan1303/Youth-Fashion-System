@@ -1919,6 +1919,8 @@ export default function OrderManager() {
                   delivered_date: newStatus === 'COMPLETED' ? (cOrd.delivered_date || formattedDate) : cOrd.delivered_date,
                   cancel_reason: (newStatus === 'CANCELLED' && cancelReason) ? cancelReason : cOrd.cancel_reason,
                   cancelled_by: (newStatus === 'CANCELLED' && cancelledBy) ? cancelledBy : cOrd.cancelled_by,
+                  cancelled_from_status: (newStatus === 'CANCELLED' && cancelledFromStatus) ? cancelledFromStatus : (cOrd.cancelled_from_status || 'PENDING'),
+                  was_pending: (newStatus === 'CANCELLED') ? (cancelledFromStatus === 'PENDING' || !cancelledFromStatus || cOrd.was_pending) : cOrd.was_pending,
                   note: (newStatus === 'CANCELLED' && updatedNote) ? updatedNote : cOrd.note,
                 };
               }
@@ -2230,6 +2232,53 @@ export default function OrderManager() {
         k && (k.startsWith('yf_customer_orders') || k === 'yf_manager_orders' || k === 'orders')
       );
       if (!allKeys.includes('yf_customer_orders')) allKeys.push('yf_customer_orders');
+
+      // Cập nhật yf_order_status_overrides để đồng bộ tức thời với ProfilePage và applyStatusOverrides
+      try {
+        const rawOv = localStorage.getItem('yf_order_status_overrides');
+        const ovs = rawOv ? JSON.parse(rawOv) : {};
+        const ovUpdate = {
+          status: 'RETURNED',
+          order_status: 'RETURNED',
+          status_label: newStatusLabel,
+          status_label_manager: newStatusLabel,
+          status_label_customer: customerLabel,
+          refund_decision: decision,
+          reject_reason: rejectReason || '',
+          refund_reason: refundReason || '',
+          refund_bank: refundBank || '',
+          note: updatedNote,
+          payment_status: decision === 'APPROVED' ? 'REFUNDED' : 'UNPAID',
+          payment_label: decision === 'APPROVED' ? 'Đã hoàn tiền' : 'Từ chối hoàn',
+          updated_at: Date.now(),
+        };
+
+        const keysToSet = new Set();
+        if (orderDigits) {
+          keysToSet.add(orderDigits);
+          keysToSet.add(`YF-${orderDigits}`);
+          keysToSet.add(`#YF-${orderDigits}`);
+          keysToSet.add(`YF - ${orderDigits}`);
+          keysToSet.add(`#YF - ${orderDigits}`);
+          keysToSet.add(`YF – ${orderDigits}`);
+          keysToSet.add(`#YF – ${orderDigits}`);
+          keysToSet.add(`#${orderDigits}`);
+        }
+        if (tId) keysToSet.add(tId);
+        if (tNum) keysToSet.add(tNum);
+
+        for (const k of Object.keys(ovs)) {
+          if (orderDigits && k.replace(/\D/g, '') === orderDigits) {
+            keysToSet.add(k);
+          }
+        }
+
+        keysToSet.forEach(k => {
+          ovs[k] = { ...(ovs[k] || {}), ...ovUpdate };
+        });
+
+        localStorage.setItem('yf_order_status_overrides', JSON.stringify(ovs));
+      } catch (errOv) {}
 
       allKeys.forEach(k => {
         try {

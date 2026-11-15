@@ -368,7 +368,7 @@ const pickAuthoritativeStatus = (statusA, statusB, labelA, labelB, noteA = '', n
 
 // Helper nhận diện và trích xuất lý do hủy đơn (phân biệt Shop hủy vs Khách hủy)
 const resolveCancelInfo = (ord) => {
-  if (!ord) return { isShopCancelled: false, cancelReason: 'Đổi ý, không muốn mua nữa' };
+  if (!ord) return { isShopCancelled: false, cancelReason: 'Đổi ý, không muốn mua nữa', wasPending: false };
   const rawId = String(ord.order_id || '').trim();
   const rawCode = String(ord.order_code || ord.order_number || '').trim();
   const digits = (rawCode || rawId).replace(/\D/g, '');
@@ -376,6 +376,8 @@ const resolveCancelInfo = (ord) => {
   let cancelledBy = ord.cancelled_by || '';
   let cancelReason = ord.cancel_reason || '';
   let noteStr = String(ord.note || '');
+  let wasPending = ord.was_pending || ord.cancelled_from_status === 'PENDING';
+  let cancelledFromStatus = ord.cancelled_from_status || '';
 
   // 1. Kiểm tra từ yf_order_status_overrides
   try {
@@ -387,6 +389,8 @@ const resolveCancelInfo = (ord) => {
         if (ov.cancelled_by) cancelledBy = ov.cancelled_by;
         if (ov.cancel_reason) cancelReason = ov.cancel_reason;
         if (ov.note && !noteStr) noteStr = ov.note;
+        if (ov.was_pending !== undefined) wasPending = ov.was_pending;
+        if (ov.cancelled_from_status) cancelledFromStatus = ov.cancelled_from_status;
       }
     }
   } catch (e) {}
@@ -405,6 +409,8 @@ const resolveCancelInfo = (ord) => {
           if (m.cancelled_by) cancelledBy = m.cancelled_by;
           if (m.cancel_reason) cancelReason = m.cancel_reason;
           if (m.note) noteStr = m.note;
+          if (m.was_pending !== undefined) wasPending = m.was_pending;
+          if (m.cancelled_from_status) cancelledFromStatus = m.cancelled_from_status;
         }
       }
     }
@@ -431,7 +437,9 @@ const resolveCancelInfo = (ord) => {
 
   return {
     isShopCancelled: isShop,
-    cancelReason: finalReason.replace('Shop hủy đơn:', '').replace('Khách hủy đơn:', '').trim()
+    cancelReason: finalReason.replace('Shop hủy đơn:', '').replace('Khách hủy đơn:', '').trim(),
+    wasPending: wasPending || isShop,
+    cancelledFromStatus: cancelledFromStatus || (isShop ? 'PENDING' : '')
   };
 };
 
@@ -3729,6 +3737,33 @@ const ProfilePage = () => {
                                         })()
                                       : 'Chi Tiết Hủy Đơn'}
                                   </button>
+
+                                  {/* Nếu Shop hủy đơn của khách (đặc biệt khi đang chờ xác nhận), hiển thị thêm nút Yêu Cầu Hoàn Tiền */}
+                                  {statusCat === 'CANCELLED' && (() => {
+                                    const cancelInfo = resolveCancelInfo(ord);
+                                    const isShopCanc = cancelInfo.isShopCancelled ||
+                                                       ord.cancelled_by === 'SHOP' ||
+                                                       ord.cancelled_by === 'MANAGER' ||
+                                                       String(ord.note || '').toLowerCase().includes('shop hủy') ||
+                                                       String(ord.cancel_reason || '').toLowerCase().includes('shop hủy');
+                                    return isShopCanc;
+                                  })() && (
+                                    <button
+                                      className="btn-order-action btn-purple-outline"
+                                      onClick={() => {
+                                        setRefundReason('Shop đã hủy đơn hàng - Yêu cầu hoàn tiền');
+                                        setCustomRefundReason('');
+                                        setRefundBankInfo('');
+                                        setRefundBankError('');
+                                        setRefundModalOrder(ord);
+                                      }}
+                                      title="Yêu cầu Shop chuyển tiền hoàn trả về số tài khoản ngân hàng của bạn"
+                                    >
+                                      <RotateCcw size={13} />
+                                      <span>Yêu Cầu Hoàn Tiền</span>
+                                    </button>
+                                  )}
+
                                   <button
                                     className="btn-order-action btn-dark-outline"
                                     onClick={() => handleReorder(ord)}
@@ -5261,13 +5296,21 @@ const ProfilePage = () => {
                 Vui lòng chọn lý do yêu cầu hoàn tiền:
               </label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {[
-                  'Sản phẩm không vừa kích cỡ (Size)',
-                  'Sản phẩm lỗi đường may / chất liệu vải',
-                  'Giao sai mẫu / sai màu sắc so với ảnh',
-                  'Không ưng ý sau khi nhận sản phẩm',
-                  'Lý do khác'
-                ].map((reason) => (
+                {(resolveCancelInfo(refundModalOrder).isShopCancelled
+                  ? [
+                      'Shop đã hủy đơn hàng - Yêu cầu hoàn tiền',
+                      'Đơn hàng bị hủy do hết hàng / sự cố kho',
+                      'Khách hàng yêu cầu nhận lại tiền hoàn qua STK ngân hàng',
+                      'Lý do khác'
+                    ]
+                  : [
+                      'Sản phẩm không vừa kích cỡ (Size)',
+                      'Sản phẩm lỗi đường may / chất liệu vải',
+                      'Giao sai mẫu / sai màu sắc so với ảnh',
+                      'Không ưng ý sau khi nhận sản phẩm',
+                      'Lý do khác'
+                    ]
+                ).map((reason) => (
                   <label key={reason} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#44403c', cursor: 'pointer' }}>
                     <input
                       type="radio"
@@ -6717,6 +6760,19 @@ const ProfilePage = () => {
           background-color: #f9fafb;
           color: #111827;
           border-color: #9ca3af;
+        }
+
+        .btn-purple-outline {
+          background-color: #faf5ff;
+          color: #7e22ce;
+          border: 1.5px solid #c084fc;
+        }
+
+        .btn-purple-outline:hover {
+          background-color: #f3e8ff;
+          color: #6b21a8;
+          border-color: #a855f7;
+          box-shadow: 0 2px 8px rgba(126, 34, 206, 0.15);
         }
 
         /* Pagination Styles */
