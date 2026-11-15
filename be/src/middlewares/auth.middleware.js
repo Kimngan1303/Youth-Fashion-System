@@ -5,7 +5,7 @@ import prisma from '../repositories/prisma.js';
 /**
  * Middleware xác thực Bearer Access Token trong Header Authorization
  */
-export const authenticateToken = (req, res, next) => {
+export const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -16,6 +16,39 @@ export const authenticateToken = (req, res, next) => {
   try {
     const decoded = verifyAccessToken(token);
     req.user = decoded; // Đính kèm thông tin user vào Request object
+
+    // Kiểm tra trạng thái tài khoản thời gian thực trong CSDL (chặn ngay lập tức khi bị admin khóa)
+    const email = (decoded.email || '').toLowerCase().trim();
+    if (email) {
+      // 1. Kiểm tra trong bảng employee
+      const emp = await prisma.employee.findUnique({
+        where: { email },
+        select: { status: true, employee_role: true },
+      });
+      if (emp) {
+        if (emp.status !== 'ACTIVE') {
+          return res.status(403).json({
+            status: false,
+            code: 'ACCOUNT_LOCKED',
+            message: 'Tài khoản của bạn đã bị Quản trị viên tạm khóa. Mọi thao tác tiếp theo đã bị vô hiệu hóa!',
+          });
+        }
+      } else {
+        // 2. Kiểm tra trong bảng customer
+        const cust = await prisma.customer.findUnique({
+          where: { email },
+          select: { status: true },
+        });
+        if (cust && cust.status !== 'ACTIVE') {
+          return res.status(403).json({
+            status: false,
+            code: 'ACCOUNT_LOCKED',
+            message: 'Tài khoản của bạn đã bị Quản trị viên tạm khóa. Mọi thao tác tiếp theo đã bị vô hiệu hóa!',
+          });
+        }
+      }
+    }
+
     next();
   } catch (err) {
     return BaseResponse.error(res, 'Access Token không hợp lệ hoặc đã hết hạn', [], 401);

@@ -221,6 +221,17 @@ export function AuthProvider({ children }) {
         try {
           const res = await authService.getProfile();
           if (res?.data) {
+            if (res.data.status === 'LOCKED') {
+              window.dispatchEvent(
+                new CustomEvent('auth:account_locked', {
+                  detail: {
+                    message: 'Tài khoản của bạn đã bị Quản trị viên tạm khóa. Mọi thao tác tiếp theo đã bị vô hiệu hóa!',
+                  },
+                })
+              );
+              return;
+            }
+
             const latestRole = res.data.role;
             const latestUserType = res.data.user_type;
             if (latestRole && (latestRole !== user.role || latestUserType !== user.user_type)) {

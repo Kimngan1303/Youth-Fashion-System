@@ -352,7 +352,7 @@ export default function SystemConfig() {
   const handleToggleAdminStatus = async (admin) => {
     const nextStatus = admin.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
     try {
-      await adminService.updateUserStatus('EMPLOYEE', admin.id, nextStatus);
+      await adminService.updateUserStatus('EMPLOYEE', admin.id, nextStatus, admin.email);
       setAdminList((prev) =>
         prev.map((a) => (a.id === admin.id ? { ...a, status: nextStatus } : a))
       );

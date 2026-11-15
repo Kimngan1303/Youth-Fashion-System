@@ -126,30 +126,17 @@ export const getAllUsersService = async ({ search = '', role = 'ALL', status = '
     };
   });
 
-  // Danh sách email của khách hàng
-  const customerEmailSet = new Set(
-    formattedCustomers.map((c) => (c.email || '').toLowerCase())
+  // Lấy danh sách email của tất cả nhân sự (cả ACTIVE lẫn LOCKED)
+  const employeeEmailSet = new Set(
+    formattedEmployees.map((e) => (e.email || '').toLowerCase())
   );
 
-  // Nếu employee là INACTIVE và email đó đã có tài khoản CUSTOMER,
-  // điều này có nghĩa là tài khoản đã được chuyển vai trò thành Khách hàng -> không hiển thị bản ghi nhân viên INACTIVE này
-  const filteredEmployees = formattedEmployees.filter((emp) => {
-    if (emp.status === 'LOCKED' && customerEmailSet.has((emp.email || '').toLowerCase())) {
-      return false;
-    }
-    return true;
-  });
-
-  // Ghép chung danh sách, loại bỏ trùng lặp nếu email đã là nhân sự đang hoạt động
-  const activeEmployeeEmails = new Set(
-    filteredEmployees
-      .filter((e) => e.status === 'ACTIVE')
-      .map((e) => (e.email || '').toLowerCase())
-  );
+  // Nhân sự (ADMIN hoặc MANAGER) luôn được giữ nguyên vai trò và trạng thái thực tế
+  // Loại bỏ bản ghi khách hàng nếu email đó đã thuộc về nhân sự để tránh trùng lặp
   const dedupedCustomers = formattedCustomers.filter(
-    (c) => !activeEmployeeEmails.has((c.email || '').toLowerCase())
+    (c) => !employeeEmailSet.has((c.email || '').toLowerCase())
   );
-  let combined = [...filteredEmployees, ...dedupedCustomers];
+  let combined = [...formattedEmployees, ...dedupedCustomers];
 
   // Lọc theo search
   if (normalizedSearch) {
@@ -192,19 +179,21 @@ export const getAllUsersService = async ({ search = '', role = 'ALL', status = '
  * Lấy các chỉ số KPI thống kê người dùng hệ thống
  */
 export const getAdminMetricsService = async () => {
-  const [totalCustomers, activeCustomers, blockedCustomers, totalEmployees] = await Promise.all([
+  const [totalCustomers, activeCustomers, blockedCustomers, totalEmployees, activeEmployees, inactiveEmployees] = await Promise.all([
     prisma.customer.count(),
     prisma.customer.count({ where: { status: 'ACTIVE' } }),
     prisma.customer.count({ where: { status: 'BLOCKED' } }),
     prisma.employee.count(),
+    prisma.employee.count({ where: { status: 'ACTIVE' } }),
+    prisma.employee.count({ where: { status: 'INACTIVE' } }),
   ]);
 
   const adminEmployees = await prisma.employee.count({ where: { employee_role: 'ADMIN' } });
   const managerEmployees = await prisma.employee.count({ where: { employee_role: 'MANAGER' } });
 
   const totalUsers = totalCustomers + totalEmployees;
-  const activeTotal = activeCustomers + totalEmployees;
-  const lockedTotal = blockedCustomers;
+  const activeTotal = activeCustomers + activeEmployees;
+  const lockedTotal = blockedCustomers + inactiveEmployees;
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -305,6 +294,16 @@ export const updateUserStatusService = async ({ type, id, status }) => {
       where: { employee_id: BigInt(id) },
       data: { status: empStatus },
     });
+
+    // Đồng bộ trạng thái khóa sang cả bảng customers nếu có tài khoản cùng email
+    const custStatus = status === 'LOCKED' ? 'BLOCKED' : 'ACTIVE';
+    if (updated.email) {
+      await prisma.customer.updateMany({
+        where: { email: updated.email },
+        data: { status: custStatus },
+      });
+    }
+
     return { id: updated.employee_id.toString(), status: updated.status };
   } else {
     const custStatus = status === 'LOCKED' ? 'BLOCKED' : 'ACTIVE';
@@ -312,6 +311,16 @@ export const updateUserStatusService = async ({ type, id, status }) => {
       where: { customer_id: BigInt(id) },
       data: { status: custStatus },
     });
+
+    // Đồng bộ trạng thái khóa sang cả bảng employees nếu có tài khoản cùng email
+    const empStatus = status === 'LOCKED' ? 'INACTIVE' : 'ACTIVE';
+    if (updated.email) {
+      await prisma.employee.updateMany({
+        where: { email: updated.email },
+        data: { status: empStatus },
+      });
+    }
+
     return { id: updated.customer_id.toString(), status: updated.status };
   }
 };
@@ -365,15 +374,19 @@ export const updateUserRoleService = async ({ type, id, role }) => {
         });
       }
 
-      // 2. Xóa tài khoản nhân viên (hoặc đặt INACTIVE nếu có liên kết dữ liệu cũ)
+      // 2. Xóa tài khoản nhân viên (hoặc đổi email giải phóng nếu dính khóa ngoại)
       try {
         await prisma.employee.delete({
           where: { employee_id: BigInt(id) },
         });
       } catch (delErr) {
+        const demotedEmail = `demoted_${Date.now()}_${emp.email}`;
         await prisma.employee.update({
           where: { employee_id: BigInt(id) },
-          data: { status: 'INACTIVE' },
+          data: { 
+            email: demotedEmail,
+            status: 'INACTIVE',
+          },
         });
       }
 

@@ -7,6 +7,7 @@ import { ensureOrderCacheReset } from './utils/orderCacheReset';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AISearchModal from './components/AISearchModal';
+import AccountLockedModal from './components/AccountLockedModal';
 import CustomerChatNotification from './components/CustomerChatNotification';
 import ManagerChatNotification from './components/ManagerChatNotification';
 import HomePage from './pages/HomePage';
@@ -361,6 +362,9 @@ function AppContent() {
           onClose={() => setIsAISearchOpen(false)} 
         />
       )}
+
+      {/* Account Locked Enforcement Modal */}
+      <AccountLockedModal />
 
       <style>{`
         .app-layout {

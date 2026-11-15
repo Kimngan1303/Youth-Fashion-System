@@ -23,11 +23,28 @@ axiosClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Handle 401 Silent Token Refresh automatically
+// Response Interceptor: Handle 401 Silent Token Refresh & 403 Account Locked
 axiosClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // Xử lý khi tài khoản bị khóa (403 với code ACCOUNT_LOCKED hoặc thông báo tài khoản bị khóa)
+    if (
+      error.response?.status === 403 &&
+      (error.response?.data?.code === 'ACCOUNT_LOCKED' ||
+       error.response?.data?.message?.includes('tạm khóa') ||
+       error.response?.data?.message?.includes('bị khóa'))
+    ) {
+      window.dispatchEvent(
+        new CustomEvent('auth:account_locked', {
+          detail: {
+            message: error.response?.data?.message || 'Tài khoản của bạn đã bị Quản trị viên tạm khóa. Mọi thao tác tiếp theo đã bị vô hiệu hóa!',
+          },
+        })
+      );
+      return Promise.reject(error);
+    }
 
     // If Access Token expired (401) and request wasn't already retried
     if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/login')) {
