@@ -674,10 +674,14 @@ const applyStatusOverrides = (ordersList) => {
             resolvedLabel = 'ĐỔI TRẢ';
           }
         } else if (!resolvedLabel) {
-          resolvedLabel = ovStatus === 'COMPLETED' ? 'ĐÃ GIAO' : (
-            ovStatus === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
-              ovStatus === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
-                ovStatus === 'CANCELLED' ? 'ĐÃ HỦY' : 'CHỜ XÁC NHẬN'
+          resolvedLabel = ovStatus === 'COMPLETED' ? 'HOÀN THÀNH' : (
+            ovStatus === 'DELIVERED' ? 'ĐÃ GIAO' : (
+              ovStatus === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
+                ovStatus === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
+                  ovStatus === 'DELIVERY_FAILED' ? 'GIAO THẤT BẠI' : (
+                    ovStatus === 'CANCELLED' ? 'ĐÃ HỦY' : 'CHỜ XÁC NHẬN'
+                  )
+                )
               )
             )
           );
@@ -753,9 +757,11 @@ const normalizeInitialOrderStatus = (order) => {
     noteStr.includes('yêu cầu hoàn tiền') ||
     (noteStr.includes('stk:') && !noteStr.includes('khách hủy đơn:'));
   const isCancelled = !isReturned && (['CANCELLED', 'FAILED'].includes(s) || label.includes('HỦY'));
-  const isCompleted = !isReturned && !isCancelled && (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s) || label.includes('ĐÃ GIAO') || label.includes('GIAO THÀNH CÔNG'));
-  const isShipping = !isReturned && !isCancelled && !isCompleted && (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s) || (label.includes('VẬN CHUYỂN') && !label.includes('CHỜ VẬN CHUYỂN')) || label.includes('ĐANG GIAO'));
-  const isConfirmed = !isReturned && !isCancelled && !isCompleted && !isShipping && (['CONFIRMED'].includes(s) || label.includes('ĐÃ XÁC NHẬN'));
+  const isCompleted = !isReturned && !isCancelled && (s === 'COMPLETED' || label.includes('HOÀN THÀNH'));
+  const isDelivered = !isReturned && !isCancelled && !isCompleted && (['DELIVERED', 'SUCCESS'].includes(s) || label.includes('ĐÃ GIAO') || label.includes('GIAO THÀNH CÔNG'));
+  const isDeliveryFailed = !isReturned && !isCancelled && !isCompleted && !isDelivered && (['DELIVERY_FAILED', 'FAILED_DELIVERY'].includes(s) || label.includes('GIAO THẤT BẠI'));
+  const isShipping = !isReturned && !isCancelled && !isCompleted && !isDelivered && !isDeliveryFailed && (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s) || (label.includes('VẬN CHUYỂN') && !label.includes('CHỜ VẬN CHUYỂN')) || label.includes('ĐANG GIAO'));
+  const isConfirmed = !isReturned && !isCancelled && !isCompleted && !isDelivered && !isDeliveryFailed && !isShipping && (['CONFIRMED'].includes(s) || label.includes('ĐÃ XÁC NHẬN'));
 
   let normalizedStatus = 'PENDING';
   let normalizedLabel = 'CHỜ XÁC NHẬN';
@@ -787,7 +793,13 @@ const normalizeInitialOrderStatus = (order) => {
     normalizedLabel = (order.status_label && !order.status_label.toUpperCase().includes('CHỜ XÁC NHẬN')) ? order.status_label : 'ĐÃ HỦY';
   } else if (isCompleted) {
     normalizedStatus = 'COMPLETED';
+    normalizedLabel = (order.status_label && !order.status_label.toUpperCase().includes('CHỜ XÁC NHẬN') && !order.status_label.toUpperCase().includes('ĐỔI TRẢ')) ? order.status_label : (order.delivered_date ? `HOÀN THÀNH (${order.delivered_date})` : 'HOÀN THÀNH');
+  } else if (isDelivered) {
+    normalizedStatus = 'DELIVERED';
     normalizedLabel = (order.status_label && !order.status_label.toUpperCase().includes('CHỜ XÁC NHẬN') && !order.status_label.toUpperCase().includes('ĐỔI TRẢ')) ? order.status_label : (order.delivered_date ? `ĐÃ GIAO (${order.delivered_date})` : 'ĐÃ GIAO');
+  } else if (isDeliveryFailed) {
+    normalizedStatus = 'DELIVERY_FAILED';
+    normalizedLabel = 'GIAO THẤT BẠI';
   } else if (isShipping) {
     normalizedStatus = 'SHIPPING';
     normalizedLabel = 'ĐANG VẬN CHUYỂN';
@@ -1191,9 +1203,9 @@ const ProfilePage = () => {
       localStorage.setItem('yf_customer_orders', JSON.stringify(local));
     } catch (e) { }
 
-    // Cập nhật giao diện ngay lập tức từ local storage (luôn sắp xếp đơn mới nhất lên đầu)
+    // Cập nhật giao diện từ local storage nếu state đang trống (tránh chớp tắt giao diện khi polling)
     if (local && local.length > 0) {
-      setCustomerOrders(sortOrdersDesc(local));
+      setCustomerOrders(prev => (!prev || prev.length === 0 ? sortOrdersDesc(local) : prev));
     }
 
     // Gọi API lấy các đơn hàng thực tế đã lưu trong MySQL
@@ -1398,7 +1410,12 @@ const ProfilePage = () => {
               image: resolveOrderItemImage(it),
             }))
           })));
-          setCustomerOrders(finalOrders);
+          setCustomerOrders(prev => {
+            const prevSign = (prev || []).map(o => `${o.order_id}_${o.status || o.order_status}_${o.status_label}_${o.customer_received_at || ''}`).join('|');
+            const nextSign = (finalOrders || []).map(o => `${o.order_id}_${o.status || o.order_status}_${o.status_label}_${o.customer_received_at || ''}`).join('|');
+            if (prevSign === nextSign) return prev;
+            return finalOrders;
+          });
           if (userKey) localStorage.setItem(userKey, JSON.stringify(finalOrders));
           localStorage.setItem('yf_customer_orders', JSON.stringify(finalOrders));
         } else {
@@ -3461,7 +3478,7 @@ const ProfilePage = () => {
                     currentOrders.map(ord => {
                       const statusCat = getOrderStatusCategory(ord.status, ord);
                       return (
-                        <div key={ord.order_id} className="order-item-card animate-fade-in">
+                        <div key={ord.order_id} className="order-item-card">
                           {/* Header Bar */}
                           <div className="order-card-header">
                             <div className="order-header-meta">
@@ -3482,7 +3499,11 @@ const ProfilePage = () => {
 
                             <div className="order-status-badge">
                               {statusCat === 'COMPLETED' ? (
-                                <span className="status-badge-pill badge-completed">
+                                <span className="status-badge-pill badge-completed" style={{ background: '#DCFCE7', color: '#15803D', border: '1.5px solid #BBF7D0' }}>
+                                  <Check size={14} strokeWidth={2.5} /> {ord.status_label ? (ord.status_label.includes('HOÀN THÀNH') ? ord.status_label : (ord.delivered_date ? `HOÀN THÀNH (${ord.delivered_date})` : 'HOÀN THÀNH')) : 'HOÀN THÀNH'}
+                                </span>
+                              ) : statusCat === 'DELIVERED' ? (
+                                <span className="status-badge-pill badge-completed" style={{ background: '#DCFCE7', color: '#15803D', border: '1.5px solid #BBF7D0' }}>
                                   <Check size={14} strokeWidth={2.5} /> {ord.status_label ? ord.status_label.replace('GIAO THÀNH CÔNG', 'ĐÃ GIAO') : (ord.delivered_date ? `ĐÃ GIAO (${ord.delivered_date})` : 'ĐÃ GIAO')}
                                 </span>
                               ) : statusCat === 'RETURNED' ? (
@@ -4213,7 +4234,7 @@ const ProfilePage = () => {
 
         const statusBadgeStyle = isDeliveryRetry
           ? { background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }
-          : (modalCat === 'COMPLETED'
+          : ((modalCat === 'COMPLETED' || modalCat === 'DELIVERED')
           ? { background: '#dcfce7', color: '#15803d' }
           : (modalCat === 'SHIPPING'
             ? { background: '#dbeafe', color: '#1d4ed8' }
@@ -4232,6 +4253,8 @@ const ProfilePage = () => {
         const statusText = isDeliveryRetry
           ? (trackingModalOrder.status_label || 'GIAO THẤT BẠI - HẸN GIAO LẠI')
           : (modalCat === 'COMPLETED'
+          ? 'HOÀN THÀNH'
+          : (modalCat === 'DELIVERED'
           ? 'ĐÃ GIAO HÀNG'
           : (modalCat === 'SHIPPING'
             ? 'ĐANG VẬN CHUYỂN'
@@ -4241,7 +4264,7 @@ const ProfilePage = () => {
                 ? 'ĐÃ HỦY'
                 : (modalCat === 'RETURNED'
                   ? (isApproved ? 'ĐÃ HOÀN TIỀN' : (isRejected ? 'TỪ CHỐI HOÀN TIỀN' : 'ĐỔI TRẢ'))
-                  : 'CHỜ XÁC NHẬN')))));
+                  : 'CHỜ XÁC NHẬN'))))));
 
         return (
           <div className="profile-modal-overlay animate-fade-in" onClick={() => setTrackingModalOrder(null)}>
@@ -4504,7 +4527,7 @@ const ProfilePage = () => {
               <div className="tracking-history-timeline">
                 <h4 className="timeline-section-title">Nhật ký hành trình đơn hàng:</h4>
                 {(() => {
-                  if (modalCat === 'COMPLETED') {
+                  if (modalCat === 'COMPLETED' || modalCat === 'DELIVERED') {
                     return (
                       <>
                         <div className="history-step active">
