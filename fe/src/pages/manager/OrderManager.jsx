@@ -136,13 +136,14 @@ const STATUS_RANK = {
   DELIVERING: 4,
   SHIPPED: 4,
   IN_TRANSIT: 4,
-  COMPLETED: 5,
+  DELIVERY_FAILED: 4.5,
   DELIVERED: 5,
-  SUCCESS: 5,
-  RETURNED: 6,
-  REFUNDED: 6,
-  CANCELLED: 7,
-  FAILED: 7
+  COMPLETED: 6,
+  SUCCESS: 6,
+  RETURNED: 7,
+  REFUNDED: 7,
+  CANCELLED: 8,
+  FAILED: 8
 };
 
 // Helper kiểm tra chuỗi có phải ghi chú hoàn tiền không
@@ -612,7 +613,9 @@ export default function OrderManager() {
             if (isRet) s = 'RETURNED';
             else if (['CONFIRMED'].includes(sRaw)) s = 'CONFIRMED';
             else if (['SHIPPING', 'SHIPPED', 'DELIVERING', 'IN_TRANSIT', 'PROCESSING', 'PREPARING'].includes(sRaw)) s = 'SHIPPING';
-            else if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(sRaw)) s = 'COMPLETED';
+            else if (['DELIVERY_FAILED', 'FAILED_DELIVERY'].includes(sRaw)) s = 'DELIVERY_FAILED';
+            else if (['DELIVERED'].includes(sRaw)) s = 'DELIVERED';
+            else if (['COMPLETED', 'SUCCESS'].includes(sRaw)) s = 'COMPLETED';
             else if (['CANCELLED', 'FAILED'].includes(sRaw)) s = 'CANCELLED';
             else if (['RETURNED', 'REFUNDED', 'EXCHANGE'].includes(sRaw)) s = 'RETURNED';
             else s = 'PENDING';
@@ -623,8 +626,10 @@ export default function OrderManager() {
               else if (ordNoteLow.includes('từ chối hoàn tiền')) statusLabel = 'Từ chối hoàn';
               else statusLabel = 'Đổi trả';
             } else if (s === 'CONFIRMED') statusLabel = 'Đã xác nhận';
-            else if (s === 'COMPLETED') statusLabel = 'Đã giao';
             else if (s === 'SHIPPING') statusLabel = 'Đang vận chuyển';
+            else if (s === 'DELIVERY_FAILED') statusLabel = 'Giao thất bại';
+            else if (s === 'DELIVERED') statusLabel = 'Đã giao';
+            else if (s === 'COMPLETED') statusLabel = 'Hoàn thành';
             else if (s === 'CANCELLED') statusLabel = 'Đã hủy';
 
             const isPayos = ord.payments?.[0]?.payment_method === 'PAYOS' || String(ord.payment_method || '').includes('PAYOS') || String(ord.payment_method || '').includes('VietQR');
@@ -692,6 +697,10 @@ export default function OrderManager() {
               refund_bank: ord.return_requests?.[0]?.bank_info || (ord.note && ord.note.includes('STK:') ? ord.note.split('STK:')[1]?.trim() : ''),
               refund_reason: ord.return_requests?.[0]?.reason || (ord.note && ord.note.includes('Khách yêu cầu hoàn tiền:') ? ord.note.replace('Khách yêu cầu hoàn tiền:', '').split('STK:')[0].replace('|', '').trim() : ''),
               reject_reason: ord.return_requests?.[0]?.reject_reason || '',
+              customer_received_at: ord.customer_received_at || null,
+              delivered_at: ord.delivered_at || null,
+              completed_at: ord.completed_at || null,
+              delivery_attempts: Number(ord.delivery_attempts || 0),
             };
           });
 
@@ -725,6 +734,10 @@ export default function OrderManager() {
                   refund_reason: merged[mIdx].refund_reason || p.refund_reason,
                   reject_reason: merged[mIdx].reject_reason || p.reject_reason,
                   note: merged[mIdx].note || p.note,
+                  customer_received_at: merged[mIdx].customer_received_at || p.customer_received_at || null,
+                  delivered_at: merged[mIdx].delivered_at || p.delivered_at || null,
+                  completed_at: merged[mIdx].completed_at || p.completed_at || null,
+                  delivery_attempts: merged[mIdx].delivery_attempts ?? p.delivery_attempts ?? 0,
                   delivered_date: best.status === 'COMPLETED' ? (merged[mIdx].delivered_date || p.delivered_date || new Date().toLocaleDateString('vi-VN')) : (merged[mIdx].delivered_date || p.delivered_date),
                 };
               }
@@ -2337,7 +2350,29 @@ export default function OrderManager() {
     const extraNote = overrideNote && String(overrideNote).trim() ? ` | Ghi chú: ${String(overrideNote).trim()}` : '';
     const updatedNote = `Đã xác nhận hoàn tiền: ${refundAmt}₫ | ${targetOrder.refund_reason ? `Lý do: ${targetOrder.refund_reason} | ` : ''}STK: ${bankInfo}${extraNote}`;
 
-    // 1. Lưu overrides vĩnh viễn với tất cả biến thể mã đơn
+    // 1. Cập nhật MySQL DB backend trước, bắt buộc await và dừng nếu lỗi
+    const targetApiId = tId || tNum || digits;
+    const extraPayload = {
+      refund_decision: 'APPROVED',
+      refundBank: bankInfo,
+      bank_info: bankInfo,
+      recipientEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
+      customerEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
+      userEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
+      returnRequest: {
+        status: 'APPROVED',
+        bank_info: bankInfo,
+      }
+    };
+    try {
+      await orderService.updateOrderStatus(targetApiId, newStatus, updatedNote, extraPayload);
+    } catch (apiErr) {
+      console.error('Lỗi API xác nhận hoàn tiền:', apiErr);
+      showError(apiErr?.response?.data?.message || 'Không thể xác nhận hoàn tiền trên máy chủ!');
+      return;
+    }
+
+    // 2. Lưu overrides vĩnh viễn với tất cả biến thể mã đơn
     try {
       const rawOv = localStorage.getItem('yf_order_status_overrides');
       const overrides = rawOv ? JSON.parse(rawOv) : {};
@@ -2372,7 +2407,7 @@ export default function OrderManager() {
       localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
     } catch (e) {}
 
-    // 2. Cập nhật state orders của Manager
+    // 3. Cập nhật state orders của Manager
     const updatedOrders = orders.map(o => {
       const oId = String(o.order_id || '').trim();
       const oNum = String(o.order_number || o.order_code || '').trim();
@@ -2397,27 +2432,8 @@ export default function OrderManager() {
     });
     saveOrders(updatedOrders);
 
-    // 3. Đồng bộ customer orders storage
+    // 4. Đồng bộ customer orders storage
     syncCustomerRefundDecision(tId, tNum, 'APPROVED', newStatusLabel, customerLabel, updatedNote, '', targetOrder.refund_reason || '', bankInfo);
-
-    // 4. Cập nhật MySQL DB backend
-    try {
-      const extraPayload = {
-        refund_decision: 'APPROVED',
-        refundBank: bankInfo,
-        bank_info: bankInfo,
-        recipientEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
-        customerEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
-        userEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
-        returnRequest: {
-          status: 'APPROVED',
-          bank_info: bankInfo,
-        }
-      };
-      if (tId) orderService.updateOrderStatus(tId, newStatus, updatedNote, extraPayload).catch(() => {});
-      else if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus, updatedNote, extraPayload).catch(() => {});
-      else if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus, updatedNote, extraPayload).catch(() => {});
-    } catch (e) {}
 
     // 5. Phát sự kiện toàn cục & BroadcastChannel
     const statusPayload = {
@@ -2546,7 +2562,31 @@ export default function OrderManager() {
       }
     };
 
-    // 1. Lưu overrides với tất cả biến thể mã đơn
+    // 1. Cập nhật MySQL DB backend trước, bắt buộc await và dừng nếu lỗi
+    const targetApiId = tId || tNum || digits;
+    const extraPayload = {
+      refund_decision: 'REJECTED',
+      rejectReason,
+      reject_reason: rejectReason,
+      reason: rejectReason,
+      recipientEmail: buyerEmail,
+      customerEmail: buyerEmail,
+      userEmail: buyerEmail,
+      recipientName: buyerName,
+      returnRequest: {
+        status: 'REJECTED',
+        reject_reason: rejectReason,
+      }
+    };
+    try {
+      await orderService.updateOrderStatus(targetApiId, newStatus, updatedNote, extraPayload);
+    } catch (apiErr) {
+      console.error('Lỗi API từ chối hoàn tiền:', apiErr);
+      showError(apiErr?.response?.data?.message || 'Không thể từ chối hoàn tiền trên máy chủ!');
+      return;
+    }
+
+    // 2. Lưu overrides với tất cả biến thể mã đơn
     try {
       const rawOv = localStorage.getItem('yf_order_status_overrides');
       const overrides = rawOv ? JSON.parse(rawOv) : {};
@@ -2578,7 +2618,7 @@ export default function OrderManager() {
       localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
     } catch (e) {}
 
-    // 2. Cập nhật state orders
+    // 3. Cập nhật state orders
     const updatedOrders = orders.map(o => {
       const oId = String(o.order_id || '').trim();
       const oNum = String(o.order_number || o.order_code || '').trim();
@@ -2602,29 +2642,8 @@ export default function OrderManager() {
     });
     saveOrders(updatedOrders);
 
-    // 3. Đồng bộ customer orders storage
+    // 4. Đồng bộ customer orders storage
     syncCustomerRefundDecision(tId, tNum, 'REJECTED', newStatusLabel, customerLabel, updatedNote, rejectReason, targetOrder.refund_reason || '', targetOrder.refund_bank || '');
-
-    // 4. Cập nhật DB
-    try {
-      const extraPayload = {
-        refund_decision: 'REJECTED',
-        rejectReason,
-        reject_reason: rejectReason,
-        reason: rejectReason,
-        recipientEmail: buyerEmail,
-        customerEmail: buyerEmail,
-        userEmail: buyerEmail,
-        recipientName: buyerName,
-        returnRequest: {
-          status: 'REJECTED',
-          reject_reason: rejectReason,
-        }
-      };
-      if (tId) orderService.updateOrderStatus(tId, newStatus, updatedNote, extraPayload).catch(() => {});
-      else if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus, updatedNote, extraPayload).catch(() => {});
-      else if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus, updatedNote, extraPayload).catch(() => {});
-    } catch (e) {}
 
     // 5. Phát sự kiện toàn cục
     const statusPayload = {

@@ -184,13 +184,14 @@ const STATUS_RANK = {
   DELIVERING: 4,
   SHIPPED: 4,
   IN_TRANSIT: 4,
-  COMPLETED: 5,
+  DELIVERY_FAILED: 4.5,
   DELIVERED: 5,
-  SUCCESS: 5,
-  RETURNED: 6,
-  REFUNDED: 6,
-  CANCELLED: 7,
-  FAILED: 7
+  COMPLETED: 6,
+  SUCCESS: 6,
+  RETURNED: 7,
+  REFUNDED: 7,
+  CANCELLED: 8,
+  FAILED: 8
 };
 
 // Phân giải chính xác trạng thái hoàn tiền (ĐỒNG Ý / TỪ CHỐI HOÀN) dựa trên đa nguồn dữ liệu (Quản lý & Overrides)
@@ -883,7 +884,9 @@ const ProfilePage = () => {
                 let mStatus = rawMStatus;
                 if (['SHIPPING', 'SHIPPED', 'DELIVERING', 'IN_TRANSIT'].includes(rawMStatus)) mStatus = 'SHIPPING';
                 else if (['CONFIRMED'].includes(rawMStatus)) mStatus = 'CONFIRMED';
-                else if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(rawMStatus)) mStatus = 'COMPLETED';
+                else if (['DELIVERY_FAILED', 'FAILED_DELIVERY'].includes(rawMStatus)) mStatus = 'DELIVERY_FAILED';
+                else if (['DELIVERED'].includes(rawMStatus)) mStatus = 'DELIVERED';
+                else if (['COMPLETED', 'SUCCESS'].includes(rawMStatus)) mStatus = 'COMPLETED';
                 else if (['CANCELLED', 'FAILED'].includes(rawMStatus)) mStatus = 'CANCELLED';
                 else if (['RETURNED', 'REFUNDED', 'EXCHANGE'].includes(rawMStatus)) mStatus = 'RETURNED';
                 else mStatus = 'PENDING';
@@ -899,6 +902,12 @@ const ProfilePage = () => {
                   } else {
                     mLabel = 'ĐỔI TRẢ';
                   }
+                } else if (mStatus === 'DELIVERED') {
+                  mLabel = 'ĐÃ GIAO';
+                } else if (mStatus === 'COMPLETED') {
+                  mLabel = 'HOÀN THÀNH';
+                } else if (mStatus === 'DELIVERY_FAILED') {
+                  mLabel = 'GIAO THẤT BẠI';
                 }
                 const rejReason = m.reject_reason || loc.reject_reason || (m.note?.includes('Từ chối hoàn tiền:') ? m.note.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim() : 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop');
                 return {
@@ -911,6 +920,10 @@ const ProfilePage = () => {
                   refund_reason: m.refund_reason || loc.refund_reason,
                   refund_bank: m.refund_bank || loc.refund_bank,
                   note: m.note || loc.note,
+                  customer_received_at: m.customer_received_at || loc.customer_received_at || null,
+                  delivered_at: m.delivered_at || loc.delivered_at || null,
+                  completed_at: m.completed_at || loc.completed_at || null,
+                  delivery_attempts: m.delivery_attempts ?? loc.delivery_attempts ?? 0,
                 };
               }
               return loc;
@@ -1111,7 +1124,9 @@ const ProfilePage = () => {
               let mStatus = rawMStatus;
               if (['SHIPPING', 'SHIPPED', 'DELIVERING', 'IN_TRANSIT'].includes(rawMStatus)) mStatus = 'SHIPPING';
               else if (['CONFIRMED'].includes(rawMStatus)) mStatus = 'CONFIRMED';
-              else if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(rawMStatus)) mStatus = 'COMPLETED';
+              else if (['DELIVERY_FAILED', 'FAILED_DELIVERY'].includes(rawMStatus)) mStatus = 'DELIVERY_FAILED';
+              else if (['DELIVERED'].includes(rawMStatus)) mStatus = 'DELIVERED';
+              else if (['COMPLETED', 'SUCCESS'].includes(rawMStatus)) mStatus = 'COMPLETED';
               else if (['CANCELLED', 'FAILED'].includes(rawMStatus)) mStatus = 'CANCELLED';
               else if (['RETURNED', 'REFUNDED', 'EXCHANGE'].includes(rawMStatus)) mStatus = 'RETURNED';
               else mStatus = 'PENDING';
@@ -1128,13 +1143,17 @@ const ProfilePage = () => {
                 } else {
                   mLabel = 'ĐỔI TRẢ';
                 }
+              } else if (mStatus === 'DELIVERED') {
+                mLabel = `ĐÃ GIAO (${formattedDate})`;
+              } else if (mStatus === 'COMPLETED') {
+                mLabel = `HOÀN THÀNH (${formattedDate})`;
+              } else if (mStatus === 'DELIVERY_FAILED') {
+                mLabel = 'GIAO THẤT BẠI';
               } else if (!mLabel) {
                 mLabel = (
-                  mStatus === 'COMPLETED' ? `ĐÃ GIAO (${formattedDate})` : (
-                    mStatus === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
-                      mStatus === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
-                        mStatus === 'CANCELLED' ? 'ĐÃ HỦY' : 'CHỜ XÁC NHẬN'
-                      )
+                  mStatus === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
+                    mStatus === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
+                      mStatus === 'CANCELLED' ? 'ĐÃ HỦY' : 'CHỜ XÁC NHẬN'
                     )
                   )
                 );
@@ -1155,7 +1174,11 @@ const ProfilePage = () => {
                 refund_reason: m.refund_reason || loc.refund_reason,
                 refund_bank: m.refund_bank || loc.refund_bank,
                 note: m.note || loc.note,
-                delivered_date: mStatus === 'COMPLETED' ? (loc.delivered_date || formattedDate) : loc.delivered_date,
+                customer_received_at: m.customer_received_at || loc.customer_received_at || null,
+                delivered_at: m.delivered_at || loc.delivered_at || null,
+                completed_at: m.completed_at || loc.completed_at || null,
+                delivery_attempts: m.delivery_attempts ?? loc.delivery_attempts ?? 0,
+                delivered_date: (mStatus === 'COMPLETED' || mStatus === 'DELIVERED') ? (loc.delivered_date || formattedDate) : loc.delivered_date,
               };
             }
             return loc;
@@ -1186,7 +1209,9 @@ const ProfilePage = () => {
             }
 
             const s = String(apiOrd.order_status || '').toUpperCase();
-            const isCompleted = ['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s);
+            const isCompleted = ['COMPLETED', 'SUCCESS'].includes(s);
+            const isDelivered = ['DELIVERED'].includes(s);
+            const isDeliveryFailed = ['DELIVERY_FAILED', 'FAILED_DELIVERY'].includes(s);
             const isShipping = ['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s);
             const isConfirmed = ['CONFIRMED'].includes(s);
             const isReturned = ['RETURNED', 'REFUNDED', 'EXCHANGE', 'RETURN'].includes(s);
@@ -1196,17 +1221,25 @@ const ProfilePage = () => {
 
             let currentStatus = isCompleted
               ? 'COMPLETED'
-              : (isReturned
-                ? 'RETURNED'
-                : (isCancelled
-                  ? 'CANCELLED'
-                  : (isShipping ? 'SHIPPING' : (isConfirmed ? 'CONFIRMED' : 'PENDING'))));
+              : (isDelivered
+                ? 'DELIVERED'
+                : (isDeliveryFailed
+                  ? 'DELIVERY_FAILED'
+                  : (isReturned
+                    ? 'RETURNED'
+                    : (isCancelled
+                      ? 'CANCELLED'
+                      : (isShipping ? 'SHIPPING' : (isConfirmed ? 'CONFIRMED' : 'PENDING'))))));
 
             let currentStatusLabel = isCompleted
-              ? `ĐÃ GIAO (${orderDateStr})`
-              : (isCancelled
-                ? 'ĐÃ HỦY'
-                : (isShipping ? 'ĐANG VẬN CHUYỂN' : (isConfirmed ? 'ĐÃ XÁC NHẬN' : 'CHỜ XÁC NHẬN')));
+              ? `HOÀN THÀNH (${orderDateStr})`
+              : (isDelivered
+                ? `ĐÃ GIAO (${orderDateStr})`
+                : (isDeliveryFailed
+                  ? 'GIAO THẤT BẠI'
+                  : (isCancelled
+                    ? 'ĐÃ HỦY'
+                    : (isShipping ? 'ĐANG VẬN CHUYỂN' : (isConfirmed ? 'ĐÃ XÁC NHẬN' : 'CHỜ XÁC NHẬN')))));
 
             let refundDecision = undefined;
             let rejectReason = '';
@@ -1257,6 +1290,10 @@ const ProfilePage = () => {
               reject_reason: rejectReason,
               refund_reason: refundReason,
               refund_bank: refundBank,
+              customer_received_at: apiOrd.customer_received_at || null,
+              delivered_at: apiOrd.delivered_at || null,
+              completed_at: apiOrd.completed_at || null,
+              delivery_attempts: Number(apiOrd.delivery_attempts || 0),
               payment_status: apiOrd.payment_status || apiOrd.payments?.[0]?.payment_status,
               payments: apiOrd.payments,
               return_requests: apiOrd.return_requests,
@@ -1342,6 +1379,10 @@ const ProfilePage = () => {
                 refund_reason: item.refund_reason || merged[idx].refund_reason,
                 reject_reason: isRefundRejected ? (item.reject_reason || merged[idx].reject_reason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop') : '',
                 note: authoritativeNote,
+                customer_received_at: merged[idx].customer_received_at || item.customer_received_at || null,
+                delivered_at: merged[idx].delivered_at || item.delivered_at || null,
+                completed_at: merged[idx].completed_at || item.completed_at || null,
+                delivery_attempts: merged[idx].delivery_attempts ?? item.delivery_attempts ?? 0,
                 payment_status: isRefundApproved ? 'REFUNDED' : (merged[idx].payment_status || item.payment_status),
                 payments: merged[idx].payments || item.payments,
                 return_requests: merged[idx].return_requests || item.return_requests,
@@ -2054,6 +2095,9 @@ const ProfilePage = () => {
         (noteStr.includes('stk:') && !noteStr.includes('khách hủy đơn:'))) {
       return 'RETURNED';
     }
+    if (['DELIVERY_FAILED', 'FAILED_DELIVERY'].includes(s) || label.includes('GIAO THẤT BẠI')) {
+      return 'DELIVERY_FAILED';
+    }
     if (['CANCELLED', 'FAILED'].includes(s) || label.includes('HỦY')) {
       return 'CANCELLED';
     }
@@ -2617,7 +2661,24 @@ const ProfilePage = () => {
     const tNum = String(orderDisplayCode || '').trim();
     const refundNote = `Khách yêu cầu hoàn tiền: ${finalReason} | STK: ${bankTrimmed}`;
 
-    // 1. Cập nhật state customerOrders ngay lập tức sang RETURNED (Đổi trả)
+    // 1. Gọi backend API trước, bắt buộc await và dừng nếu lỗi
+    const refundTarget = tId || tNum || orderDigits;
+    try {
+      await orderService.customerRequestRefund(refundTarget, {
+        reason: finalReason,
+        bank_info: bankTrimmed
+      });
+    } catch (apiErr) {
+      console.error('Lỗi API yêu cầu hoàn tiền:', apiErr);
+      setOrderAlert({
+        type: 'error',
+        message: apiErr?.response?.data?.message || apiErr?.message || 'Không thể gửi yêu cầu hoàn tiền lên máy chủ!',
+      });
+      setTimeout(() => setOrderAlert({ type: '', message: '' }), 4500);
+      return;
+    }
+
+    // 2. Cập nhật state customerOrders sang RETURNED (Đổi trả) sau khi backend thành công
     const updatedOrders = customerOrders.map((o) => {
       const oId = String(o.order_id || '').trim();
       const oNum = String(o.order_code || o.order_number || '').trim();
@@ -2643,7 +2704,7 @@ const ProfilePage = () => {
 
     setCustomerOrders(updatedOrders);
 
-    // 2. Lưu vào localStorage & đồng bộ sang Manager
+    // 3. Lưu vào localStorage & đồng bộ sang Manager
     try {
       const userKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : null;
       if (userKey) localStorage.setItem(userKey, JSON.stringify(updatedOrders));
@@ -2771,17 +2832,6 @@ const ProfilePage = () => {
       } catch (e) {}
     } catch (e) {
       console.warn('Lỗi lưu localStorage khi hoàn tiền:', e);
-    }
-
-    // 3. Đồng bộ lên Backend MySQL CSDL
-    try {
-      const refundTarget = tId || tNum || orderDigits;
-      await orderService.customerRequestRefund(refundTarget, {
-        reason: finalReason,
-        bank_info: bankTrimmed
-      });
-    } catch (err) {
-      console.warn('Cập nhật hoàn tiền DB:', err?.message);
     }
 
     // 4. Gửi thông báo đến chuông thông báo & gửi email Gmail
