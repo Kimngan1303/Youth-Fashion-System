@@ -51,10 +51,10 @@ export const createOrderService = async ({
     const subtotal = unitPrice * quantity;
 
     return {
-      variant_id: item.variant_id || item.id,
+      variant_id: item.variant_id || item.variantId || item.id,
       product_id: item.product_id || item.productId || (typeof item.id === 'string' ? item.id.split('-')[0] : item.id),
       product_name: item.title || item.product_name || item.name || 'Sản phẩm',
-      sku: item.sku || `SKU-${item.variant_id || item.id}`,
+      sku: item.sku || `SKU-${item.variant_id || item.variantId || item.id}`,
       size: item.size || 'M',
       color: item.color || item.colorName || 'Mặc định',
       unit_price: unitPrice,
@@ -748,18 +748,16 @@ export const updateOrderStatusService = async (orderId, status, note = null, opt
   // Tự động gửi email thông báo cập nhật trạng thái đơn hàng
   try {
     const fullOrder = await orderRepo.findOrderAny(orderId);
-    const emailsToSend = new Set();
+    // Mỗi lần đổi trạng thái chỉ gửi đúng 1 email (ưu tiên recipient_email, không có thì dùng email tài khoản)
+    let targetEmail = null;
     if (fullOrder?.recipient_email && fullOrder.recipient_email.includes('@')) {
-      emailsToSend.add(fullOrder.recipient_email.trim().toLowerCase());
-    }
-    if (fullOrder?.customer?.email && fullOrder.customer.email.includes('@')) {
-      emailsToSend.add(fullOrder.customer.email.trim().toLowerCase());
-    }
-    if (options?.recipientEmail && options.recipientEmail.includes('@')) {
-      emailsToSend.add(options.recipientEmail.trim().toLowerCase());
-    }
-    if (options?.userEmail && options.userEmail.includes('@')) {
-      emailsToSend.add(options.userEmail.trim().toLowerCase());
+      targetEmail = fullOrder.recipient_email.trim();
+    } else if (fullOrder?.customer?.email && fullOrder.customer.email.includes('@')) {
+      targetEmail = fullOrder.customer.email.trim();
+    } else if (options?.recipientEmail && options.recipientEmail.includes('@')) {
+      targetEmail = options.recipientEmail.trim();
+    } else if (options?.userEmail && options.userEmail.includes('@')) {
+      targetEmail = options.userEmail.trim();
     }
 
     const cancelReason = options?.cancelReason || options?.reason || note;
@@ -777,10 +775,7 @@ export const updateOrderStatusService = async (orderId, status, note = null, opt
                             String(options?.reason || note || '').toLowerCase().includes('đã xác nhận hoàn tiền');
     const emailStatus = isRejectRefund ? 'REJECTED' : (isApproveRefund ? 'APPROVED' : mappedStatus);
 
-    for (const targetEmail of emailsToSend) {
-      if (targetEmail.endsWith('@example.com') && emailsToSend.size > 1) {
-        continue;
-      }
+    if (targetEmail) {
       sendOrderNotificationEmail({
         toEmail: targetEmail,
         order: fullOrder,
@@ -819,23 +814,22 @@ export const notifyOrderEmailService = async ({
     fullOrder = await orderRepo.findOrderAny(targetId);
   }
 
-  const emailsToSend = new Set();
-  if (recipientEmail && recipientEmail.includes('@')) emailsToSend.add(recipientEmail.trim().toLowerCase());
-  if (fullOrder?.recipient_email && fullOrder.recipient_email.includes('@')) emailsToSend.add(fullOrder.recipient_email.trim().toLowerCase());
-  if (fullOrder?.customer?.email && fullOrder.customer.email.includes('@')) emailsToSend.add(fullOrder.customer.email.trim().toLowerCase());
-  if (extraData?.recipientEmail && extraData.recipientEmail.includes('@')) emailsToSend.add(extraData.recipientEmail.trim().toLowerCase());
-  if (extraData?.customerEmail && extraData.customerEmail.includes('@')) emailsToSend.add(extraData.customerEmail.trim().toLowerCase());
-  if (extraData?.userEmail && extraData.userEmail.includes('@')) emailsToSend.add(extraData.userEmail.trim().toLowerCase());
+  let targetEmail = null;
+  if (recipientEmail && recipientEmail.includes('@')) targetEmail = recipientEmail.trim();
+  else if (fullOrder?.recipient_email && fullOrder.recipient_email.includes('@')) targetEmail = fullOrder.recipient_email.trim();
+  else if (fullOrder?.customer?.email && fullOrder.customer.email.includes('@')) targetEmail = fullOrder.customer.email.trim();
+  else if (extraData?.recipientEmail && extraData.recipientEmail.includes('@')) targetEmail = extraData.recipientEmail.trim();
+  else if (extraData?.customerEmail && extraData.customerEmail.includes('@')) targetEmail = extraData.customerEmail.trim();
+  else if (extraData?.userEmail && extraData.userEmail.includes('@')) targetEmail = extraData.userEmail.trim();
 
-  if (emailsToSend.size === 0) {
+  if (!targetEmail) {
     return { success: false, message: 'Không tìm thấy địa chỉ email hợp lệ để gửi thông báo' };
   }
 
-  const primaryEmail = Array.from(emailsToSend)[0];
   const orderPayload = fullOrder || {
     order_id: orderId,
     order_number: orderNumber || `YF-${orderId}`,
-    recipient_email: primaryEmail,
+    recipient_email: targetEmail,
     recipient_name: extraData?.recipientName || 'Quý khách',
     recipient_phone: extraData?.recipientPhone || '',
     shipping_address_line: extraData?.shippingAddress || '',
@@ -844,18 +838,12 @@ export const notifyOrderEmailService = async ({
     order_items: extraData?.items || [],
   };
 
-  let lastResult = null;
-  for (const emailToUse of emailsToSend) {
-    if (emailToUse.endsWith('@example.com') && emailsToSend.size > 1) {
-      continue;
-    }
-    lastResult = await sendOrderNotificationEmail({
-      toEmail: emailToUse,
-      order: { ...orderPayload, recipient_email: emailToUse },
-      status: newStatus,
-      extraData,
-    });
-  }
+  const lastResult = await sendOrderNotificationEmail({
+    toEmail: targetEmail,
+    order: { ...orderPayload, recipient_email: targetEmail },
+    status: newStatus,
+    extraData,
+  });
 
   return lastResult || { success: true };
 };

@@ -352,6 +352,10 @@ Youth Fashion Team`;
 // Bộ nhớ đệm chống gửi trùng lặp email thông báo đơn hàng trong thời gian ngắn (10 giây)
 const recentOrderEmails = new Map();
 
+export const emailHooks = {
+  sendOrderNotificationEmail: null,
+};
+
 /**
  * Service gửi Email thông báo trạng thái đơn hàng đến Gmail của khách hàng
  * Hỗ trợ các trạng thái: PENDING/ORDER_CREATED, CONFIRMED/PAID, PROCESSING, SHIPPED, DELIVERED, CANCELLED, REFUND (APPROVED/REJECTED)
@@ -362,6 +366,15 @@ export const sendOrderNotificationEmail = async ({
   status,
   extraData = {},
 }) => {
+  if (typeof emailHooks.sendOrderNotificationEmail === 'function') {
+    return await emailHooks.sendOrderNotificationEmail({
+      toEmail,
+      order,
+      status,
+      extraData,
+    });
+  }
+
   const isDev = process.env.NODE_ENV !== 'production';
 
   const recipient = (
