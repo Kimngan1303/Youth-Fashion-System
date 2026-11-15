@@ -27,6 +27,7 @@ export const createOrderTransaction = async ({
         total_amount: orderData.total_amount,
         order_status: orderData.order_status || 'PENDING',
         note: orderData.note || null,
+        voucher_code: voucherCode ? String(voucherCode).toUpperCase().trim() : null,
       },
     });
 
@@ -155,8 +156,8 @@ export const createOrderTransaction = async ({
       },
     });
 
-    // 4. Nếu có áp dụng voucher, tăng số lượt đã sử dụng (used_count)
-    if (voucherCode) {
+    // 4. Nếu có áp dụng voucher: Với COD tăng used_count ngay, với PAYOS chỉ tăng khi thanh toán thành công
+    if (voucherCode && paymentData.payment_method === 'COD') {
       await tx.voucher.updateMany({
         where: { code: voucherCode.toUpperCase().trim() },
         data: { used_count: { increment: 1 } },
@@ -437,7 +438,11 @@ export const updateOrderStatus = async (orderIdOrNumber, status, note = null, op
     // Ánh xạ trạng thái an toàn sang Enum OrderStatus của Prisma CSDL MySQL
     let prismaStatus = 'PENDING';
     const s = String(status || '').toUpperCase();
-    if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s)) {
+    if (s === 'COMPLETED') {
+      prismaStatus = 'COMPLETED';
+    } else if (s === 'DELIVERY_FAILED' || s === 'FAILED_DELIVERY') {
+      prismaStatus = 'DELIVERY_FAILED';
+    } else if (['DELIVERED', 'SUCCESS'].includes(s)) {
       prismaStatus = 'DELIVERED';
     } else if (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s)) {
       prismaStatus = 'SHIPPED';
@@ -451,6 +456,10 @@ export const updateOrderStatus = async (orderIdOrNumber, status, note = null, op
       prismaStatus = 'CANCELLED';
     }
 
+    if (prismaStatus === 'CANCELLED') {
+      return await cancelOrder(existingOrder.order_id, note || 'Shop hủy đơn hàng', options);
+    }
+
     const employeeId = options?.employeeId ? BigInt(options.employeeId) : null;
     const returnData = options?.returnRequestData || {};
 
@@ -462,6 +471,13 @@ export const updateOrderStatus = async (orderIdOrNumber, status, note = null, op
       if (employeeId) {
         updateData.managed_by_employee_id = employeeId;
       }
+      if (prismaStatus === 'DELIVERED') {
+        updateData.delivered_at = new Date();
+      } else if (prismaStatus === 'COMPLETED') {
+        updateData.completed_at = new Date();
+      } else if (prismaStatus === 'DELIVERY_FAILED') {
+        updateData.delivery_attempts = { increment: 1 };
+      }
 
       const updatedOrder = await tx.order.update({
         where: { order_id: existingOrder.order_id },
@@ -469,7 +485,7 @@ export const updateOrderStatus = async (orderIdOrNumber, status, note = null, op
       });
 
       // Ghi nhận lịch sử thay đổi trạng thái vào bảng order_status_history
-      if ((existingOrder.order_status !== prismaStatus || (note && String(note).trim() !== '')) && tx.orderStatusHistory?.create) {
+      if (tx.orderStatusHistory?.create) {
         await tx.orderStatusHistory.create({
           data: {
             order_id: existingOrder.order_id,
@@ -477,6 +493,68 @@ export const updateOrderStatus = async (orderIdOrNumber, status, note = null, op
             to_status: prismaStatus,
             changed_by_employee_id: employeeId,
             note: note ? String(note).slice(0, 500) : `Chuyển trạng thái từ ${existingOrder.order_status} sang ${prismaStatus}`,
+          },
+        });
+      }
+
+      // Tạo thông báo Web trong bảng notifications cho khách hàng
+      if (existingOrder.customer_id) {
+        let notifTitle = 'Cập nhật đơn hàng';
+        let notifMsg = `Đơn hàng #${existingOrder.order_number} vừa được cập nhật trạng thái mới.`;
+        let notifBadge = 'CẬP NHẬT';
+
+        if (prismaStatus === 'CONFIRMED') {
+          notifTitle = 'Đơn hàng đã được xác nhận';
+          notifMsg = `Đơn hàng #${existingOrder.order_number} đã được Shop xác nhận thành công và đang chuyển sang khâu đóng gói.`;
+          notifBadge = 'ĐÃ XÁC NHẬN';
+        } else if (prismaStatus === 'SHIPPED') {
+          notifTitle = 'Đơn hàng đang được vận chuyển';
+          notifMsg = `Đơn hàng #${existingOrder.order_number} đang trên đường giao tới bạn. Shipper sẽ liên hệ trước khi phát.`;
+          notifBadge = 'ĐANG VẬN CHUYỂN';
+        } else if (prismaStatus === 'DELIVERY_FAILED') {
+          notifTitle = 'Giao hàng chưa thành công';
+          notifMsg = `Đơn hàng #${existingOrder.order_number} giao chưa thành công. Shipper hoặc Shop sẽ liên hệ lại với bạn.`;
+          notifBadge = 'GIAO THẤT BẠI';
+        } else if (prismaStatus === 'DELIVERED') {
+          notifTitle = 'Đơn hàng đã giao thành công';
+          notifMsg = `Đơn hàng #${existingOrder.order_number} đã được giao tận tay bạn. Vui lòng kiểm tra và xác nhận đã nhận hàng.`;
+          notifBadge = 'ĐÃ GIAO';
+        } else if (prismaStatus === 'COMPLETED') {
+          notifTitle = 'Đơn hàng đã hoàn tất';
+          notifMsg = `Đơn hàng #${existingOrder.order_number} đã hoàn tất thành công. Cảm ơn Quý khách đã mua sắm tại Youth Fashion!`;
+          notifBadge = 'HOÀN TẤT';
+        } else if (prismaStatus === 'RETURNED') {
+          const isApp = options?.refund_decision === 'APPROVED' || String(note || '').toLowerCase().includes('đã hoàn tiền');
+          const isRej = options?.refund_decision === 'REJECTED' || String(note || '').toLowerCase().includes('từ chối hoàn');
+          if (isApp) {
+            notifTitle = 'Hoàn tiền thành công';
+            notifMsg = `Shop đã phê duyệt yêu cầu đổi trả và hoàn tiền cho đơn hàng #${existingOrder.order_number}.`;
+            notifBadge = 'ĐÃ HOÀN TIỀN';
+          } else if (isRej) {
+            notifTitle = 'Từ chối hoàn tiền';
+            notifMsg = `Shop đã từ chối yêu cầu hoàn tiền cho đơn hàng #${existingOrder.order_number}.`;
+            notifBadge = 'TỪ CHỐI HOÀN';
+          } else {
+            notifTitle = 'Đã tiếp nhận yêu cầu đổi trả';
+            notifMsg = `Shop đã tiếp nhận yêu cầu đổi trả & hoàn tiền cho đơn hàng #${existingOrder.order_number}.`;
+            notifBadge = 'CHỜ HOÀN TIỀN';
+          }
+        }
+
+        const digits = String(existingOrder.order_number).replace(/\D/g, '') || String(existingOrder.order_id);
+        await tx.notification.create({
+          data: {
+            customer_id: existingOrder.customer_id,
+            notification_type: 'ORDER',
+            title: notifTitle,
+            message: notifMsg,
+            reference_id: existingOrder.order_id,
+            link: `/profile?tab=orders&order=${digits}`,
+            data: {
+              order_number: existingOrder.order_number,
+              status: prismaStatus,
+              badge: notifBadge,
+            },
           },
         });
       }
@@ -577,33 +655,113 @@ export const updateOrderStatus = async (orderIdOrNumber, status, note = null, op
   return null;
 };
 
-export const cancelOrder = async (orderIdOrNumber, reason = 'Khách hàng yêu cầu hủy đơn') => {
+export const cancelOrder = async (orderIdOrNumber, reason = 'Khách hàng yêu cầu hủy đơn', options = {}) => {
   const cancelText = reason ? String(reason).trim() : 'Khách hàng yêu cầu hủy đơn';
-  const cancelNote = cancelText.startsWith('Khách hủy đơn:') ? cancelText : `Khách hủy đơn: ${cancelText}`;
+  const isShop = options?.isShopCancelled || options?.cancelledBy === 'SHOP';
+  const cancelNote = isShop
+    ? (cancelText.startsWith('Shop hủy đơn:') ? cancelText : `Shop hủy đơn: ${cancelText}`)
+    : (cancelText.startsWith('Khách hủy đơn:') ? cancelText : `Khách hủy đơn: ${cancelText}`);
 
   const existingOrder = await findOrderByIdOrNumber(orderIdOrNumber);
-  if (existingOrder) {
-    return await prisma.$transaction(async (tx) => {
-      const updated = await tx.order.update({
-        where: { order_id: existingOrder.order_id },
+  if (!existingOrder) return null;
+
+  return await prisma.$transaction(async (tx) => {
+    // 1. Kiểm tra trạng thái hiện tại trong transaction để tránh hoàn kho / voucher 2 lần
+    const freshOrder = await tx.order.findUnique({
+      where: { order_id: existingOrder.order_id },
+      include: { order_items: true, payments: true },
+    });
+
+    if (!freshOrder || freshOrder.order_status === 'CANCELLED') {
+      return freshOrder || existingOrder;
+    }
+
+    // 2. Cập nhật Order sang CANCELLED
+    const updated = await tx.order.update({
+      where: { order_id: existingOrder.order_id },
+      data: {
+        order_status: 'CANCELLED',
+        note: cancelNote.slice(0, 500),
+      },
+    });
+
+    // 3. Cập nhật Payment sang CANCELLED nếu đang PENDING
+    await tx.payment.updateMany({
+      where: {
+        order_id: existingOrder.order_id,
+        payment_status: 'PENDING',
+      },
+      data: {
+        payment_status: 'CANCELLED',
+        failure_reason: cancelNote.slice(0, 500),
+      },
+    });
+
+    // 4. Hoàn lại tồn kho cho các biến thể sản phẩm (đảm bảo atomic)
+    if (freshOrder.order_items && freshOrder.order_items.length > 0) {
+      for (const it of freshOrder.order_items) {
+        if (it.variant_id) {
+          await tx.productVariant.updateMany({
+            where: { variant_id: it.variant_id },
+            data: { stock: { increment: Number(it.quantity || 1) } },
+          });
+        }
+      }
+    }
+
+    // 5. Hoàn lượt voucher nếu đơn đã áp dụng (COD hoặc PayOS đã thanh toán)
+    const hasPaidPayos = freshOrder.payments?.some((p) => p.payment_method === 'PAYOS' && (p.payment_status === 'SUCCESS' || p.payment_status === 'PAID'));
+    const isCod = freshOrder.payments?.some((p) => p.payment_method === 'COD');
+    if (freshOrder.voucher_code && (isCod || hasPaidPayos)) {
+      await tx.voucher.updateMany({
+        where: {
+          code: String(freshOrder.voucher_code).toUpperCase().trim(),
+          used_count: { gt: 0 },
+        },
         data: {
-          order_status: 'CANCELLED',
-          note: cancelNote.slice(0, 500),
+          used_count: { decrement: 1 },
         },
       });
-      if (tx.orderStatusHistory?.create) {
-        await tx.orderStatusHistory.create({
-          data: {
-            order_id: existingOrder.order_id,
-            from_status: existingOrder.order_status,
-            to_status: 'CANCELLED',
-            note: cancelNote.slice(0, 500),
-          },
-        });
-      }
-      return updated;
+    }
+
+    // 6. Ghi nhật ký lịch sử OrderStatusHistory
+    await tx.orderStatusHistory.create({
+      data: {
+        order_id: existingOrder.order_id,
+        from_status: freshOrder.order_status,
+        to_status: 'CANCELLED',
+        changed_by_employee_id: options?.employeeId ? BigInt(options.employeeId) : null,
+        note: cancelNote.slice(0, 500),
+      },
     });
-  }
+
+    // 7. Tạo thông báo trong CSDL cho khách hàng
+    if (existingOrder.customer_id) {
+      const digits = String(existingOrder.order_number).replace(/\D/g, '') || String(existingOrder.order_id);
+      await tx.notification.create({
+        data: {
+          customer_id: existingOrder.customer_id,
+          notification_type: 'ORDER',
+          title: isShop ? 'Shop đã hủy đơn hàng' : 'Đơn hàng đã được hủy',
+          message: isShop
+            ? `Shop đã hủy đơn hàng #${existingOrder.order_number}. Lý do: "${cancelText}".`
+            : `Đơn hàng #${existingOrder.order_number} đã được hủy theo yêu cầu của bạn.`,
+          reference_id: existingOrder.order_id,
+          link: `/profile?tab=orders&order=${digits}`,
+          data: {
+            order_number: existingOrder.order_number,
+            status: 'CANCELLED',
+            badge: isShop ? 'SHOP HỦY ĐƠN' : 'ĐÃ HỦY ĐƠN',
+            reason: cancelText,
+            cancelled_by: isShop ? 'SHOP' : 'CUSTOMER',
+          },
+        },
+      });
+    }
+
+    return updated;
+  });
+};
 
   return null;
 };

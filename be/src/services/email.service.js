@@ -431,13 +431,20 @@ export const sendOrderNotificationEmail = async ({
     badgeColor = '#1D4ED8';
     headline = 'Đơn hàng đang trên đường giao tới bạn';
     messageBody = `Đơn hàng <strong>#${orderNumber}</strong> đã được bàn giao cho đối tác vận chuyển hỏa tốc Express. Shipper sẽ liên hệ với Quý khách trước khi giao hàng.`;
-  } else if (s === 'DELIVERED' || s === 'COMPLETED' || s === 'SUCCESS') {
+  } else if (s === 'COMPLETED') {
+    subject = `Youth Fashion - Đơn hàng #${orderNumber} đã hoàn tất thành công`;
+    badgeText = 'HOÀN TẤT ĐƠN HÀNG';
+    badgeBg = '#DCFCE7';
+    badgeColor = '#15803D';
+    headline = 'Đơn hàng đã hoàn tất thành công';
+    messageBody = `Đơn hàng <strong>#${orderNumber}</strong> đã hoàn tất thành công. Youth Fashion xin chân thành cảm ơn sự tin tưởng và đồng hành của Quý khách!`;
+  } else if (s === 'DELIVERED' || s === 'SUCCESS') {
     subject = `Youth Fashion - Đơn hàng #${orderNumber} đã giao thành công`;
     badgeText = 'GIAO HÀNG THÀNH CÔNG';
     badgeBg = '#DCFCE7';
     badgeColor = '#15803D';
     headline = 'Đơn hàng đã được giao tận tay Quý khách';
-    messageBody = `Đơn hàng <strong>#${orderNumber}</strong> đã được phát thành công. Youth Fashion xin chân thành cảm ơn sự tin tưởng và đồng hành của Quý khách!`;
+    messageBody = `Đơn hàng <strong>#${orderNumber}</strong> đã được phát thành công. Quý khách vui lòng kiểm tra sản phẩm và bấm xác nhận nhận hàng. Cảm ơn Quý khách!`;
   } else if (s === 'CANCELLED') {
     const isShop = extraData?.cancelledBy === 'SHOP' ||
                    extraData?.isShopCancelled ||
