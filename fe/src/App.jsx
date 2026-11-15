@@ -255,19 +255,11 @@ function AppContent() {
           />
           <Route
             path="/manager/system-config"
-            element={
-              <AdminRoute>
-                <SystemConfig />
-              </AdminRoute>
-            }
+            element={<Navigate to="/manager/dashboard" replace />}
           />
           <Route
             path="/admin/system-config"
-            element={
-              <AdminRoute>
-                <SystemConfig />
-              </AdminRoute>
-            }
+            element={<Navigate to="/manager/dashboard" replace />}
           />
           <Route
             path="/manager/chat"

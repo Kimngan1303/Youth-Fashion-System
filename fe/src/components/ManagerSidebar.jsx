@@ -15,8 +15,7 @@ import {
   BarChart2, 
   Home, 
   LogOut,
-  Users,
-  Settings 
+  Users 
 } from 'lucide-react';
 
 const sidebarStyles = `
@@ -462,20 +461,6 @@ export default function ManagerSidebar({ activeMenu = 'products' }) {
               <span>Báo Cáo & Doanh Thu</span>
             </div>
           </button>
-
-          {/* 9. Cấu Hình Hệ Thống (Chỉ tài khoản Admin mới có) */}
-          {isAdmin && (
-            <button
-              type="button"
-              className={`nav-menu-link ${activeMenu === 'system-config' ? 'active' : ''}`}
-              onClick={() => navigate('/manager/system-config')}
-            >
-              <div className="nav-item-inner">
-                <Settings size={16} />
-                <span>Cấu Hình Hệ Thống</span>
-              </div>
-            </button>
-          )}
         </nav>
       </div>
 
