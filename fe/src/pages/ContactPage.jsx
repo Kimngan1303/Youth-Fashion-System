@@ -38,7 +38,7 @@ const ContactPage = () => {
 
             <div className="highlight-item">
               <span className="hl-label">HỖ TRỢ ĐƠN HÀNG:</span>
-              <a href="tel:+842838228999" className="hl-value">+84 28 3822 8999</a>
+              <a href="tel:+84325373369" className="hl-value">+84325373369</a>
             </div>
 
             <span className="hl-divider">|</span>
