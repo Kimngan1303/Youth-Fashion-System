@@ -84,7 +84,8 @@ export const orderService = {
    */
   updateOrderStatus: async (orderId, status, note, extraData = {}) => {
     try {
-      const res = await axiosClient.patch(`/orders/${orderId}/status`, { status, note, ...extraData });
+      const { status: _ignoredStatus, ...cleanExtra } = extraData || {};
+      const res = await axiosClient.patch(`/orders/${orderId}/status`, { ...cleanExtra, status, note });
       return res.data;
     } catch (error) {
       throw error;

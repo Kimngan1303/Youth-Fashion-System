@@ -2747,7 +2747,12 @@ const ProfilePage = () => {
           refund_bank: bankTrimmed,
           reason: finalReason,
           bank_info: bankTrimmed,
-          status: 'PENDING'
+          returnRequest: {
+            reason: finalReason,
+            bank_info: bankTrimmed,
+            status: 'PENDING',
+            type: 'REFUND'
+          }
         };
         if (tId) await orderService.updateOrderStatus(tId, 'RETURNED', refundNote, payloadExtra).catch((e) => console.warn('Cập nhật DB tId:', e));
         if (tNum && tNum !== tId) await orderService.updateOrderStatus(tNum, 'RETURNED', refundNote, payloadExtra).catch((e) => console.warn('Cập nhật DB tNum:', e));

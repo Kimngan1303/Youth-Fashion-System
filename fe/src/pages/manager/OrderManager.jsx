@@ -184,7 +184,7 @@ const isOrderReturned = (status, label = '', note = '', ord = null) => {
   if (['RETURNED', 'REFUNDED', 'EXCHANGE', 'RETURN'].includes(s)) return true;
   if (l.includes('ĐỔI TRẢ') || l.includes('TRẢ HÀNG') || l.includes('HOÀN TIỀN') || l.includes('TỪ CHỐI HOÀN') || l.includes('ĐÃ HOÀN') || l.includes('YÊU CẦU HOÀN')) return true;
   if (refundDecision === 'APPROVED' || refundDecision === 'REJECTED') return true;
-  if (Boolean(ord?.refund_reason) || Boolean(ord?.refund_bank) || Boolean(ord?.reject_reason)) return true;
+  if (Boolean(ord?.refund_reason) || Boolean(ord?.refund_bank) || Boolean(ord?.reject_reason) || (ord?.return_requests && ord.return_requests.length > 0)) return true;
   if (n.includes('hoàn tiền') || n.includes('đổi trả') || (n.includes('stk:') && !n.includes('khách hủy đơn:'))) return true;
   if (cr.includes('hoàn tiền') || cr.includes('đổi trả') || cr.includes('stk:')) return true;
 
@@ -605,6 +605,7 @@ export default function OrderManager() {
       .then((res) => {
         if (res?.status && Array.isArray(res.data) && res.data.length > 0) {
           const apiFormatted = res.data.map((ord) => {
+            const ordNoteLow = String(ord.note || '').toLowerCase();
             const isRet = isOrderReturned(ord.order_status, '', ord.note, ord);
             const sRaw = String(ord.order_status || 'PENDING').toUpperCase();
             let s = sRaw;
@@ -618,9 +619,8 @@ export default function OrderManager() {
 
             let statusLabel = 'Chờ xác nhận';
             if (s === 'RETURNED') {
-              const noteLow = String(ord.note || '').toLowerCase();
-              if (noteLow.includes('đã xác nhận hoàn tiền')) statusLabel = 'Đã hoàn tiền';
-              else if (noteLow.includes('từ chối hoàn tiền')) statusLabel = 'Từ chối hoàn';
+              if (ordNoteLow.includes('đã xác nhận hoàn tiền')) statusLabel = 'Đã hoàn tiền';
+              else if (ordNoteLow.includes('từ chối hoàn tiền')) statusLabel = 'Từ chối hoàn';
               else statusLabel = 'Đổi trả';
             } else if (s === 'CONFIRMED') statusLabel = 'Đã xác nhận';
             else if (s === 'COMPLETED') statusLabel = 'Đã giao';
@@ -684,8 +684,14 @@ export default function OrderManager() {
               payment_status: payStatus,
               payment_label: payLabel,
               order_status: s,
+              status: s,
               status_label: statusLabel,
-              note: ord.note || ''
+              note: ord.note || '',
+              return_requests: ord.return_requests,
+              refund_decision: ord.return_requests?.[0]?.status === 'COMPLETED' ? 'APPROVED' : (ord.return_requests?.[0]?.status === 'REJECTED' ? 'REJECTED' : (ord.return_requests?.[0]?.status === 'APPROVED' ? 'APPROVED' : (ordNoteLow.includes('đã xác nhận') ? 'APPROVED' : (ordNoteLow.includes('từ chối') ? 'REJECTED' : (isRet ? 'PENDING' : ''))))),
+              refund_bank: ord.return_requests?.[0]?.bank_info || (ord.note && ord.note.includes('STK:') ? ord.note.split('STK:')[1]?.trim() : ''),
+              refund_reason: ord.return_requests?.[0]?.reason || (ord.note && ord.note.includes('Khách yêu cầu hoàn tiền:') ? ord.note.replace('Khách yêu cầu hoàn tiền:', '').split('STK:')[0].replace('|', '').trim() : ''),
+              reject_reason: ord.return_requests?.[0]?.reject_reason || '',
             };
           });
 
@@ -714,6 +720,10 @@ export default function OrderManager() {
                   order_status: best.status,
                   status: best.status,
                   status_label: best.label,
+                  refund_decision: merged[mIdx].refund_decision || p.refund_decision,
+                  refund_bank: merged[mIdx].refund_bank || p.refund_bank,
+                  refund_reason: merged[mIdx].refund_reason || p.refund_reason,
+                  reject_reason: merged[mIdx].reject_reason || p.reject_reason,
                   note: merged[mIdx].note || p.note,
                   delivered_date: best.status === 'COMPLETED' ? (merged[mIdx].delivered_date || p.delivered_date || new Date().toLocaleDateString('vi-VN')) : (merged[mIdx].delivered_date || p.delivered_date),
                 };
@@ -1123,7 +1133,7 @@ export default function OrderManager() {
 
     // Lọc theo Tab
     if (activeTab !== 'ALL') {
-      result = result.filter(o => getCategoryFromStatus(o.order_status, o.status_label) === activeTab);
+      result = result.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === activeTab);
     }
 
     // Lọc theo phương thức thanh toán
