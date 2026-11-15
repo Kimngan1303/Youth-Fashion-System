@@ -9,27 +9,27 @@ import * as orderController from '../controllers/order.controller.js';
 const router = Router();
 
 // ==========================================
-// 1. PUBLIC / OPTIONAL AUTH ROUTES
+// 1. SPECIFIC GET & PUBLIC / OPTIONAL AUTH ROUTES
 // ==========================================
 
 // Tạo đơn hàng mới (hỗ trợ cả khách đăng nhập và khách mua nhanh)
 router.post('/', optionalAuthenticateToken, orderController.createOrder);
 
-// Tra cứu thông tin đơn hàng theo mã đơn (cho khách vãng lai / trang OrderSuccess)
-router.get('/:orderNumber', optionalAuthenticateToken, orderController.getOrderByNumber);
-
-// Kiểm tra trạng thái thanh toán PayOS theo orderCode
-router.get('/check-payos/:orderCode', optionalAuthenticateToken, orderController.checkPayosStatus);
-
 // Webhook tiếp nhận thông báo tự động từ PayOS
 router.post('/payos-webhook', orderController.payosWebhook);
+
+// Lấy danh sách đơn hàng của chính khách hàng đang đăng nhập (phải đặt trước /:orderNumber)
+router.get('/my-orders', authenticateToken, orderController.getMyOrders);
+
+// Kiểm tra trạng thái thanh toán PayOS theo orderCode (phải đặt trước /:orderNumber)
+router.get('/check-payos/:orderCode', optionalAuthenticateToken, orderController.checkPayosStatus);
+
+// Tra cứu thông tin đơn hàng theo mã đơn (cho khách vãng lai / trang OrderSuccess / chủ đơn)
+router.get('/:orderNumber', optionalAuthenticateToken, orderController.getOrderByNumber);
 
 // ==========================================
 // 2. CUSTOMER AUTHENTICATED ROUTES
 // ==========================================
-
-// Lấy danh sách đơn hàng của chính khách hàng đang đăng nhập
-router.get('/my-orders', authenticateToken, orderController.getMyOrders);
 
 // Khách hàng hủy đơn hàng của chính mình (chỉ cho phép khi đơn ở trạng thái PENDING)
 router.patch('/customer/:id/cancel', authenticateToken, orderController.customerCancelOrder);
@@ -55,11 +55,11 @@ router.patch('/:id/status', authenticateToken, authorizeRoles('ADMIN', 'MANAGER'
 router.patch('/:id/cancel', authenticateToken, authorizeRoles('ADMIN', 'MANAGER'), orderController.cancelOrder);
 router.post('/:id/cancel', authenticateToken, authorizeRoles('ADMIN', 'MANAGER'), orderController.cancelOrder);
 
+// Xóa toàn bộ đơn hàng (phải đặt trước /:id)
+router.delete('/clear-all', authenticateToken, authorizeRoles('ADMIN', 'MANAGER'), orderController.clearAllOrders);
+
 // Xóa đơn hàng cụ thể
 router.delete('/:id', authenticateToken, authorizeRoles('ADMIN', 'MANAGER'), orderController.deleteOrder);
-
-// Xóa toàn bộ đơn hàng (chỉ khi có quyền Admin/Manager)
-router.delete('/clear-all', authenticateToken, authorizeRoles('ADMIN', 'MANAGER'), orderController.clearAllOrders);
 
 // Gửi email thông báo đơn hàng trực tiếp
 router.post('/notify-email', authenticateToken, authorizeRoles('ADMIN', 'MANAGER'), orderController.notifyOrderEmail);
