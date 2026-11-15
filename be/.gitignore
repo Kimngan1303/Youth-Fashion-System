@@ -11,3 +11,20 @@ node_modules/
 dist/
 uploads/
 *.log
+
+# Non-project files & Documentation
+README*
+Readme*
+readme*
+FIX_REPORT*
+*agentic*
+*.mjs
+
+# Tests & Benchmarks
+test/
+tests/
+test_*.js
+*.test.js
+*.spec.js
+measure_latency_audit.js
+print_benchmark_table.js

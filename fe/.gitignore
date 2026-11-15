@@ -10,3 +10,18 @@ node_modules/
 # Production Build & Logs
 dist/
 *.log
+
+# Non-project files & Documentation
+README*
+Readme*
+readme*
+FIX_REPORT*
+*agentic*
+*.mjs
+
+# Tests
+test/
+tests/
+test_*.js
+*.test.js
+*.spec.js
