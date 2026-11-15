@@ -74,7 +74,13 @@ export default function NotificationPage() {
       };
     } catch (e) {}
 
+    // Polling định kỳ mỗi 3.5 giây để đồng bộ realtime các thông báo trạng thái đơn hàng
+    const pollInterval = setInterval(() => {
+      refreshNotifications();
+    }, 3500);
+
     return () => {
+      clearInterval(pollInterval);
       window.removeEventListener('yf_notification_added', handleNotifAdded);
       window.removeEventListener('yf_notifications_updated', handleNotifUpdated);
       window.removeEventListener('yf_order_status_changed', handleNotifAdded);

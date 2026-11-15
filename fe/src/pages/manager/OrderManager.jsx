@@ -2000,21 +2000,27 @@ export default function OrderManager() {
         } catch (err) {}
       });
 
-      if (newStatus === 'CANCELLED') {
-        try {
-          const fakeTarget = {
-            order_id: tId,
-            order_number: tNum,
-            cancel_reason: cancelReason,
-            cancelled_by: cancelledBy,
-          };
-          sendOrderStatusNotification(fakeTarget, 'CANCELLED', {
-            reason: cancelReason,
-            cancelledBy: cancelledBy,
-            isShopCancelled: cancelledBy === 'SHOP',
-            newStatusLabel: newStatusLabel || 'Đã hủy'
-          });
-        } catch (e) {}
+      // Gửi thông báo realtime đến người mua với mọi trạng thái thay đổi
+      try {
+        const notifTarget = {
+          ...targetOrder,
+          order_id: tId,
+          order_number: tNum || targetOrder?.order_number || targetOrder?.order_code,
+          customer_id: targetOrder?.customer_id || targetOrder?.customer?.customer_id || targetOrder?.customer?.id,
+          recipient_name: targetOrder?.recipient_name || targetOrder?.customer?.full_name || targetOrder?.customer?.name,
+          recipient_email: targetOrder?.recipient_email || targetOrder?.customer?.email,
+          recipient_phone: targetOrder?.recipient_phone || targetOrder?.customer?.phone,
+          cancel_reason: (newStatus === 'CANCELLED' && cancelReason) ? cancelReason : targetOrder?.cancel_reason,
+          cancelled_by: (newStatus === 'CANCELLED' && cancelledBy) ? cancelledBy : targetOrder?.cancelled_by,
+        };
+        sendOrderStatusNotification(notifTarget, newStatus, {
+          reason: cancelReason || targetOrder?.cancel_reason,
+          cancelledBy: (newStatus === 'CANCELLED' && cancelledBy) ? cancelledBy : (targetOrder?.cancelled_by || (newStatus === 'CANCELLED' ? 'SHOP' : undefined)),
+          isShopCancelled: cancelledBy === 'SHOP' || targetOrder?.cancelled_by === 'SHOP' || newStatus === 'CANCELLED',
+          newStatusLabel: newStatusLabel || finalCustomerLabel,
+        });
+      } catch (err) {
+        console.error('Lỗi sendOrderStatusNotification trong updateSingleOrderStatus:', err);
       }
 
       try {
