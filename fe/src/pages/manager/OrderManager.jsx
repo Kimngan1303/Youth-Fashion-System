@@ -1074,8 +1074,10 @@ export default function OrderManager() {
     if (isOrderCancelled(status, label, note, ord)) return 'CANCELLED';
     const s = String(status || '').toUpperCase();
     const l = String(label || '').toUpperCase();
-    if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s) || l.includes('ĐÃ GIAO')) return 'COMPLETED';
-    if (['SHIPPING', 'DELIVERING', 'IN_TRANSIT'].includes(s) || (l.includes('VẬN CHUYỂN') && !l.includes('CHỜ VẬN CHUYỂN'))) return 'SHIPPING';
+    if (s === 'COMPLETED' || l.includes('HOÀN THÀNH')) return 'COMPLETED';
+    if (['DELIVERY_FAILED', 'FAILED_DELIVERY'].includes(s) || l.includes('GIAO THẤT BẠI')) return 'DELIVERY_FAILED';
+    if (['DELIVERED', 'SUCCESS'].includes(s) || l.includes('ĐÃ GIAO')) return 'DELIVERED';
+    if (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s) || (l.includes('VẬN CHUYỂN') && !l.includes('CHỜ VẬN CHUYỂN'))) return 'SHIPPING';
     if (['CONFIRMED'].includes(s) || l.includes('ĐÃ XÁC NHẬN')) return 'CONFIRMED';
     if (['PENDING'].includes(s) || l.includes('CHỜ XÁC NHẬN')) return 'PENDING';
     return 'PENDING';
@@ -1088,6 +1090,8 @@ export default function OrderManager() {
       PENDING: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'PENDING').length,
       CONFIRMED: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'CONFIRMED').length,
       SHIPPING: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'SHIPPING').length,
+      DELIVERY_FAILED: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'DELIVERY_FAILED').length,
+      DELIVERED: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'DELIVERED').length,
       COMPLETED: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'COMPLETED').length,
       CANCELLED: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'CANCELLED').length,
       RETURNED: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'RETURNED').length,
@@ -1096,16 +1100,17 @@ export default function OrderManager() {
 
   // Doanh thu và thống kê (chỉ tính các đơn hàng đã hoàn thành / đã giao)
   const stats = useMemo(() => {
-    const completedOrders = orders.filter(
-      o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'COMPLETED'
-    );
-    const totalRev = completedOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const revenueOrders = orders.filter(o => {
+      const cat = getCategoryFromStatus(o.order_status, o.status_label, o.note, o);
+      return cat === 'COMPLETED' || cat === 'DELIVERED';
+    });
+    const totalRev = revenueOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
     const pendingRevenue = orders
       .filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'PENDING')
       .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
-    const completedCount = counts.COMPLETED;
+    const completedCount = counts.COMPLETED + counts.DELIVERED;
     const pendingCount = counts.PENDING;
     const aov = completedCount > 0 ? Math.round(totalRev / completedCount) : 0;
 
@@ -1271,9 +1276,11 @@ export default function OrderManager() {
       PENDING: ['CONFIRMED', 'CANCELLED'],
       CONFIRMED: ['SHIPPING', 'CANCELLED'],
       PROCESSING: ['SHIPPING', 'CANCELLED'],
-      SHIPPING: ['COMPLETED', 'CANCELLED'],
-      COMPLETED: ['RETURNED'],
-      CANCELLED: [],
+      SHIPPING: ['DELIVERED', 'DELIVERY_FAILED'],
+      DELIVERY_FAILED: ['SHIPPING', 'CANCELLED'],
+      DELIVERED: ['COMPLETED', 'RETURNED'],
+      CANCELLED: ['RETURNED'],
+      COMPLETED: [],
       RETURNED: ['RETURNED'],
     };
     const normalizedTarget = ['APPROVED', 'REJECTED', 'RETURNED'].includes(newStatus) ? 'RETURNED' : newStatus;
@@ -1285,7 +1292,9 @@ export default function OrderManager() {
           CONFIRMED: 'Đã xác nhận',
           PROCESSING: 'Đang xử lý',
           SHIPPING: 'Đang vận chuyển',
-          COMPLETED: 'Đã giao',
+          DELIVERY_FAILED: 'Giao thất bại',
+          DELIVERED: 'Đã giao',
+          COMPLETED: 'Hoàn thành',
           CANCELLED: 'Đã hủy',
           RETURNED: 'Đổi trả',
         };
@@ -1301,9 +1310,22 @@ export default function OrderManager() {
     if (newStatus === 'CONFIRMED') {
       newStatusLabel = 'Đã xác nhận';
       customerLabel = 'ĐÃ XÁC NHẬN';
-    } else if (newStatus === 'COMPLETED') {
+    } else if (newStatus === 'DELIVERED') {
       newStatusLabel = 'Đã giao';
       customerLabel = `ĐÃ GIAO (${formattedDate})`;
+    } else if (newStatus === 'COMPLETED') {
+      const hasCustomerConfirmed = Boolean(targetOrder.customer_received_at);
+      const delDate = targetOrder.delivered_at || targetOrder.delivered_date;
+      const isPastCutoff = delDate ? (Date.now() - new Date(delDate).getTime()) >= 3 * 24 * 60 * 60 * 1000 : false;
+      if (!hasCustomerConfirmed && !isPastCutoff) {
+        showError("Chỉ có thể bấm 'Hoàn thành' khi khách hàng đã bấm 'Đã nhận được hàng' hoặc đơn hàng đã giao quá 3 ngày!");
+        return;
+      }
+      newStatusLabel = 'Hoàn thành';
+      customerLabel = 'HOÀN THÀNH';
+    } else if (newStatus === 'DELIVERY_FAILED') {
+      newStatusLabel = 'Giao thất bại';
+      customerLabel = 'GIAO THẤT BẠI';
     } else if (newStatus === 'SHIPPING') {
       newStatusLabel = 'Đang vận chuyển';
       customerLabel = 'ĐANG VẬN CHUYỂN';
@@ -1471,8 +1493,8 @@ export default function OrderManager() {
     const formattedDate = new Date().toLocaleDateString('vi-VN');
 
     if (deliveryResult === 'SUCCESS') {
-      // 1. Trường hợp GIAO HÀNG THÀNH CÔNG
-      await updateSingleOrderStatus(targetOrder, 'COMPLETED');
+      // 1. Trường hợp GIAO HÀNG THÀNH CÔNG -> Chuyển sang DELIVERED (Đã giao)
+      await updateSingleOrderStatus(targetOrder, 'DELIVERED');
       setIsDeliveryModalOpen(false);
       setDeliveryOrder(null);
       if (isEditModalOpen) setIsEditModalOpen(false);
@@ -1488,7 +1510,7 @@ export default function OrderManager() {
     const newAttempts = willRetry ? prevAttempts + 1 : prevAttempts;
     const formattedRetryDate = retryDate ? new Date(retryDate).toLocaleDateString('vi-VN') : 'ngày làm việc tiếp theo';
 
-    const newStatus = willRetry ? 'SHIPPING' : 'CANCELLED';
+    const newStatus = willRetry ? 'DELIVERY_FAILED' : 'CANCELLED';
     const newStatusLabel = willRetry
       ? `Giao thất bại (Hẹn giao lại: ${formattedRetryDate})`
       : 'Giao thất bại (Chuyển hoàn)';
@@ -1512,7 +1534,7 @@ export default function OrderManager() {
 
     // 1. Gửi API backend cập nhật CSDL MySQL trước (chỉ 1 lần duy nhất)
     const targetApiId = tId || tNum || digits;
-    const backendStatus = willRetry ? 'SHIPPED' : 'CANCELLED';
+    const backendStatus = willRetry ? 'DELIVERY_FAILED' : 'CANCELLED';
     try {
       await orderService.updateOrderStatus(targetApiId, backendStatus, updatedNote);
     } catch (apiErr) {
@@ -2952,7 +2974,9 @@ export default function OrderManager() {
                 { key: 'PENDING', label: `Chờ xác nhận (${counts.PENDING})`, type: 'pending' },
                 { key: 'CONFIRMED', label: `Đã xác nhận (${counts.CONFIRMED})`, type: 'confirmed' },
                 { key: 'SHIPPING', label: `Đang vận chuyển (${counts.SHIPPING})`, type: 'shipping' },
-                { key: 'COMPLETED', label: `Đã giao (${counts.COMPLETED})`, type: 'completed' },
+                { key: 'DELIVERY_FAILED', label: `Giao thất bại (${counts.DELIVERY_FAILED})`, type: 'failed' },
+                { key: 'DELIVERED', label: `Đã giao (${counts.DELIVERED})`, type: 'delivered' },
+                { key: 'COMPLETED', label: `Hoàn thành (${counts.COMPLETED})`, type: 'completed' },
                 { key: 'CANCELLED', label: `Đã hủy (${counts.CANCELLED})`, type: 'cancelled' },
                 { key: 'RETURNED', label: `Đổi trả (${counts.RETURNED})`, type: 'returned' },
               ].map(tab => (
@@ -3280,13 +3304,24 @@ export default function OrderManager() {
                                         case 'SHIPPING':
                                           return [
                                             { val: 'SHIPPING', label: 'Đang vận chuyển' },
-                                            { val: 'COMPLETED', label: 'Đã giao' },
-                                            { val: 'CANCELLED', label: 'Hủy đơn (Giao thất bại)' },
+                                            { val: 'DELIVERED', label: 'Đã giao' },
+                                            { val: 'DELIVERY_FAILED', label: 'Giao thất bại' },
+                                          ];
+                                        case 'DELIVERY_FAILED':
+                                          return [
+                                            { val: 'DELIVERY_FAILED', label: 'Giao thất bại' },
+                                            { val: 'SHIPPING', label: 'Giao lại (Đang vận chuyển)' },
+                                            { val: 'CANCELLED', label: 'Chuyển hoàn (Hủy)' },
+                                          ];
+                                        case 'DELIVERED':
+                                          return [
+                                            { val: 'DELIVERED', label: 'Đã giao' },
+                                            { val: 'COMPLETED', label: 'Hoàn thành' },
+                                            { val: 'RETURNED', label: 'Đổi trả / Hoàn tiền' },
                                           ];
                                         case 'COMPLETED':
                                           return [
-                                            { val: 'COMPLETED', label: 'Đã giao' },
-                                            { val: 'RETURNED', label: 'Đổi trả / Hoàn tiền' },
+                                            { val: 'COMPLETED', label: 'Hoàn thành' },
                                           ];
                                         default:
                                           return [
@@ -3311,11 +3346,22 @@ export default function OrderManager() {
                                           }
                                           if (val === 'CANCELLED') {
                                             handleOpenShopCancelModal(ord);
-                                          } else if (val === 'COMPLETED') {
+                                          } else if (val === 'DELIVERED') {
                                             handleOpenDeliveryModal(ord);
+                                          } else if (val === 'DELIVERY_FAILED') {
+                                            handleOpenDeliveryModal(ord);
+                                          } else if (val === 'COMPLETED') {
+                                            const hasCustomerConfirmed = Boolean(ord.customer_received_at);
+                                            const delDate = ord.delivered_at || ord.delivered_date;
+                                            const isPastCutoff = delDate ? (Date.now() - new Date(delDate).getTime()) >= 3 * 24 * 60 * 60 * 1000 : false;
+                                            if (!hasCustomerConfirmed && !isPastCutoff) {
+                                              showError("Chỉ có thể bấm 'Hoàn thành' khi khách hàng đã bấm 'Đã nhận được hàng' hoặc đơn hàng đã giao quá 3 ngày!");
+                                              return;
+                                            }
+                                            updateSingleOrderStatus(ord, 'COMPLETED');
                                           } else if (val === 'RETURNED') {
-                                            if (cat !== 'COMPLETED' && cat !== 'RETURNED') {
-                                              showError('Chỉ đơn hàng đã giao thành công (COMPLETED) mới có thể chuyển sang Đổi trả / Hoàn tiền!');
+                                            if (cat !== 'DELIVERED' && cat !== 'COMPLETED' && cat !== 'RETURNED') {
+                                              showError('Chỉ đơn hàng đã giao (DELIVERED) hoặc hoàn thành mới có thể chuyển sang Đổi trả / Hoàn tiền!');
                                               return;
                                             }
                                             handleOpenReturnModal(ord);
@@ -3394,6 +3440,47 @@ export default function OrderManager() {
                                   <Truck size={14} />
                                 </button>
                               )}
+                              {cat === 'DELIVERY_FAILED' && (
+                                <button
+                                  type="button"
+                                  className="action-icon-btn"
+                                  style={{ color: '#D97706', background: '#FEF3C7', border: '1px solid #FCD34D' }}
+                                  title="Giao lại (Đưa về trạng thái Đang vận chuyển)"
+                                  onClick={() => updateSingleOrderStatus(ord, 'SHIPPING')}
+                                >
+                                  <RotateCcw size={14} />
+                                </button>
+                              )}
+                              {cat === 'DELIVERED' && (() => {
+                                const hasCustomerConfirmed = Boolean(ord.customer_received_at);
+                                const delDate = ord.delivered_at || ord.delivered_date;
+                                const isPastCutoff = delDate ? (Date.now() - new Date(delDate).getTime()) >= 3 * 24 * 60 * 60 * 1000 : false;
+                                const canComplete = hasCustomerConfirmed || isPastCutoff;
+                                return (
+                                  <button
+                                    type="button"
+                                    className="action-icon-btn"
+                                    style={{
+                                      color: canComplete ? '#15803D' : '#9CA3AF',
+                                      background: canComplete ? '#F0FDF4' : '#F3F4F6',
+                                      border: `1px solid ${canComplete ? '#BBF7D0' : '#E5E7EB'}`,
+                                      cursor: canComplete ? 'pointer' : 'not-allowed',
+                                      opacity: canComplete ? 1 : 0.6
+                                    }}
+                                    disabled={!canComplete}
+                                    title={canComplete ? "Hoàn thành đơn hàng" : "Chờ khách xác nhận nhận hàng hoặc sau 3 ngày hệ thống tự hoàn tất"}
+                                    onClick={() => {
+                                      if (!canComplete) {
+                                        showError("Chỉ có thể bấm 'Hoàn thành' khi khách hàng đã bấm 'Đã nhận được hàng' hoặc đơn hàng đã giao quá 3 ngày!");
+                                        return;
+                                      }
+                                      updateSingleOrderStatus(ord, 'COMPLETED');
+                                    }}
+                                  >
+                                    <CheckCircle size={14} />
+                                  </button>
+                                );
+                              })()}
                               <button
                                 type="button"
                                 className="action-icon-btn edit-btn"

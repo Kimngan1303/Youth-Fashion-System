@@ -2057,8 +2057,11 @@ const ProfilePage = () => {
     if (['CANCELLED', 'FAILED'].includes(s) || label.includes('HỦY')) {
       return 'CANCELLED';
     }
-    if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s) || label.includes('ĐÃ GIAO') || label.includes('GIAO THÀNH CÔNG')) {
+    if (s === 'COMPLETED' || label.includes('HOÀN THÀNH')) {
       return 'COMPLETED';
+    }
+    if (['DELIVERED', 'SUCCESS'].includes(s) || label.includes('ĐÃ GIAO') || label.includes('GIAO THÀNH CÔNG')) {
+      return 'DELIVERED';
     }
     if (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT', 'PROCESSING', 'PREPARING'].includes(s) || label.includes('VẬN CHUYỂN') || label.includes('ĐANG GIAO')) {
       return 'SHIPPING';
@@ -2077,14 +2080,18 @@ const ProfilePage = () => {
     PENDING: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'PENDING').length,
     CONFIRMED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'CONFIRMED').length,
     SHIPPING: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'SHIPPING').length,
+    DELIVERED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'DELIVERED').length,
     COMPLETED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'COMPLETED').length,
     CANCELLED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'CANCELLED').length,
     RETURNED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'RETURNED').length,
   };
 
-  // Chỉ tính những đơn hàng có trạng thái ĐÃ GIAO cho mục Tổng chi tiêu ở Profile
+  // Tính những đơn hàng có trạng thái ĐÃ GIAO hoặc HOÀN THÀNH cho mục Tổng chi tiêu ở Profile
   const deliveredOrders = useMemo(() => {
-    return customerOrders.filter((ord) => getOrderStatusCategory(ord.status, ord) === 'COMPLETED');
+    return customerOrders.filter((ord) => {
+      const cat = getOrderStatusCategory(ord.status, ord);
+      return cat === 'COMPLETED' || cat === 'DELIVERED';
+    });
   }, [customerOrders]);
 
   const deliveredSpent = useMemo(() => {
@@ -2555,11 +2562,8 @@ const ProfilePage = () => {
 
       // 6. Gửi API backend cập nhật CSDL MySQL
       try {
-        if (tId) orderService.cancelOrder(tId, finalReason).catch(() => {});
-        if (tNum && tNum !== tId) orderService.cancelOrder(tNum, finalReason).catch(() => {});
-        if (orderDigits && orderDigits !== tId && orderDigits !== tNum) orderService.cancelOrder(orderDigits, finalReason).catch(() => {});
-        if (tId) orderService.updateOrderStatus(tId, 'CANCELLED').catch(() => {});
-        if (orderDigits && orderDigits !== tId) orderService.updateOrderStatus(orderDigits, 'CANCELLED').catch(() => {});
+        const cancelTarget = tId || tNum || orderDigits;
+        await orderService.customerCancelOrder(cancelTarget, finalReason);
       } catch (err) {
         console.warn('Cập nhật hủy đơn DB:', err?.message);
       }
@@ -2771,23 +2775,11 @@ const ProfilePage = () => {
 
     // 3. Đồng bộ lên Backend MySQL CSDL
     try {
-      if (orderService.updateOrderStatus) {
-        const payloadExtra = {
-          refund_reason: finalReason,
-          refund_bank: bankTrimmed,
-          reason: finalReason,
-          bank_info: bankTrimmed,
-          returnRequest: {
-            reason: finalReason,
-            bank_info: bankTrimmed,
-            status: 'PENDING',
-            type: 'REFUND'
-          }
-        };
-        if (tId) await orderService.updateOrderStatus(tId, 'RETURNED', refundNote, payloadExtra).catch((e) => console.warn('Cập nhật DB tId:', e));
-        if (tNum && tNum !== tId) await orderService.updateOrderStatus(tNum, 'RETURNED', refundNote, payloadExtra).catch((e) => console.warn('Cập nhật DB tNum:', e));
-        if (orderDigits && orderDigits !== tId && orderDigits !== tNum) await orderService.updateOrderStatus(orderDigits, 'RETURNED', refundNote, payloadExtra).catch((e) => console.warn('Cập nhật DB orderDigits:', e));
-      }
+      const refundTarget = tId || tNum || orderDigits;
+      await orderService.customerRequestRefund(refundTarget, {
+        reason: finalReason,
+        bank_info: bankTrimmed
+      });
     } catch (err) {
       console.warn('Cập nhật hoàn tiền DB:', err?.message);
     }
@@ -2813,6 +2805,36 @@ const ProfilePage = () => {
     } finally {
       setIsRefunding(false);
       setRefundModalOrder(null);
+    }
+  };
+
+  // Khách hàng bấm "Đã nhận được hàng"
+  const handleCustomerConfirmDelivered = async (ord) => {
+    if (!ord) return;
+    const orderDisplayCode = ord.order_code || ord.order_number || ord.order_id;
+    const tId = String(ord.order_id || ord.order_number || '').trim();
+    if (!window.confirm(`Bạn có chắc chắn đã nhận được toàn bộ sản phẩm của đơn hàng #${orderDisplayCode}?`)) {
+      return;
+    }
+    try {
+      await orderService.customerConfirmDelivered(tId);
+      setCustomerOrders(prev => prev.map(o => {
+        if (String(o.order_id) === String(tId) || String(o.order_number) === String(tId) || String(o.order_code) === String(tId)) {
+          return { ...o, customer_received_at: new Date().toISOString() };
+        }
+        return o;
+      }));
+      setOrderAlert({
+        type: 'success',
+        message: `Cảm ơn bạn! Đã ghi nhận bạn đã nhận được đơn hàng #${orderDisplayCode}.`,
+      });
+      setTimeout(() => setOrderAlert({ type: '', message: '' }), 4000);
+    } catch (err) {
+      setOrderAlert({
+        type: 'error',
+        message: err?.response?.data?.message || err?.message || 'Có lỗi khi xác nhận nhận hàng',
+      });
+      setTimeout(() => setOrderAlert({ type: '', message: '' }), 4000);
     }
   };
 
@@ -3347,7 +3369,8 @@ const ProfilePage = () => {
                     { key: 'PENDING', label: `Chờ xác nhận (${String(orderCounts.PENDING).padStart(2, '0')})`, type: 'pending' },
                     { key: 'CONFIRMED', label: `Đã xác nhận (${String(orderCounts.CONFIRMED).padStart(2, '0')})`, type: 'confirmed' },
                     { key: 'SHIPPING', label: `Đang vận chuyển (${String(orderCounts.SHIPPING).padStart(2, '0')})`, type: 'shipping' },
-                    { key: 'COMPLETED', label: `Đã giao (${String(orderCounts.COMPLETED).padStart(2, '0')})`, type: 'completed' },
+                    { key: 'DELIVERED', label: `Đã giao (${String(orderCounts.DELIVERED).padStart(2, '0')})`, type: 'delivered' },
+                    { key: 'COMPLETED', label: `Hoàn thành (${String(orderCounts.COMPLETED).padStart(2, '0')})`, type: 'completed' },
                     { key: 'CANCELLED', label: `Đã hủy (${String(orderCounts.CANCELLED).padStart(2, '0')})`, type: 'cancelled' },
                     { key: 'RETURNED', label: `Đổi trả (${String(orderCounts.RETURNED).padStart(2, '0')})`, type: 'returned' }
                   ].map(st => (
@@ -3685,7 +3708,7 @@ const ProfilePage = () => {
                             </div>
 
                             <div className="order-actions-group">
-                              {(statusCat === 'PENDING' || statusCat === 'CONFIRMED') && (
+                              {statusCat === 'PENDING' && (
                                 <>
                                   <button
                                     type="button"
@@ -3708,6 +3731,18 @@ const ProfilePage = () => {
                                 </>
                               )}
 
+                              {statusCat === 'CONFIRMED' && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn-order-action btn-black-solid"
+                                    onClick={() => handleOpenTrackingModal(ord)}
+                                  >
+                                    THEO DÕI HÀNH TRÌNH CHI TIẾT
+                                  </button>
+                                </>
+                              )}
+
                               {(statusCat === 'SHIPPING' || statusCat === 'DELIVERING') && (
                                 <>
                                   <button
@@ -3716,6 +3751,51 @@ const ProfilePage = () => {
                                     onClick={() => handleOpenTrackingModal(ord)}
                                   >
                                     THEO DÕI HÀNH TRÌNH CHI TIẾT
+                                  </button>
+                                </>
+                              )}
+
+                              {statusCat === 'DELIVERED' && (
+                                <>
+                                  <button
+                                    className="btn-order-action btn-neutral-outline"
+                                    onClick={() => handleOpenTrackingModal(ord)}
+                                  >
+                                    Xem Chi Tiết
+                                  </button>
+                                  {!ord.customer_received_at ? (
+                                    <button
+                                      type="button"
+                                      className="btn-order-action btn-green-solid"
+                                      style={{ backgroundColor: '#15803D', color: '#FFFFFF', border: 'none', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      onClick={() => handleCustomerConfirmDelivered(ord)}
+                                      title="Bấm để xác nhận bạn đã nhận được gói hàng"
+                                    >
+                                      <CheckCircle size={14} />
+                                      <span>ĐÃ NHẬN ĐƯỢC HÀNG</span>
+                                    </button>
+                                  ) : (
+                                    <span style={{ fontSize: '11px', color: '#15803D', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                      <CheckCircle size={13} /> Đã nhận hàng
+                                    </span>
+                                  )}
+                                  <button
+                                    className="btn-order-action btn-neutral-outline"
+                                    onClick={() => {
+                                      setRefundReason('Sản phẩm không vừa kích cỡ (Size)');
+                                      setCustomRefundReason('');
+                                      setRefundBankInfo('');
+                                      setRefundBankError('');
+                                      setRefundModalOrder(ord);
+                                    }}
+                                  >
+                                    Yêu Cầu Hoàn Tiền
+                                  </button>
+                                  <button
+                                    className="btn-order-action btn-dark-outline"
+                                    onClick={() => handleReorder(ord)}
+                                  >
+                                    {ord.items.length > 1 ? 'MUA LẠI ĐƠN NÀY' : 'MUA LẠI'}
                                   </button>
                                 </>
                               )}
@@ -3743,18 +3823,6 @@ const ProfilePage = () => {
                                       </button>
                                     );
                                   })()}
-                                  <button
-                                    className="btn-order-action btn-neutral-outline"
-                                    onClick={() => {
-                                      setRefundReason('Sản phẩm không vừa kích cỡ (Size)');
-                                      setCustomRefundReason('');
-                                      setRefundBankInfo('');
-                                      setRefundBankError('');
-                                      setRefundModalOrder(ord);
-                                    }}
-                                  >
-                                    Yêu Cầu Hoàn Tiền
-                                  </button>
                                   <button
                                     className="btn-order-action btn-dark-outline"
                                     onClick={() => handleReorder(ord)}
