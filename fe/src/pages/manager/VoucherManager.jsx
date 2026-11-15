@@ -972,6 +972,27 @@ export default function VoucherManager() {
     { value: 'oldest', label: 'Cũ nhất trước' },
   ];
 
+  const getItemStatusTab = (v) => {
+    if (!v) return 'active';
+    if (v.statusTab) return v.statusTab;
+    const now = new Date();
+    if (v.status === 'INACTIVE') return 'inactive';
+    const endDate = v.endDate || v.end_date;
+    const startDate = v.startDate || v.start_date;
+    if (endDate && new Date(endDate) < now) return 'expired';
+    if (startDate && new Date(startDate) > now) return 'upcoming';
+    return 'active';
+  };
+
+  const tabCounts = useMemo(() => {
+    const counts = { all: vouchers.length, active: 0, upcoming: 0, expired: 0 };
+    vouchers.forEach((v) => {
+      const tab = getItemStatusTab(v);
+      if (counts[tab] !== undefined) counts[tab]++;
+    });
+    return counts;
+  }, [vouchers]);
+
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -1017,30 +1038,48 @@ export default function VoucherManager() {
     categoryLimit: 'Ready-To-Wear',
   });
 
-  // Filter vouchers based on tab, search query, offerType
+  // Filter vouchers based on tab, search query, offerType, sortBy
   const filteredVouchers = useMemo(() => {
     return vouchers.filter(item => {
       // Tab filter
-      if (activeTab === 'active' && item.statusTab !== 'active') return false;
-      if (activeTab === 'upcoming' && item.statusTab !== 'upcoming') return false;
-      if (activeTab === 'expired' && item.statusTab !== 'expired') return false;
+      const itemTab = getItemStatusTab(item);
+      if (activeTab === 'active' && itemTab !== 'active') return false;
+      if (activeTab === 'upcoming' && itemTab !== 'upcoming') return false;
+      if (activeTab === 'expired' && itemTab !== 'expired') return false;
 
       // Offer type filter
-      if (offerTypeFilter !== 'all' && item.discountType !== offerTypeFilter) return false;
+      if (offerTypeFilter !== 'all') {
+        const itemType = String(item.discountType || item.discount_type || '').toLowerCase();
+        if (offerTypeFilter === 'percent' && itemType !== 'percent') return false;
+        if (offerTypeFilter === 'fixed' && itemType !== 'fixed' && itemType !== 'amount') return false;
+        if (offerTypeFilter === 'shipping' && itemType !== 'shipping' && itemType !== 'free_shipping') return false;
+      }
 
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const matchCode = item.code.toLowerCase().includes(q);
-        const matchName = item.name.toLowerCase().includes(q);
+        const matchCode = String(item.code || '').toLowerCase().includes(q);
+        const matchName = String(item.name || '').toLowerCase().includes(q);
         if (!matchCode && !matchName) return false;
       }
 
       return true;
     }).sort((a, b) => {
-      if (sortBy === 'usage') return b.usedCount - a.usedCount;
-      if (sortBy === 'limit') return b.totalLimit - a.totalLimit;
-      return 0; // default newest
+      const usedA = Number(a.usedCount ?? a.used_count ?? 0);
+      const usedB = Number(b.usedCount ?? b.used_count ?? 0);
+      const limitA = Number(a.totalLimit ?? a.total_limit ?? 0);
+      const limitB = Number(b.totalLimit ?? b.total_limit ?? 0);
+      const valA = Number(a.discountPercent || a.discount_percent || a.discountAmount || a.discount_amount || 0);
+      const valB = Number(b.discountPercent || b.discount_percent || b.discountAmount || b.discount_amount || 0);
+      const dateA = new Date(a.updated_at || a.updatedAt || a.created_at || a.createdAt || 0).getTime() || Number(a.id || a.voucher_id || 0);
+      const dateB = new Date(b.updated_at || b.updatedAt || b.created_at || b.createdAt || 0).getTime() || Number(b.id || b.voucher_id || 0);
+
+      if (sortBy === 'usage') return usedB - usedA;
+      if (sortBy === 'limit') return limitB - limitA;
+      if (sortBy === 'discount') return valB - valA;
+      if (sortBy === 'oldest') return dateA - dateB;
+      // Default: newest
+      return dateB - dateA;
     });
   }, [vouchers, activeTab, searchQuery, offerTypeFilter, sortBy]);
 
@@ -1235,19 +1274,19 @@ export default function VoucherManager() {
               </div>
 
               <div className="kpi-value-row">
-                <span className="kpi-number-big">0{vouchers.length}</span>
+                <span className="kpi-number-big">{String(tabCounts.all).padStart(2, '0')}</span>
                 <span className="kpi-unit-label">Mã</span>
               </div>
 
               <div>
                 <div className="kpi-sub-row">
-                  <span style={{ color: '#111111', fontWeight: 500 }}>Đang áp dụng: 0{vouchers.filter(v => v.statusTab === 'active').length}</span>
-                  <span style={{ color: '#78716C' }}>Dự kiến: 0{vouchers.filter(v => v.statusTab === 'upcoming').length}</span>
+                  <span style={{ color: '#111111', fontWeight: 500 }}>Đang áp dụng: {String(tabCounts.active).padStart(2, '0')}</span>
+                  <span style={{ color: '#78716C' }}>Dự kiến: {String(tabCounts.upcoming).padStart(2, '0')}</span>
                 </div>
                 <div className="kpi-progress-bar-track">
                   <div 
                     className="kpi-progress-bar-fill" 
-                    style={{ width: `${(vouchers.filter(v => v.statusTab === 'active').length / Math.max(1, vouchers.length)) * 100}%`, background: '#111111' }}
+                    style={{ width: `${(tabCounts.active / Math.max(1, tabCounts.all)) * 100}%`, background: '#111111' }}
                   />
                 </div>
               </div>
@@ -1344,28 +1383,28 @@ export default function VoucherManager() {
                 className={`tab-pill-btn ${activeTab === 'all' ? 'active' : ''}`}
                 onClick={() => { setActiveTab('all'); setCurrentPage(1); }}
               >
-                Tất cả (18)
+                Tất cả ({String(tabCounts.all).padStart(2, '0')})
               </button>
               <button 
                 type="button" 
                 className={`tab-pill-btn ${activeTab === 'active' ? 'active' : ''}`}
                 onClick={() => { setActiveTab('active'); setCurrentPage(1); }}
               >
-                Đang diễn ra (14)
+                Đang diễn ra ({String(tabCounts.active).padStart(2, '0')})
               </button>
               <button 
                 type="button" 
                 className={`tab-pill-btn ${activeTab === 'upcoming' ? 'active' : ''}`}
                 onClick={() => { setActiveTab('upcoming'); setCurrentPage(1); }}
               >
-                Sắp diễn ra (04)
+                Sắp diễn ra ({String(tabCounts.upcoming).padStart(2, '0')})
               </button>
               <button 
                 type="button" 
                 className={`tab-pill-btn ${activeTab === 'expired' ? 'active' : ''}`}
                 onClick={() => { setActiveTab('expired'); setCurrentPage(1); }}
               >
-                Đã kết thúc (22)
+                Đã kết thúc ({String(tabCounts.expired).padStart(2, '0')})
               </button>
             </div>
 
