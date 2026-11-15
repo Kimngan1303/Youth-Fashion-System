@@ -100,6 +100,45 @@ export const cancelOrder = async (req, res, next) => {
   }
 };
 
+export const customerCancelOrder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+    const customerId = req.user?.id || req.user?.customer_id;
+    const result = await orderService.customerCancelOrderService(id, customerId, reason);
+    return BaseResponse.success(res, 'Hủy đơn hàng thành công', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const customerRefundRequest = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason, bank_info, images } = req.body || {};
+    const customerId = req.user?.id || req.user?.customer_id;
+    const result = await orderService.customerRefundRequestService(id, customerId, {
+      reason,
+      bank_info,
+      images,
+    });
+    return BaseResponse.success(res, 'Gửi yêu cầu hoàn tiền thành công', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const customerConfirmDelivered = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const customerId = req.user?.id || req.user?.customer_id;
+    const result = await orderService.customerConfirmDeliveredService(id, customerId);
+    return BaseResponse.success(res, 'Xác nhận đã nhận hàng thành công', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getAllOrders = async (req, res, next) => {
   try {
     const orders = await orderService.getAllOrdersService();
