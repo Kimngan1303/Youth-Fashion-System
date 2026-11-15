@@ -457,20 +457,40 @@ export const sendOrderNotificationEmail = async ({
       bg: '#FEF2F2',
       border: '#FCA5A5',
     };
-  } else if (s === 'APPROVED' || s === 'REFUND_APPROVED' || s === 'RETURNED') {
-    subject = `Youth Fashion - Xác nhận hoàn tiền cho đơn hàng #${orderNumber}`;
+  } else if (
+    s === 'APPROVED' ||
+    s === 'REFUND_APPROVED' ||
+    (s === 'RETURNED' && (
+      extraData?.refund_decision === 'APPROVED' ||
+      extraData?.status === 'APPROVED' ||
+      extraData?.returnRequest?.status === 'APPROVED' ||
+      extraData?.returnRequest?.status === 'COMPLETED' ||
+      String(reason).toLowerCase().includes('đã xác nhận hoàn tiền') ||
+      String(reason).toLowerCase().includes('đã hoàn tiền')
+    ))
+  ) {
+    subject = `Youth Fashion - Xác nhận hoàn tiền thành công cho đơn hàng #${orderNumber}`;
     badgeText = 'ĐÃ HOÀN TIỀN';
     badgeBg = '#DCFCE7';
     badgeColor = '#15803D';
-    headline = 'Yêu cầu đổi trả & hoàn tiền đã được xử lý';
-    messageBody = `Shop đã phê duyệt yêu cầu đổi trả và hoàn tất thủ tục hoàn tiền cho đơn hàng <strong>#${orderNumber}</strong>. Quý khách vui lòng kiểm tra biến động tài khoản ngân hàng.`;
-  } else if (s === 'REJECTED' || s === 'REFUND_REJECTED') {
-    subject = `Youth Fashion - Phản hồi yêu cầu hoàn tiền đơn hàng #${orderNumber}`;
+    headline = 'Yêu cầu đổi trả & hoàn tiền đã hoàn tất';
+    messageBody = `Shop đã phê duyệt yêu cầu đổi trả và hoàn tất thủ tục hoàn trả tiền về tài khoản ngân hàng của Quý khách cho đơn hàng <strong>#${orderNumber}</strong>. Quý khách vui lòng kiểm tra biến động số dư tài khoản.`;
+  } else if (
+    s === 'REJECTED' ||
+    s === 'REFUND_REJECTED' ||
+    (s === 'RETURNED' && (
+      extraData?.refund_decision === 'REJECTED' ||
+      extraData?.status === 'REJECTED' ||
+      extraData?.returnRequest?.status === 'REJECTED' ||
+      String(reason).toLowerCase().includes('từ chối hoàn tiền')
+    ))
+  ) {
+    subject = `Youth Fashion - Phản hồi từ chối yêu cầu hoàn tiền đơn hàng #${orderNumber}`;
     badgeText = 'TỪ CHỐI HOÀN TIỀN';
     badgeBg = '#FEE2E2';
     badgeColor = '#B91C1C';
     headline = 'Từ chối yêu cầu đổi trả / hoàn tiền';
-    messageBody = `Shop rất tiếc phải thông báo yêu cầu đổi trả & hoàn tiền cho đơn hàng <strong>#${orderNumber}</strong> chưa thể phê duyệt do chưa thỏa mãn chính sách đổi trả.`;
+    messageBody = `Shop rất tiếc phải thông báo yêu cầu đổi trả & hoàn tiền cho đơn hàng <strong>#${orderNumber}</strong> chưa thể phê duyệt do chưa thỏa mãn chính sách đổi trả của Youth Fashion.`;
     alertBox = {
       title: 'Lý do từ chối từ Shop',
       content: rejectReason || reason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo quy định của Youth Fashion.',
@@ -478,6 +498,22 @@ export const sendOrderNotificationEmail = async ({
       bg: '#FEF2F2',
       border: '#FCA5A5',
     };
+  } else if (s === 'RETURNED') {
+    subject = `Youth Fashion - Đã tiếp nhận yêu cầu đổi trả & hoàn tiền đơn hàng #${orderNumber}`;
+    badgeText = 'CHỜ HOÀN TIỀN';
+    badgeBg = '#F3E8FF';
+    badgeColor = '#7E22CE';
+    headline = 'Yêu cầu đổi trả & hoàn tiền đang được xem xét';
+    messageBody = `Shop đã tiếp nhận yêu cầu đổi trả & hoàn tiền của Quý khách cho đơn hàng <strong>#${orderNumber}</strong>. Bộ phận chăm sóc khách hàng đang kiểm tra và sẽ phản hồi trong thời gian sớm nhất.`;
+    if (reason || extraData?.bank_info || extraData?.refund_bank) {
+      alertBox = {
+        title: 'Thông tin yêu cầu hoàn tiền',
+        content: `${reason ? `Lý do: ${reason}` : ''}${extraData?.bank_info || extraData?.refund_bank ? ` | STK: ${extraData.bank_info || extraData.refund_bank}` : ''}`.trim(),
+        color: '#6B21A8',
+        bg: '#FAF5FF',
+        border: '#E9D5FF',
+      };
+    }
   } else if (s === 'DELIVERY_FAILED' || s === 'FAILED_DELIVERY') {
     const willRetry = extraData?.willRetry || extraData?.retryDate;
     subject = willRetry

@@ -17,6 +17,7 @@ import {
 import { orderService } from '../../services/orderService';
 import { useAuth } from '../../context/AuthContext';
 import { resolveOrderItemImage } from '../../utils/productImageUtils';
+import { sendOrderStatusNotification } from '../../services/notificationService';
 
 export default function OrderSuccessPage() {
   const navigate = useNavigate();
@@ -226,6 +227,12 @@ export default function OrderSuccessPage() {
 
         window.dispatchEvent(new Event('order_status_updated'));
         window.dispatchEvent(new Event('yf_order_status_changed'));
+
+        try {
+          sendOrderStatusNotification(finalOrderEntry, 'PENDING', {
+            newStatusLabel: 'Chờ xác nhận',
+          });
+        } catch (e) {}
       } catch (e) {
         console.error('Lỗi khi lưu đơn hàng PayOS thành công:', e);
       }

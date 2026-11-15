@@ -37,6 +37,16 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
   const rejectReason = extraData.rejectReason || order.reject_reason || '';
 
   switch (s) {
+    case 'PENDING':
+    case 'ORDER_CREATED':
+      return {
+        type: 'ORDER_CREATED',
+        title: `Đơn hàng ${displayCode} đã được tiếp nhận`,
+        message: `Đơn hàng ${displayCode} của bạn đã được hệ thống ghi nhận thành công và đang chờ Quản trị viên Shop xác nhận.`,
+        badge: 'CHỜ XÁC NHẬN',
+        badgeColor: '#0369A1',
+        badgeBg: '#E0F2FE',
+      };
     case 'CONFIRMED':
       return {
         type: 'ORDER_CONFIRMED',
@@ -350,23 +360,30 @@ export const getNotificationsForUser = (user = null) => {
     } catch (e) {}
   });
 
-  // TỰ ĐỘNG ĐỐI SOÁT & BỔ SUNG THÔNG BÁO CHO CÁC ĐƠN HÀNG ĐÃ BỊ HỦY BỞI SHOP
+  // TỰ ĐỘNG ĐỐI SOÁT & BỔ SUNG THÔNG BÁO CHO MỌI ĐƠN HÀNG VÀ MỌI TRẠNG THÁI
   try {
-    const cancelledOrders = [];
     const rawOverrides = localStorage.getItem('yf_order_status_overrides');
     const overrides = rawOverrides ? JSON.parse(rawOverrides) : {};
+    const trackableOrders = [];
 
+    // Quét overrides
     Object.keys(overrides).forEach(key => {
       const entry = overrides[key];
-      if (entry && (entry.status === 'CANCELLED' || String(entry.status_label || '').toUpperCase().includes('HỦY'))) {
+      if (entry && (entry.status || entry.order_status)) {
         const digits = key.replace(/\D/g, '');
-        if (digits && !cancelledOrders.some(c => c.digits === digits)) {
-          cancelledOrders.push({
+        if (digits && !trackableOrders.some(c => c.digits === digits)) {
+          trackableOrders.push({
             digits,
             order_id: entry.order_id || digits,
             order_number: entry.order_number || `YF-${digits}`,
-            cancel_reason: entry.cancel_reason || 'Sản phẩm tạm thời hết hàng trong kho',
-            cancelled_by: entry.cancelled_by || 'SHOP',
+            status: entry.status || entry.order_status,
+            status_label: entry.status_label || entry.status_label_customer || '',
+            refund_decision: entry.refund_decision,
+            reject_reason: entry.reject_reason,
+            refund_reason: entry.refund_reason,
+            cancel_reason: entry.cancel_reason,
+            cancelled_by: entry.cancelled_by,
+            note: entry.note,
             updated_at: entry.updated_at || Date.now()
           });
         }
@@ -380,20 +397,23 @@ export const getNotificationsForUser = (user = null) => {
           const list = JSON.parse(raw);
           if (Array.isArray(list)) {
             list.forEach(ord => {
-              const s = String(ord.status || ord.order_status || '').toUpperCase();
-              const l = String(ord.status_label || '').toUpperCase();
-              if (s === 'CANCELLED' || l.includes('HỦY')) {
-                const digits = String(ord.order_number || ord.order_code || ord.order_id || '').replace(/\D/g, '');
-                if (digits && !cancelledOrders.some(c => c.digits === digits)) {
-                  cancelledOrders.push({
-                    digits,
-                    order_id: ord.order_id || digits,
-                    order_number: ord.order_number || `YF-${digits}`,
-                    cancel_reason: ord.cancel_reason || (ord.note?.includes('Shop hủy đơn:') ? ord.note.replace('Shop hủy đơn:', '').trim() : 'Sản phẩm tạm thời hết hàng trong kho'),
-                    cancelled_by: ord.cancelled_by || 'SHOP',
-                    updated_at: ord.updated_at || Date.now()
-                  });
-                }
+              const s = String(ord.status || ord.order_status || 'PENDING').toUpperCase();
+              const digits = String(ord.order_number || ord.order_code || ord.order_id || '').replace(/\D/g, '');
+              if (digits && !trackableOrders.some(c => c.digits === digits)) {
+                trackableOrders.push({
+                  digits,
+                  order_id: ord.order_id || digits,
+                  order_number: ord.order_number || `YF-${digits}`,
+                  status: s,
+                  status_label: ord.status_label || '',
+                  refund_decision: ord.refund_decision,
+                  reject_reason: ord.reject_reason,
+                  refund_reason: ord.refund_reason,
+                  cancel_reason: ord.cancel_reason,
+                  cancelled_by: ord.cancelled_by,
+                  note: ord.note,
+                  updated_at: ord.updated_at || (ord.created_date ? new Date(ord.created_date).getTime() : Date.now())
+                });
               }
             });
           }
@@ -401,58 +421,58 @@ export const getNotificationsForUser = (user = null) => {
       } catch (e) {}
     });
 
-    cancelledOrders.forEach(cancOrd => {
+    trackableOrders.forEach(trackOrd => {
+      let targetStatus = trackOrd.status;
+      if (trackOrd.status === 'RETURNED') {
+        if (trackOrd.refund_decision === 'APPROVED') targetStatus = 'APPROVED';
+        else if (trackOrd.refund_decision === 'REJECTED') targetStatus = 'REJECTED';
+        else targetStatus = 'RETURNED';
+      }
+
       const hasNotif = aggregated.some(n =>
-        (n.order_digits === cancOrd.digits || String(n.order_number || '').replace(/\D/g, '') === cancOrd.digits) &&
-        (n.type?.includes('CANCEL') || n.status === 'CANCELLED' || n.badge?.includes('HỦY'))
+        (n.order_digits === trackOrd.digits || String(n.order_number || '').replace(/\D/g, '') === trackOrd.digits) &&
+        (n.status === targetStatus || n.type?.includes(targetStatus))
       );
 
       if (!hasNotif) {
         const fakeOrder = {
-          order_id: cancOrd.order_id,
-          order_number: cancOrd.order_number,
-          cancel_reason: cancOrd.cancel_reason,
+          order_id: trackOrd.order_id,
+          order_number: trackOrd.order_number,
+          cancel_reason: trackOrd.cancel_reason,
+          reject_reason: trackOrd.reject_reason,
           customer_id: effectiveUser?.customer_id || effectiveUser?.id,
           recipient_email: effectiveUser?.email,
           recipient_phone: effectiveUser?.phone
         };
-        const content = buildNotificationContent(fakeOrder, 'CANCELLED', {
-          reason: cancOrd.cancel_reason,
-          cancelledBy: cancOrd.cancelled_by,
-          isShopCancelled: cancOrd.cancelled_by === 'SHOP'
+        const content = buildNotificationContent(fakeOrder, targetStatus, {
+          reason: trackOrd.cancel_reason || trackOrd.refund_reason || trackOrd.note,
+          rejectReason: trackOrd.reject_reason,
+          cancelledBy: trackOrd.cancelled_by,
+          isShopCancelled: trackOrd.cancelled_by === 'SHOP'
         });
         const autoNotif = {
-          id: `notif_auto_cancel_${cancOrd.digits}`,
-          order_id: cancOrd.order_id,
-          order_number: cancOrd.order_number,
-          order_digits: cancOrd.digits,
+          id: `notif_auto_${targetStatus.toLowerCase()}_${trackOrd.digits}`,
+          order_id: trackOrd.order_id,
+          order_number: trackOrd.order_number,
+          order_digits: trackOrd.digits,
           title: content.title,
           message: content.message,
           badge: content.badge,
           badgeColor: content.badgeColor,
           badgeBg: content.badgeBg,
-          status: 'CANCELLED',
+          status: targetStatus,
           type: content.type,
-          time: formatNotificationTime(cancOrd.updated_at),
-          created_at: new Date(cancOrd.updated_at).toISOString(),
-          timestamp: cancOrd.updated_at,
+          time: formatNotificationTime(trackOrd.updated_at),
+          created_at: new Date(trackOrd.updated_at).toISOString(),
+          timestamp: trackOrd.updated_at,
           is_read: false,
-          link: `/profile?tab=orders&order=${cancOrd.digits}`,
+          link: `/profile?tab=orders&order=${trackOrd.digits}`,
           customer_id: effectiveUser?.customer_id || effectiveUser?.id || '',
           customer_email: effectiveUser?.email || '',
           customer_phone: effectiveUser?.phone || ''
         };
         aggregated.push(autoNotif);
         seenIds.add(autoNotif.id);
-
-        try {
-          const rawCustNotifs = localStorage.getItem('yf_customer_notifications');
-          const custNotifs = rawCustNotifs ? JSON.parse(rawCustNotifs) : [];
-          if (Array.isArray(custNotifs)) {
-            custNotifs.unshift(autoNotif);
-            localStorage.setItem('yf_customer_notifications', JSON.stringify(custNotifs.slice(0, 50)));
-          }
-        } catch (e) {}
       }
     });
   } catch (e) {

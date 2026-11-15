@@ -13,6 +13,7 @@ import { orderService } from '../services/orderService';
 import { productService } from '../services/productService';
 import { resolveOrderItemImage } from '../utils/productImageUtils';
 import { ensureOrderCacheReset } from '../utils/orderCacheReset';
+import { sendOrderStatusNotification } from '../services/notificationService';
 
 // Chuẩn hóa ngày hiển thị sang dạng DD/MM/YYYY
 const normalizeDobToVn = (dob) => {
@@ -2543,6 +2544,15 @@ const ProfilePage = () => {
         console.warn('Cập nhật hủy đơn DB:', err?.message);
       }
 
+      // 7. Gửi thông báo đến chuông thông báo & gửi email Gmail
+      try {
+        sendOrderStatusNotification(ord, 'CANCELLED', {
+          reason: finalReason,
+          cancelledBy: 'CUSTOMER',
+          isShopCancelled: false,
+        });
+      } catch (e) {}
+
       setOrderAlert({
         type: 'success',
         message: `Đã hủy thành công đơn hàng #${orderDisplayCode}!`,
@@ -2761,6 +2771,17 @@ const ProfilePage = () => {
     } catch (err) {
       console.warn('Cập nhật hoàn tiền DB:', err?.message);
     }
+
+    // 4. Gửi thông báo đến chuông thông báo & gửi email Gmail
+    try {
+      sendOrderStatusNotification(ord, 'RETURNED', {
+        newStatusLabel: 'Đổi trả',
+        reason: finalReason,
+        bank_info: bankTrimmed,
+        refund_bank: bankTrimmed,
+        refund_reason: finalReason,
+      });
+    } catch (e) {}
 
       setOrderAlert({
         type: 'success',
