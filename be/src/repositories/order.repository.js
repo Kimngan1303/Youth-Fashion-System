@@ -31,14 +31,16 @@ export const createOrderTransaction = async ({
     });
 
     // 1b. Ghi lại lịch sử trạng thái khởi tạo đơn hàng
-    await tx.orderStatusHistory.create({
-      data: {
-        order_id: order.order_id,
-        from_status: null,
-        to_status: order.order_status,
-        note: 'Khởi tạo đơn hàng mới',
-      },
-    });
+    if (tx.orderStatusHistory?.create) {
+      await tx.orderStatusHistory.create({
+        data: {
+          order_id: order.order_id,
+          from_status: null,
+          to_status: order.order_status,
+          note: 'Khởi tạo đơn hàng mới',
+        },
+      });
+    }
 
     // Lấy biến thể dự phòng đầu tiên trong CSDL để đảm bảo không bao giờ bị lỗi khóa ngoại
     const defaultVariant = await tx.productVariant.findFirst({
@@ -472,7 +474,7 @@ export const updateOrderStatus = async (orderIdOrNumber, status, note = null, op
       });
 
       // Ghi nhận lịch sử thay đổi trạng thái vào bảng order_status_history
-      if (existingOrder.order_status !== prismaStatus || (note && String(note).trim() !== '')) {
+      if ((existingOrder.order_status !== prismaStatus || (note && String(note).trim() !== '')) && tx.orderStatusHistory?.create) {
         await tx.orderStatusHistory.create({
           data: {
             order_id: existingOrder.order_id,
@@ -527,44 +529,48 @@ export const updateOrderStatus = async (orderIdOrNumber, status, note = null, op
           ? Number(returnData.refund_amount)
           : Number(existingOrder.total_amount || 0);
 
-        const existingReturn = await tx.returnRequest.findFirst({
-          where: { order_id: existingOrder.order_id },
-          orderBy: { created_at: 'desc' },
-        });
+        if (tx.returnRequest) {
+          const existingReturn = await tx.returnRequest.findFirst({
+            where: { order_id: existingOrder.order_id },
+            orderBy: { created_at: 'desc' },
+          });
 
-        if (existingReturn) {
-          await tx.returnRequest.update({
-            where: { return_request_id: existingReturn.return_request_id },
-            data: {
-              status: reqStatus,
-              ...(bankInfo ? { bank_info: bankInfo.slice(0, 500) } : {}),
-              ...(rejectReason ? { reject_reason: rejectReason.slice(0, 500) } : {}),
-              ...(employeeId ? { processed_by_employee_id: employeeId } : {}),
-              ...(returnData.images ? { images: returnData.images } : {}),
-            },
-          });
-        } else {
-          await tx.returnRequest.create({
-            data: {
-              order_id: existingOrder.order_id,
-              reason: reasonText || 'Yêu cầu đổi trả',
-              type: reqType,
-              status: reqStatus,
-              refund_amount: refundAmt,
-              bank_info: bankInfo ? bankInfo.slice(0, 500) : null,
-              images: returnData.images || null,
-              reject_reason: rejectReason ? rejectReason.slice(0, 500) : null,
-              processed_by_employee_id: employeeId,
-            },
-          });
+          if (existingReturn) {
+            await tx.returnRequest.update({
+              where: { return_request_id: existingReturn.return_request_id },
+              data: {
+                status: reqStatus,
+                ...(bankInfo ? { bank_info: bankInfo.slice(0, 500) } : {}),
+                ...(rejectReason ? { reject_reason: rejectReason.slice(0, 500) } : {}),
+                ...(employeeId ? { processed_by_employee_id: employeeId } : {}),
+                ...(returnData.images ? { images: returnData.images } : {}),
+              },
+            });
+          } else if (tx.returnRequest?.create) {
+            await tx.returnRequest.create({
+              data: {
+                order_id: existingOrder.order_id,
+                reason: reasonText || 'Yêu cầu đổi trả',
+                type: reqType,
+                status: reqStatus,
+                refund_amount: refundAmt,
+                bank_info: bankInfo ? bankInfo.slice(0, 500) : null,
+                images: returnData.images || null,
+                reject_reason: rejectReason ? rejectReason.slice(0, 500) : null,
+                processed_by_employee_id: employeeId,
+              },
+            });
+          }
         }
 
         // Cập nhật trạng thái thanh toán sang REFUNDED khi hoàn tiền thành công
         if (reqStatus === 'COMPLETED' || noteLow.includes('đã xác nhận hoàn tiền') || noteLow.includes('đã hoàn tiền')) {
-          await tx.payment.updateMany({
-            where: { order_id: existingOrder.order_id },
-            data: { payment_status: 'REFUNDED' },
-          });
+          if (tx.payment?.updateMany) {
+            await tx.payment.updateMany({
+              where: { order_id: existingOrder.order_id },
+              data: { payment_status: 'REFUNDED' },
+            });
+          }
         }
       }
 
@@ -590,14 +596,16 @@ export const cancelOrder = async (orderIdOrNumber, reason = 'Khách hàng yêu c
           note: cancelNote.slice(0, 500),
         },
       });
-      await tx.orderStatusHistory.create({
-        data: {
-          order_id: existingOrder.order_id,
-          from_status: existingOrder.order_status,
-          to_status: 'CANCELLED',
-          note: cancelNote.slice(0, 500),
-        },
-      });
+      if (tx.orderStatusHistory?.create) {
+        await tx.orderStatusHistory.create({
+          data: {
+            order_id: existingOrder.order_id,
+            from_status: existingOrder.order_status,
+            to_status: 'CANCELLED',
+            note: cancelNote.slice(0, 500),
+          },
+        });
+      }
       return updated;
     });
   }
