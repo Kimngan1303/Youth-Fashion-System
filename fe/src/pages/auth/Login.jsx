@@ -580,7 +580,7 @@ export default function Login() {
           </div>
 
           <div className="banner-footer-credentials">
-            © 2026 Youth Fashion. All rights reserved.
+            © 2026 Youth Fashion. Bảo lưu mọi quyền.
           </div>
         </div>
 
