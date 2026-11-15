@@ -624,12 +624,15 @@ const applyStatusOverrides = (ordersList) => {
         const ovDecision = String(ov.refund_decision || '').toUpperCase();
 
         let resolvedLabel = ov.status_label_customer || ov.status_label;
+        let isActuallyApproved = false;
+        let isActuallyRejected = false;
+
         if (ovStatus === 'RETURNED') {
           const effectiveDecision = ovDecision || String(ord.refund_decision || '').toUpperCase();
           const effectiveLabel = ovLabel || String(ord.status_label || '').toUpperCase();
           const effectiveNote = String(ov.note || ord.note || '').toLowerCase();
           const ordNoteLow = String(ord.note || '').toLowerCase();
-          const isActuallyApproved =
+          isActuallyApproved =
             effectiveDecision === 'APPROVED' ||
             effectiveLabel.includes('ĐÃ HOÀN') ||
             effectiveNote.includes('đã xác nhận hoàn tiền') ||
@@ -640,7 +643,7 @@ const applyStatusOverrides = (ordersList) => {
             ord.payments?.some(p => p.payment_status === 'REFUNDED') ||
             ord.return_requests?.some(r => r.status === 'COMPLETED' || r.status === 'APPROVED');
 
-          const isActuallyRejected = !isActuallyApproved && (
+          isActuallyRejected = !isActuallyApproved && (
             effectiveDecision === 'REJECTED' ||
             effectiveLabel.includes('TỪ CHỐI') ||
             effectiveNote.includes('từ chối hoàn') ||

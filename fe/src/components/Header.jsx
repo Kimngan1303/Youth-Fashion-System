@@ -27,6 +27,7 @@ const Header = ({ onOpenAISearch }) => {
     )
   );
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showSearchInput, setShowSearchInput] = useState(false);
