@@ -320,20 +320,11 @@ export const getNotificationsForUser = (user = null) => {
     } catch (e) {}
   }
 
-  const keysToCheck = new Set(['yf_customer_notifications', 'yf_all_notifications']);
+  const deletedIds = new Set(getDeletedNotificationIds());
+  const keysToCheck = new Set(['yf_customer_notifications']);
   if (effectiveUser) {
     if (effectiveUser.customer_id) keysToCheck.add(`yf_notifications_${effectiveUser.customer_id}`);
     if (effectiveUser.id) keysToCheck.add(`yf_notifications_${effectiveUser.id}`);
-    if (effectiveUser.email) keysToCheck.add(`yf_notifications_${effectiveUser.email.toLowerCase()}`);
-    if (effectiveUser.phone) keysToCheck.add(`yf_notifications_${effectiveUser.phone.replace(/\D/g, '')}`);
-  }
-
-  // Quét qua tất cả các key thông báo người dùng có trong localStorage
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k && k.startsWith('yf_notifications_')) {
-      keysToCheck.add(k);
-    }
   }
 
   keysToCheck.forEach(k => {
@@ -343,8 +334,13 @@ export const getNotificationsForUser = (user = null) => {
         const list = JSON.parse(raw);
         if (Array.isArray(list)) {
           list.forEach(item => {
-            if (item && item.id && !seenIds.has(item.id)) {
-              seenIds.add(item.id);
+            const notifKey = String(item?.id || item?.notification_id || '');
+            if (item && notifKey && !seenIds.has(notifKey) && !deletedIds.has(notifKey)) {
+              // Đảm bảo thông báo thuộc về chính user hiện tại nếu có customer_id
+              if (item.customer_id && effectiveUser?.id && String(item.customer_id) !== String(effectiveUser.id) && String(item.customer_id) !== String(effectiveUser.customer_id)) {
+                return;
+              }
+              seenIds.add(notifKey);
               aggregated.push({
                 ...item,
                 time: formatNotificationTime(item.created_at || item.timestamp)
@@ -356,159 +352,63 @@ export const getNotificationsForUser = (user = null) => {
     } catch (e) {}
   });
 
-  // TỰ ĐỘNG ĐỐI SOÁT & BỔ SUNG THÔNG BÁO CHO MỌI ĐƠN HÀNG VÀ MỌI TRẠNG THÁI
-  try {
-    const rawOverrides = localStorage.getItem('yf_order_status_overrides');
-    const overrides = rawOverrides ? JSON.parse(rawOverrides) : {};
-    const trackableOrders = [];
-
-    // Quét overrides
-    Object.keys(overrides).forEach(key => {
-      const entry = overrides[key];
-      if (entry && (entry.status || entry.order_status)) {
-        const digits = key.replace(/\D/g, '');
-        if (digits && !trackableOrders.some(c => c.digits === digits)) {
-          trackableOrders.push({
-            digits,
-            order_id: entry.order_id || digits,
-            order_number: entry.order_number || `YF-${digits}`,
-            status: entry.status || entry.order_status,
-            status_label: entry.status_label || entry.status_label_customer || '',
-            refund_decision: entry.refund_decision,
-            reject_reason: entry.reject_reason,
-            refund_reason: entry.refund_reason,
-            cancel_reason: entry.cancel_reason,
-            cancelled_by: entry.cancelled_by,
-            note: entry.note,
-            updated_at: entry.updated_at || Date.now()
-          });
-        }
-      }
-    });
-
-    ['yf_customer_orders', 'yf_manager_orders'].forEach(storageKey => {
-      try {
-        const raw = localStorage.getItem(storageKey);
-        if (raw) {
-          const list = JSON.parse(raw);
-          if (Array.isArray(list)) {
-            list.forEach(ord => {
-              const s = String(ord.status || ord.order_status || 'PENDING').toUpperCase();
-              const digits = String(ord.order_number || ord.order_code || ord.order_id || '').replace(/\D/g, '');
-              if (digits && !trackableOrders.some(c => c.digits === digits)) {
-                trackableOrders.push({
-                  digits,
-                  order_id: ord.order_id || digits,
-                  order_number: ord.order_number || `YF-${digits}`,
-                  status: s,
-                  status_label: ord.status_label || '',
-                  refund_decision: ord.refund_decision,
-                  reject_reason: ord.reject_reason,
-                  refund_reason: ord.refund_reason,
-                  cancel_reason: ord.cancel_reason,
-                  cancelled_by: ord.cancelled_by,
-                  note: ord.note,
-                  updated_at: ord.updated_at || (ord.created_date ? new Date(ord.created_date).getTime() : Date.now())
-                });
-              }
-            });
-          }
-        }
-      } catch (e) {}
-    });
-
-    trackableOrders.forEach(trackOrd => {
-      let targetStatus = trackOrd.status;
-      if (trackOrd.status === 'RETURNED' || trackOrd.refund_decision) {
-        const isRej = trackOrd.refund_decision === 'REJECTED' ||
-                      String(trackOrd.status_label || '').toUpperCase().includes('TỪ CHỐI') ||
-                      String(trackOrd.note || '').toLowerCase().includes('từ chối hoàn tiền') ||
-                      String(trackOrd.note || '').toLowerCase().includes('từ chối hoàn');
-        const isApp = trackOrd.refund_decision === 'APPROVED' ||
-                      String(trackOrd.status_label || '').toUpperCase().includes('ĐÃ HOÀN') ||
-                      String(trackOrd.note || '').toLowerCase().includes('đã hoàn tiền') ||
-                      String(trackOrd.note || '').toLowerCase().includes('đã xác nhận hoàn tiền');
-        if (isApp) targetStatus = 'APPROVED';
-        else if (isRej) targetStatus = 'REJECTED';
-        else targetStatus = 'RETURNED';
-      }
-
-      const hasNotif = aggregated.some(n =>
-        (n.order_digits === trackOrd.digits || String(n.order_number || '').replace(/\D/g, '') === trackOrd.digits) &&
-        (n.status === targetStatus || n.type?.includes(targetStatus) || (targetStatus === 'REJECTED' && (n.badge === 'TỪ CHỐI HOÀN' || n.type === 'REFUND_REJECTED')))
-      );
-
-      if (!hasNotif) {
-        const fakeOrder = {
-          order_id: trackOrd.order_id,
-          order_number: trackOrd.order_number,
-          cancel_reason: trackOrd.cancel_reason,
-          reject_reason: trackOrd.reject_reason,
-          customer_id: effectiveUser?.customer_id || effectiveUser?.id,
-          recipient_email: effectiveUser?.email,
-          recipient_phone: effectiveUser?.phone
-        };
-        const cleanStatus = String(targetStatus || 'PENDING').toUpperCase();
-        const content = buildNotificationContent(fakeOrder, cleanStatus, {
-          reason: trackOrd.cancel_reason || trackOrd.refund_reason || trackOrd.note,
-          rejectReason: trackOrd.reject_reason,
-          cancelledBy: trackOrd.cancelled_by,
-          isShopCancelled: trackOrd.cancelled_by === 'SHOP'
-        });
-        const safeIsoDate = (() => {
-          if (!trackOrd.updated_at) return new Date().toISOString();
-          const d = new Date(trackOrd.updated_at);
-          return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
-        })();
-        const safeTimestamp = (() => {
-          if (!trackOrd.updated_at) return Date.now();
-          const t = typeof trackOrd.updated_at === 'number' ? trackOrd.updated_at : new Date(trackOrd.updated_at).getTime();
-          return isNaN(t) ? Date.now() : t;
-        })();
-        const autoNotif = {
-          id: `notif_auto_${cleanStatus.toLowerCase()}_${trackOrd.digits}`,
-          order_id: trackOrd.order_id,
-          order_number: trackOrd.order_number,
-          order_digits: trackOrd.digits,
-          title: content.title,
-          message: content.message,
-          badge: content.badge,
-          badgeColor: content.badgeColor,
-          badgeBg: content.badgeBg,
-          status: cleanStatus,
-          type: content.type,
-          time: formatNotificationTime(safeTimestamp),
-          created_at: safeIsoDate,
-          timestamp: safeTimestamp,
-          is_read: false,
-          link: `/profile?tab=orders&order=${trackOrd.digits}`,
-          customer_id: effectiveUser?.customer_id || effectiveUser?.id || '',
-          customer_email: effectiveUser?.email || '',
-          customer_phone: effectiveUser?.phone || ''
-        };
-        aggregated.push(autoNotif);
-        seenIds.add(autoNotif.id);
-      }
-    });
-  } catch (e) {
-    console.warn('Lỗi tự động đối soát thông báo hủy đơn:', e);
-  }
-
   // Sắp xếp thông báo mới nhất lên đầu
   aggregated.sort((a, b) => (b.timestamp || new Date(b.created_at).getTime() || 0) - (a.timestamp || new Date(a.created_at).getTime() || 0));
 
   return aggregated;
 };
 
+// Lấy danh sách ID thông báo đã bị xóa
+export const getDeletedNotificationIds = () => {
+  try {
+    const raw = localStorage.getItem('yf_deleted_notification_ids');
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+// Ghi nhận ID thông báo đã xóa để không bao giờ hiển thị lại sau khi reload
+export const addDeletedNotificationId = (id) => {
+  if (!id) return;
+  try {
+    const list = getDeletedNotificationIds();
+    const idStr = String(id);
+    if (!list.includes(idStr)) {
+      list.push(idStr);
+      localStorage.setItem('yf_deleted_notification_ids', JSON.stringify(list));
+    }
+  } catch (e) {}
+};
+
+// Tải thông báo mới nhất từ API backend và cập nhật bộ nhớ tạm
+export const fetchNotificationsFromApi = async () => {
+  try {
+    const res = await axiosClient.get('/notifications');
+    if (res.data?.data && Array.isArray(res.data.data)) {
+      const deletedIds = new Set(getDeletedNotificationIds());
+      const apiList = res.data.data
+        .filter(n => !deletedIds.has(String(n.id || n.notification_id)))
+        .map(n => ({
+          ...n,
+          time: formatNotificationTime(n.created_at || n.timestamp)
+        }));
+      localStorage.setItem('yf_customer_notifications', JSON.stringify(apiList));
+      return apiList;
+    }
+  } catch (e) {
+    // Không làm gián đoạn UI nếu chưa đăng nhập hoặc mạng offline
+  }
+  return null;
+};
+
 // Đánh dấu 1 thông báo đã đọc
-export const markNotificationAsRead = (notifId, user = null) => {
+export const markNotificationAsRead = async (notifId, user = null) => {
   if (!notifId) return;
   const keysToCheck = ['yf_customer_notifications'];
   if (user) {
     if (user.customer_id) keysToCheck.push(`yf_notifications_${user.customer_id}`);
     if (user.id) keysToCheck.push(`yf_notifications_${user.id}`);
-    if (user.email) keysToCheck.push(`yf_notifications_${user.email.toLowerCase()}`);
-    if (user.phone) keysToCheck.push(`yf_notifications_${user.phone.replace(/\D/g, '')}`);
   }
 
   keysToCheck.forEach(k => {
@@ -517,24 +417,26 @@ export const markNotificationAsRead = (notifId, user = null) => {
       if (raw) {
         const list = JSON.parse(raw);
         if (Array.isArray(list)) {
-          const updated = list.map(n => n.id === notifId ? { ...n, is_read: true } : n);
+          const updated = list.map(n => String(n.id) === String(notifId) || String(n.notification_id) === String(notifId) ? { ...n, is_read: true } : n);
           localStorage.setItem(k, JSON.stringify(updated));
         }
       }
     } catch (e) {}
   });
 
+  try {
+    await axiosClient.patch(`/notifications/${notifId}/read`);
+  } catch (e) {}
+
   window.dispatchEvent(new CustomEvent('yf_notifications_updated', { detail: { notifId, is_read: true } }));
 };
 
 // Đánh dấu tất cả thông báo đã đọc
-export const markAllNotificationsAsRead = (user = null) => {
+export const markAllNotificationsAsRead = async (user = null) => {
   const keysToCheck = ['yf_customer_notifications'];
   if (user) {
     if (user.customer_id) keysToCheck.push(`yf_notifications_${user.customer_id}`);
     if (user.id) keysToCheck.push(`yf_notifications_${user.id}`);
-    if (user.email) keysToCheck.push(`yf_notifications_${user.email.toLowerCase()}`);
-    if (user.phone) keysToCheck.push(`yf_notifications_${user.phone.replace(/\D/g, '')}`);
   }
 
   keysToCheck.forEach(k => {
@@ -550,24 +452,71 @@ export const markAllNotificationsAsRead = (user = null) => {
     } catch (e) {}
   });
 
+  try {
+    await axiosClient.patch('/notifications/read-all');
+  } catch (e) {}
+
   window.dispatchEvent(new CustomEvent('yf_notifications_updated', { detail: { allRead: true } }));
 };
 
-// Xóa toàn bộ thông báo
-export const clearAllNotifications = (user = null) => {
+// Xóa 1 thông báo (cả API backend và bộ nhớ tạm)
+export const deleteNotification = async (notifId, user = null) => {
+  if (!notifId) return;
+  addDeletedNotificationId(notifId);
+
   const keysToCheck = ['yf_customer_notifications'];
   if (user) {
     if (user.customer_id) keysToCheck.push(`yf_notifications_${user.customer_id}`);
     if (user.id) keysToCheck.push(`yf_notifications_${user.id}`);
-    if (user.email) keysToCheck.push(`yf_notifications_${user.email.toLowerCase()}`);
-    if (user.phone) keysToCheck.push(`yf_notifications_${user.phone.replace(/\D/g, '')}`);
   }
 
   keysToCheck.forEach(k => {
     try {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          const updated = list.filter(n => String(n.id) !== String(notifId) && String(n.notification_id) !== String(notifId));
+          localStorage.setItem(k, JSON.stringify(updated));
+        }
+      }
+    } catch (e) {}
+  });
+
+  try {
+    await axiosClient.delete(`/notifications/${notifId}`);
+  } catch (e) {}
+
+  window.dispatchEvent(new CustomEvent('yf_notifications_updated', { detail: { deletedId: notifId } }));
+};
+
+// Xóa toàn bộ thông báo (cả API backend và bộ nhớ tạm)
+export const clearAllNotifications = async (user = null) => {
+  const keysToCheck = ['yf_customer_notifications'];
+  if (user) {
+    if (user.customer_id) keysToCheck.push(`yf_notifications_${user.customer_id}`);
+    if (user.id) keysToCheck.push(`yf_notifications_${user.id}`);
+  }
+
+  keysToCheck.forEach(k => {
+    try {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          list.forEach(n => {
+            if (n.id) addDeletedNotificationId(n.id);
+            if (n.notification_id) addDeletedNotificationId(n.notification_id);
+          });
+        }
+      }
       localStorage.setItem(k, JSON.stringify([]));
     } catch (e) {}
   });
+
+  try {
+    await axiosClient.delete('/notifications');
+  } catch (e) {}
 
   window.dispatchEvent(new CustomEvent('yf_notifications_updated', { detail: { cleared: true } }));
 };
