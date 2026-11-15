@@ -1287,11 +1287,11 @@ export default function OrderManager() {
     // Quy tắc chuyển trạng thái hợp lệ tuần tự từng bước 1 (đồng bộ với Backend Order State Machine)
     const allowedTransitionsUI = {
       PENDING: ['CONFIRMED', 'CANCELLED'],
-      CONFIRMED: ['SHIPPING', 'CANCELLED'],
-      PROCESSING: ['SHIPPING', 'CANCELLED'],
+      CONFIRMED: ['SHIPPING'],
+      PROCESSING: ['SHIPPING'],
       SHIPPING: ['DELIVERED', 'DELIVERY_FAILED'],
       DELIVERY_FAILED: ['SHIPPING', 'CANCELLED'],
-      DELIVERED: ['COMPLETED', 'RETURNED'],
+      DELIVERED: ['COMPLETED'],
       CANCELLED: ['RETURNED'],
       COMPLETED: [],
       RETURNED: ['RETURNED'],
@@ -3339,7 +3339,6 @@ export default function OrderManager() {
                                           return [
                                             { val: 'DELIVERED', label: 'Đã giao' },
                                             { val: 'COMPLETED', label: 'Hoàn thành' },
-                                            { val: 'RETURNED', label: 'Đổi trả / Hoàn tiền' },
                                           ];
                                         case 'COMPLETED':
                                           return [
@@ -4017,13 +4016,17 @@ export default function OrderManager() {
                             case 'SHIPPING':
                               return [
                                 { val: 'SHIPPING', label: 'Đang vận chuyển' },
-                                { val: 'COMPLETED', label: 'Đã giao' },
-                                { val: 'CANCELLED', label: 'Hủy đơn (Giao thất bại)' },
+                                { val: 'DELIVERED', label: 'Đã giao' },
+                                { val: 'DELIVERY_FAILED', label: 'Giao thất bại' },
+                              ];
+                            case 'DELIVERED':
+                              return [
+                                { val: 'DELIVERED', label: 'Đã giao' },
+                                { val: 'COMPLETED', label: 'Hoàn thành' },
                               ];
                             case 'COMPLETED':
                               return [
-                                { val: 'COMPLETED', label: 'Đã giao' },
-                                { val: 'RETURNED', label: 'Đổi trả / Hoàn tiền' },
+                                { val: 'COMPLETED', label: 'Hoàn thành' },
                               ];
                             default:
                               return [
