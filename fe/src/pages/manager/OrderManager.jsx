@@ -1330,7 +1330,17 @@ export default function OrderManager() {
     const tNum = String(targetOrder.order_number || targetOrder.order_code || '').trim();
     const digits = (tNum || tId).replace(/\D/g, '');
 
-    // 1. Lưu đè vĩnh viễn vào yf_order_status_overrides để ĐẢM BẢO không bao giờ bị F5 hay API làm mất trạng thái
+    // 1. Gửi API backend cập nhật CSDL MySQL trước (chỉ gọi 1 lần duy nhất theo order_id/order_number)
+    const targetApiId = tId || tNum || digits;
+    try {
+      await orderService.updateOrderStatus(targetApiId, newStatus);
+    } catch (apiErr) {
+      console.error('Lỗi API cập nhật trạng thái đơn hàng:', apiErr);
+      showError(apiErr?.response?.data?.message || 'Không thể cập nhật trạng thái đơn hàng trên máy chủ!');
+      return;
+    }
+
+    // 2. Lưu đè vào yf_order_status_overrides
     try {
       const rawOv = localStorage.getItem('yf_order_status_overrides');
       const overrides = rawOv ? JSON.parse(rawOv) : {};
@@ -1372,7 +1382,7 @@ export default function OrderManager() {
       localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
     } catch (e) {}
 
-    // 2. Cập nhật state danh sách đơn hàng Manager
+    // 3. Cập nhật state danh sách đơn hàng Manager
     const updated = orders.map(o => {
       const oId = String(o.order_id || '').trim();
       const oNum = String(o.order_number || o.order_code || '').trim();
@@ -1397,15 +1407,8 @@ export default function OrderManager() {
 
     saveOrders(updated);
 
-    // 3. Đồng bộ trực tiếp vào tất cả các key localStorage của khách hàng
+    // 4. Đồng bộ trực tiếp vào tất cả các key localStorage của khách hàng
     syncCustomerOrdersStorage(tId, tNum, newStatus, newStatusLabel, customerLabel);
-
-    // 4. Gửi API backend cập nhật CSDL MySQL
-    try {
-      if (tId) orderService.updateOrderStatus(tId, newStatus).catch(() => {});
-      if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus).catch(() => {});
-      if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus).catch(() => {});
-    } catch (e) {}
 
     // 5. Phát sự kiện toàn cục và ghi sự kiện cross-tab để trang hồ sơ khách hàng nhận được ngay
     const statusPayload = {
@@ -1507,7 +1510,18 @@ export default function OrderManager() {
 
     const updatedNote = `[Giao thất bại lần ${prevAttempts}]: ${finalReason}${willRetry ? ` | Hẹn giao lại: ${formattedRetryDate}` : ' | Chuyển hoàn về kho'}${deliveryNote.trim() ? ` | Ghi chú: ${deliveryNote.trim()}` : ''}`;
 
-    // Lưu đè vĩnh viễn vào yf_order_status_overrides
+    // 1. Gửi API backend cập nhật CSDL MySQL trước (chỉ 1 lần duy nhất)
+    const targetApiId = tId || tNum || digits;
+    const backendStatus = willRetry ? 'SHIPPED' : 'CANCELLED';
+    try {
+      await orderService.updateOrderStatus(targetApiId, backendStatus, updatedNote);
+    } catch (apiErr) {
+      console.error('Lỗi API cập nhật giao hàng thất bại:', apiErr);
+      showError(apiErr?.response?.data?.message || 'Không thể lưu trạng thái giao thất bại trên máy chủ!');
+      return;
+    }
+
+    // 2. Lưu đè vĩnh viễn vào yf_order_status_overrides
     try {
       const rawOv = localStorage.getItem('yf_order_status_overrides');
       const overrides = rawOv ? JSON.parse(rawOv) : {};
@@ -1536,7 +1550,7 @@ export default function OrderManager() {
       localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
     } catch (e) {}
 
-    // Cập nhật state danh sách đơn hàng Manager
+    // 3. Cập nhật state danh sách đơn hàng Manager
     const updated = orders.map(o => {
       const oId = String(o.order_id || '').trim();
       const oNum = String(o.order_number || o.order_code || '').trim();
@@ -1564,16 +1578,8 @@ export default function OrderManager() {
 
     saveOrders(updated);
 
-    // Đồng bộ storage phía khách hàng
+    // 4. Đồng bộ storage phía khách hàng
     syncCustomerOrdersStorage(tId, tNum, newStatus, newStatusLabel, customerLabel);
-
-    // Gửi API backend cập nhật CSDL MySQL
-    try {
-      const backendStatus = willRetry ? 'SHIPPED' : 'CANCELLED';
-      if (tId) orderService.updateOrderStatus(tId, backendStatus, updatedNote).catch(() => {});
-      if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, backendStatus, updatedNote).catch(() => {});
-      if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, backendStatus, updatedNote).catch(() => {});
-    } catch (e) {}
 
     // Phát sự kiện toàn cục cross-tab
     const statusPayload = {
@@ -1663,7 +1669,34 @@ export default function OrderManager() {
     const customerLabel = 'ĐÃ HỦY';
     const updatedNote = cancelledBy === 'SHOP' ? `Shop hủy đơn: ${reason}` : `Khách hủy đơn: ${reason}`;
 
-    // 1. Lưu đè vĩnh viễn vào yf_order_status_overrides
+    // 1. Gửi API backend cập nhật CSDL MySQL trước (chỉ 1 lần duy nhất)
+    const targetApiId = tId || tNum || digits;
+    try {
+      let activeUserEmail = '';
+      try {
+        const rawUser = localStorage.getItem('user');
+        if (rawUser) {
+          const u = JSON.parse(rawUser);
+          if (u?.email && u.email.includes('@')) activeUserEmail = u.email;
+        }
+      } catch (e) {}
+
+      const cancelOptions = {
+        cancelReason: reason,
+        cancelledBy,
+        isShopCancelled: cancelledBy === 'SHOP',
+        recipientEmail: targetOrder.recipient_email || targetOrder.customer?.email,
+        userEmail: activeUserEmail
+      };
+
+      await orderService.updateOrderStatus(targetApiId, newStatus, updatedNote, cancelOptions);
+    } catch (apiErr) {
+      console.error('Lỗi API hủy đơn hàng:', apiErr);
+      showError(apiErr?.response?.data?.message || 'Không thể hủy đơn hàng trên máy chủ!');
+      return;
+    }
+
+    // 2. Lưu đè vĩnh viễn vào yf_order_status_overrides
     try {
       const rawOv = localStorage.getItem('yf_order_status_overrides');
       const overrides = rawOv ? JSON.parse(rawOv) : {};
@@ -1699,7 +1732,7 @@ export default function OrderManager() {
       localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
     } catch (e) {}
 
-    // 2. Cập nhật state danh sách đơn hàng Manager
+    // 3. Cập nhật state danh sách đơn hàng Manager
     const updated = orders.map(o => {
       const oId = String(o.order_id || '').trim();
       const oNum = String(o.order_number || o.order_code || '').trim();
@@ -1724,32 +1757,8 @@ export default function OrderManager() {
     });
     saveOrders(updated);
 
-    // 3. Đồng bộ storage của khách hàng
+    // 4. Đồng bộ storage của khách hàng
     syncCustomerOrdersStorage(tId, tNum, newStatus, newStatusLabel, customerLabel, reason, cancelledBy, updatedNote, currentCat);
-
-    // 4. Gửi API backend cập nhật CSDL MySQL kèm thông tin gửi Email hủy đơn
-    try {
-      let activeUserEmail = '';
-      try {
-        const rawUser = localStorage.getItem('user');
-        if (rawUser) {
-          const u = JSON.parse(rawUser);
-          if (u?.email && u.email.includes('@')) activeUserEmail = u.email;
-        }
-      } catch (e) {}
-
-      const cancelOptions = {
-        cancelReason: reason,
-        cancelledBy,
-        isShopCancelled: cancelledBy === 'SHOP',
-        recipientEmail: targetOrder.recipient_email || targetOrder.customer?.email,
-        userEmail: activeUserEmail
-      };
-
-      if (tId) orderService.updateOrderStatus(tId, newStatus, updatedNote, cancelOptions).catch(() => {});
-      if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus, updatedNote, cancelOptions).catch(() => {});
-      if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus, updatedNote, cancelOptions).catch(() => {});
-    } catch (e) {}
 
     // 5. Phát sự kiện toàn cục và ghi sự kiện cross-tab
     const statusPayload = {

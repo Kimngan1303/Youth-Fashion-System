@@ -304,46 +304,6 @@ export const sendOrderStatusNotification = (order, newStatus, extraData = {}) =>
     bc.close();
   } catch (e) {}
 
-  // 3. Đồng bộ gửi thông báo về Gmail của khách hàng qua Backend API
-  try {
-    const recipientEmail = (customerEmail && customerEmail.includes('@') && !customerEmail.endsWith('@example.com'))
-      ? customerEmail
-      : (order.recipient_email || order.customer?.email || extraData?.recipientEmail || '');
-
-    axiosClient
-      .post('/orders/notify-email', {
-        orderId: newNotif.order_id,
-        orderNumber: newNotif.order_number,
-        recipientEmail: recipientEmail || undefined,
-        newStatus,
-        extraData: {
-          ...extraData,
-          customerEmail,
-          recipientEmail,
-          recipientName: customerName || order.recipient_name || order.customer?.full_name || order.customer?.name,
-          recipientPhone: customerPhone || order.recipient_phone || order.customer?.phone || order.phone,
-          refund_decision: newStatus === 'REJECTED' ? 'REJECTED' : (newStatus === 'APPROVED' ? 'APPROVED' : extraData?.refund_decision),
-          rejectReason: extraData?.rejectReason || order.reject_reason || '',
-          reason: extraData?.rejectReason || extraData?.reason || order.reject_reason || order.cancel_reason || '',
-          shippingAddress: [
-            order.shipping_address_line,
-            order.shipping_ward,
-            order.shipping_district,
-            order.shipping_city,
-          ]
-            .filter(Boolean)
-            .join(', '),
-          totalAmount: order.total_amount,
-          items: order.order_items || order.items || [],
-        },
-      })
-      .catch((err) => {
-        console.warn('Lỗi khi gửi email thông báo tự động:', err?.message);
-      });
-  } catch (e) {
-    console.warn('Lỗi kích hoạt gửi email thông báo:', e);
-  }
-
   return newNotif;
 };
 

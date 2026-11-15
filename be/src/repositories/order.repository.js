@@ -229,32 +229,28 @@ export const findOrderByIdOrNumber = async (orderIdOrNumber) => {
   const rawStr = String(orderIdOrNumber || '').trim();
   if (!rawStr) return null;
 
-  const digitsOnly = rawStr.replace(/\D/g, '');
-  const variants = [rawStr, `YF-${rawStr}`, `YF - ${rawStr}`];
-  if (digitsOnly) {
-    variants.push(digitsOnly, `YF-${digitsOnly}`, `YF - ${digitsOnly}`);
+  const conditions = [{ order_number: rawStr }];
+  if (rawStr.startsWith('YF-')) {
+    const withoutPrefix = rawStr.replace(/^YF-/, '');
+    if (withoutPrefix) conditions.push({ order_number: withoutPrefix });
+  } else {
+    conditions.push({ order_number: `YF-${rawStr}` });
   }
 
-  const orConditions = [{ order_number: { in: variants } }];
-  if (digitsOnly) {
-    orConditions.push({ order_number: { contains: digitsOnly } });
-  }
-  if (!isNaN(Number(orderIdOrNumber))) {
+  if (!isNaN(Number(rawStr)) && /^\d+$/.test(rawStr)) {
     try {
-      orConditions.push({ order_id: BigInt(orderIdOrNumber) });
-    } catch (e) {}
-  }
-  if (digitsOnly && !isNaN(Number(digitsOnly))) {
-    try {
-      orConditions.push({ order_id: BigInt(digitsOnly) });
+      conditions.push({ order_id: BigInt(rawStr) });
     } catch (e) {}
   }
 
   return await prisma.order.findFirst({
-    where: { OR: orConditions },
+    where: { OR: conditions },
     include: {
       status_history: { orderBy: { created_at: 'asc' } },
       return_requests: { orderBy: { created_at: 'desc' } },
+      order_items: true,
+      payments: true,
+      customer: true,
     },
   });
 };
@@ -388,22 +384,21 @@ export const deleteOrderById = async (orderIdOrNumber) => {
     const rawStr = String(orderIdOrNumber || '').trim();
     if (!rawStr) return { count: 0 };
 
-    const digitsOnly = rawStr.replace(/\D/g, '');
-    const variants = [rawStr, `YF-${rawStr}`, `YF - ${rawStr}`];
-    if (digitsOnly) variants.push(digitsOnly, `YF-${digitsOnly}`, `YF - ${digitsOnly}`);
-
-    const orConditions = [
-      { order_number: { in: variants } },
-    ];
-    if (!isNaN(Number(orderIdOrNumber))) {
-      orConditions.push({ order_id: BigInt(orderIdOrNumber) });
+    const conditions = [{ order_number: rawStr }];
+    if (rawStr.startsWith('YF-')) {
+      const withoutPrefix = rawStr.replace(/^YF-/, '');
+      if (withoutPrefix) conditions.push({ order_number: withoutPrefix });
+    } else {
+      conditions.push({ order_number: `YF-${rawStr}` });
     }
-    if (digitsOnly && !isNaN(Number(digitsOnly))) {
-      orConditions.push({ order_id: BigInt(digitsOnly) });
+    if (!isNaN(Number(rawStr)) && /^\d+$/.test(rawStr)) {
+      try {
+        conditions.push({ order_id: BigInt(rawStr) });
+      } catch (e) {}
     }
 
     const foundOrders = await prisma.order.findMany({
-      where: { OR: orConditions },
+      where: { OR: conditions },
       include: { order_items: true },
     });
 
@@ -631,23 +626,25 @@ export const updatePaymentStatus = async (orderId, paymentStatus, extra = {}) =>
 export const findOrderAny = async (orderIdOrNumber) => {
   if (!orderIdOrNumber) return null;
   const rawStr = String(orderIdOrNumber).trim();
-  const digitsOnly = rawStr.replace(/\D/g, '');
-  const variants = [rawStr, `YF-${rawStr}`, `YF - ${rawStr}`];
-  if (digitsOnly) {
-    variants.push(digitsOnly, `YF-${digitsOnly}`, `YF - ${digitsOnly}`);
+  if (!rawStr) return null;
+
+  const conditions = [{ order_number: rawStr }];
+  if (rawStr.startsWith('YF-')) {
+    const withoutPrefix = rawStr.replace(/^YF-/, '');
+    if (withoutPrefix) conditions.push({ order_number: withoutPrefix });
+  } else {
+    conditions.push({ order_number: `YF-${rawStr}` });
   }
 
-  const orConditions = [{ order_number: { in: variants } }];
-  if (digitsOnly && !isNaN(Number(digitsOnly))) {
-    orConditions.push({ order_id: BigInt(digitsOnly) });
-  }
-  if (!isNaN(Number(rawStr))) {
-    orConditions.push({ order_id: BigInt(rawStr) });
+  if (!isNaN(Number(rawStr)) && /^\d+$/.test(rawStr)) {
+    try {
+      conditions.push({ order_id: BigInt(rawStr) });
+    } catch (e) {}
   }
 
   try {
     return await prisma.order.findFirst({
-      where: { OR: orConditions },
+      where: { OR: conditions },
       include: {
         order_items: {
           include: {
@@ -666,6 +663,8 @@ export const findOrderAny = async (orderIdOrNumber) => {
         },
         payments: true,
         customer: true,
+        status_history: { orderBy: { created_at: 'asc' } },
+        return_requests: { orderBy: { created_at: 'desc' } },
       },
     });
   } catch (e) {
