@@ -1,4 +1,4 @@
-﻿-- CreateTable
+-- CreateTable
 CREATE TABLE `employees` (
     `employee_id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `employee_code` VARCHAR(30) NOT NULL,
