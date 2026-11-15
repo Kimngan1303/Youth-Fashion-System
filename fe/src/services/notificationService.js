@@ -162,9 +162,62 @@ export const sendOrderStatusNotification = (order, newStatus, extraData = {}) =>
   const orderNumber = String(order.order_number || order.order_code || '').trim();
   const orderDigits = (orderNumber || orderId).replace(/\D/g, '');
 
-  const customerId = order.customer_id || order.customer?.customer_id || order.customer?.id || order.user_id || '';
-  const customerEmail = (order.recipient_email || order.customer?.email || order.email || '').toLowerCase().trim();
-  const customerPhone = (order.recipient_phone || order.customer?.phone || order.phone || '').trim();
+  // Tra cứu thông tin định danh người mua chính xác từ nhiều nguồn lưu trữ
+  let customerEmail = (
+    order.recipient_email ||
+    order.customer?.email ||
+    order.email ||
+    extraData?.recipientEmail ||
+    extraData?.customerEmail ||
+    ''
+  ).toLowerCase().trim();
+
+  let customerId = order.customer_id || order.customer?.customer_id || order.customer?.id || order.user_id || extraData?.customerId || '';
+  let customerPhone = (order.recipient_phone || order.customer?.phone || order.phone || extraData?.recipientPhone || '').trim();
+  let customerName = order.recipient_name || order.customer?.full_name || order.customer?.name || extraData?.recipientName || '';
+
+  // Nếu thiếu email hoặc là email mẫu, quét tìm trong kho dữ liệu cục bộ theo mã đơn
+  if (!customerEmail || customerEmail.endsWith('@example.com') || !customerId) {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('yf_customer_orders') || k === 'yf_manager_orders' || k.startsWith('yf_notifications_'))) {
+          try {
+            const rawList = localStorage.getItem(k);
+            if (rawList) {
+              const list = JSON.parse(rawList);
+              if (Array.isArray(list)) {
+                const match = list.find(item => {
+                  if (!item) return false;
+                  const iId = String(item.order_id || '').trim();
+                  const iNum = String(item.order_number || item.order_code || '').trim();
+                  const iDig = (iNum || iId).replace(/\D/g, '');
+                  return (orderId && (iId === orderId || iNum === orderId)) ||
+                         (orderNumber && (iId === orderNumber || iNum === orderNumber)) ||
+                         (orderDigits && iDig && orderDigits === iDig);
+                });
+                if (match) {
+                  const mEmail = (match.recipient_email || match.customer?.email || match.email || match.customer_email || '').toLowerCase().trim();
+                  if (mEmail && mEmail.includes('@') && !mEmail.endsWith('@example.com')) {
+                    customerEmail = mEmail;
+                  }
+                  if (!customerId) {
+                    customerId = match.customer_id || match.customer?.customer_id || match.customer?.id || match.user_id || '';
+                  }
+                  if (!customerPhone) {
+                    customerPhone = match.recipient_phone || match.customer?.phone || match.phone || match.customer_phone || '';
+                  }
+                  if (!customerName) {
+                    customerName = match.recipient_name || match.customer?.full_name || match.customer?.name || '';
+                  }
+                }
+              }
+            }
+          } catch (e) {}
+        }
+      }
+    } catch (e) {}
+  }
 
   const newNotif = {
     id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -187,6 +240,7 @@ export const sendOrderStatusNotification = (order, newStatus, extraData = {}) =>
     customer_id: customerId,
     customer_email: customerEmail,
     customer_phone: customerPhone,
+    customer_name: customerName,
   };
 
   // 1. Lưu vào danh sách các khóa liên quan trong localStorage
@@ -207,7 +261,7 @@ export const sendOrderStatusNotification = (order, newStatus, extraData = {}) =>
     }
   } catch (e) {}
 
-  // Tìm các key yf_customer_orders_* để gắn cùng key tương ứng
+  // Tìm các key yf_customer_orders_* để gắn cùng key thông báo tương ứng
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (k && k.startsWith('yf_customer_orders_')) {
@@ -252,58 +306,40 @@ export const sendOrderStatusNotification = (order, newStatus, extraData = {}) =>
 
   // 3. Đồng bộ gửi thông báo về Gmail của khách hàng qua Backend API
   try {
-    const rawRecipient =
-      newNotif.customer_email ||
-      order.recipient_email ||
-      order.customer?.email ||
-      order.email ||
-      '';
+    const recipientEmail = (customerEmail && customerEmail.includes('@') && !customerEmail.endsWith('@example.com'))
+      ? customerEmail
+      : (order.recipient_email || order.customer?.email || extraData?.recipientEmail || '');
 
-    let userEmail = '';
-    try {
-      const rawUser = localStorage.getItem('user');
-      if (rawUser) {
-        const u = JSON.parse(rawUser);
-        if (u?.email && u.email.includes('@')) {
-          userEmail = u.email.toLowerCase().trim();
-        }
-      }
-    } catch (e) {}
-
-    const recipientEmail = (rawRecipient && !rawRecipient.endsWith('@example.com'))
-      ? rawRecipient
-      : (userEmail || rawRecipient);
-
-    if (recipientEmail && recipientEmail.includes('@')) {
-      axiosClient
-        .post('/orders/notify-email', {
-          orderId: newNotif.order_id,
-          orderNumber: newNotif.order_number,
+    axiosClient
+      .post('/orders/notify-email', {
+        orderId: newNotif.order_id,
+        orderNumber: newNotif.order_number,
+        recipientEmail: recipientEmail || undefined,
+        newStatus,
+        extraData: {
+          ...extraData,
+          customerEmail,
           recipientEmail,
-          newStatus,
-          extraData: {
-            ...extraData,
-            userEmail,
-            customerEmail: newNotif.customer_email,
-            recipientEmail,
-            recipientName: order.recipient_name || order.customer?.full_name || order.customer?.name,
-            recipientPhone: order.recipient_phone || order.customer?.phone || order.phone,
-            shippingAddress: [
-              order.shipping_address_line,
-              order.shipping_ward,
-              order.shipping_district,
-              order.shipping_city,
-            ]
-              .filter(Boolean)
-              .join(', '),
-            totalAmount: order.total_amount,
-            items: order.order_items || order.items || [],
-          },
-        })
-        .catch((err) => {
-          console.warn('Lỗi khi gửi email thông báo tự động:', err?.message);
-        });
-    }
+          recipientName: customerName || order.recipient_name || order.customer?.full_name || order.customer?.name,
+          recipientPhone: customerPhone || order.recipient_phone || order.customer?.phone || order.phone,
+          refund_decision: newStatus === 'REJECTED' ? 'REJECTED' : (newStatus === 'APPROVED' ? 'APPROVED' : extraData?.refund_decision),
+          rejectReason: extraData?.rejectReason || order.reject_reason || '',
+          reason: extraData?.rejectReason || extraData?.reason || order.reject_reason || order.cancel_reason || '',
+          shippingAddress: [
+            order.shipping_address_line,
+            order.shipping_ward,
+            order.shipping_district,
+            order.shipping_city,
+          ]
+            .filter(Boolean)
+            .join(', '),
+          totalAmount: order.total_amount,
+          items: order.order_items || order.items || [],
+        },
+      })
+      .catch((err) => {
+        console.warn('Lỗi khi gửi email thông báo tự động:', err?.message);
+      });
   } catch (e) {
     console.warn('Lỗi kích hoạt gửi email thông báo:', e);
   }
@@ -423,15 +459,23 @@ export const getNotificationsForUser = (user = null) => {
 
     trackableOrders.forEach(trackOrd => {
       let targetStatus = trackOrd.status;
-      if (trackOrd.status === 'RETURNED') {
-        if (trackOrd.refund_decision === 'APPROVED') targetStatus = 'APPROVED';
-        else if (trackOrd.refund_decision === 'REJECTED') targetStatus = 'REJECTED';
+      if (trackOrd.status === 'RETURNED' || trackOrd.refund_decision) {
+        const isRej = trackOrd.refund_decision === 'REJECTED' ||
+                      String(trackOrd.status_label || '').toUpperCase().includes('TỪ CHỐI') ||
+                      String(trackOrd.note || '').toLowerCase().includes('từ chối hoàn tiền') ||
+                      String(trackOrd.note || '').toLowerCase().includes('từ chối hoàn');
+        const isApp = trackOrd.refund_decision === 'APPROVED' ||
+                      String(trackOrd.status_label || '').toUpperCase().includes('ĐÃ HOÀN') ||
+                      String(trackOrd.note || '').toLowerCase().includes('đã hoàn tiền') ||
+                      String(trackOrd.note || '').toLowerCase().includes('đã xác nhận hoàn tiền');
+        if (isApp) targetStatus = 'APPROVED';
+        else if (isRej) targetStatus = 'REJECTED';
         else targetStatus = 'RETURNED';
       }
 
       const hasNotif = aggregated.some(n =>
         (n.order_digits === trackOrd.digits || String(n.order_number || '').replace(/\D/g, '') === trackOrd.digits) &&
-        (n.status === targetStatus || n.type?.includes(targetStatus))
+        (n.status === targetStatus || n.type?.includes(targetStatus) || (targetStatus === 'REJECTED' && (n.badge === 'TỪ CHỐI HOÀN' || n.type === 'REFUND_REJECTED')))
       );
 
       if (!hasNotif) {

@@ -482,6 +482,17 @@ export const updateOrderStatusService = async (orderId, status, note = null, opt
     const isShopCanc = options?.isShopCancelled ?? (mappedStatus === 'CANCELLED');
     const cancBy = options?.cancelledBy || (mappedStatus === 'CANCELLED' ? 'SHOP' : undefined);
 
+    const isRejectRefund = options?.refund_decision === 'REJECTED' ||
+                           options?.returnRequest?.status === 'REJECTED' ||
+                           s === 'REJECTED' ||
+                           String(options?.reason || note || '').toLowerCase().includes('từ chối hoàn tiền');
+    const isApproveRefund = options?.refund_decision === 'APPROVED' ||
+                            options?.returnRequest?.status === 'APPROVED' ||
+                            s === 'APPROVED' ||
+                            String(options?.reason || note || '').toLowerCase().includes('đã hoàn tiền') ||
+                            String(options?.reason || note || '').toLowerCase().includes('đã xác nhận hoàn tiền');
+    const emailStatus = isRejectRefund ? 'REJECTED' : (isApproveRefund ? 'APPROVED' : mappedStatus);
+
     for (const targetEmail of emailsToSend) {
       if (targetEmail.endsWith('@example.com') && emailsToSend.size > 1) {
         continue;
@@ -489,7 +500,7 @@ export const updateOrderStatusService = async (orderId, status, note = null, opt
       sendOrderNotificationEmail({
         toEmail: targetEmail,
         order: fullOrder,
-        status: mappedStatus,
+        status: emailStatus,
         extraData: {
           note,
           reason: cancelReason,

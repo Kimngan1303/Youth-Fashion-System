@@ -491,9 +491,17 @@ export const sendOrderNotificationEmail = async ({
     badgeColor = '#B91C1C';
     headline = 'Từ chối yêu cầu đổi trả / hoàn tiền';
     messageBody = `Shop rất tiếc phải thông báo yêu cầu đổi trả & hoàn tiền cho đơn hàng <strong>#${orderNumber}</strong> chưa thể phê duyệt do chưa thỏa mãn chính sách đổi trả của Youth Fashion.`;
+    let cleanRejectReason = rejectReason || extraData?.reject_reason;
+    if (!cleanRejectReason && reason) {
+      if (reason.includes('Từ chối hoàn tiền:')) {
+        cleanRejectReason = reason.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim();
+      } else {
+        cleanRejectReason = reason;
+      }
+    }
     alertBox = {
       title: 'Lý do từ chối từ Shop',
-      content: rejectReason || reason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo quy định của Youth Fashion.',
+      content: cleanRejectReason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo quy định của Youth Fashion.',
       color: '#991B1B',
       bg: '#FEF2F2',
       border: '#FCA5A5',

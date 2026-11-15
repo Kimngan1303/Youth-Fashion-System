@@ -2371,9 +2371,21 @@ export default function OrderManager() {
 
     // 4. Cập nhật MySQL DB backend
     try {
-      if (tId) orderService.updateOrderStatus(tId, newStatus, updatedNote).catch(() => {});
-      if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus, updatedNote).catch(() => {});
-      if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus, updatedNote).catch(() => {});
+      const extraPayload = {
+        refund_decision: 'APPROVED',
+        refundBank: bankInfo,
+        bank_info: bankInfo,
+        recipientEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
+        customerEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
+        userEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
+        returnRequest: {
+          status: 'APPROVED',
+          bank_info: bankInfo,
+        }
+      };
+      if (tId) orderService.updateOrderStatus(tId, newStatus, updatedNote, extraPayload).catch(() => {});
+      else if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus, updatedNote, extraPayload).catch(() => {});
+      else if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus, updatedNote, extraPayload).catch(() => {});
     } catch (e) {}
 
     // 5. Phát sự kiện toàn cục & BroadcastChannel
@@ -2447,6 +2459,62 @@ export default function OrderManager() {
     const customerLabel = 'TỪ CHỐI HOÀN';
     const updatedNote = `Từ chối hoàn tiền: ${rejectReason} | Lý do khách gửi: ${targetOrder.refund_reason || 'Đổi trả'}`;
 
+    // Tìm thông tin người mua thực sự
+    let buyerEmail = targetOrder.recipient_email || targetOrder.customer?.email || targetOrder.email || '';
+    let buyerId = targetOrder.customer_id || targetOrder.customer?.customer_id || targetOrder.customer?.id || targetOrder.user_id || '';
+    let buyerPhone = targetOrder.recipient_phone || targetOrder.customer?.phone || targetOrder.phone || '';
+    let buyerName = targetOrder.recipient_name || targetOrder.customer?.name || targetOrder.customer?.full_name || '';
+
+    if (!buyerEmail || buyerEmail.endsWith('@example.com') || !buyerId) {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('yf_customer_orders') || k === 'yf_manager_orders' || k.startsWith('yf_notifications_'))) {
+          try {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                const matched = list.find(it => {
+                  if (!it) return false;
+                  const iId = String(it.order_id || '').trim();
+                  const iNum = String(it.order_number || it.order_code || '').trim();
+                  const iDig = (iNum || iId).replace(/\D/g, '');
+                  return (tId && (iId === tId || iNum === tId)) ||
+                         (tNum && (iId === tNum || iNum === tNum)) ||
+                         (digits && iDig && digits === iDig);
+                });
+                if (matched) {
+                  const mEmail = matched.recipient_email || matched.customer?.email || matched.email || matched.customer_email;
+                  if (mEmail && mEmail.includes('@') && !mEmail.endsWith('@example.com')) {
+                    buyerEmail = mEmail;
+                  }
+                  if (!buyerId) buyerId = matched.customer_id || matched.customer?.customer_id || matched.customer?.id || matched.user_id;
+                  if (!buyerPhone) buyerPhone = matched.recipient_phone || matched.customer?.phone || matched.phone;
+                  if (!buyerName) buyerName = matched.recipient_name || matched.customer?.name || matched.customer?.full_name;
+                }
+              }
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
+    const enrichedOrder = {
+      ...targetOrder,
+      recipient_email: buyerEmail,
+      recipient_phone: buyerPhone,
+      recipient_name: buyerName,
+      customer_id: buyerId,
+      refund_decision: 'REJECTED',
+      reject_reason: rejectReason,
+      customer: {
+        ...(targetOrder.customer || {}),
+        email: buyerEmail,
+        phone: buyerPhone,
+        name: buyerName,
+      }
+    };
+
     // 1. Lưu overrides với tất cả biến thể mã đơn
     try {
       const rawOv = localStorage.getItem('yf_order_status_overrides');
@@ -2459,6 +2527,8 @@ export default function OrderManager() {
         refund_decision: 'REJECTED',
         reject_reason: rejectReason,
         refund_reason: targetOrder.refund_reason || '',
+        recipient_email: buyerEmail,
+        customer_id: buyerId,
         note: updatedNote,
         updated_at: Date.now(),
       };
@@ -2494,6 +2564,7 @@ export default function OrderManager() {
           refund_decision: 'REJECTED',
           reject_reason: rejectReason,
           note: updatedNote,
+          recipient_email: buyerEmail || o.recipient_email,
         };
       }
       return o;
@@ -2505,9 +2576,23 @@ export default function OrderManager() {
 
     // 4. Cập nhật DB
     try {
-      if (tId) orderService.updateOrderStatus(tId, newStatus, updatedNote).catch(() => {});
-      if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus, updatedNote).catch(() => {});
-      if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus, updatedNote).catch(() => {});
+      const extraPayload = {
+        refund_decision: 'REJECTED',
+        rejectReason,
+        reject_reason: rejectReason,
+        reason: rejectReason,
+        recipientEmail: buyerEmail,
+        customerEmail: buyerEmail,
+        userEmail: buyerEmail,
+        recipientName: buyerName,
+        returnRequest: {
+          status: 'REJECTED',
+          reject_reason: rejectReason,
+        }
+      };
+      if (tId) orderService.updateOrderStatus(tId, newStatus, updatedNote, extraPayload).catch(() => {});
+      else if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus, updatedNote, extraPayload).catch(() => {});
+      else if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus, updatedNote, extraPayload).catch(() => {});
     } catch (e) {}
 
     // 5. Phát sự kiện toàn cục
@@ -2521,6 +2606,7 @@ export default function OrderManager() {
       refund_decision: 'REJECTED',
       reject_reason: rejectReason,
       note: updatedNote,
+      recipient_email: buyerEmail,
       timestamp: Date.now()
     };
     try {
@@ -2535,9 +2621,13 @@ export default function OrderManager() {
 
     // Gửi thông báo từ chối hoàn đến tài khoản người mua đơn hàng
     try {
-      sendOrderStatusNotification(targetOrder, 'REJECTED', {
+      sendOrderStatusNotification(enrichedOrder, 'REJECTED', {
         newStatusLabel: 'Từ chối hoàn',
-        rejectReason
+        rejectReason,
+        reason: rejectReason,
+        recipientEmail: buyerEmail,
+        customerEmail: buyerEmail,
+        recipientName: buyerName,
       });
     } catch (err) {
       console.error('Lỗi gửi thông báo từ chối hoàn cho người mua:', err);
@@ -2551,6 +2641,7 @@ export default function OrderManager() {
       refund_decision: 'REJECTED',
       reject_reason: rejectReason,
       note: updatedNote,
+      recipient_email: buyerEmail || prev.recipient_email,
     } : null);
 
     setShowRejectInput(false);
@@ -2617,127 +2708,9 @@ export default function OrderManager() {
   // Cập nhật lại lý do từ chối hoàn tiền khi Shop muốn thay đổi
   const handleUpdateRejectReason = async (targetOrder, customReason) => {
     if (!targetOrder) return;
+    await handleConfirmRejectWithReason(targetOrder, customReason);
     const tId = String(targetOrder.order_id || '').trim();
     const tNum = String(targetOrder.order_number || targetOrder.order_code || '').trim();
-    const digits = (tNum || tId).replace(/\D/g, '');
-
-    const rejectReason = String(customReason || '').trim() || 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop';
-    const newStatus = 'RETURNED';
-    const newStatusLabel = 'Từ chối hoàn';
-    const customerLabel = 'TỪ CHỐI HOÀN';
-    const updatedNote = `Từ chối hoàn tiền: ${rejectReason} | Lý do khách gửi: ${targetOrder.refund_reason || 'Đổi trả'}`;
-
-    // 1. Lưu overrides với tất cả biến thể mã đơn
-    try {
-      const rawOv = localStorage.getItem('yf_order_status_overrides');
-      const overrides = rawOv ? JSON.parse(rawOv) : {};
-      const overrideEntry = {
-        status: newStatus,
-        status_label: newStatusLabel,
-        status_label_manager: newStatusLabel,
-        status_label_customer: customerLabel,
-        refund_decision: 'REJECTED',
-        reject_reason: rejectReason,
-        refund_reason: targetOrder.refund_reason || '',
-        note: updatedNote,
-        updated_at: Date.now(),
-      };
-      if (digits) {
-        overrides[digits] = overrideEntry;
-        overrides[`YF-${digits}`] = overrideEntry;
-        overrides[`#YF-${digits}`] = overrideEntry;
-        overrides[`YF - ${digits}`] = overrideEntry;
-        overrides[`#YF - ${digits}`] = overrideEntry;
-        overrides[`YF – ${digits}`] = overrideEntry;
-        overrides[`#YF – ${digits}`] = overrideEntry;
-        overrides[`#${digits}`] = overrideEntry;
-        for (const k of Object.keys(overrides)) {
-          if (k.replace(/\D/g, '') === digits) {
-            overrides[k] = overrideEntry;
-          }
-        }
-      }
-      if (tId) overrides[tId] = overrideEntry;
-      if (tNum) overrides[tNum] = overrideEntry;
-      localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
-    } catch (e) {}
-
-    // 2. Cập nhật state orders của Manager
-    const updatedOrders = orders.map(o => {
-      const oId = String(o.order_id || '').trim();
-      const oNum = String(o.order_number || o.order_code || '').trim();
-      const oDigits = (oNum || oId).replace(/\D/g, '');
-      const isMatch = (tId && (oId === tId || oNum === tId)) ||
-                      (tNum && (oId === tNum || oNum === tNum)) ||
-                      (digits && oDigits && digits === oDigits);
-      if (isMatch) {
-        return {
-          ...o,
-          order_status: newStatus,
-          status: newStatus,
-          status_label: newStatusLabel,
-          refund_decision: 'REJECTED',
-          reject_reason: rejectReason,
-          note: updatedNote,
-        };
-      }
-      return o;
-    });
-    saveOrders(updatedOrders);
-
-    // 3. Đồng bộ customer orders storage
-    syncCustomerRefundDecision(tId, tNum, 'REJECTED', newStatusLabel, customerLabel, updatedNote, rejectReason, targetOrder.refund_reason || '', targetOrder.refund_bank || '');
-
-    // 4. Cập nhật DB MySQL backend
-    try {
-      if (tId) orderService.updateOrderStatus(tId, newStatus, updatedNote).catch(() => {});
-      if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus, updatedNote).catch(() => {});
-      if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus, updatedNote).catch(() => {});
-    } catch (e) {}
-
-    // 5. Phát sự kiện toàn cục & BroadcastChannel
-    const statusPayload = {
-      orderId: tId,
-      orderNumber: tNum,
-      digits,
-      status: newStatus,
-      statusLabel: newStatusLabel,
-      customerLabel,
-      refund_decision: 'REJECTED',
-      reject_reason: rejectReason,
-      note: updatedNote,
-      timestamp: Date.now()
-    };
-    try {
-      localStorage.setItem('yf_last_status_event', JSON.stringify(statusPayload));
-      const bc = new BroadcastChannel('yf_orders_sync_channel');
-      bc.postMessage(statusPayload);
-      bc.close();
-    } catch (e) {}
-
-    window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: statusPayload }));
-    window.dispatchEvent(new Event('order_status_updated'));
-
-    // Gửi thông báo từ chối hoàn đến tài khoản người mua đơn hàng
-    try {
-      sendOrderStatusNotification(targetOrder, 'REJECTED', {
-        newStatusLabel: 'Từ chối hoàn',
-        rejectReason
-      });
-    } catch (err) {
-      console.error('Lỗi gửi thông báo từ chối hoàn cho người mua:', err);
-    }
-
-    // Cập nhật lại editingOrder hiện tại
-    setEditingOrder(prev => prev ? {
-      ...prev,
-      order_status: newStatus,
-      status_label: newStatusLabel,
-      refund_decision: 'REJECTED',
-      reject_reason: rejectReason,
-      note: updatedNote,
-    } : null);
-
     showSuccess(`Đã cập nhật lý do từ chối hoàn tiền cho đơn hàng #${tNum || tId} thành công!`);
   };
 
