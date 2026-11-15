@@ -45,7 +45,7 @@ const ContactPage = () => {
 
             <div className="highlight-item">
               <span className="hl-label">EMAIL HỖ TRỢ:</span>
-              <a href="mailto:cskh@youthfashion.vn" className="hl-value">cskh@youthfashion.vn</a>
+              <a href="mailto:ssogarena7022@gmail.com" className="hl-value">ssogarena7022@gmail.com</a>
             </div>
           </div>
         </section>
