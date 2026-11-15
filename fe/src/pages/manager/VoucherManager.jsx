@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import ManagerSidebar from '../../components/ManagerSidebar';
 import ManagerHeader from '../../components/ManagerHeader';
 import { useToast } from '../../context/ToastContext';
@@ -20,7 +20,8 @@ import {
   Calendar, 
   TrendingUp,
   Filter,
-  ArrowRight
+  ArrowRight,
+  Check
 } from 'lucide-react';
 
 
@@ -376,6 +377,94 @@ const voucherPageStyles = `
     min-width: 175px;
     position: relative;
     user-select: none;
+    transition: all 0.15s ease;
+  }
+
+  .custom-select-box:hover {
+    border-color: #B8B2A7;
+  }
+
+  .custom-select-box.active {
+    border-color: #111111;
+    box-shadow: 0 0 0 1px #111111;
+  }
+
+  .custom-dropdown-chevron {
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .custom-dropdown-chevron.rotate {
+    transform: rotate(180deg);
+  }
+
+  .custom-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 220px;
+    background: #FFFFFF;
+    border: 1px solid #E2DFD7;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    padding: 6px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .dropdown-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #44403C;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .dropdown-menu-item:hover {
+    background: #F5F4EF;
+    color: #111111;
+  }
+
+  .dropdown-menu-item.selected {
+    background: #FAF8F5;
+    color: #111111;
+    font-weight: 600;
+  }
+
+  .btn-reset-filter {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    height: 40px;
+    background: #F5F4EF;
+    border: 1px solid #E2DFD7;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #78716C;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+
+  .btn-reset-filter:hover {
+    background: #EAE7DF;
+    color: #111111;
   }
 
   /* Table Container */
@@ -834,10 +923,54 @@ export default function VoucherManager() {
   const [activeTab, setActiveTab] = useState('all'); // all, active, upcoming, expired
   const [searchQuery, setSearchQuery] = useState('');
   const [offerTypeFilter, setOfferTypeFilter] = useState('all'); // all, percent, fixed, shipping
-  const [sortBy, setSortBy] = useState('newest'); // newest, usage, discount
+  const [sortBy, setSortBy] = useState('newest'); // newest, usage, limit, discount, oldest
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 6;
+
+  // Dropdown menus state & click-outside handlers
+  const [isOfferTypeOpen, setIsOfferTypeOpen] = useState(false);
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const offerTypeRef = useRef(null);
+  const sortRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (offerTypeRef.current && !offerTypeRef.current.contains(e.target)) {
+        setIsOfferTypeOpen(false);
+      }
+      if (sortRef.current && !sortRef.current.contains(e.target)) {
+        setIsSortOpen(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsOfferTypeOpen(false);
+        setIsSortOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  const OFFER_TYPE_OPTIONS = [
+    { value: 'all', label: 'Tất cả loại ưu đãi', shortLabel: 'Tất cả', icon: <Tag size={13} color="#78716C" /> },
+    { value: 'percent', label: 'Giảm theo phần trăm (%)', shortLabel: 'Giảm %', icon: <Percent size={13} color="#111111" /> },
+    { value: 'fixed', label: 'Giảm tiền mặt (₫)', shortLabel: 'Giảm tiền', icon: <Gift size={13} color="#D97706" /> },
+    { value: 'shipping', label: 'Miễn phí vận chuyển (Freeship)', shortLabel: 'Freeship', icon: <Truck size={13} color="#2563EB" /> },
+  ];
+
+  const SORT_OPTIONS = [
+    { value: 'newest', label: 'Mới cập nhật nhất' },
+    { value: 'usage', label: 'Lượt dùng nhiều nhất' },
+    { value: 'limit', label: 'Giới hạn cao nhất' },
+    { value: 'discount', label: 'Giá trị giảm cao nhất' },
+    { value: 'oldest', label: 'Cũ nhất trước' },
+  ];
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -1268,45 +1401,114 @@ export default function VoucherManager() {
 
               {/* Offer Type Dropdown */}
               <div 
-                className="custom-select-box"
+                ref={offerTypeRef}
+                className={`custom-select-box ${isOfferTypeOpen ? 'active' : ''}`}
                 onClick={() => {
-                  const types = ['all', 'percent', 'fixed', 'shipping'];
-                  const curIdx = types.indexOf(offerTypeFilter);
-                  const next = types[(curIdx + 1) % types.length];
-                  setOfferTypeFilter(next);
-                  setCurrentPage(1);
+                  setIsOfferTypeOpen(prev => !prev);
+                  setIsSortOpen(false);
                 }}
-                title="Nhấn để chuyển đổi loại ưu đãi"
+                title="Chọn loại ưu đãi để lọc"
               >
                 <span>
                   Loại ưu đãi: {
-                    offerTypeFilter === 'all' ? 'Tất cả' :
-                    offerTypeFilter === 'percent' ? 'Giảm %' :
-                    offerTypeFilter === 'fixed' ? 'Giảm tiền' : 'Freeship'
+                    OFFER_TYPE_OPTIONS.find(t => t.value === offerTypeFilter)?.shortLabel || 'Tất cả'
                   }
                 </span>
-                <ChevronDown size={15} color="#78716C" />
+                <ChevronDown 
+                  size={15} 
+                  color="#78716C" 
+                  className={`custom-dropdown-chevron ${isOfferTypeOpen ? 'rotate' : ''}`} 
+                />
+
+                {isOfferTypeOpen && (
+                  <div className="custom-dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                    {OFFER_TYPE_OPTIONS.map((opt) => {
+                      const isSelected = offerTypeFilter === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          className={`dropdown-menu-item ${isSelected ? 'selected' : ''}`}
+                          onClick={() => {
+                            setOfferTypeFilter(opt.value);
+                            setCurrentPage(1);
+                            setIsOfferTypeOpen(false);
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {opt.icon}
+                            <span>{opt.label}</span>
+                          </div>
+                          {isSelected && <Check size={14} color="#111111" strokeWidth={2.5} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Sort By Dropdown */}
               <div 
-                className="custom-select-box"
+                ref={sortRef}
+                className={`custom-select-box ${isSortOpen ? 'active' : ''}`}
                 onClick={() => {
-                  const sorts = ['newest', 'usage', 'limit'];
-                  const curIdx = sorts.indexOf(sortBy);
-                  const next = sorts[(curIdx + 1) % sorts.length];
-                  setSortBy(next);
+                  setIsSortOpen(prev => !prev);
+                  setIsOfferTypeOpen(false);
                 }}
-                title="Nhấn để sắp xếp"
+                title="Chọn thứ tự sắp xếp"
               >
                 <span>
                   Sắp xếp: {
-                    sortBy === 'newest' ? 'Mới cập nhật nhất' :
-                    sortBy === 'usage' ? 'Lượt dùng nhiều nhất' : 'Giới hạn cao nhất'
+                    SORT_OPTIONS.find(s => s.value === sortBy)?.label || 'Mới cập nhật nhất'
                   }
                 </span>
-                <ChevronDown size={15} color="#78716C" />
+                <ChevronDown 
+                  size={15} 
+                  color="#78716C" 
+                  className={`custom-dropdown-chevron ${isSortOpen ? 'rotate' : ''}`} 
+                />
+
+                {isSortOpen && (
+                  <div className="custom-dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                    {SORT_OPTIONS.map((opt) => {
+                      const isSelected = sortBy === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          className={`dropdown-menu-item ${isSelected ? 'selected' : ''}`}
+                          onClick={() => {
+                            setSortBy(opt.value);
+                            setIsSortOpen(false);
+                          }}
+                        >
+                          <span>{opt.label}</span>
+                          {isSelected && <Check size={14} color="#111111" strokeWidth={2.5} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
+
+              {/* Nút đặt lại bộ lọc nếu có lọc */}
+              {(offerTypeFilter !== 'all' || searchQuery.trim() || activeTab !== 'all') && (
+                <button
+                  type="button"
+                  className="btn-reset-filter"
+                  onClick={() => {
+                    setOfferTypeFilter('all');
+                    setSortBy('newest');
+                    setSearchQuery('');
+                    setActiveTab('all');
+                    setCurrentPage(1);
+                  }}
+                  title="Đặt lại toàn bộ lọc"
+                >
+                  <X size={14} color="#E11D48" />
+                  <span>Xóa lọc</span>
+                </button>
+              )}
             </div>
           </div>
 
