@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useAuth } from '../../hooks/useAuth';
-import { useToast } from '../../context/ToastContext';
-import { brandService } from '../../services/brandService';
-import ManagerSidebar from '../../components/ManagerSidebar';
-import ManagerHeader from '../../components/ManagerHeader';
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useAuth } from "../../hooks/useAuth";
+import { useToast } from "../../context/ToastContext";
+import { brandService } from "../../services/brandService";
+import ManagerSidebar from "../../components/ManagerSidebar";
+import ManagerHeader from "../../components/ManagerHeader";
 import {
   Award,
   Star,
@@ -18,8 +18,8 @@ import {
   TrendingUp,
   Banknote,
   CheckCircle,
-  X
-} from 'lucide-react';
+  X,
+} from "lucide-react";
 
 const brandStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,400;1,600&display=swap');
@@ -746,42 +746,59 @@ const brandStyles = `
  * Trích xuất hoặc gán xuất xứ chuẩn chỉ cho thương hiệu từ mô tả/tên
  */
 export const getBrandOrigin = (brand) => {
-  if (!brand) return 'Quốc tế';
-  const desc = brand.description || '';
-  const match = desc.match(/\[Xuất xứ:\s*([^\]]+)\]/i) || desc.match(/Xuất xứ:\s*([^|\n]+)/i);
+  if (!brand) return "Quốc tế";
+  const desc = brand.description || "";
+  const match =
+    desc.match(/\[Xuất xứ:\s*([^\]]+)\]/i) ||
+    desc.match(/Xuất xứ:\s*([^|\n]+)/i);
   if (match) return match[1].trim();
 
-  const name = (brand.brand_name || '').toLowerCase();
-  if (name.includes('chanel') || name.includes('saint laurent') || name.includes('margiela') || name.includes('jacquemus') || name.includes('atelier') || name.includes('couture')) {
-    return 'Pháp (Paris)';
+  const name = (brand.brand_name || "").toLowerCase();
+  if (
+    name.includes("chanel") ||
+    name.includes("saint laurent") ||
+    name.includes("margiela") ||
+    name.includes("jacquemus") ||
+    name.includes("atelier") ||
+    name.includes("couture")
+  ) {
+    return "Pháp (Paris)";
   }
-  if (name.includes('loro piana') || name.includes('elegance') || name.includes('heritage') || name.includes('modern luxe')) {
-    return 'Ý (Milan)';
+  if (
+    name.includes("loro piana") ||
+    name.includes("elegance") ||
+    name.includes("heritage") ||
+    name.includes("modern luxe")
+  ) {
+    return "Ý (Milan)";
   }
-  if (name.includes('the row') || name.includes('denim')) {
-    return 'Mỹ (New York)';
+  if (name.includes("the row") || name.includes("denim")) {
+    return "Mỹ (New York)";
   }
-  if (name.includes('tokyo') || name.includes('minimalist')) {
-    return 'Nhật Bản (Tokyo)';
+  if (name.includes("tokyo") || name.includes("minimalist")) {
+    return "Nhật Bản (Tokyo)";
   }
-  if (name.includes('urban') || name.includes('sporty')) {
-    return 'Hàn Quốc (Seoul)';
+  if (name.includes("urban") || name.includes("sporty")) {
+    return "Hàn Quốc (Seoul)";
   }
-  if (name.includes('nordic') || name.includes('eco')) {
-    return 'Thụy Điển (Stockholm)';
+  if (name.includes("nordic") || name.includes("eco")) {
+    return "Thụy Điển (Stockholm)";
   }
-  if (name.includes('youthfashion') || name.includes('casual essentials')) {
-    return 'Việt Nam (Hà Nội)';
+  if (name.includes("youthfashion") || name.includes("casual essentials")) {
+    return "Việt Nam (Hà Nội)";
   }
-  return 'Quốc tế';
+  return "Quốc tế";
 };
 
 /**
  * Tách phần mô tả sạch (không chứa tag [Xuất xứ: ...])
  */
-export const getCleanDescription = (desc = '') => {
-  if (!desc) return '';
-  return desc.replace(/\[Xuất xứ:\s*[^\]]+\]\s*/i, '').replace(/Xuất xứ:\s*[^|\n]+[|\n]?\s*/i, '').trim();
+export const getCleanDescription = (desc = "") => {
+  if (!desc) return "";
+  return desc
+    .replace(/\[Xuất xứ:\s*[^\]]+\]\s*/i, "")
+    .replace(/Xuất xứ:\s*[^|\n]+[|\n]?\s*/i, "")
+    .trim();
 };
 
 const ITEMS_PER_PAGE = 6;
@@ -793,9 +810,9 @@ export default function BrandManager() {
   const [loading, setLoading] = useState(true);
 
   // Filters & Sorting
-  const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'INACTIVE'
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'name_asc' | 'name_desc' | 'products_desc' | 'products_asc'
+  const [activeTab, setActiveTab] = useState("ALL"); // 'ALL' | 'ACTIVE' | 'INACTIVE'
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("newest"); // 'newest' | 'name_asc' | 'name_desc' | 'products_desc' | 'products_asc'
   const [currentPage, setCurrentPage] = useState(1);
 
   // Checkbox Selection
@@ -809,10 +826,10 @@ export default function BrandManager() {
 
   // Form State
   const [formData, setFormData] = useState({
-    brand_name: '',
-    origin: '',
-    description: '',
-    status: 'ACTIVE',
+    brand_name: "",
+    origin: "",
+    description: "",
+    status: "ACTIVE",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -825,8 +842,8 @@ export default function BrandManager() {
         setBrands(res.data || []);
       }
     } catch (err) {
-      console.error('Lỗi khi tải danh sách thương hiệu:', err);
-      showError('Không thể tải danh sách thương hiệu từ cơ sở dữ liệu MySQL');
+      console.error("Lỗi khi tải danh sách thương hiệu:", err);
+      showError("Không thể tải danh sách thương hiệu từ cơ sở dữ liệu MySQL");
     } finally {
       setLoading(false);
     }
@@ -838,12 +855,19 @@ export default function BrandManager() {
 
   // Thống kê metrics cho 3 thẻ Card
   const totalCount = brands.length;
-  const activeCount = brands.filter((b) => b.status === 'ACTIVE').length;
-  const inactiveCount = brands.filter((b) => b.status === 'INACTIVE').length;
-  const totalProducts = brands.reduce((sum, b) => sum + (b.product_count || 0), 0);
+  const activeCount = brands.filter((b) => b.status === "ACTIVE").length;
+  const inactiveCount = brands.filter((b) => b.status === "INACTIVE").length;
+  const totalProducts = brands.reduce(
+    (sum, b) => sum + (b.product_count || 0),
+    0,
+  );
   const topBrand = useMemo(() => {
     if (brands.length === 0) return null;
-    return brands.reduce((max, b) => ((b.product_count || 0) > (max?.product_count || 0) ? b : max), brands[0]);
+    return brands.reduce(
+      (max, b) =>
+        (b.product_count || 0) > (max?.product_count || 0) ? b : max,
+      brands[0],
+    );
   }, [brands]);
 
   // Lọc và Sắp xếp
@@ -851,33 +875,39 @@ export default function BrandManager() {
     let result = [...brands];
 
     // Lọc theo Tab Trạng thái
-    if (activeTab === 'ACTIVE') {
-      result = result.filter((b) => b.status === 'ACTIVE');
-    } else if (activeTab === 'INACTIVE') {
-      result = result.filter((b) => b.status === 'INACTIVE');
+    if (activeTab === "ACTIVE") {
+      result = result.filter((b) => b.status === "ACTIVE");
+    } else if (activeTab === "INACTIVE") {
+      result = result.filter((b) => b.status === "INACTIVE");
     }
 
     // Lọc theo Từ khóa tìm kiếm (tên, xuất xứ, mô tả)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       result = result.filter((b) => {
-        const name = (b.brand_name || '').toLowerCase();
+        const name = (b.brand_name || "").toLowerCase();
         const origin = getBrandOrigin(b).toLowerCase();
-        const desc = (b.description || '').toLowerCase();
+        const desc = (b.description || "").toLowerCase();
         return name.includes(q) || origin.includes(q) || desc.includes(q);
       });
     }
 
     // Sắp xếp
-    if (sortBy === 'newest') {
-      result.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-    } else if (sortBy === 'name_asc') {
-      result.sort((a, b) => (a.brand_name || '').localeCompare(b.brand_name || '', 'vi'));
-    } else if (sortBy === 'name_desc') {
-      result.sort((a, b) => (b.brand_name || '').localeCompare(a.brand_name || '', 'vi'));
-    } else if (sortBy === 'products_desc') {
+    if (sortBy === "newest") {
+      result.sort(
+        (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
+      );
+    } else if (sortBy === "name_asc") {
+      result.sort((a, b) =>
+        (a.brand_name || "").localeCompare(b.brand_name || "", "vi"),
+      );
+    } else if (sortBy === "name_desc") {
+      result.sort((a, b) =>
+        (b.brand_name || "").localeCompare(a.brand_name || "", "vi"),
+      );
+    } else if (sortBy === "products_desc") {
       result.sort((a, b) => (b.product_count || 0) - (a.product_count || 0));
-    } else if (sortBy === 'products_asc') {
+    } else if (sortBy === "products_asc") {
       result.sort((a, b) => (a.product_count || 0) - (b.product_count || 0));
     }
 
@@ -885,17 +915,27 @@ export default function BrandManager() {
   }, [brands, activeTab, searchQuery, sortBy]);
 
   // Phân trang
-  const totalPages = Math.max(1, Math.ceil(filteredBrands.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredBrands.length / ITEMS_PER_PAGE),
+  );
   const validCurrentPage = Math.min(currentPage, totalPages);
   const startIndex = (validCurrentPage - 1) * ITEMS_PER_PAGE;
-  const currentItems = filteredBrands.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const currentItems = filteredBrands.slice(
+    startIndex,
+    startIndex + ITEMS_PER_PAGE,
+  );
 
   // Checkbox handlers
-  const isAllCurrentSelected = currentItems.length > 0 && currentItems.every((item) => selectedIds.includes(item.brand_id));
+  const isAllCurrentSelected =
+    currentItems.length > 0 &&
+    currentItems.every((item) => selectedIds.includes(item.brand_id));
 
   const handleSelectAll = () => {
     if (isAllCurrentSelected) {
-      setSelectedIds((prev) => prev.filter((id) => !currentItems.some((item) => item.brand_id === id)));
+      setSelectedIds((prev) =>
+        prev.filter((id) => !currentItems.some((item) => item.brand_id === id)),
+      );
     } else {
       const newIds = currentItems.map((item) => item.brand_id);
       setSelectedIds((prev) => Array.from(new Set([...prev, ...newIds])));
@@ -903,12 +943,14 @@ export default function BrandManager() {
   };
 
   const handleToggleSelectOne = (id) => {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
   };
 
   // Toggle nhanh trạng thái Hiển thị / Tạm ẩn
   const handleToggleStatus = async (brand) => {
-    const nextStatus = brand.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const nextStatus = brand.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
     try {
       await brandService.updateBrand(brand.brand_id, {
         brand_name: brand.brand_name,
@@ -916,21 +958,27 @@ export default function BrandManager() {
         status: nextStatus,
       });
       setBrands((prev) =>
-        prev.map((b) => (b.brand_id === brand.brand_id ? { ...b, status: nextStatus } : b))
+        prev.map((b) =>
+          b.brand_id === brand.brand_id ? { ...b, status: nextStatus } : b,
+        ),
       );
-      showSuccess(`Đã chuyển thương hiệu "${brand.brand_name}" sang trạng thái ${nextStatus === 'ACTIVE' ? 'Hiển thị' : 'Tạm ẩn'}`);
+      showSuccess(
+        `Đã chuyển thương hiệu "${brand.brand_name}" sang trạng thái ${nextStatus === "ACTIVE" ? "Hiển thị" : "Tạm ẩn"}`,
+      );
     } catch (err) {
-      showError(err.response?.data?.message || 'Không thể đổi trạng thái thương hiệu');
+      showError(
+        err.response?.data?.message || "Không thể đổi trạng thái thương hiệu",
+      );
     }
   };
 
   // Mở modal Thêm mới
   const handleOpenCreate = () => {
     setFormData({
-      brand_name: '',
-      origin: 'Pháp (Paris)',
-      description: '',
-      status: 'ACTIVE',
+      brand_name: "",
+      origin: "Pháp (Paris)",
+      description: "",
+      status: "ACTIVE",
     });
     setIsCreateOpen(true);
   };
@@ -950,7 +998,7 @@ export default function BrandManager() {
   const handleSaveBrand = async (e) => {
     e.preventDefault();
     if (!formData.brand_name.trim()) {
-      showError('Vui lòng nhập tên thương hiệu');
+      showError("Vui lòng nhập tên thương hiệu");
       return;
     }
 
@@ -968,7 +1016,9 @@ export default function BrandManager() {
 
       if (editingBrand) {
         await brandService.updateBrand(editingBrand.brand_id, payload);
-        showSuccess(`Cập nhật thương hiệu "${formData.brand_name}" thành công!`);
+        showSuccess(
+          `Cập nhật thương hiệu "${formData.brand_name}" thành công!`,
+        );
         setEditingBrand(null);
       } else {
         await brandService.createBrand(payload);
@@ -977,7 +1027,9 @@ export default function BrandManager() {
       }
       fetchBrands();
     } catch (err) {
-      showError(err.response?.data?.message || 'Lỗi khi lưu dữ liệu thương hiệu');
+      showError(
+        err.response?.data?.message || "Lỗi khi lưu dữ liệu thương hiệu",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -988,12 +1040,16 @@ export default function BrandManager() {
     if (!deletingBrand) return;
     try {
       await brandService.deleteBrand(deletingBrand.brand_id);
-      setSelectedIds((prev) => prev.filter((id) => id !== deletingBrand.brand_id));
+      setSelectedIds((prev) =>
+        prev.filter((id) => id !== deletingBrand.brand_id),
+      );
       setDeletingBrand(null);
       fetchBrands();
-      showSuccess(`Đã xóa thương hiệu "${deletingBrand.brand_name}" thành công`);
+      showSuccess(
+        `Đã xóa thương hiệu "${deletingBrand.brand_name}" thành công`,
+      );
     } catch (err) {
-      showError(err.response?.data?.message || 'Không thể xóa thương hiệu này');
+      showError(err.response?.data?.message || "Không thể xóa thương hiệu này");
     }
   };
 
@@ -1002,12 +1058,14 @@ export default function BrandManager() {
     if (selectedIds.length === 0) return;
     try {
       await Promise.all(selectedIds.map((id) => brandService.deleteBrand(id)));
-      showSuccess(`Đã xóa thành công ${selectedIds.length} thương hiệu đã chọn`);
+      showSuccess(
+        `Đã xóa thành công ${selectedIds.length} thương hiệu đã chọn`,
+      );
       setSelectedIds([]);
       setIsBulkDeleteOpen(false);
       fetchBrands();
     } catch (err) {
-      showError('Có lỗi xảy ra khi xóa một số thương hiệu liên kết sản phẩm');
+      showError("Có lỗi xảy ra khi xóa một số thương hiệu liên kết sản phẩm");
       setIsBulkDeleteOpen(false);
       fetchBrands();
     }
@@ -1029,14 +1087,21 @@ export default function BrandManager() {
           {/* TIÊU ĐỀ TRANG & NÚT THÊM THƯƠNG HIỆU */}
           <div className="bm-header-row">
             <div>
-              <p className="dashboard-header-sub">YOUTHFASHION • QUẢN LÝ THƯƠNG HIỆU</p>
+              <p className="dashboard-header-sub">
+                YOUTHFASHION • QUẢN LÝ THƯƠNG HIỆU
+              </p>
               <h1 className="bm-title-heading">Danh Sách Thương Hiệu</h1>
               <p className="bm-title-sub">
-                Kiểm soát danh mục {totalCount} nhà mốt liên kết, chỉ số doanh thu đối tác và chính sách phân phối độc quyền.
+                Kiểm soát danh mục {totalCount} nhà mốt liên kết, chỉ số doanh
+                thu đối tác và chính sách phân phối độc quyền.
               </p>
             </div>
 
-            <button type="button" className="bm-btn-add" onClick={handleOpenCreate}>
+            <button
+              type="button"
+              className="bm-btn-add"
+              onClick={handleOpenCreate}
+            >
               <Plus size={16} strokeWidth={2.5} />
               THÊM THƯƠNG HIỆU MỚI
             </button>
@@ -1047,7 +1112,9 @@ export default function BrandManager() {
             {/* Thẻ 1: Tổng thương hiệu hợp tác */}
             <div className="bm-metric-card">
               <div className="bm-metric-head">
-                <span className="bm-metric-title">TỔNG THƯƠNG HIỆU HỢP TÁC</span>
+                <span className="bm-metric-title">
+                  TỔNG THƯƠNG HIỆU HỢP TÁC
+                </span>
                 <div className="bm-metric-icon-box">
                   <Award size={18} strokeWidth={2} />
                 </div>
@@ -1058,14 +1125,18 @@ export default function BrandManager() {
               </div>
               <div>
                 <div className="bm-metric-subtext">
-                  <span style={{ color: '#111111', fontWeight: 700 }}>● {activeCount} đang hiển thị</span>
-                  <span style={{ margin: '0 4px', color: '#D1D5DB' }}>•</span>
+                  <span style={{ color: "#111111", fontWeight: 700 }}>
+                    ● {activeCount} đang hiển thị
+                  </span>
+                  <span style={{ margin: "0 4px", color: "#D1D5DB" }}>•</span>
                   <span>{inactiveCount} đã ẩn</span>
                 </div>
                 <div className="bm-progress-bar-wrap">
                   <div
                     className="bm-progress-bar-fill"
-                    style={{ width: `${totalCount > 0 ? (activeCount / totalCount) * 100 : 0}%` }}
+                    style={{
+                      width: `${totalCount > 0 ? (activeCount / totalCount) * 100 : 0}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -1074,20 +1145,30 @@ export default function BrandManager() {
             {/* Thẻ 2: Thương hiệu nhiều sản phẩm nhất */}
             <div className="bm-metric-card">
               <div className="bm-metric-head">
-                <span className="bm-metric-title">THƯƠNG HIỆU NHIỀU SẢN PHẨM NHẤT</span>
+                <span className="bm-metric-title">
+                  THƯƠNG HIỆU NHIỀU SẢN PHẨM NHẤT
+                </span>
                 <div className="bm-metric-icon-box gold">
                   <Star size={18} strokeWidth={2} fill="#D97706" />
                 </div>
               </div>
               <div className="bm-metric-value-row">
-                <span className="bm-metric-value-num" style={{ fontSize: '26px' }}>
-                  {topBrand?.brand_name || 'Chưa có'}
+                <span
+                  className="bm-metric-value-num"
+                  style={{ fontSize: "26px" }}
+                >
+                  {topBrand?.brand_name || "Chưa có"}
                 </span>
               </div>
               <div>
-                <div className="bm-metric-subtext" style={{ color: '#4B5563', fontWeight: 600 }}>
+                <div
+                  className="bm-metric-subtext"
+                  style={{ color: "#4B5563", fontWeight: 600 }}
+                >
                   <TrendingUp size={15} color="#D97706" />
-                  <span>Chứa {topBrand?.product_count || 0} sản phẩm liên kết</span>
+                  <span>
+                    Chứa {topBrand?.product_count || 0} sản phẩm liên kết
+                  </span>
                 </div>
                 <div className="bm-progress-accent-line" />
               </div>
@@ -1096,13 +1177,17 @@ export default function BrandManager() {
             {/* Thẻ 3: Sản phẩm phân phối liên kết */}
             <div className="bm-metric-card">
               <div className="bm-metric-head">
-                <span className="bm-metric-title">SẢN PHẨM PHÂN PHỐI LIÊN KẾT</span>
+                <span className="bm-metric-title">
+                  SẢN PHẨM PHÂN PHỐI LIÊN KẾT
+                </span>
                 <div className="bm-metric-icon-box">
                   <Tag size={18} strokeWidth={2} />
                 </div>
               </div>
               <div className="bm-metric-value-row">
-                <span className="bm-metric-value-num">{totalProducts.toLocaleString('vi-VN')}</span>
+                <span className="bm-metric-value-num">
+                  {totalProducts.toLocaleString("vi-VN")}
+                </span>
                 <span className="bm-metric-value-unit">Sản Phẩm</span>
               </div>
               <div>
@@ -1111,7 +1196,10 @@ export default function BrandManager() {
                   <span>AOV trung bình ~2.680.000đ / sản phẩm</span>
                 </div>
                 <div className="bm-progress-bar-wrap">
-                  <div className="bm-progress-bar-fill" style={{ width: '55%' }} />
+                  <div
+                    className="bm-progress-bar-fill"
+                    style={{ width: "55%" }}
+                  />
                 </div>
               </div>
             </div>
@@ -1124,55 +1212,46 @@ export default function BrandManager() {
               <div className="bm-tab-group">
                 <button
                   type="button"
-                  className={`bm-tab-btn ${activeTab === 'ALL' ? 'active' : ''}`}
+                  className={`bm-tab-btn ${activeTab === "ALL" ? "active" : ""}`}
                   onClick={() => {
-                    setActiveTab('ALL');
+                    setActiveTab("ALL");
                     setCurrentPage(1);
                   }}
                 >
-                  Tất cả ({totalCount < 10 ? '0' + totalCount : totalCount})
+                  Tất cả ({totalCount < 10 ? "0" + totalCount : totalCount})
                 </button>
                 <button
                   type="button"
-                  className={`bm-tab-btn ${activeTab === 'ACTIVE' ? 'active' : ''}`}
+                  className={`bm-tab-btn ${activeTab === "ACTIVE" ? "active" : ""}`}
                   onClick={() => {
-                    setActiveTab('ACTIVE');
+                    setActiveTab("ACTIVE");
                     setCurrentPage(1);
                   }}
                 >
-                  Phát hành ({activeCount < 10 ? '0' + activeCount : activeCount})
+                  Phát hành (
+                  {activeCount < 10 ? "0" + activeCount : activeCount})
                 </button>
                 <button
                   type="button"
-                  className={`bm-tab-btn ${activeTab === 'INACTIVE' ? 'active' : ''}`}
+                  className={`bm-tab-btn ${activeTab === "INACTIVE" ? "active" : ""}`}
                   onClick={() => {
-                    setActiveTab('INACTIVE');
+                    setActiveTab("INACTIVE");
                     setCurrentPage(1);
                   }}
                 >
-                  Tạm ẩn ({inactiveCount < 10 ? '0' + inactiveCount : inactiveCount})
+                  Tạm ẩn (
+                  {inactiveCount < 10 ? "0" + inactiveCount : inactiveCount})
                 </button>
               </div>
 
               {/* Nhóm nút bên phải */}
               <div className="bm-quick-actions">
-                <button
-                  type="button"
-                  className="bm-btn-pill-outline"
-                  onClick={() => {
-                    setActiveTab('ALL');
-                    setSearchQuery('');
-                    setSelectedIds([]);
-                    setCurrentPage(1);
-                  }}
-                  title="Đặt lại bộ lọc và quay lại danh sách đầy đủ"
-                >
-                  <ArrowLeft size={14} />
-                  Quay lại
-                </button>
-
                 <span className="bm-selection-count-text">
-                  | Đã chọn: <strong style={{ color: '#111111' }}>{selectedIds.length} mục</strong> |
+                  | Đã chọn:{" "}
+                  <strong style={{ color: "#111111" }}>
+                    {selectedIds.length} mục
+                  </strong>{" "}
+                  |
                 </span>
 
                 <button
@@ -1205,8 +1284,14 @@ export default function BrandManager() {
                 {searchQuery && (
                   <button
                     type="button"
-                    onClick={() => setSearchQuery('')}
-                    style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: 0 }}
+                    onClick={() => setSearchQuery("")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#9CA3AF",
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
                   >
                     <X size={15} />
                   </button>
@@ -1232,11 +1317,11 @@ export default function BrandManager() {
 
           {/* BẢNG DỮ LIỆU THƯƠNG HIỆU */}
           <div className="bm-table-card">
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: "auto" }}>
               <table className="bm-table">
                 <thead>
                   <tr>
-                    <th style={{ width: '48px', textAlign: 'center' }}>
+                    <th style={{ width: "48px", textAlign: "center" }}>
                       <input
                         type="checkbox"
                         className="bm-custom-checkbox"
@@ -1245,31 +1330,70 @@ export default function BrandManager() {
                         title="Chọn tất cả dòng trên trang này"
                       />
                     </th>
-                    <th style={{ width: '30%' }}>THƯƠNG HIỆU</th>
-                    <th style={{ width: '25%' }}>XUẤT XỨ</th>
-                    <th style={{ width: '18%' }}>SỐ LƯỢNG SẢN PHẨM</th>
-                    <th style={{ width: '14%', textAlign: 'center' }}>TRẠNG THÁI</th>
-                    <th style={{ width: '13%', textAlign: 'center' }}>THAO TÁC</th>
+                    <th style={{ width: "30%" }}>THƯƠNG HIỆU</th>
+                    <th style={{ width: "25%" }}>XUẤT XỨ</th>
+                    <th style={{ width: "18%" }}>SỐ LƯỢNG SẢN PHẨM</th>
+                    <th style={{ width: "14%", textAlign: "center" }}>
+                      TRẠNG THÁI
+                    </th>
+                    <th style={{ width: "13%", textAlign: "center" }}>
+                      THAO TÁC
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', padding: '60px', color: '#78716C' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                          <Loader2 size={26} className="animate-spin" color="#111111" />
-                          <span>Đang đồng bộ dữ liệu thương hiệu từ MySQL...</span>
+                      <td
+                        colSpan="6"
+                        style={{
+                          textAlign: "center",
+                          padding: "60px",
+                          color: "#78716C",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: "10px",
+                          }}
+                        >
+                          <Loader2
+                            size={26}
+                            className="animate-spin"
+                            color="#111111"
+                          />
+                          <span>
+                            Đang đồng bộ dữ liệu thương hiệu từ MySQL...
+                          </span>
                         </div>
                       </td>
                     </tr>
                   ) : currentItems.length === 0 ? (
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', padding: '60px', color: '#78716C' }}>
-                        <p style={{ margin: 0, fontWeight: 600, color: '#374151' }}>
-                          Không tìm thấy thương hiệu nào phù hợp với bộ lọc hiện tại.
+                      <td
+                        colSpan="6"
+                        style={{
+                          textAlign: "center",
+                          padding: "60px",
+                          color: "#78716C",
+                        }}
+                      >
+                        <p
+                          style={{
+                            margin: 0,
+                            fontWeight: 600,
+                            color: "#374151",
+                          }}
+                        >
+                          Không tìm thấy thương hiệu nào phù hợp với bộ lọc hiện
+                          tại.
                         </p>
-                        <p style={{ margin: '6px 0 0 0', fontSize: '13px' }}>
-                          Bạn có thể thử tìm kiếm từ khóa khác hoặc nhấn "Thêm Thương Hiệu Mới".
+                        <p style={{ margin: "6px 0 0 0", fontSize: "13px" }}>
+                          Bạn có thể thử tìm kiếm từ khóa khác hoặc nhấn "Thêm
+                          Thương Hiệu Mới".
                         </p>
                       </td>
                     </tr>
@@ -1279,20 +1403,29 @@ export default function BrandManager() {
                       const origin = getBrandOrigin(brand);
 
                       return (
-                        <tr key={brand.brand_id} style={{ background: isChecked ? '#FFFDF8' : undefined }}>
+                        <tr
+                          key={brand.brand_id}
+                          style={{
+                            background: isChecked ? "#FFFDF8" : undefined,
+                          }}
+                        >
                           {/* 1. Hộp kiểm Checkbox */}
-                          <td style={{ textAlign: 'center' }}>
+                          <td style={{ textAlign: "center" }}>
                             <input
                               type="checkbox"
                               className="bm-custom-checkbox"
                               checked={isChecked}
-                              onChange={() => handleToggleSelectOne(brand.brand_id)}
+                              onChange={() =>
+                                handleToggleSelectOne(brand.brand_id)
+                              }
                             />
                           </td>
 
                           {/* 2. Tên thương hiệu (Serif thanh lịch Playfair Display) */}
                           <td>
-                            <h3 className="bm-brand-name-text">{brand.brand_name}</h3>
+                            <h3 className="bm-brand-name-text">
+                              {brand.brand_name}
+                            </h3>
                           </td>
 
                           {/* 3. Xuất xứ */}
@@ -1302,19 +1435,23 @@ export default function BrandManager() {
 
                           {/* 4. Số lượng sản phẩm */}
                           <td>
-                            <span className="bm-count-number">{brand.product_count || 0}</span>
+                            <span className="bm-count-number">
+                              {brand.product_count || 0}
+                            </span>
                             <span className="bm-count-unit">Mẫu</span>
                           </td>
 
                           {/* 5. Trạng thái (Hiển thị / Tạm ẩn) */}
-                          <td style={{ textAlign: 'center' }}>
+                          <td style={{ textAlign: "center" }}>
                             <button
                               type="button"
-                              className={`bm-status-pill ${brand.status === 'ACTIVE' ? 'active' : 'inactive'}`}
+                              className={`bm-status-pill ${brand.status === "ACTIVE" ? "active" : "inactive"}`}
                               onClick={() => handleToggleStatus(brand)}
                               title="Nhấp để đổi trạng thái Hiển thị / Tạm ẩn"
                             >
-                              {brand.status === 'ACTIVE' ? 'Hiển thị' : 'Tạm ẩn'}
+                              {brand.status === "ACTIVE"
+                                ? "Hiển thị"
+                                : "Tạm ẩn"}
                             </button>
                           </td>
 
@@ -1351,12 +1488,13 @@ export default function BrandManager() {
             {/* THANH PHÂN TRANG CHUẨN XÁC */}
             <div className="bm-pagination-bar">
               <span className="bm-pagination-info">
-                Hiển thị{' '}
+                Hiển thị{" "}
                 <strong>
-                  {filteredBrands.length === 0 ? 0 : startIndex + 1} -{' '}
+                  {filteredBrands.length === 0 ? 0 : startIndex + 1} -{" "}
                   {Math.min(startIndex + ITEMS_PER_PAGE, filteredBrands.length)}
-                </strong>{' '}
-                trên tổng số <strong>{filteredBrands.length}</strong> thương hiệu
+                </strong>{" "}
+                trên tổng số <strong>{filteredBrands.length}</strong> thương
+                hiệu
               </span>
 
               <div className="bm-pagination-controls">
@@ -1369,34 +1507,46 @@ export default function BrandManager() {
                   TRƯỚC
                 </button>
 
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
-                  if (
-                    totalPages > 7 &&
-                    num > 3 &&
-                    num < totalPages - 1 &&
-                    Math.abs(num - validCurrentPage) > 1
-                  ) {
-                    if (num === 4) return <span key={num} style={{ padding: '0 4px', color: '#9CA3AF' }}>...</span>;
-                    return null;
-                  }
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (num) => {
+                    if (
+                      totalPages > 7 &&
+                      num > 3 &&
+                      num < totalPages - 1 &&
+                      Math.abs(num - validCurrentPage) > 1
+                    ) {
+                      if (num === 4)
+                        return (
+                          <span
+                            key={num}
+                            style={{ padding: "0 4px", color: "#9CA3AF" }}
+                          >
+                            ...
+                          </span>
+                        );
+                      return null;
+                    }
 
-                  return (
-                    <button
-                      key={num}
-                      type="button"
-                      className={`bm-page-num-btn ${validCurrentPage === num ? 'active' : ''}`}
-                      onClick={() => setCurrentPage(num)}
-                    >
-                      {num}
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={num}
+                        type="button"
+                        className={`bm-page-num-btn ${validCurrentPage === num ? "active" : ""}`}
+                        onClick={() => setCurrentPage(num)}
+                      >
+                        {num}
+                      </button>
+                    );
+                  },
+                )}
 
                 <button
                   type="button"
                   className="bm-page-nav-btn"
                   disabled={validCurrentPage >= totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
                 >
                   SAU
                 </button>
@@ -1418,7 +1568,9 @@ export default function BrandManager() {
           <div className="bm-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="bm-modal-head">
               <h2 className="bm-modal-title">
-                {editingBrand ? 'Chỉnh Sửa Thương Hiệu' : 'Thêm Thương Hiệu Mới'}
+                {editingBrand
+                  ? "Chỉnh Sửa Thương Hiệu"
+                  : "Thêm Thương Hiệu Mới"}
               </h2>
               <button
                 type="button"
@@ -1441,19 +1593,25 @@ export default function BrandManager() {
                     className="bm-form-input"
                     placeholder="VD: Maison Margiela, Chanel, Saint Laurent..."
                     value={formData.brand_name}
-                    onChange={(e) => setFormData({ ...formData, brand_name: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, brand_name: e.target.value })
+                    }
                     required
                   />
                 </div>
 
                 <div className="bm-form-group">
-                  <label className="bm-form-label">Xuất Xứ (Quốc Gia / Thành Phố)</label>
+                  <label className="bm-form-label">
+                    Xuất Xứ (Quốc Gia / Thành Phố)
+                  </label>
                   <input
                     type="text"
                     className="bm-form-input"
                     placeholder="VD: Pháp (Paris), Ý (Milan), Mỹ (New York)..."
                     value={formData.origin}
-                    onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, origin: e.target.value })
+                    }
                   />
                 </div>
 
@@ -1464,7 +1622,9 @@ export default function BrandManager() {
                     rows={3}
                     placeholder="Giới thiệu phong cách thiết kế, định vị thời trang..."
                     value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
                   />
                 </div>
 
@@ -1473,10 +1633,16 @@ export default function BrandManager() {
                   <select
                     className="bm-form-select"
                     value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, status: e.target.value })
+                    }
                   >
-                    <option value="ACTIVE">Hiển thị (Phát hành công khai)</option>
-                    <option value="INACTIVE">Tạm ẩn (Ẩn khỏi trang khách hàng)</option>
+                    <option value="ACTIVE">
+                      Hiển thị (Phát hành công khai)
+                    </option>
+                    <option value="INACTIVE">
+                      Tạm ẩn (Ẩn khỏi trang khách hàng)
+                    </option>
                   </select>
                 </div>
               </div>
@@ -1492,9 +1658,13 @@ export default function BrandManager() {
                 >
                   Hủy Bỏ
                 </button>
-                <button type="submit" className="bm-btn-modal-submit" disabled={submitting}>
+                <button
+                  type="submit"
+                  className="bm-btn-modal-submit"
+                  disabled={submitting}
+                >
                   {submitting && <Loader2 size={14} className="animate-spin" />}
-                  {editingBrand ? 'Lưu Thay Đổi' : 'Tạo Thương Hiệu'}
+                  {editingBrand ? "Lưu Thay Đổi" : "Tạo Thương Hiệu"}
                 </button>
               </div>
             </form>
@@ -1504,37 +1674,73 @@ export default function BrandManager() {
 
       {/* MODAL 2: XÁC NHẬN XÓA 1 THƯƠNG HIỆU */}
       {deletingBrand && (
-        <div className="bm-modal-overlay" onClick={() => setDeletingBrand(null)}>
-          <div className="bm-modal-card" style={{ maxWidth: '420px', textAlign: 'center', padding: '28px 24px' }} onClick={(e) => e.stopPropagation()}>
+        <div
+          className="bm-modal-overlay"
+          onClick={() => setDeletingBrand(null)}
+        >
+          <div
+            className="bm-modal-card"
+            style={{
+              maxWidth: "420px",
+              textAlign: "center",
+              padding: "28px 24px",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div
               style={{
                 width: 48,
                 height: 48,
-                borderRadius: '50%',
-                background: '#FEF2F2',
-                color: '#DC2626',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px',
+                borderRadius: "50%",
+                background: "#FEF2F2",
+                color: "#DC2626",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 16px",
               }}
             >
               <AlertCircle size={26} />
             </div>
 
-            <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 8px', color: '#111' }}>
+            <h3
+              style={{
+                fontSize: "18px",
+                fontWeight: 700,
+                margin: "0 0 8px",
+                color: "#111",
+              }}
+            >
               Xóa Thương Hiệu?
             </h3>
-            <p style={{ fontSize: '13px', color: '#6B7280', margin: '0 0 20px', lineHeight: 1.5 }}>
-              Bạn có chắc muốn xóa thương hiệu <strong>"{deletingBrand.brand_name}"</strong>?
+            <p
+              style={{
+                fontSize: "13px",
+                color: "#6B7280",
+                margin: "0 0 20px",
+                lineHeight: 1.5,
+              }}
+            >
+              Bạn có chắc muốn xóa thương hiệu{" "}
+              <strong>"{deletingBrand.brand_name}"</strong>?
               {deletingBrand.product_count > 0 && (
-                <span style={{ display: 'block', color: '#DC2626', fontWeight: 600, marginTop: '8px' }}>
-                  ⚠️ Thương hiệu này đang liên kết với {deletingBrand.product_count} sản phẩm trong cửa hàng!
+                <span
+                  style={{
+                    display: "block",
+                    color: "#DC2626",
+                    fontWeight: 600,
+                    marginTop: "8px",
+                  }}
+                >
+                  ⚠️ Thương hiệu này đang liên kết với{" "}
+                  {deletingBrand.product_count} sản phẩm trong cửa hàng!
                 </span>
               )}
             </p>
 
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+            <div
+              style={{ display: "flex", justifyContent: "center", gap: "10px" }}
+            >
               <button
                 type="button"
                 className="bm-btn-modal-cancel"
@@ -1545,7 +1751,7 @@ export default function BrandManager() {
               <button
                 type="button"
                 className="bm-btn-modal-submit"
-                style={{ background: '#DC2626' }}
+                style={{ background: "#DC2626" }}
                 onClick={handleConfirmDelete}
               >
                 Xác Nhận Xóa
@@ -1557,32 +1763,61 @@ export default function BrandManager() {
 
       {/* MODAL 3: XÁC NHẬN XÓA HÀNG LOẠT */}
       {isBulkDeleteOpen && (
-        <div className="bm-modal-overlay" onClick={() => setIsBulkDeleteOpen(false)}>
-          <div className="bm-modal-card" style={{ maxWidth: '420px', textAlign: 'center', padding: '28px 24px' }} onClick={(e) => e.stopPropagation()}>
+        <div
+          className="bm-modal-overlay"
+          onClick={() => setIsBulkDeleteOpen(false)}
+        >
+          <div
+            className="bm-modal-card"
+            style={{
+              maxWidth: "420px",
+              textAlign: "center",
+              padding: "28px 24px",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div
               style={{
                 width: 48,
                 height: 48,
-                borderRadius: '50%',
-                background: '#FEF2F2',
-                color: '#DC2626',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px',
+                borderRadius: "50%",
+                background: "#FEF2F2",
+                color: "#DC2626",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 16px",
               }}
             >
               <Trash2 size={26} />
             </div>
 
-            <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 8px', color: '#111' }}>
+            <h3
+              style={{
+                fontSize: "18px",
+                fontWeight: 700,
+                margin: "0 0 8px",
+                color: "#111",
+              }}
+            >
               Xóa Hàng Loạt?
             </h3>
-            <p style={{ fontSize: '13px', color: '#6B7280', margin: '0 0 20px', lineHeight: 1.5 }}>
-              Bạn có chắc chắn muốn xóa <strong>{selectedIds.length}</strong> thương hiệu đã chọn khỏi cơ sở dữ liệu? Hành động này không thể hoàn tác.
+            <p
+              style={{
+                fontSize: "13px",
+                color: "#6B7280",
+                margin: "0 0 20px",
+                lineHeight: 1.5,
+              }}
+            >
+              Bạn có chắc chắn muốn xóa <strong>{selectedIds.length}</strong>{" "}
+              thương hiệu đã chọn khỏi cơ sở dữ liệu? Hành động này không thể
+              hoàn tác.
             </p>
 
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+            <div
+              style={{ display: "flex", justifyContent: "center", gap: "10px" }}
+            >
               <button
                 type="button"
                 className="bm-btn-modal-cancel"
@@ -1593,7 +1828,7 @@ export default function BrandManager() {
               <button
                 type="button"
                 className="bm-btn-modal-submit"
-                style={{ background: '#DC2626' }}
+                style={{ background: "#DC2626" }}
                 onClick={handleConfirmBulkDelete}
               >
                 Xóa {selectedIds.length} Mục
