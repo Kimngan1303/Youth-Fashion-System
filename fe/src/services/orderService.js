@@ -82,9 +82,9 @@ export const orderService = {
   /**
    * Cập nhật trạng thái đơn hàng (Dành cho Quản trị viên & Quản lý)
    */
-  updateOrderStatus: async (orderId, status, note) => {
+  updateOrderStatus: async (orderId, status, note, extraData = {}) => {
     try {
-      const res = await axiosClient.patch(`/orders/${orderId}/status`, { status, note });
+      const res = await axiosClient.patch(`/orders/${orderId}/status`, { status, note, ...extraData });
       return res.data;
     } catch (error) {
       throw error;

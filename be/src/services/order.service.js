@@ -464,13 +464,39 @@ export const updateOrderStatusService = async (orderId, status, note = null, opt
   // Tự động gửi email thông báo cập nhật trạng thái đơn hàng
   try {
     const fullOrder = await orderRepo.findOrderAny(orderId);
-    const targetEmail = fullOrder?.recipient_email || fullOrder?.customer?.email;
-    if (targetEmail) {
+    const emailsToSend = new Set();
+    if (fullOrder?.recipient_email && fullOrder.recipient_email.includes('@')) {
+      emailsToSend.add(fullOrder.recipient_email.trim().toLowerCase());
+    }
+    if (fullOrder?.customer?.email && fullOrder.customer.email.includes('@')) {
+      emailsToSend.add(fullOrder.customer.email.trim().toLowerCase());
+    }
+    if (options?.recipientEmail && options.recipientEmail.includes('@')) {
+      emailsToSend.add(options.recipientEmail.trim().toLowerCase());
+    }
+    if (options?.userEmail && options.userEmail.includes('@')) {
+      emailsToSend.add(options.userEmail.trim().toLowerCase());
+    }
+
+    const cancelReason = options?.cancelReason || options?.reason || note;
+    const isShopCanc = options?.isShopCancelled ?? (mappedStatus === 'CANCELLED');
+    const cancBy = options?.cancelledBy || (mappedStatus === 'CANCELLED' ? 'SHOP' : undefined);
+
+    for (const targetEmail of emailsToSend) {
+      if (targetEmail.endsWith('@example.com') && emailsToSend.size > 1) {
+        continue;
+      }
       sendOrderNotificationEmail({
         toEmail: targetEmail,
         order: fullOrder,
         status: mappedStatus,
-        extraData: { note, reason: note },
+        extraData: {
+          note,
+          reason: cancelReason,
+          cancelledBy: cancBy,
+          isShopCancelled: isShopCanc,
+          ...options,
+        },
       }).catch((emailErr) => {
         console.error('Lỗi khi gửi email cập nhật trạng thái đơn hàng:', emailErr.message);
       });
@@ -498,22 +524,23 @@ export const notifyOrderEmailService = async ({
     fullOrder = await orderRepo.findOrderAny(targetId);
   }
 
-  const emailToUse = (
-    recipientEmail ||
-    fullOrder?.recipient_email ||
-    fullOrder?.customer?.email ||
-    extraData?.recipientEmail ||
-    ''
-  ).trim();
+  const emailsToSend = new Set();
+  if (recipientEmail && recipientEmail.includes('@')) emailsToSend.add(recipientEmail.trim().toLowerCase());
+  if (fullOrder?.recipient_email && fullOrder.recipient_email.includes('@')) emailsToSend.add(fullOrder.recipient_email.trim().toLowerCase());
+  if (fullOrder?.customer?.email && fullOrder.customer.email.includes('@')) emailsToSend.add(fullOrder.customer.email.trim().toLowerCase());
+  if (extraData?.recipientEmail && extraData.recipientEmail.includes('@')) emailsToSend.add(extraData.recipientEmail.trim().toLowerCase());
+  if (extraData?.customerEmail && extraData.customerEmail.includes('@')) emailsToSend.add(extraData.customerEmail.trim().toLowerCase());
+  if (extraData?.userEmail && extraData.userEmail.includes('@')) emailsToSend.add(extraData.userEmail.trim().toLowerCase());
 
-  if (!emailToUse || !emailToUse.includes('@')) {
+  if (emailsToSend.size === 0) {
     return { success: false, message: 'Không tìm thấy địa chỉ email hợp lệ để gửi thông báo' };
   }
 
+  const primaryEmail = Array.from(emailsToSend)[0];
   const orderPayload = fullOrder || {
     order_id: orderId,
     order_number: orderNumber || `YF-${orderId}`,
-    recipient_email: emailToUse,
+    recipient_email: primaryEmail,
     recipient_name: extraData?.recipientName || 'Quý khách',
     recipient_phone: extraData?.recipientPhone || '',
     shipping_address_line: extraData?.shippingAddress || '',
@@ -522,14 +549,20 @@ export const notifyOrderEmailService = async ({
     order_items: extraData?.items || [],
   };
 
-  const emailResult = await sendOrderNotificationEmail({
-    toEmail: emailToUse,
-    order: orderPayload,
-    status: newStatus,
-    extraData,
-  });
+  let lastResult = null;
+  for (const emailToUse of emailsToSend) {
+    if (emailToUse.endsWith('@example.com') && emailsToSend.size > 1) {
+      continue;
+    }
+    lastResult = await sendOrderNotificationEmail({
+      toEmail: emailToUse,
+      order: { ...orderPayload, recipient_email: emailToUse },
+      status: newStatus,
+      extraData,
+    });
+  }
 
-  return emailResult;
+  return lastResult || { success: true };
 };
 
 /**

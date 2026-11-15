@@ -439,18 +439,20 @@ export const sendOrderNotificationEmail = async ({
     headline = 'Đơn hàng đã được giao tận tay Quý khách';
     messageBody = `Đơn hàng <strong>#${orderNumber}</strong> đã được phát thành công. Youth Fashion xin chân thành cảm ơn sự tin tưởng và đồng hành của Quý khách!`;
   } else if (s === 'CANCELLED') {
-    const isShop = extraData?.cancelledBy === 'SHOP' || extraData?.isShopCancelled;
-    subject = `Youth Fashion - Đơn hàng #${orderNumber} đã bị hủy`;
+    const isShop = extraData?.cancelledBy === 'SHOP' ||
+                   extraData?.isShopCancelled ||
+                   String(extraData?.note || extraData?.reason || order?.note || '').toLowerCase().includes('shop');
+    subject = isShop ? `Youth Fashion - Shop đã hủy đơn hàng #${orderNumber}` : `Youth Fashion - Đơn hàng #${orderNumber} đã hủy`;
     badgeText = isShop ? 'SHOP HỦY ĐƠN' : 'ĐÃ HỦY ĐƠN';
     badgeBg = '#FEE2E2';
     badgeColor = '#B91C1C';
-    headline = 'Thông báo hủy đơn hàng';
+    headline = isShop ? 'Shop đã hủy đơn hàng của Quý khách' : 'Thông báo hủy đơn hàng';
     messageBody = isShop
-      ? `Đơn hàng <strong>#${orderNumber}</strong> đã bị hủy từ phía Shop.`
-      : `Đơn hàng <strong>#${orderNumber}</strong> đã được hủy theo yêu cầu của Quý khách.`;
+      ? `Đơn hàng <strong>#${orderNumber}</strong> đã được phía Quản trị viên Shop hủy. Lý do từ Shop: "<strong>${reason || 'Sản phẩm tạm thời hết hàng trong kho'}</strong>". Quý khách vui lòng liên hệ hotline hoặc nhắn tin trực tiếp với shop nếu cần hỗ trợ thêm.`
+      : `Đơn hàng <strong>#${orderNumber}</strong> đã được hủy theo yêu cầu của Quý khách. Lý do: "${reason || 'Khách yêu cầu hủy đơn'}".`;
     alertBox = {
-      title: 'Lý do hủy đơn hàng',
-      content: reason || 'Sản phẩm tạm thời hết hàng trong kho hoặc có thay đổi nhu cầu.',
+      title: isShop ? 'Lý do Shop hủy đơn hàng' : 'Lý do hủy đơn hàng',
+      content: reason || (isShop ? 'Sản phẩm tạm thời hết hàng trong kho.' : 'Khách yêu cầu hủy đơn.'),
       color: '#991B1B',
       bg: '#FEF2F2',
       border: '#FCA5A5',

@@ -242,12 +242,27 @@ export const sendOrderStatusNotification = (order, newStatus, extraData = {}) =>
 
   // 3. Đồng bộ gửi thông báo về Gmail của khách hàng qua Backend API
   try {
-    const recipientEmail =
+    const rawRecipient =
       newNotif.customer_email ||
       order.recipient_email ||
       order.customer?.email ||
       order.email ||
       '';
+
+    let userEmail = '';
+    try {
+      const rawUser = localStorage.getItem('user');
+      if (rawUser) {
+        const u = JSON.parse(rawUser);
+        if (u?.email && u.email.includes('@')) {
+          userEmail = u.email.toLowerCase().trim();
+        }
+      }
+    } catch (e) {}
+
+    const recipientEmail = (rawRecipient && !rawRecipient.endsWith('@example.com'))
+      ? rawRecipient
+      : (userEmail || rawRecipient);
 
     if (recipientEmail && recipientEmail.includes('@')) {
       axiosClient
@@ -258,8 +273,11 @@ export const sendOrderStatusNotification = (order, newStatus, extraData = {}) =>
           newStatus,
           extraData: {
             ...extraData,
-            recipientName: order.recipient_name || order.customer?.full_name,
-            recipientPhone: order.recipient_phone || order.phone,
+            userEmail,
+            customerEmail: newNotif.customer_email,
+            recipientEmail,
+            recipientName: order.recipient_name || order.customer?.full_name || order.customer?.name,
+            recipientPhone: order.recipient_phone || order.customer?.phone || order.phone,
             shippingAddress: [
               order.shipping_address_line,
               order.shipping_ward,
@@ -269,7 +287,7 @@ export const sendOrderStatusNotification = (order, newStatus, extraData = {}) =>
               .filter(Boolean)
               .join(', '),
             totalAmount: order.total_amount,
-            items: order.order_items || [],
+            items: order.order_items || order.items || [],
           },
         })
         .catch((err) => {

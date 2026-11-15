@@ -1725,11 +1725,28 @@ export default function OrderManager() {
     // 3. Đồng bộ storage của khách hàng
     syncCustomerOrdersStorage(tId, tNum, newStatus, newStatusLabel, customerLabel, reason, cancelledBy, updatedNote);
 
-    // 4. Gửi API backend cập nhật CSDL MySQL
+    // 4. Gửi API backend cập nhật CSDL MySQL kèm thông tin gửi Email hủy đơn
     try {
-      if (tId) orderService.updateOrderStatus(tId, newStatus, updatedNote).catch(() => {});
-      if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus, updatedNote).catch(() => {});
-      if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus, updatedNote).catch(() => {});
+      let activeUserEmail = '';
+      try {
+        const rawUser = localStorage.getItem('user');
+        if (rawUser) {
+          const u = JSON.parse(rawUser);
+          if (u?.email && u.email.includes('@')) activeUserEmail = u.email;
+        }
+      } catch (e) {}
+
+      const cancelOptions = {
+        cancelReason: reason,
+        cancelledBy,
+        isShopCancelled: cancelledBy === 'SHOP',
+        recipientEmail: targetOrder.recipient_email || targetOrder.customer?.email,
+        userEmail: activeUserEmail
+      };
+
+      if (tId) orderService.updateOrderStatus(tId, newStatus, updatedNote, cancelOptions).catch(() => {});
+      if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus, updatedNote, cancelOptions).catch(() => {});
+      if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus, updatedNote, cancelOptions).catch(() => {});
     } catch (e) {}
 
     // 5. Phát sự kiện toàn cục và ghi sự kiện cross-tab
