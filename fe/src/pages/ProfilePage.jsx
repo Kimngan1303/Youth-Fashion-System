@@ -2851,6 +2851,8 @@ const ProfilePage = () => {
           refund_amount: finalRefundAmount,
           return_items: selectedItemsPayload,
           items: selectedItemsPayload,
+          customerEmail: user?.email || ord.recipient_email || ord.customer?.email,
+          recipientEmail: ord.recipient_email || user?.email,
         });
       } catch (apiErr) {
         console.error('Lỗi API yêu cầu hoàn tiền:', apiErr);

@@ -610,4 +610,88 @@ describe('Youth Fashion Order Flow & Bug Fix Test Suite', () => {
       emailHooks.sendOrderNotificationEmail = null;
     }
   });
+
+  it('Scenario 12: Refund notifications sent to Gmail on approval and rejection', async () => {
+    // 1. Tạo đơn hàng và chuyển sang DELIVERED
+    const orderRes = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${customerAToken}`)
+      .send({
+        recipientName: 'Khach Hang Refund',
+        recipientPhone: '0988776655',
+        recipientEmail: 'refund.customer@example.com',
+        shippingAddressLine: '123 Hoan Kiem',
+        shippingCity: 'Ha Noi',
+        paymentMethod: 'COD',
+        items: [{ variant_id: Number(testVariant.variant_id), quantity: 1, unit_price: 200000 }],
+      });
+    assert.equal(orderRes.status, 201);
+    const orderId = orderRes.body.data.order?.order_id || orderRes.body.data.order_id;
+
+    // Chuyển sang CONFIRMED -> SHIPPED -> DELIVERED
+    await request(app).patch(`/api/orders/${orderId}/status`).set('Authorization', `Bearer ${managerToken}`).send({ status: 'CONFIRMED' });
+    await request(app).patch(`/api/orders/${orderId}/status`).set('Authorization', `Bearer ${managerToken}`).send({ status: 'SHIPPED' });
+    await request(app).patch(`/api/orders/${orderId}/status`).set('Authorization', `Bearer ${managerToken}`).send({ status: 'DELIVERED' });
+
+    let emailsSent = [];
+    emailHooks.sendOrderNotificationEmail = mock.fn(async (params) => {
+      emailsSent.push(params);
+      return { success: true };
+    });
+
+    try {
+      // 2. Khách gửi yêu cầu hoàn tiền
+      const refundReqRes = await request(app)
+        .post(`/api/orders/customer/${orderId}/refund-request`)
+        .set('Authorization', `Bearer ${customerAToken}`)
+        .send({
+          reason: 'Hang khong vua size',
+          bank_info: '1903688888 - Techcombank - KHACH HANG',
+          refund_amount: 200000,
+        });
+      assert.equal(refundReqRes.status, 200);
+
+      await new Promise(r => setTimeout(r, 100));
+      assert.ok(emailsSent.some(e => e.status === 'RETURNED' && e.toEmail === 'refund.customer@example.com'), 'Email tiep nhan yeu cau hoan tien duoc gui');
+
+      // 3. Manager phe duyet hoan tien (APPROVED)
+      emailsSent = [];
+      const approveRes = await request(app)
+        .patch(`/api/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({
+          status: 'RETURNED',
+          note: 'Đã xác nhận hoàn tiền: 200.000₫ | STK: 1903688888 - Techcombank - KHACH HANG',
+          refund_decision: 'APPROVED',
+          refund_amount: 200000,
+          bank_info: '1903688888 - Techcombank - KHACH HANG',
+        });
+      assert.equal(approveRes.status, 200);
+
+      await new Promise(r => setTimeout(r, 100));
+      assert.equal(emailsSent.length, 1);
+      assert.equal(emailsSent[0].status, 'APPROVED', 'Trạng thái email là APPROVED khi hoàn tiền thành công');
+      assert.equal(emailsSent[0].toEmail, 'refund.customer@example.com');
+
+      // 4. Manager từ chối hoàn tiền (REJECTED)
+      emailsSent = [];
+      const rejectRes = await request(app)
+        .patch(`/api/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({
+          status: 'RETURNED',
+          note: 'Từ chối hoàn tiền: San pham da qua su dung',
+          refund_decision: 'REJECTED',
+          rejectReason: 'San pham da qua su dung',
+        });
+      assert.equal(rejectRes.status, 200);
+
+      await new Promise(r => setTimeout(r, 100));
+      assert.equal(emailsSent.length, 1);
+      assert.equal(emailsSent[0].status, 'REJECTED', 'Trạng thái email là REJECTED khi hoàn tiền thất bại/từ chối');
+      assert.equal(emailsSent[0].toEmail, 'refund.customer@example.com');
+    } finally {
+      emailHooks.sendOrderNotificationEmail = null;
+    }
+  });
 });

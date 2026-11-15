@@ -556,7 +556,7 @@ export const customerCancelOrderService = async (orderIdOrNumber, customerId, re
 /**
  * Khách hàng yêu cầu hoàn tiền cho đơn PayOS bị shop hủy hoặc đổi trả đơn đã giao
  */
-export const customerRefundRequestService = async (orderIdOrNumber, customerId, { reason, bank_info, images, refund_amount, return_items } = {}) => {
+export const customerRefundRequestService = async (orderIdOrNumber, customerId, { reason, bank_info, images, refund_amount, return_items, customerEmail, recipientEmail } = {}) => {
   const existingOrder = await orderRepo.findOrderByIdOrNumber(orderIdOrNumber);
   if (!existingOrder) {
     throw createServiceError('Không tìm thấy đơn hàng', 404);
@@ -661,13 +661,26 @@ export const customerRefundRequestService = async (orderIdOrNumber, customerId, 
     });
 
     // 5. Gửi đúng 1 email xác nhận yêu cầu hoàn tiền
-    const targetEmail = existingOrder.recipient_email || existingOrder.customer?.email;
+    const candidateEmails = [
+      existingOrder.recipient_email,
+      existingOrder.customer?.email,
+      recipientEmail,
+      customerEmail,
+    ].filter((e) => e && typeof e === 'string' && e.includes('@')).map((e) => e.trim());
+    const targetEmail = candidateEmails.find((e) => !e.toLowerCase().endsWith('@example.com')) || candidateEmails[0] || null;
+
     if (targetEmail) {
       sendOrderNotificationEmail({
         toEmail: targetEmail,
         order: existingOrder,
         status: 'RETURNED',
-        extraData: { reason: refundReason, bank_info, refund_amount: finalRefundAmount, return_items: parsedItems },
+        extraData: {
+          reason: refundReason,
+          bank_info,
+          refund_amount: finalRefundAmount,
+          return_items: parsedItems,
+          customerEmail: targetEmail,
+        },
       }).catch((e) => console.warn('Lỗi gửi email yêu cầu hoàn tiền:', e.message));
     }
 
@@ -854,43 +867,63 @@ export const updateOrderStatusService = async (orderId, status, note = null, opt
   // Tự động gửi email thông báo cập nhật trạng thái đơn hàng
   try {
     const fullOrder = await orderRepo.findOrderAny(orderId);
-    // Mỗi lần đổi trạng thái chỉ gửi đúng 1 email (ưu tiên recipient_email, không có thì dùng email tài khoản)
-    let targetEmail = null;
-    if (fullOrder?.recipient_email && fullOrder.recipient_email.includes('@')) {
-      targetEmail = fullOrder.recipient_email.trim();
-    } else if (fullOrder?.customer?.email && fullOrder.customer.email.includes('@')) {
-      targetEmail = fullOrder.customer.email.trim();
-    } else if (options?.recipientEmail && options.recipientEmail.includes('@')) {
-      targetEmail = options.recipientEmail.trim();
-    } else if (options?.userEmail && options.userEmail.includes('@')) {
-      targetEmail = options.userEmail.trim();
-    }
+    // Tập hợp tất cả ứng viên email theo thứ tự ưu tiên
+    const candidateEmails = [
+      options?.recipientEmail,
+      options?.customerEmail,
+      options?.userEmail,
+      fullOrder?.recipient_email,
+      fullOrder?.customer?.email,
+    ].filter((e) => e && typeof e === 'string' && e.includes('@')).map((e) => e.trim());
+
+    // Ưu tiên email thực sự (không phải @example.com)
+    let targetEmail = candidateEmails.find((e) => !e.toLowerCase().endsWith('@example.com')) || candidateEmails[0] || null;
 
     const cancelReason = options?.cancelReason || options?.reason || note;
     const isShopCanc = options?.isShopCancelled ?? (mappedStatus === 'CANCELLED');
     const cancBy = options?.cancelledBy || (mappedStatus === 'CANCELLED' ? 'SHOP' : undefined);
 
-    const isRejectRefund = options?.refund_decision === 'REJECTED' ||
-                           options?.returnRequest?.status === 'REJECTED' ||
+    const returnData = {
+      ...(options?.returnRequestData || {}),
+      ...(options?.returnRequest || {}),
+    };
+    const refundDecision = options?.refund_decision || returnData?.status;
+    const isRejectRefund = refundDecision === 'REJECTED' ||
+                           returnData?.status === 'REJECTED' ||
                            s === 'REJECTED' ||
-                           String(options?.reason || note || '').toLowerCase().includes('từ chối hoàn tiền');
-    const isApproveRefund = options?.refund_decision === 'APPROVED' ||
-                            options?.returnRequest?.status === 'APPROVED' ||
+                           String(options?.reason || options?.reject_reason || options?.rejectReason || note || '').toLowerCase().includes('từ chối hoàn tiền');
+    const isApproveRefund = refundDecision === 'APPROVED' ||
+                            returnData?.status === 'APPROVED' ||
+                            returnData?.status === 'COMPLETED' ||
                             s === 'APPROVED' ||
                             String(options?.reason || note || '').toLowerCase().includes('đã hoàn tiền') ||
                             String(options?.reason || note || '').toLowerCase().includes('đã xác nhận hoàn tiền');
     const emailStatus = isRejectRefund ? 'REJECTED' : (isApproveRefund ? 'APPROVED' : mappedStatus);
 
+    const fallbackOrder = fullOrder || {
+      order_id: orderId,
+      order_number: options?.orderNumber || (String(orderId).startsWith('YF-') ? orderId : `YF-${orderId}`),
+      recipient_email: targetEmail,
+      recipient_name: options?.recipientName || 'Quý khách',
+      recipient_phone: options?.recipientPhone || '',
+      total_amount: options?.totalAmount || options?.refund_amount || 0,
+      order_status: mappedStatus,
+      note,
+    };
+
     if (targetEmail) {
       sendOrderNotificationEmail({
         toEmail: targetEmail,
-        order: fullOrder,
+        order: fullOrder || fallbackOrder,
         status: emailStatus,
         extraData: {
           note,
           reason: cancelReason,
           cancelledBy: cancBy,
           isShopCancelled: isShopCanc,
+          refund_decision: isRejectRefund ? 'REJECTED' : (isApproveRefund ? 'APPROVED' : undefined),
+          returnRequest: returnData,
+          returnRequestData: returnData,
           ...options,
         },
       }).catch((emailErr) => {
@@ -920,17 +953,38 @@ export const notifyOrderEmailService = async ({
     fullOrder = await orderRepo.findOrderAny(targetId);
   }
 
-  let targetEmail = null;
-  if (recipientEmail && recipientEmail.includes('@')) targetEmail = recipientEmail.trim();
-  else if (fullOrder?.recipient_email && fullOrder.recipient_email.includes('@')) targetEmail = fullOrder.recipient_email.trim();
-  else if (fullOrder?.customer?.email && fullOrder.customer.email.includes('@')) targetEmail = fullOrder.customer.email.trim();
-  else if (extraData?.recipientEmail && extraData.recipientEmail.includes('@')) targetEmail = extraData.recipientEmail.trim();
-  else if (extraData?.customerEmail && extraData.customerEmail.includes('@')) targetEmail = extraData.customerEmail.trim();
-  else if (extraData?.userEmail && extraData.userEmail.includes('@')) targetEmail = extraData.userEmail.trim();
+  const candidateEmails = [
+    recipientEmail,
+    extraData?.recipientEmail,
+    extraData?.customerEmail,
+    extraData?.userEmail,
+    fullOrder?.recipient_email,
+    fullOrder?.customer?.email,
+  ].filter((e) => e && typeof e === 'string' && e.includes('@')).map((e) => e.trim());
+
+  const targetEmail = candidateEmails.find((e) => !e.toLowerCase().endsWith('@example.com')) || candidateEmails[0] || null;
 
   if (!targetEmail) {
     return { success: false, message: 'Không tìm thấy địa chỉ email hợp lệ để gửi thông báo' };
   }
+
+  const s = String(newStatus || '').toUpperCase();
+  const returnData = {
+    ...(extraData?.returnRequestData || {}),
+    ...(extraData?.returnRequest || {}),
+  };
+  const refundDecision = extraData?.refund_decision || returnData?.status;
+  const isRejectRefund = refundDecision === 'REJECTED' ||
+                         returnData?.status === 'REJECTED' ||
+                         s === 'REJECTED' ||
+                         String(extraData?.reason || extraData?.reject_reason || extraData?.note || '').toLowerCase().includes('từ chối hoàn tiền');
+  const isApproveRefund = refundDecision === 'APPROVED' ||
+                          returnData?.status === 'APPROVED' ||
+                          returnData?.status === 'COMPLETED' ||
+                          s === 'APPROVED' ||
+                          String(extraData?.reason || extraData?.note || '').toLowerCase().includes('đã hoàn tiền') ||
+                          String(extraData?.reason || extraData?.note || '').toLowerCase().includes('đã xác nhận hoàn tiền');
+  const emailStatus = isRejectRefund ? 'REJECTED' : (isApproveRefund ? 'APPROVED' : newStatus);
 
   const orderPayload = fullOrder || {
     order_id: orderId,
@@ -940,15 +994,19 @@ export const notifyOrderEmailService = async ({
     recipient_phone: extraData?.recipientPhone || '',
     shipping_address_line: extraData?.shippingAddress || '',
     total_amount: extraData?.totalAmount || 0,
-    order_status: newStatus,
+    order_status: emailStatus,
     order_items: extraData?.items || [],
   };
 
   const lastResult = await sendOrderNotificationEmail({
     toEmail: targetEmail,
     order: { ...orderPayload, recipient_email: targetEmail },
-    status: newStatus,
-    extraData,
+    status: emailStatus,
+    extraData: {
+      ...extraData,
+      refund_decision: isRejectRefund ? 'REJECTED' : (isApproveRefund ? 'APPROVED' : undefined),
+      returnRequest: returnData,
+    },
   });
 
   return lastResult || { success: true };

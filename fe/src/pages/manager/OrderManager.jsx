@@ -2374,15 +2374,59 @@ export default function OrderManager() {
     const extraNote = overrideNote && String(overrideNote).trim() ? ` | Ghi chú: ${String(overrideNote).trim()}` : '';
     const updatedNote = `Đã xác nhận hoàn tiền: ${refundAmt}₫ | ${targetOrder.refund_reason ? `Lý do: ${targetOrder.refund_reason} | ` : ''}STK: ${bankInfo}${extraNote}`;
 
+    // Tìm thông tin người mua thực sự từ bộ nhớ và đơn hàng
+    let buyerEmail = targetOrder.recipient_email || targetOrder.customer?.email || targetOrder.email || targetOrder.customer_email || '';
+    let buyerId = targetOrder.customer_id || targetOrder.customer?.customer_id || targetOrder.customer?.id || targetOrder.user_id || '';
+    let buyerPhone = targetOrder.recipient_phone || targetOrder.customer?.phone || targetOrder.phone || '';
+    let buyerName = targetOrder.recipient_name || targetOrder.customer?.name || targetOrder.customer?.full_name || '';
+
+    if (!buyerEmail || buyerEmail.endsWith('@example.com') || !buyerId) {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('yf_customer_orders') || k === 'yf_manager_orders' || k.startsWith('yf_notifications_'))) {
+          try {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                const matched = list.find(it => {
+                  if (!it) return false;
+                  const iId = String(it.order_id || '').trim();
+                  const iNum = String(it.order_number || it.order_code || '').trim();
+                  const iDig = (iNum || iId).replace(/\D/g, '');
+                  return (tId && (iId === tId || iNum === tId)) ||
+                         (tNum && (iId === tNum || iNum === tNum)) ||
+                         (digits && iDig && digits === iDig);
+                });
+                if (matched) {
+                  const mEmail = matched.recipient_email || matched.customer?.email || matched.email || matched.customer_email;
+                  if (mEmail && mEmail.includes('@') && !mEmail.endsWith('@example.com')) {
+                    buyerEmail = mEmail;
+                  }
+                  if (!buyerId) buyerId = matched.customer_id || matched.customer?.customer_id || matched.customer?.id || matched.user_id;
+                  if (!buyerPhone) buyerPhone = matched.recipient_phone || matched.customer?.phone || matched.phone;
+                  if (!buyerName) buyerName = matched.recipient_name || matched.customer?.name || matched.customer?.full_name;
+                }
+              }
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
     // 1. Cập nhật MySQL DB backend trước, bắt buộc await và dừng nếu lỗi
     const targetApiId = tId || tNum || digits;
     const extraPayload = {
       refund_decision: 'APPROVED',
       refundBank: bankInfo,
       bank_info: bankInfo,
-      recipientEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
-      customerEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
-      userEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
+      refund_amount: refundAmtNum,
+      return_items: targetOrder.return_items || targetOrder.return_requests?.[0]?.images?.return_items || null,
+      recipientEmail: buyerEmail,
+      customerEmail: buyerEmail,
+      userEmail: buyerEmail,
+      recipientName: buyerName,
+      recipientPhone: buyerPhone,
       returnRequest: {
         status: 'APPROVED',
         bank_info: bankInfo,
@@ -2495,7 +2539,11 @@ export default function OrderManager() {
       sendOrderStatusNotification(targetOrder, 'APPROVED', {
         newStatusLabel: 'Đã hoàn tiền',
         refundBank: bankInfo,
-        refundAmount: refundAmt
+        refundAmount: refundAmt,
+        recipientEmail: buyerEmail,
+        customerEmail: buyerEmail,
+        recipientName: buyerName,
+        recipientPhone: buyerPhone,
       });
     } catch (err) {
       console.error('Lỗi gửi thông báo hoàn tiền cho người mua:', err);
@@ -2611,10 +2659,14 @@ export default function OrderManager() {
       rejectReason,
       reject_reason: rejectReason,
       reason: rejectReason,
+      refund_amount: Number(targetOrder.refund_amount || targetOrder.return_requests?.[0]?.refund_amount || 0),
+      bank_info: targetOrder.refund_bank || (targetOrder.note && targetOrder.note.includes('STK:') ? targetOrder.note.split('STK:')[1]?.trim() : ''),
+      return_items: targetOrder.return_items || targetOrder.return_requests?.[0]?.images?.return_items || null,
       recipientEmail: buyerEmail,
       customerEmail: buyerEmail,
       userEmail: buyerEmail,
       recipientName: buyerName,
+      recipientPhone: buyerPhone,
       returnRequest: {
         status: 'REJECTED',
         reject_reason: rejectReason,
