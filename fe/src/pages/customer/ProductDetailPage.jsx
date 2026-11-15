@@ -898,7 +898,7 @@ export default function ProductDetailPage() {
 
               <div className="rating-meta-col">
                 <span className="meta-verified-text">
-                  {reviewsCount} ĐÁNH GIÁ ĐÃ XÁC THỰC
+                  {reviewsCount} ĐÁNH GIÁ
                 </span>
                 <span className="meta-satisfaction">
                   {reviewsCount > 0 
@@ -1220,7 +1220,7 @@ export default function ProductDetailPage() {
             <div className="modal-card-header">
               <div>
                 <h3 className="modal-title font-serif">Tất Cả Đánh Giá Từ Khách Hàng</h3>
-                <span className="modal-sub-count">{localReviews.length} đánh giá đã xác thực • {satisfiedPercent}% hài lòng</span>
+                <span className="modal-sub-count">{localReviews.length} đánh giá • {satisfiedPercent}% hài lòng</span>
               </div>
               <button 
                 type="button" 
