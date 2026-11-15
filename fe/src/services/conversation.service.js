@@ -21,6 +21,65 @@ export const getInitials = (name) => {
   return (first + last).toUpperCase();
 };
 
+// Quản lý kết nối Server-Sent Events (SSE) dùng chung (Singleton) chống tạo nhiều kết nối và phát lặp sự kiện
+let sharedEventSource = null;
+const streamMessageListeners = new Set();
+const streamStatusListeners = new Set();
+const recentDeliveredMessageIds = new Set();
+
+function initSharedStream() {
+  if (sharedEventSource) return;
+
+  try {
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const streamUrl = `${baseUrl}/conversations/stream`;
+    sharedEventSource = new EventSource(streamUrl);
+
+    sharedEventSource.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === 'NEW_MESSAGE' && payload.data) {
+          const msgId = String(payload.data.message_id || '');
+          if (msgId) {
+            // Chống phát trùng lặp sự kiện cùng 1 message_id trong vòng 4 giây
+            if (recentDeliveredMessageIds.has(msgId)) {
+              return;
+            }
+            recentDeliveredMessageIds.add(msgId);
+            setTimeout(() => {
+              recentDeliveredMessageIds.delete(msgId);
+            }, 4000);
+          }
+
+          streamMessageListeners.forEach((listener) => {
+            try {
+              listener(payload.data);
+            } catch (err) {
+              console.error('Lỗi trong message listener SSE:', err);
+            }
+          });
+        } else if (payload.type === 'STATUS_CHANGE' && payload.data) {
+          streamStatusListeners.forEach((listener) => {
+            try {
+              listener(payload.data);
+            } catch (err) {
+              console.error('Lỗi trong status listener SSE:', err);
+            }
+          });
+        }
+      } catch (e) {
+        // ignore heartbeat or parse errors
+      }
+    };
+
+    sharedEventSource.onerror = () => {
+      // EventSource tự động reconnect
+    };
+  } catch (err) {
+    console.warn('SSE stream error:', err);
+  }
+}
+
 export const conversationService = {
   /**
    * Lấy danh sách cuộc trò chuyện thật của Khách Hàng từ CSDL Backend
@@ -247,37 +306,24 @@ export const conversationService = {
   },
 
   /**
-   * Đăng ký lắng nghe sự kiện Server-Sent Events (SSE) realtime
+   * Đăng ký lắng nghe sự kiện Server-Sent Events (SSE) realtime qua kết nối dùng chung (Singleton)
    */
   subscribeToChatStream: (onMessage, onStatusChange) => {
-    try {
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-      const streamUrl = `${baseUrl}/conversations/stream`;
-      const eventSource = new EventSource(streamUrl);
+    if (onMessage) streamMessageListeners.add(onMessage);
+    if (onStatusChange) streamStatusListeners.add(onStatusChange);
 
-      eventSource.onmessage = (event) => {
+    initSharedStream();
+
+    return () => {
+      if (onMessage) streamMessageListeners.delete(onMessage);
+      if (onStatusChange) streamStatusListeners.delete(onStatusChange);
+
+      if (streamMessageListeners.size === 0 && streamStatusListeners.size === 0 && sharedEventSource) {
         try {
-          const payload = JSON.parse(event.data);
-          if (payload.type === 'NEW_MESSAGE' && onMessage) {
-            onMessage(payload.data);
-          } else if (payload.type === 'STATUS_CHANGE' && onStatusChange) {
-            onStatusChange(payload.data);
-          }
-        } catch (e) {
-          // ignore heartbeat or parse errors
-        }
-      };
-
-      eventSource.onerror = () => {
-        // SSE tự động kết nối lại
-      };
-
-      return () => {
-        eventSource.close();
-      };
-    } catch (err) {
-      console.warn('SSE stream error:', err);
-      return () => {};
-    }
+          sharedEventSource.close();
+        } catch (e) {}
+        sharedEventSource = null;
+      }
+    };
   },
 };
