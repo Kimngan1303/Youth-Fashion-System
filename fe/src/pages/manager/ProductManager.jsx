@@ -1712,6 +1712,22 @@ export default function ProductManager() {
 
   const handleVariantChange = (index, field, value) => {
     const updated = [...variantsData];
+    if (field === "stock") {
+      if (value !== "" && Number(value) < 0) {
+        showError("Số lượng tồn kho không được là số âm (tối thiểu là 0)!");
+        updated[index][field] = 0;
+        setVariantsData(updated);
+        return;
+      }
+    }
+    if (field === "price") {
+      if (value !== "" && Number(value) < 0) {
+        showError("Giá sản phẩm không được là số âm!");
+        updated[index][field] = 0;
+        setVariantsData(updated);
+        return;
+      }
+    }
     updated[index][field] = value;
     setVariantsData(updated);
   };
@@ -1726,6 +1742,33 @@ export default function ProductManager() {
     if (isCreate && (!selectedFiles || selectedFiles.length === 0)) {
       showError("Vui lòng chọn ít nhất 1 hình ảnh từ máy tính cho sản phẩm mới");
       return;
+    }
+
+    // Kiểm tra danh sách biến thể
+    if (!variantsData || variantsData.length === 0) {
+      showError("Sản phẩm phải có ít nhất 1 biến thể (size, màu sắc, giá, tồn kho)!");
+      return;
+    }
+
+    for (let i = 0; i < variantsData.length; i++) {
+      const v = variantsData[i];
+      const variantName = `${v.size || ""} ${v.color || ""}`.trim() || `dòng số ${i + 1}`;
+      if (v.stock === "" || v.stock === null || v.stock === undefined || isNaN(Number(v.stock))) {
+        showError(`Vui lòng nhập số lượng tồn kho hợp lệ cho biến thể "${variantName}"`);
+        return;
+      }
+      if (Number(v.stock) < 0) {
+        showError(`Số lượng tồn kho không được là số âm (tối thiểu là 0)! Vui lòng kiểm tra lại biến thể "${variantName}"`);
+        return;
+      }
+      if (v.price === "" || v.price === null || v.price === undefined || isNaN(Number(v.price))) {
+        showError(`Vui lòng nhập giá bán hợp lệ cho biến thể "${variantName}"`);
+        return;
+      }
+      if (Number(v.price) < 0) {
+        showError(`Giá bán sản phẩm không được là số âm! Vui lòng kiểm tra lại biến thể "${variantName}"`);
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -1758,10 +1801,23 @@ export default function ProductManager() {
       );
     } catch (err) {
       console.error("Lỗi khi lưu sản phẩm:", err);
-      const detailedErrors = err.response?.data?.errors?.join(", ");
-      const errorMsg = detailedErrors
-        ? `${err.response.data.message}: ${detailedErrors}`
-        : err.response?.data?.message || "Có lỗi xảy ra khi lưu sản phẩm";
+      const rawMsg = err.response?.data?.message || err.message || "";
+      let errorMsg = rawMsg;
+
+      if (
+        rawMsg.includes("Out of range") ||
+        rawMsg.includes("column 'stock'") ||
+        (rawMsg.includes("stock") && rawMsg.includes("range"))
+      ) {
+        errorMsg = "Số lượng tồn kho không hợp lệ hoặc không được là số âm (tối thiểu là 0)!";
+      } else if (rawMsg.includes("prisma.") || rawMsg.includes("invocation:")) {
+        errorMsg = "Dữ liệu sản phẩm không hợp lệ. Vui lòng kiểm tra lại giá và số lượng tồn kho!";
+      } else {
+        const detailedErrors = err.response?.data?.errors?.join(", ");
+        errorMsg = detailedErrors
+          ? `${err.response.data.message}: ${detailedErrors}`
+          : rawMsg || "Có lỗi xảy ra khi lưu sản phẩm";
+      }
       showError(errorMsg);
     } finally {
       setSubmitting(false);
@@ -2818,6 +2874,10 @@ export default function ProductManager() {
                       <input
                         placeholder="Giá (VNĐ)"
                         type="number"
+                        min="0"
+                        onKeyDown={(e) => {
+                          if (e.key === "-" || e.key === "e") e.preventDefault();
+                        }}
                         className="form-input"
                         style={{ padding: "6px", fontSize: "11px" }}
                         value={v.price}
@@ -2828,6 +2888,10 @@ export default function ProductManager() {
                       <input
                         placeholder="Kho"
                         type="number"
+                        min="0"
+                        onKeyDown={(e) => {
+                          if (e.key === "-" || e.key === "e") e.preventDefault();
+                        }}
                         className="form-input"
                         style={{ padding: "6px", fontSize: "11px" }}
                         value={v.stock}
