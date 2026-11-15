@@ -3936,6 +3936,18 @@ const ProfilePage = () => {
                                   >
                                     Xem Chi Tiết
                                   </button>
+                                  <button
+                                    className="btn-order-action btn-neutral-outline"
+                                    onClick={() => {
+                                      setRefundReason('Sản phẩm không vừa kích cỡ (Size)');
+                                      setCustomRefundReason('');
+                                      setRefundBankInfo('');
+                                      setRefundBankError('');
+                                      setRefundModalOrder(ord);
+                                    }}
+                                  >
+                                    Yêu Cầu Hoàn Tiền
+                                  </button>
                                   {(() => {
                                     const reviewedCount = getOrderReviewedCount(ord);
                                     const totalCount = ord.items?.length || 0;

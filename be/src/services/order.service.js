@@ -563,8 +563,8 @@ export const customerRefundRequestService = async (orderIdOrNumber, customerId, 
     if (!isPayos || !isPaid) {
       throw createServiceError('Chỉ đơn hàng PayOS đã thanh toán thành công mới được yêu cầu hoàn tiền khi shop hủy', 400);
     }
-  } else if (existingOrder.order_status !== 'DELIVERED') {
-    throw createServiceError('Chỉ đơn hàng đã giao hoặc đơn PayOS đã thanh toán bị hủy mới có thể yêu cầu đổi trả / hoàn tiền', 400);
+  } else if (!['DELIVERED', 'COMPLETED'].includes(existingOrder.order_status)) {
+    throw createServiceError('Chỉ đơn hàng đã giao, đơn đã hoàn thành hoặc đơn PayOS đã thanh toán bị hủy mới có thể yêu cầu đổi trả / hoàn tiền', 400);
   }
 
   const refundReason = reason ? String(reason).trim() : 'Khách yêu cầu hoàn tiền';

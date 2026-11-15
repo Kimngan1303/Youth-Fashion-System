@@ -3224,87 +3224,38 @@ export default function OrderManager() {
                                 (() => {
                                   const isRej = ord.refund_decision === 'REJECTED' || String(ord.status_label || '').toUpperCase().includes('TỪ CHỐI') || String(ord.note || '').toLowerCase().includes('từ chối hoàn tiền');
                                   const isApp = !isRej && (ord.refund_decision === 'APPROVED' || String(ord.status_label || '').toUpperCase().includes('ĐÃ HOÀN') || String(ord.note || '').toLowerCase().includes('đã xác nhận hoàn tiền'));
-
-                                  if (isApp) {
-                                    return (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenReturnModal(ord)}
-                                        className="status-select-pill status-pill-approved status-pill-completed"
-                                        style={{
-                                          fontWeight: 700,
-                                          cursor: 'pointer',
-                                          padding: '5px 14px',
-                                          borderRadius: '20px',
-                                          fontSize: '11.5px',
-                                          textAlign: 'center',
-                                          border: '1.5px solid #BBF7D0',
-                                          backgroundColor: '#DCFCE7',
-                                          color: '#15803D',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '5px'
-                                        }}
-                                        title="Đã hoàn tiền thành công - Bấm để xem chi tiết"
-                                      >
-                                        <Check size={12} strokeWidth={2.5} />
-                                        Đã hoàn tiền
-                                      </button>
-                                    );
-                                  }
-
-                                  if (isRej) {
-                                    return (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenReturnModal(ord)}
-                                        className="status-select-pill status-pill-rejected status-pill-cancelled"
-                                        style={{
-                                          fontWeight: 700,
-                                          cursor: 'pointer',
-                                          padding: '5px 14px',
-                                          borderRadius: '20px',
-                                          fontSize: '11.5px',
-                                          textAlign: 'center',
-                                          border: '1.5px solid #FECACA',
-                                          backgroundColor: '#FEF2F2',
-                                          color: '#DC2626',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '5px'
-                                        }}
-                                        title={ord.reject_reason ? `Lý do: ${ord.reject_reason} (Bấm để xem chi tiết & cập nhật)` : "Đã từ chối hoàn tiền"}
-                                      >
-                                        <X size={12} strokeWidth={2.5} />
-                                        Từ chối hoàn
-                                      </button>
-                                    );
-                                  }
+                                  const currentVal = isApp ? 'APPROVED' : (isRej ? 'REJECTED' : 'PENDING');
 
                                   return (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenReturnModal(ord)}
-                                      className="status-select-pill status-pill-returned"
+                                    <select
+                                      className={`status-select-pill ${isApp ? 'status-pill-approved status-pill-completed' : isRej ? 'status-pill-rejected status-pill-cancelled' : 'status-pill-returned'}`}
+                                      value={currentVal}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === currentVal) return;
+                                        if (val === 'APPROVED') {
+                                          handleOpenReturnModal(ord, 'APPROVED');
+                                        } else if (val === 'REJECTED') {
+                                          handleOpenReturnModal(ord, 'REJECTED');
+                                        } else {
+                                          handleOpenReturnModal(ord);
+                                        }
+                                      }}
                                       style={{
                                         fontWeight: 700,
                                         cursor: 'pointer',
-                                        padding: '5px 14px',
+                                        padding: '5px 12px',
                                         borderRadius: '20px',
                                         fontSize: '11.5px',
-                                        textAlign: 'center',
-                                        border: '1.5px solid #D8B4FE',
-                                        backgroundColor: '#FAF5FF',
-                                        color: '#7E22CE',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '5px'
+                                        border: isApp ? '1.5px solid #BBF7D0' : isRej ? '1.5px solid #FECACA' : '1.5px solid #D8B4FE',
+                                        backgroundColor: isApp ? '#DCFCE7' : isRej ? '#FEF2F2' : '#FAF5FF',
+                                        color: isApp ? '#15803D' : isRej ? '#DC2626' : '#7E22CE',
                                       }}
-                                      title="Khách yêu cầu hoàn tiền - Bấm để mở form xử lý hoàn tiền hoặc từ chối"
                                     >
-                                      <RotateCcw size={12} />
-                                      Chờ hoàn tiền
-                                    </button>
+                                      <option value="PENDING">Chờ hoàn tiền</option>
+                                      <option value="APPROVED">Đồng ý hoàn</option>
+                                      <option value="REJECTED">Từ chối hoàn</option>
+                                    </select>
                                   );
                                 })()
                               ) : (
