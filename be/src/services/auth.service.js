@@ -248,17 +248,20 @@ export const loginService = async ({ email, password, user_type }) => {
   let role = 'CUSTOMER';
   let resolvedUserType = user_type || 'CUSTOMER';
 
-  // 1. Tự động kiểm tra: Nếu email này thuộc về nhân sự (ADMIN hoặc MANAGER) đang ACTIVE trong CSDL
-  const activeEmp = await prisma.employee.findFirst({
-    where: { email: normalizedEmail, status: 'ACTIVE' },
+  // 1. Tự động kiểm tra: Nếu email này thuộc về nhân sự (ADMIN hoặc MANAGER)
+  const emp = await prisma.employee.findUnique({
+    where: { email: normalizedEmail },
   });
 
-  if (activeEmp) {
-    user = activeEmp;
-    role = activeEmp.employee_role; // 'ADMIN' hoặc 'MANAGER'
+  if (emp) {
+    if (emp.status !== 'ACTIVE') {
+      throw { statusCode: 403, message: 'Tài khoản nhân sự của bạn đang bị tạm khóa. Vui lòng liên hệ quản trị viên!' };
+    }
+    user = emp;
+    role = emp.employee_role; // 'ADMIN' hoặc 'MANAGER'
     resolvedUserType = 'EMPLOYEE';
   } else {
-    // Không phải nhân sự active -> Tìm trong bảng khách hàng
+    // Không phải nhân sự -> Tìm trong bảng khách hàng
     user = await findCustomerByEmail(normalizedEmail);
     if (!user) {
       throw { statusCode: 401, message: 'Email hoặc mật khẩu không chính xác' };
@@ -662,20 +665,21 @@ export const getProfileService = async ({ customer_id, user_type }) => {
 
   const email = (emp?.email || cust?.email || '').trim().toLowerCase();
   if (email) {
-    const activeEmp = await prisma.employee.findFirst({
-      where: { email, status: 'ACTIVE' },
+    const anyEmp = await prisma.employee.findUnique({
+      where: { email },
     });
-    if (activeEmp) {
+    if (anyEmp) {
       return {
-        id: activeEmp.employee_id.toString(),
-        customer_id: activeEmp.employee_id.toString(),
-        email: activeEmp.email,
-        full_name: activeEmp.full_name,
-        phone: activeEmp.phone || cust?.phone || '',
-        avatar_url: activeEmp.avatar_url || cust?.avatar_url || null,
-        role: activeEmp.employee_role,
+        id: anyEmp.employee_id.toString(),
+        customer_id: anyEmp.employee_id.toString(),
+        email: anyEmp.email,
+        full_name: anyEmp.full_name,
+        phone: anyEmp.phone || cust?.phone || '',
+        avatar_url: anyEmp.avatar_url || cust?.avatar_url || null,
+        role: anyEmp.employee_role,
         user_type: 'EMPLOYEE',
-        created_at: activeEmp.created_at,
+        status: anyEmp.status === 'ACTIVE' ? 'ACTIVE' : 'LOCKED',
+        created_at: anyEmp.created_at,
       };
     }
   }
