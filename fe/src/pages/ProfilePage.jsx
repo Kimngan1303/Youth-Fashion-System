@@ -444,6 +444,24 @@ const resolveCancelInfo = (ord) => {
   };
 };
 
+// Helper nhận diện đơn đổi trả / hoàn tiền chính xác
+const isOrderReturned = (status, label = '', note = '', ord = null) => {
+  const s = String(status || ord?.order_status || ord?.status || '').toUpperCase();
+  const l = String(label || ord?.status_label || '').toUpperCase();
+  const n = String(note || ord?.note || '').toLowerCase();
+  const cr = String(ord?.cancel_reason || '').toLowerCase();
+  const refundDecision = String(ord?.refund_decision || '').toUpperCase();
+
+  if (['RETURNED', 'REFUNDED', 'EXCHANGE', 'RETURN'].includes(s)) return true;
+  if (l.includes('ĐỔI TRẢ') || l.includes('TRẢ HÀNG') || l.includes('HOÀN TIỀN') || l.includes('TỪ CHỐI HOÀN') || l.includes('ĐÃ HOÀN') || l.includes('YÊU CẦU HOÀN')) return true;
+  if (refundDecision === 'APPROVED' || refundDecision === 'REJECTED') return true;
+  if (Boolean(ord?.refund_reason) || Boolean(ord?.refund_bank) || Boolean(ord?.reject_reason) || (ord?.return_requests && ord.return_requests.length > 0)) return true;
+  if (n.includes('hoàn tiền') || n.includes('đổi trả') || (n.includes('stk:') && !n.includes('khách hủy đơn:'))) return true;
+  if (cr.includes('hoàn tiền') || cr.includes('đổi trả') || cr.includes('stk:')) return true;
+
+  return false;
+};
+
 // Áp dụng trạng thái ghi đè (overrides) để trang người dùng luôn đồng bộ 100% với Manager
 const applyStatusOverrides = (ordersList) => {
   if (!Array.isArray(ordersList)) return [];

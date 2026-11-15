@@ -488,14 +488,25 @@ export const getNotificationsForUser = (user = null) => {
           recipient_email: effectiveUser?.email,
           recipient_phone: effectiveUser?.phone
         };
-        const content = buildNotificationContent(fakeOrder, targetStatus, {
+        const cleanStatus = String(targetStatus || 'PENDING').toUpperCase();
+        const content = buildNotificationContent(fakeOrder, cleanStatus, {
           reason: trackOrd.cancel_reason || trackOrd.refund_reason || trackOrd.note,
           rejectReason: trackOrd.reject_reason,
           cancelledBy: trackOrd.cancelled_by,
           isShopCancelled: trackOrd.cancelled_by === 'SHOP'
         });
+        const safeIsoDate = (() => {
+          if (!trackOrd.updated_at) return new Date().toISOString();
+          const d = new Date(trackOrd.updated_at);
+          return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+        })();
+        const safeTimestamp = (() => {
+          if (!trackOrd.updated_at) return Date.now();
+          const t = typeof trackOrd.updated_at === 'number' ? trackOrd.updated_at : new Date(trackOrd.updated_at).getTime();
+          return isNaN(t) ? Date.now() : t;
+        })();
         const autoNotif = {
-          id: `notif_auto_${targetStatus.toLowerCase()}_${trackOrd.digits}`,
+          id: `notif_auto_${cleanStatus.toLowerCase()}_${trackOrd.digits}`,
           order_id: trackOrd.order_id,
           order_number: trackOrd.order_number,
           order_digits: trackOrd.digits,
@@ -504,11 +515,11 @@ export const getNotificationsForUser = (user = null) => {
           badge: content.badge,
           badgeColor: content.badgeColor,
           badgeBg: content.badgeBg,
-          status: targetStatus,
+          status: cleanStatus,
           type: content.type,
-          time: formatNotificationTime(trackOrd.updated_at),
-          created_at: new Date(trackOrd.updated_at).toISOString(),
-          timestamp: trackOrd.updated_at,
+          time: formatNotificationTime(safeTimestamp),
+          created_at: safeIsoDate,
+          timestamp: safeTimestamp,
           is_read: false,
           link: `/profile?tab=orders&order=${trackOrd.digits}`,
           customer_id: effectiveUser?.customer_id || effectiveUser?.id || '',
