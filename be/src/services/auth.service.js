@@ -243,12 +243,23 @@ export const resendVerificationOtpService = async ({ email }) => {
  * @param {Object} param0 { email, password, user_type }
  */
 export const loginService = async ({ email, password, user_type }) => {
+  const normalizedEmail = email.trim().toLowerCase();
   let user = null;
   let role = 'CUSTOMER';
+  let resolvedUserType = user_type || 'CUSTOMER';
 
-  // 1. Kiểm tra tài khoản dựa trên loại người dùng (CUSTOMER hoặc EMPLOYEE)
-  if (user_type === 'CUSTOMER') {
-    user = await findCustomerByEmail(email.trim().toLowerCase());
+  // 1. Tự động kiểm tra: Nếu email này thuộc về nhân sự (ADMIN hoặc MANAGER) đang ACTIVE trong CSDL
+  const activeEmp = await prisma.employee.findFirst({
+    where: { email: normalizedEmail, status: 'ACTIVE' },
+  });
+
+  if (activeEmp) {
+    user = activeEmp;
+    role = activeEmp.employee_role; // 'ADMIN' hoặc 'MANAGER'
+    resolvedUserType = 'EMPLOYEE';
+  } else {
+    // Không phải nhân sự active -> Tìm trong bảng khách hàng
+    user = await findCustomerByEmail(normalizedEmail);
     if (!user) {
       throw { statusCode: 401, message: 'Email hoặc mật khẩu không chính xác' };
     }
@@ -260,15 +271,7 @@ export const loginService = async ({ email, password, user_type }) => {
       await markCustomerEmailVerified(user.customer_id);
     }
     role = 'CUSTOMER';
-  } else if (user_type === 'EMPLOYEE') {
-    user = await findEmployeeByEmail(email.trim().toLowerCase());
-    if (!user) {
-      throw { statusCode: 401, message: 'Email hoặc mật khẩu không chính xác' };
-    }
-    if (user.status !== 'ACTIVE') {
-      throw { statusCode: 403, message: 'Tài khoản nhân viên đang bị khóa hoặc ngưng hoạt động' };
-    }
-    role = user.employee_role; // MANAGER hoặc ADMIN
+    resolvedUserType = 'CUSTOMER';
   }
 
   // 2. Kiểm tra mật khẩu (hỗ trợ cả Bcrypt hash và mật khẩu plain-text sửa trực tiếp trong CSDL)
@@ -281,7 +284,7 @@ export const loginService = async ({ email, password, user_type }) => {
     if (isPasswordValid) {
       // Tự động nâng cấp mã hóa lại thành chuẩn bcrypt hash bảo mật
       const upgradedHash = await bcrypt.hash(password, 10);
-      if (user_type === 'CUSTOMER') {
+      if (resolvedUserType === 'CUSTOMER') {
         await prisma.customer.update({
           where: { customer_id: user.customer_id },
           data: { password_hash: upgradedHash },
@@ -295,30 +298,52 @@ export const loginService = async ({ email, password, user_type }) => {
     }
   }
 
+  // Nếu mật khẩu trên bảng employee không khớp (ví dụ khách hàng đổi pass bên bảng customer trước khi thành Manager),
+  // kiểm tra dự phòng bên bảng customer để người dùng vẫn đăng nhập thông suốt
+  if (!isPasswordValid && resolvedUserType === 'EMPLOYEE') {
+    const custFallback = await findCustomerByEmail(normalizedEmail);
+    if (custFallback && custFallback.password_hash) {
+      let custPassValid = false;
+      if (custFallback.password_hash.startsWith('$2a$') || custFallback.password_hash.startsWith('$2b$')) {
+        custPassValid = await bcrypt.compare(password, custFallback.password_hash);
+      } else {
+        custPassValid = (password === custFallback.password_hash);
+      }
+      if (custPassValid) {
+        isPasswordValid = true;
+        // Đồng bộ mật khẩu mới sang employee
+        await prisma.employee.update({
+          where: { employee_id: user.employee_id },
+          data: { password_hash: custFallback.password_hash },
+        });
+      }
+    }
+  }
+
   if (!isPasswordValid) {
     throw { statusCode: 401, message: 'Email hoặc mật khẩu không chính xác' };
   }
 
   // 3. Sinh cặp Token (Access Token & Refresh Token)
-  const userId = user_type === 'CUSTOMER' ? user.customer_id : user.employee_id;
+  const userId = resolvedUserType === 'CUSTOMER' ? user.customer_id : user.employee_id;
   const tokenPayload = {
     id: userId.toString(),
     email: user.email,
     full_name: user.full_name,
     role,
-    user_type,
+    user_type: resolvedUserType,
   };
 
   const accessToken = generateAccessToken(tokenPayload);
-  const refreshToken = generateRefreshToken({ id: userId.toString(), user_type });
+  const refreshToken = generateRefreshToken({ id: userId.toString(), user_type: resolvedUserType });
 
   // 4. Băm mã Refresh Token để lưu an toàn vào CSDL
   const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 ngày
 
   await saveRefreshToken({
-    customer_id: user_type === 'CUSTOMER' ? userId : null,
-    employee_id: user_type === 'EMPLOYEE' ? userId : null,
+    customer_id: resolvedUserType === 'CUSTOMER' ? userId : null,
+    employee_id: resolvedUserType === 'EMPLOYEE' ? userId : null,
     token_hash: tokenHash,
     expires_at: expiresAt,
   });
@@ -327,7 +352,7 @@ export const loginService = async ({ email, password, user_type }) => {
     accessToken,
     refreshToken,
     user: {
-      customer_id: user_type === 'CUSTOMER' ? user.customer_id.toString() : undefined,
+      customer_id: resolvedUserType === 'CUSTOMER' ? user.customer_id.toString() : undefined,
       id: userId.toString(),
       email: user.email,
       full_name: user.full_name,
@@ -336,7 +361,7 @@ export const loginService = async ({ email, password, user_type }) => {
       gender: user.gender || null,
       dob: user.dob || null,
       role,
-      user_type,
+      user_type: resolvedUserType,
       created_at: user.created_at,
     },
   };
@@ -620,55 +645,70 @@ export const resetPasswordService = async ({ email, otp, new_password }) => {
  * Lấy thông tin hồ sơ người dùng hiện tại kèm ngày đăng ký created_at
  */
 export const getProfileService = async ({ customer_id, user_type }) => {
-  const isEmployee = user_type === 'EMPLOYEE' || user_type === 'ADMIN' || user_type === 'MANAGER';
-  if (isEmployee) {
-    const emp = await prisma.employee.findUnique({
+  let emp = null;
+  let cust = null;
+
+  try {
+    emp = await prisma.employee.findUnique({
       where: { employee_id: BigInt(customer_id) },
     });
-    if (emp) {
+  } catch (e) {}
+
+  try {
+    cust = await prisma.customer.findUnique({
+      where: { customer_id: BigInt(customer_id) },
+    });
+  } catch (e) {}
+
+  const email = (emp?.email || cust?.email || '').trim().toLowerCase();
+  if (email) {
+    const activeEmp = await prisma.employee.findFirst({
+      where: { email, status: 'ACTIVE' },
+    });
+    if (activeEmp) {
       return {
-        id: emp.employee_id.toString(),
-        customer_id: emp.employee_id.toString(),
-        email: emp.email,
-        full_name: emp.full_name,
-        phone: emp.phone || '',
-        avatar_url: emp.avatar_url || null,
-        role: emp.employee_role,
+        id: activeEmp.employee_id.toString(),
+        customer_id: activeEmp.employee_id.toString(),
+        email: activeEmp.email,
+        full_name: activeEmp.full_name,
+        phone: activeEmp.phone || cust?.phone || '',
+        avatar_url: activeEmp.avatar_url || cust?.avatar_url || null,
+        role: activeEmp.employee_role,
         user_type: 'EMPLOYEE',
-        created_at: emp.created_at,
+        created_at: activeEmp.created_at,
       };
     }
   }
 
-  const cust = await findCustomerById(customer_id);
-  if (cust) {
+  // Nếu không phải nhân sự đang active -> Luôn trả về thông tin Khách hàng
+  const targetCust = cust || (email ? await prisma.customer.findUnique({ where: { email } }) : null);
+  if (targetCust) {
     return {
-      id: cust.customer_id.toString(),
-      customer_id: cust.customer_id.toString(),
-      email: cust.email,
-      full_name: cust.full_name,
-      phone: cust.phone || '',
-      avatar_url: cust.avatar_url,
-      gender: cust.gender,
-      dob: cust.dob,
+      id: targetCust.customer_id.toString(),
+      customer_id: targetCust.customer_id.toString(),
+      email: targetCust.email,
+      full_name: targetCust.full_name,
+      phone: targetCust.phone || '',
+      avatar_url: targetCust.avatar_url,
+      gender: targetCust.gender,
+      dob: targetCust.dob,
       role: 'CUSTOMER',
       user_type: 'CUSTOMER',
-      created_at: cust.created_at,
+      created_at: targetCust.created_at,
     };
   }
 
-  const empFallback = await prisma.employee.findUnique({ where: { employee_id: BigInt(customer_id) } });
-  if (empFallback) {
+  if (emp) {
     return {
-      id: empFallback.employee_id.toString(),
-      customer_id: empFallback.employee_id.toString(),
-      email: empFallback.email,
-      full_name: empFallback.full_name,
-      phone: empFallback.phone || '',
-      avatar_url: empFallback.avatar_url || null,
-      role: empFallback.employee_role,
+      id: emp.employee_id.toString(),
+      customer_id: emp.employee_id.toString(),
+      email: emp.email,
+      full_name: emp.full_name,
+      phone: emp.phone || '',
+      avatar_url: emp.avatar_url || null,
+      role: emp.employee_role,
       user_type: 'EMPLOYEE',
-      created_at: empFallback.created_at,
+      created_at: emp.created_at,
     };
   }
 

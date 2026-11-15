@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
+import { useConfirmModal } from '../../context/ConfirmModalContext';
 import { adminService } from '../../services/adminService';
 import ManagerSidebar from '../../components/ManagerSidebar';
 import ManagerHeader from '../../components/ManagerHeader';
@@ -690,6 +691,7 @@ const ITEMS_PER_PAGE = 6;
 
 export default function UserManagement() {
   const { showSuccess, showError } = useToast();
+  const { confirmModal } = useConfirmModal();
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin =
@@ -872,6 +874,31 @@ export default function UserManagement() {
       await adminService.updateUserRole(detailModalUser.type, detailModalUser.id, selectedRole);
       await fetchData();
       showSuccess(`Đã cập nhật phân quyền cho "${detailModalUser.full_name}" thành công!`);
+
+      // Đồng bộ vai trò ngay lập tức nếu admin đang phân quyền trên chính tài khoản của mình
+      if (user?.email && detailModalUser.email && user.email.toLowerCase() === detailModalUser.email.toLowerCase()) {
+        const updatedSelf = {
+          ...user,
+          role: selectedRole,
+          employee_role: selectedRole === 'CUSTOMER' ? undefined : selectedRole,
+          user_type: selectedRole === 'CUSTOMER' ? 'CUSTOMER' : 'EMPLOYEE',
+        };
+        localStorage.setItem('user', JSON.stringify(updatedSelf));
+        window.dispatchEvent(new Event('yf_user_updated'));
+      }
+
+      // Phát tín hiệu broadcast toàn cục để các tab trình duyệt khác của người dùng cập nhật quyền hạn ngay lập tức
+      try {
+        const bc = new BroadcastChannel('yf_role_sync_channel');
+        bc.postMessage({
+          type: 'ROLE_CHANGED',
+          email: detailModalUser.email,
+          newRole: selectedRole,
+          userType: selectedRole === 'CUSTOMER' ? 'CUSTOMER' : 'EMPLOYEE',
+        });
+        bc.close();
+      } catch (e) {}
+
       setDetailModalUser(null);
     } catch (err) {
       showError(err?.response?.data?.message || 'Lỗi khi cập nhật vai trò');
@@ -886,7 +913,13 @@ export default function UserManagement() {
       showError('Tài khoản Quản trị viên (Admin) là cố định duy nhất, không thể xóa!');
       return;
     }
-    const confirmed = window.confirm(`Bạn có chắc chắn muốn xóa tài khoản "${user.full_name}" không?`);
+    const confirmed = await confirmModal({
+      title: 'Xóa tài khoản người dùng',
+      message: `Bạn có chắc chắn muốn xóa tài khoản "${user.full_name}" không? Thao tác này sẽ xóa toàn bộ dữ liệu người dùng và không thể hoàn tác.`,
+      confirmText: 'Xác nhận xóa',
+      cancelText: 'Hủy bỏ',
+      variant: 'danger',
+    });
     if (!confirmed) return;
     try {
       await adminService.deleteUser(user.type, user.id);
@@ -1095,7 +1128,14 @@ export default function UserManagement() {
                       showError('Không thể xóa tài khoản Quản trị viên (Admin)');
                       return;
                     }
-                    if (window.confirm(`Bạn có chắc muốn xóa ${nonAdminSelectedIds.length} tài khoản đã chọn?`)) {
+                    const confirmed = await confirmModal({
+                      title: 'Xóa hàng loạt tài khoản',
+                      message: `Bạn có chắc chắn muốn xóa ${nonAdminSelectedIds.length} tài khoản đã chọn không? Thao tác này sẽ xóa toàn bộ dữ liệu người dùng và không thể hoàn tác.`,
+                      confirmText: 'Xác nhận xóa',
+                      cancelText: 'Hủy bỏ',
+                      variant: 'danger',
+                    });
+                    if (confirmed) {
                       try {
                         for (const id of nonAdminSelectedIds) {
                           const u = users.find((user) => user.id === id);

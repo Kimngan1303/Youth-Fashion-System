@@ -1,5 +1,6 @@
 import { verifyAccessToken } from '../helpers/jwt.helper.js';
 import { BaseResponse } from '../utils/baseResponse.js';
+import prisma from '../repositories/prisma.js';
 
 /**
  * Middleware xác thực Bearer Access Token trong Header Authorization
@@ -28,13 +29,29 @@ export const authenticateToken = (req, res, next) => {
 export const authorizeRoles = (...allowedRoles) => {
   const normalizedAllowed = allowedRoles.map((r) => String(r).toUpperCase());
 
-  return (req, res, next) => {
+  return async (req, res, next) => {
     if (!req.user) {
       return BaseResponse.error(res, 'Bạn không có quyền truy cập tài nguyên này', [], 403);
     }
 
+    const email = (req.user.email || '').toLowerCase().trim();
     const rawRole = req.user.role || req.user.employee_role;
-    const userRole = rawRole ? String(rawRole).toUpperCase() : null;
+    let userRole = rawRole ? String(rawRole).toUpperCase() : null;
+
+    // Kiểm tra realtime với CSDL nếu route yêu cầu quyền quản trị (ADMIN / MANAGER)
+    if (normalizedAllowed.includes('MANAGER') || normalizedAllowed.includes('ADMIN')) {
+      if (email) {
+        try {
+          const activeEmp = await prisma.employee.findFirst({
+            where: { email, status: 'ACTIVE' },
+          });
+          if (!activeEmp) {
+            return BaseResponse.error(res, 'Quyền quản lý của bạn đã bị thu hồi hoặc tài khoản không có quyền truy cập', [], 403);
+          }
+          userRole = String(activeEmp.employee_role).toUpperCase();
+        } catch (e) {}
+      }
+    }
 
     if (userRole && normalizedAllowed.includes(userRole)) {
       return next();

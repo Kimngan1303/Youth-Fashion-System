@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
+import { useConfirmModal } from '../../context/ConfirmModalContext';
 import { adminService } from '../../services/adminService';
 import ManagerSidebar from '../../components/ManagerSidebar';
 import ManagerHeader from '../../components/ManagerHeader';
@@ -247,6 +248,7 @@ const configStyles = `
 
 export default function SystemConfig() {
   const { showSuccess, showError } = useToast();
+  const { confirmModal } = useConfirmModal();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState('CREATE_ADMIN'); // 'CREATE_ADMIN' | 'ADMIN_LIST' | 'STORE_CONFIG'
@@ -367,7 +369,14 @@ export default function SystemConfig() {
       return;
     }
 
-    if (!window.confirm(`Xác nhận xóa tài khoản "${admin.full_name}"?`)) return;
+    const confirmed = await confirmModal({
+      title: 'Xóa tài khoản Quản trị viên',
+      message: `Bạn có chắc chắn muốn xóa tài khoản "${admin.full_name}" khỏi hệ thống không? Thao tác này không thể hoàn tác.`,
+      confirmText: 'Xác nhận xóa',
+      cancelText: 'Hủy bỏ',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     try {
       await adminService.deleteUser('EMPLOYEE', admin.id);

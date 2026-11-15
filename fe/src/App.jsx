@@ -91,6 +91,19 @@ function ProtectedRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 }
 
+function ManagerRoute({ children }) {
+  const { user, isAuthenticated } = useContext(AuthContext);
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const isManagerOrAdmin = Boolean(
+    user && (
+      ['ADMIN', 'MANAGER', 'EMPLOYEE'].includes(String(user?.role || '').toUpperCase()) ||
+      ['ADMIN', 'MANAGER'].includes(String(user?.employee_role || '').toUpperCase()) ||
+      String(user?.user_type || user?.type || '').toUpperCase() === 'EMPLOYEE'
+    )
+  );
+  return isManagerOrAdmin ? children : <Navigate to="/" replace />;
+}
+
 function AdminRoute({ children }) {
   const { user, isAuthenticated } = useContext(AuthContext);
   if (!isAuthenticated) return <Navigate to="/login" replace />;
@@ -203,90 +216,90 @@ function AppContent() {
           <Route
             path="/manager"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <ManagerDashboard />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           <Route
             path="/admin"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <ManagerDashboard />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           
           <Route
             path="/manager/products"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <ProductManager />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           <Route
             path="/manager/categories"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <CategoryManager />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           <Route
             path="/manager/brands"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <BrandManager />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           <Route
             path="/manager/lookbooks"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <LookbookManagement />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           <Route
             path="/manager/vouchers"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <VoucherManager />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           <Route
             path="/manager/orders"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <OrderManager />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           <Route
             path="/admin/orders"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <OrderManager />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           <Route
             path="/manager/reports"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <RevenueReport />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           <Route
             path="/admin/reports"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <RevenueReport />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           <Route
@@ -316,17 +329,17 @@ function AppContent() {
           <Route
             path="/manager/chat"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <ChatManagement />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           <Route
             path="/manager/support"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <ChatManagement />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           

@@ -172,27 +172,80 @@ export function AuthProvider({ children }) {
       });
   }, [user?.customer_id, user?.id, user?.email]);
 
-  // Đồng bộ lại thông tin hồ sơ & ngày đăng ký created_at từ backend nếu chưa có
+  // Lắng nghe tín hiệu đồng bộ phân quyền vai trò (ROLE_CHANGED) từ Admin
+  useEffect(() => {
+    let bc = null;
+    try {
+      bc = new BroadcastChannel('yf_role_sync_channel');
+      bc.onmessage = (event) => {
+        if (event.data?.type === 'ROLE_CHANGED' && user?.email) {
+          if (user.email.toLowerCase() === (event.data.email || '').toLowerCase()) {
+            const isManagerOrAdmin = ['MANAGER', 'ADMIN', 'EMPLOYEE'].includes(String(event.data.newRole).toUpperCase());
+            const updated = {
+              ...user,
+              role: event.data.newRole,
+              employee_role: isManagerOrAdmin ? event.data.newRole : undefined,
+              user_type: event.data.userType,
+            };
+            setUser(updated);
+            localStorage.setItem('user', JSON.stringify(updated));
+
+            // Nếu bị hạ quyền về Khách Hàng khi đang ở giao diện Quản lý -> Tự động chuyển hướng về trang chủ
+            if (!isManagerOrAdmin && window.location.pathname.startsWith('/manager')) {
+              window.location.href = '/';
+            }
+          }
+        }
+      };
+    } catch (e) {}
+
+    const handleLocalUserUpdate = () => {
+      try {
+        const raw = localStorage.getItem('user');
+        if (raw) setUser(JSON.parse(raw));
+      } catch (e) {}
+    };
+    window.addEventListener('yf_user_updated', handleLocalUserUpdate);
+
+    return () => {
+      if (bc) try { bc.close(); } catch (e) {}
+      window.removeEventListener('yf_user_updated', handleLocalUserUpdate);
+    };
+  }, [user]);
+
+  // Đồng bộ lại thông tin hồ sơ & vai trò từ backend
   useEffect(() => {
     const syncUserProfile = async () => {
       const token = localStorage.getItem('accessToken');
-      if (token && user && !user.created_at) {
+      if (token && user?.email) {
         try {
           const res = await authService.getProfile();
-          if (res?.data?.created_at) {
-            setUser(prev => {
-              const updated = { ...prev, ...res.data };
-              localStorage.setItem('user', JSON.stringify(updated));
-              return updated;
-            });
+          if (res?.data) {
+            const latestRole = res.data.role;
+            const latestUserType = res.data.user_type;
+            if (latestRole && (latestRole !== user.role || latestUserType !== user.user_type)) {
+              const isManagerOrAdmin = ['MANAGER', 'ADMIN', 'EMPLOYEE'].includes(String(latestRole).toUpperCase());
+              setUser(prev => {
+                const updated = {
+                  ...prev,
+                  ...res.data,
+                  role: latestRole,
+                  employee_role: isManagerOrAdmin ? latestRole : undefined,
+                  user_type: latestUserType,
+                };
+                localStorage.setItem('user', JSON.stringify(updated));
+                return updated;
+              });
+              if (!isManagerOrAdmin && window.location.pathname.startsWith('/manager')) {
+                window.location.href = '/';
+              }
+            }
           }
-        } catch (e) {
-          // ignore error
-        }
+        } catch (e) {}
       }
     };
     syncUserProfile();
-  }, [user?.customer_id, user?.id, user?.email]);
+  }, [user?.email]);
 
   useEffect(() => {
     const handleLogoutEvent = () => {
