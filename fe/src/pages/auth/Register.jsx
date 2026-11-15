@@ -619,7 +619,7 @@ export default function Register() {
 
             {/* Footer credentials */}
             <div className="banner-footer-credentials">
-              © 2026 YOUTH FASHION
+              © 2026 Youth Fashion. Bảo lưu mọi quyền.
             </div>
           </div>
 
