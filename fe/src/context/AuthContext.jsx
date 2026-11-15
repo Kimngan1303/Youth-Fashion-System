@@ -223,6 +223,14 @@ export function AuthProvider({ children }) {
         next = prev.filter(item => (typeof item === 'object' ? (item.id !== targetId && item.product_id !== targetId) : item !== targetId));
       } else {
         wasAdded = true;
+        const isOutOfStock = typeof product === 'object' && (
+          product.inStock === false ||
+          product.status === 'HẾT HÀNG' ||
+          String(product.status || '').toLowerCase().includes('hết hàng') ||
+          String(product.status || '').toUpperCase() === 'OUT_OF_STOCK' ||
+          (product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0)
+        );
+
         const itemToAdd = typeof product === 'object' ? {
           id: targetId,
           product_id: targetId,
@@ -238,11 +246,13 @@ export function AuthProvider({ children }) {
           image: product.image || product.images?.[0]?.image_url || 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=800',
           badgeTop: (product.badgeTop && product.badgeTop !== 'MỚI') ? product.badgeTop : null,
           badgeSub: (product.badgeSub && product.badgeSub !== 'CASHMERE 100%') ? product.badgeSub : null,
-          status: product.status || 'CÒN HÀNG',
-          statusColor: product.statusColor || 'green',
+          status: product.status || (isOutOfStock ? 'HẾT HÀNG' : 'CÒN HÀNG'),
+          statusColor: product.statusColor || (isOutOfStock ? '#dc2626' : 'green'),
           availableSizes: product.availableSizes || ['S', 'M', 'L'],
           selectedSize: product.selectedSize || 'M',
-          inStock: product.inStock !== undefined ? product.inStock : true,
+          inStock: isOutOfStock ? false : (product.inStock !== undefined ? product.inStock : true),
+          stock: product.stock !== undefined ? product.stock : (isOutOfStock ? 0 : null),
+          variants: product.variants || product.rawVariants || [],
         } : {
           id: targetId,
           product_id: targetId,
@@ -259,7 +269,9 @@ export function AuthProvider({ children }) {
           statusColor: 'green',
           availableSizes: ['S', 'M', 'L'],
           selectedSize: 'M',
-          inStock: true
+          inStock: true,
+          stock: null,
+          variants: []
         };
         next = [itemToAdd, ...prev];
       }
@@ -327,8 +339,37 @@ export function AuthProvider({ children }) {
       return { success: false, requireLogin: true, message: 'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!' };
     }
 
+    if (!product) {
+      return { success: false, message: 'Sản phẩm không hợp lệ!' };
+    }
+
+    // Kiểm tra trạng thái hết hàng của sản phẩm
+    const isOutOfStock = 
+      product.inStock === false ||
+      product.status === 'HẾT HÀNG' ||
+      String(product.status || '').toLowerCase().includes('hết hàng') ||
+      String(product.status || '').toUpperCase() === 'OUT_OF_STOCK' ||
+      (product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0);
+
+    if (isOutOfStock) {
+      return { success: false, isOutOfStock: true, message: 'Sản phẩm hiện đã hết hàng!' };
+    }
+
     const prodId = product.id || product.product_id || product.sku || 'PROD';
     const size = selectedSize || product.selectedSize || 'M';
+
+    // Nếu sản phẩm có thông tin các biến thể (variants), kiểm tra tồn kho của size được chọn
+    if (Array.isArray(product.variants) && product.variants.length > 0) {
+      const matchVar = product.variants.find(v => String(v.size || '').trim().toUpperCase() === String(size).trim().toUpperCase());
+      if (matchVar && Number(matchVar.stock || 0) <= 0) {
+        return { success: false, isOutOfStock: true, message: `Sản phẩm kích cỡ ${size} hiện đã hết hàng!` };
+      }
+      const totalStock = product.variants.reduce((sum, v) => sum + Number(v.stock || 0), 0);
+      if (totalStock <= 0) {
+        return { success: false, isOutOfStock: true, message: 'Sản phẩm hiện đã hết hàng!' };
+      }
+    }
+
     const variantId = product.variant_id || product.variantId;
 
     // 1. Nếu có variant_id hợp lệ, gọi Backend API lưu vào MySQL
@@ -361,7 +402,15 @@ export function AuthProvider({ children }) {
           return { success: true };
         }
       } catch (err) {
-        console.warn('Lỗi gọi API cart, lưu cục bộ:', err.message);
+        console.warn('Lỗi gọi API cart, kiểm tra phản hồi lỗi:', err.message);
+        // Nếu server báo lỗi 400 (hết hàng / không đủ số lượng / ngừng kinh doanh)
+        if (err.response?.status === 400) {
+          return {
+            success: false,
+            isOutOfStock: true,
+            message: err.response?.data?.message || 'Sản phẩm hiện đã hết hàng trong kho!'
+          };
+        }
       }
     }
 
