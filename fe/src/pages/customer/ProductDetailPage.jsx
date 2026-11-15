@@ -460,6 +460,12 @@ export default function ProductDetailPage() {
       image: activeImage,
       selectedSize,
       colorName: product.colors.find(c => c.id === selectedColor)?.name || 'Camel Tự Nhiên',
+      inStock: !isOutOfStock,
+      status: isOutOfStock ? 'HẾT HÀNG' : (currentStock <= 5 ? 'SẮP HẾT HÀNG' : 'CÒN HÀNG'),
+      statusColor: isOutOfStock ? '#dc2626' : (currentStock <= 5 ? '#c2410c' : '#15803d'),
+      stock: currentStock,
+      availableSizes: product.sizes || ['S', 'M', 'L'],
+      variants: product.rawVariants || [],
     });
     if (res?.wasAdded) {
       showSuccess('Đã thêm sản phẩm vào danh sách yêu thích!');
@@ -476,7 +482,7 @@ export default function ProductDetailPage() {
     }
 
     if (isOutOfStock) {
-      showError('Sản phẩm với phân loại kích thước/màu sắc này hiện đã hết hàng!');
+      showError('Sản phẩm hiện đã hết hàng!');
       return;
     }
 
@@ -522,7 +528,7 @@ export default function ProductDetailPage() {
     }
 
     if (isOutOfStock) {
-      showError('Sản phẩm với phân loại kích thước/màu sắc này hiện đã hết hàng!');
+      showError('Sản phẩm hiện đã hết hàng!');
       return;
     }
 
@@ -812,8 +818,7 @@ export default function ProductDetailPage() {
                     type="button"
                     className="btn-add-to-cart"
                     onClick={handleAddToCart}
-                    disabled={isOutOfStock}
-                    style={isOutOfStock ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: '#6B7280' } : undefined}
+                    style={isOutOfStock ? { opacity: 0.8, cursor: 'pointer', backgroundColor: '#6B7280' } : undefined}
                   >
                     <ShoppingBag size={15} color="#FFFFFF" />
                     <span>{isOutOfStock ? 'HẾT HÀNG' : 'THÊM VÀO GIỎ HÀNG'}</span>
@@ -838,8 +843,7 @@ export default function ProductDetailPage() {
                   type="button"
                   className="btn-buy-now"
                   onClick={handleBuyNow}
-                  disabled={isOutOfStock}
-                  style={isOutOfStock ? { opacity: 0.6, cursor: 'not-allowed', borderColor: '#D1D5DB', color: '#9CA3AF' } : undefined}
+                  style={isOutOfStock ? { opacity: 0.8, cursor: 'pointer', borderColor: '#D1D5DB', color: '#9CA3AF' } : undefined}
                 >
                   {isOutOfStock ? 'TẠM HẾT HÀNG' : 'MUA NGAY'}
                 </button>

@@ -42,9 +42,18 @@ export const formatWishlistItem = (item) => {
     availableSizes: availableSizes.length > 0 ? availableSizes : ['S', 'M', 'L'],
     colors: availableColors,
     selectedSize: availableSizes[0] || 'M',
-    inStock: totalStock > 0 || variants.length === 0,
+    stock: totalStock,
+    inStock: totalStock > 0,
     status: totalStock > 0 ? 'CÒN HÀNG' : 'HẾT HÀNG',
     statusColor: totalStock > 0 ? 'green' : 'red',
+    variants: variants.map((v) => ({
+      variant_id: v.variant_id.toString(),
+      sku: v.sku,
+      size: v.size,
+      color: v.color,
+      price: Number(v.price),
+      stock: Number(v.stock),
+    })),
     created_at: item.created_at,
   };
 };

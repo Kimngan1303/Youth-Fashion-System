@@ -556,7 +556,7 @@ export const customerCancelOrderService = async (orderIdOrNumber, customerId, re
 /**
  * Khách hàng yêu cầu hoàn tiền cho đơn PayOS bị shop hủy hoặc đổi trả đơn đã giao
  */
-export const customerRefundRequestService = async (orderIdOrNumber, customerId, { reason, bank_info, images } = {}) => {
+export const customerRefundRequestService = async (orderIdOrNumber, customerId, { reason, bank_info, images, refund_amount, selected_items } = {}) => {
   const existingOrder = await orderRepo.findOrderByIdOrNumber(orderIdOrNumber);
   if (!existingOrder) {
     throw createServiceError('Không tìm thấy đơn hàng', 404);
@@ -577,7 +577,8 @@ export const customerRefundRequestService = async (orderIdOrNumber, customerId, 
   }
 
   const refundReason = reason ? String(reason).trim() : 'Khách yêu cầu hoàn tiền';
-  const updatedNote = `[Yêu cầu hoàn tiền]: ${refundReason}${bank_info ? ` | STK: ${bank_info}` : ''}`;
+  const effectiveRefundAmount = refund_amount && Number(refund_amount) > 0 ? Number(refund_amount) : Number(existingOrder.total_amount);
+  const updatedNote = `[Yêu cầu hoàn tiền]: ${refundReason} | Tiền hoàn: ${effectiveRefundAmount.toLocaleString('vi-VN')}₫${bank_info ? ` | STK: ${bank_info}` : ''}`;
 
   return await prisma.$transaction(async (tx) => {
     // 1. Tạo ReturnRequest
@@ -587,9 +588,9 @@ export const customerRefundRequestService = async (orderIdOrNumber, customerId, 
         reason: refundReason,
         type: 'REFUND',
         status: 'PENDING',
-        refund_amount: existingOrder.total_amount,
+        refund_amount: effectiveRefundAmount,
         bank_info: bank_info || null,
-        images: images || null,
+        images: images || (selected_items ? { selected_items } : null),
       },
     });
 

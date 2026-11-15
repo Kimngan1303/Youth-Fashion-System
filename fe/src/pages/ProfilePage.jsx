@@ -1019,11 +1019,24 @@ const ProfilePage = () => {
   const [selectedReviewItemIndex, setSelectedReviewItemIndex] = useState(0);
   const [warrantyModalOpen, setWarrantyModalOpen] = useState(false);
   const [refundModalOrder, setRefundModalOrder] = useState(null);
+  const [selectedRefundItemIndices, setSelectedRefundItemIndices] = useState([]);
   const [refundReason, setRefundReason] = useState('Sản phẩm không vừa kích cỡ (Size)');
   const [customRefundReason, setCustomRefundReason] = useState('');
   const [refundBankInfo, setRefundBankInfo] = useState('');
   const [refundBankError, setRefundBankError] = useState('');
   const [isRefunding, setIsRefunding] = useState(false);
+
+  // Mở popup Yêu Cầu Hoàn Tiền (mặc định tick chọn tất cả sản phẩm trong đơn)
+  const openRefundModal = (ord, defaultReason = 'Sản phẩm không vừa kích cỡ (Size)') => {
+    if (!ord) return;
+    setRefundReason(defaultReason);
+    setCustomRefundReason('');
+    setRefundBankInfo('');
+    setRefundBankError('');
+    const itemsCount = ord.items?.length || 0;
+    setSelectedRefundItemIndices(Array.from({ length: itemsCount }, (_, i) => i));
+    setRefundModalOrder(ord);
+  };
   const [cancelModalOrder, setCancelModalOrder] = useState(null);
   const [cancelReason, setCancelReason] = useState('Đổi ý, không muốn mua nữa');
   const [customCancelReason, setCustomCancelReason] = useState('');
@@ -2710,6 +2723,18 @@ const ProfilePage = () => {
   const confirmRefundOrder = async (ord) => {
     if (!ord) return;
 
+    const items = ord.items || [];
+    const selectedItems = items.filter((_, idx) => selectedRefundItemIndices.includes(idx));
+
+    if (items.length > 0 && selectedItems.length === 0) {
+      setOrderAlert({
+        type: 'error',
+        message: 'Vui lòng tick chọn ít nhất một sản phẩm bạn muốn hoàn trả!',
+      });
+      setTimeout(() => setOrderAlert({ type: '', message: '' }), 4000);
+      return;
+    }
+
     // Bắt buộc nhập thông tin tài khoản ngân hàng để nhận tiền hoàn
     const bankTrimmed = String(refundBankInfo || '').trim();
     if (!bankTrimmed) {
@@ -2728,195 +2753,226 @@ const ProfilePage = () => {
         ? customRefundReason.trim()
         : refundReason;
 
-    const orderDisplayCode = ord.order_code || ord.order_number || ord.order_id;
-    const orderDigits = String(orderDisplayCode || ord.order_id || '').replace(/\D/g, '');
-    const tId = String(ord.order_id || '').trim();
-    const tNum = String(orderDisplayCode || '').trim();
-    const refundNote = `Khách yêu cầu hoàn tiền: ${finalReason} | STK: ${bankTrimmed}`;
+      const orderDisplayCode = ord.order_code || ord.order_number || ord.order_id;
+      const orderDigits = String(orderDisplayCode || ord.order_id || '').replace(/\D/g, '');
+      const tId = String(ord.order_id || '').trim();
+      const tNum = String(orderDisplayCode || '').trim();
 
-    // 1. Gọi backend API trước, bắt buộc await và dừng nếu lỗi
-    const refundTarget = tId || tNum || orderDigits;
-    try {
-      await orderService.customerRequestRefund(refundTarget, {
-        reason: finalReason,
-        bank_info: bankTrimmed
-      });
-    } catch (apiErr) {
-      console.error('Lỗi API yêu cầu hoàn tiền:', apiErr);
-      setOrderAlert({
-        type: 'error',
-        message: apiErr?.response?.data?.message || apiErr?.message || 'Không thể gửi yêu cầu hoàn tiền lên máy chủ!',
-      });
-      setTimeout(() => setOrderAlert({ type: '', message: '' }), 4500);
-      return;
-    }
+      const isAllSelected = items.length === 0 || selectedItems.length === items.length;
+      const calculatedRefundAmount = isAllSelected
+        ? Number(ord.total_amount || 0)
+        : selectedItems.reduce((sum, it) => sum + (Number(it.price || it.unit_price || 0) * (Number(it.quantity) || 1)), 0);
 
-    // 2. Cập nhật state customerOrders sang RETURNED (Đổi trả) sau khi backend thành công
-    const updatedOrders = customerOrders.map((o) => {
-      const oId = String(o.order_id || '').trim();
-      const oNum = String(o.order_code || o.order_number || '').trim();
-      const oDigits = (oNum || oId).replace(/\D/g, '');
-      const isMatch =
-        (tId && (oId === tId || oNum === tId)) ||
-        (tNum && (oId === tNum || oNum === tNum)) ||
-        (orderDigits && oDigits && orderDigits === oDigits);
-      if (isMatch) {
-        return {
-          ...o,
-          status: 'RETURNED',
-          order_status: 'RETURNED',
-          status_label: 'ĐỔI TRẢ',
-          refund_reason: finalReason,
-          refund_bank: bankTrimmed,
-          note: refundNote,
-          stepper: null,
-        };
-      }
-      return o;
-    });
+      const itemsDesc = selectedItems.length > 0
+        ? ` (${selectedItems.map(i => `${i.name || i.product_name || 'Sản phẩm'}${i.size ? ` [Size ${i.size}]` : ''} x${i.quantity || 1}`).join(', ')})`
+        : '';
 
-    setCustomerOrders(updatedOrders);
+      const refundNote = `Khách yêu cầu hoàn tiền: ${finalReason}${itemsDesc} | Tiền hoàn: ${calculatedRefundAmount.toLocaleString('vi-VN')}₫ | STK: ${bankTrimmed}`;
 
-    // 3. Lưu vào localStorage & đồng bộ sang Manager
-    try {
-      const userKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : null;
-      if (userKey) localStorage.setItem(userKey, JSON.stringify(updatedOrders));
-      localStorage.setItem('yf_customer_orders', JSON.stringify(updatedOrders));
-
-      // Cập nhật tất cả key yf_customer_orders_*
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith('yf_customer_orders_') && k !== userKey) {
-          try {
-            const rawK = localStorage.getItem(k);
-            if (rawK) {
-              const parsedK = JSON.parse(rawK);
-              if (Array.isArray(parsedK)) {
-                const updatedK = parsedK.map(item => {
-                  const iId = String(item.order_id || '').trim();
-                  const iNum = String(item.order_code || item.order_number || '').trim();
-                  const iDigits = (iNum || iId).replace(/\D/g, '');
-                  if ((tId && (iId === tId || iNum === tId)) ||
-                      (tNum && (iId === tNum || iNum === tNum)) ||
-                      (orderDigits && iDigits && orderDigits === iDigits)) {
-                    return {
-                      ...item,
-                      status: 'RETURNED',
-                      order_status: 'RETURNED',
-                      status_label: 'ĐỔI TRẢ',
-                      refund_reason: finalReason,
-                      refund_bank: bankTrimmed,
-                      note: refundNote
-                    };
-                  }
-                  return item;
-                });
-                localStorage.setItem(k, JSON.stringify(updatedK));
-              }
-            }
-          } catch (err) {}
-        }
-      }
-
-      // Ghi đè trạng thái overrides vĩnh viễn
-      const rawOverrides = localStorage.getItem('yf_order_status_overrides');
-      const overrides = rawOverrides ? JSON.parse(rawOverrides) : {};
-      const overrideEntry = {
-        status: 'RETURNED',
-        status_label: 'Đổi trả',
-        status_label_manager: 'Đổi trả',
-        status_label_customer: 'ĐỔI TRẢ',
-        refund_decision: 'PENDING',
-        refund_reason: finalReason,
-        refund_bank: bankTrimmed,
-        note: refundNote,
-        updated_at: Date.now()
-      };
-      if (orderDigits) {
-        overrides[orderDigits] = overrideEntry;
-        overrides[`YF-${orderDigits}`] = overrideEntry;
-        overrides[`#YF-${orderDigits}`] = overrideEntry;
-        overrides[`YF - ${orderDigits}`] = overrideEntry;
-        overrides[`#YF - ${orderDigits}`] = overrideEntry;
-        overrides[`YF – ${orderDigits}`] = overrideEntry;
-        overrides[`#YF – ${orderDigits}`] = overrideEntry;
-        overrides[`#${orderDigits}`] = overrideEntry;
-      }
-      if (tId) overrides[tId] = overrideEntry;
-      if (tNum) overrides[tNum] = overrideEntry;
-      localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
-
-      // Cập nhật yf_manager_orders để trang quản lý nhận được ngay lập tức
-      const mgrRaw = localStorage.getItem('yf_manager_orders');
-      if (mgrRaw) {
-        const mgrOrders = JSON.parse(mgrRaw);
-        if (Array.isArray(mgrOrders)) {
-          const updatedMgr = mgrOrders.map(m => {
-            const mId = String(m.order_id || '').trim();
-            const mNum = String(m.order_number || m.order_code || '').trim();
-            const mDigits = (mNum || mId).replace(/\D/g, '');
-            const isMatch =
-              (tId && (mId === tId || mNum === tId)) ||
-              (tNum && (mId === tNum || mNum === tNum)) ||
-              (orderDigits && mDigits && orderDigits === mDigits);
-            if (isMatch) {
-              return {
-                ...m,
-                order_status: 'RETURNED',
-                status: 'RETURNED',
-                status_label: 'Đổi trả',
-                refund_decision: 'PENDING',
-                refund_reason: finalReason,
-                refund_bank: bankTrimmed,
-                note: refundNote,
-              };
-            }
-            return m;
-          });
-          localStorage.setItem('yf_manager_orders', JSON.stringify(updatedMgr));
-        }
-      }
-
-      // Phát event storage đa tab & BroadcastChannel
-      const statusPayload = {
-        orderId: tId,
-        orderNumber: tNum,
-        orderDigits: orderDigits,
-        digits: orderDigits,
-        orderCode: orderDisplayCode,
-        status: 'RETURNED',
-        statusLabel: 'Đổi trả',
-        customerLabel: 'ĐỔI TRẢ',
-        refund_bank: bankTrimmed,
-        refund_reason: finalReason,
-        reason: finalReason,
-        refund_decision: 'PENDING',
-        note: refundNote,
-        timestamp: Date.now()
-      };
-      localStorage.setItem('yf_last_status_event', JSON.stringify(statusPayload));
-      window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: statusPayload }));
-      window.dispatchEvent(new CustomEvent('order_status_updated', { detail: statusPayload }));
-
+      // 1. Gọi backend API trước, bắt buộc await và dừng nếu lỗi
+      const refundTarget = tId || tNum || orderDigits;
       try {
-        const bc = new BroadcastChannel('yf_orders_sync_channel');
-        bc.postMessage(statusPayload);
-        bc.close();
-      } catch (e) {}
-    } catch (e) {
-      console.warn('Lỗi lưu localStorage khi hoàn tiền:', e);
-    }
+        await orderService.customerRequestRefund(refundTarget, {
+          reason: `${finalReason}${itemsDesc}`,
+          bank_info: bankTrimmed,
+          refund_amount: calculatedRefundAmount,
+          selected_items: selectedItems.map(i => ({
+            name: i.name || i.product_name,
+            size: i.size,
+            color: i.color,
+            quantity: i.quantity || 1,
+            price: i.price || i.unit_price,
+            product_id: i.product_id || i.productId,
+            variant_id: i.variant_id
+          }))
+        });
+      } catch (apiErr) {
+        console.error('Lỗi API yêu cầu hoàn tiền:', apiErr);
+        setOrderAlert({
+          type: 'error',
+          message: apiErr?.response?.data?.message || apiErr?.message || 'Không thể gửi yêu cầu hoàn tiền lên máy chủ!',
+        });
+        setTimeout(() => setOrderAlert({ type: '', message: '' }), 4500);
+        return;
+      }
 
-    // 4. Gửi thông báo đến chuông thông báo & gửi email Gmail
-    try {
-      sendOrderStatusNotification(ord, 'RETURNED', {
-        newStatusLabel: 'Đổi trả',
-        reason: finalReason,
-        bank_info: bankTrimmed,
-        refund_bank: bankTrimmed,
-        refund_reason: finalReason,
+      // 2. Cập nhật state customerOrders sang RETURNED (Đổi trả) sau khi backend thành công
+      const updatedOrders = customerOrders.map((o) => {
+        const oId = String(o.order_id || '').trim();
+        const oNum = String(o.order_code || o.order_number || '').trim();
+        const oDigits = (oNum || oId).replace(/\D/g, '');
+        const isMatch =
+          (tId && (oId === tId || oNum === tId)) ||
+          (tNum && (oId === tNum || oNum === tNum)) ||
+          (orderDigits && oDigits && orderDigits === oDigits);
+        if (isMatch) {
+          return {
+            ...o,
+            status: 'RETURNED',
+            order_status: 'RETURNED',
+            status_label: 'ĐỔI TRẢ',
+            refund_reason: `${finalReason}${itemsDesc}`,
+            refund_bank: bankTrimmed,
+            refund_amount: calculatedRefundAmount,
+            returned_items: selectedItems,
+            note: refundNote,
+            stepper: null,
+          };
+        }
+        return o;
       });
-    } catch (e) {}
+
+      setCustomerOrders(updatedOrders);
+
+      // 3. Lưu vào localStorage & đồng bộ sang Manager
+      try {
+        const userKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : null;
+        if (userKey) localStorage.setItem(userKey, JSON.stringify(updatedOrders));
+        localStorage.setItem('yf_customer_orders', JSON.stringify(updatedOrders));
+
+        // Cập nhật tất cả key yf_customer_orders_*
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('yf_customer_orders_') && k !== userKey) {
+            try {
+              const rawK = localStorage.getItem(k);
+              if (rawK) {
+                const parsedK = JSON.parse(rawK);
+                if (Array.isArray(parsedK)) {
+                  const updatedK = parsedK.map(item => {
+                    const iId = String(item.order_id || '').trim();
+                    const iNum = String(item.order_code || item.order_number || '').trim();
+                    const iDigits = (iNum || iId).replace(/\D/g, '');
+                    if ((tId && (iId === tId || iNum === tId)) ||
+                        (tNum && (iId === tNum || iNum === tNum)) ||
+                        (orderDigits && iDigits && orderDigits === iDigits)) {
+                      return {
+                        ...item,
+                        status: 'RETURNED',
+                        order_status: 'RETURNED',
+                        status_label: 'ĐỔI TRẢ',
+                        refund_reason: `${finalReason}${itemsDesc}`,
+                        refund_bank: bankTrimmed,
+                        refund_amount: calculatedRefundAmount,
+                        returned_items: selectedItems,
+                        note: refundNote
+                      };
+                    }
+                    return item;
+                  });
+                  localStorage.setItem(k, JSON.stringify(updatedK));
+                }
+              }
+            } catch (err) {}
+          }
+        }
+
+        // Ghi đè trạng thái overrides vĩnh viễn
+        const rawOverrides = localStorage.getItem('yf_order_status_overrides');
+        const overrides = rawOverrides ? JSON.parse(rawOverrides) : {};
+        const overrideEntry = {
+          status: 'RETURNED',
+          status_label: 'Đổi trả',
+          status_label_manager: 'Đổi trả',
+          status_label_customer: 'ĐỔI TRẢ',
+          refund_decision: 'PENDING',
+          refund_reason: `${finalReason}${itemsDesc}`,
+          refund_bank: bankTrimmed,
+          refund_amount: calculatedRefundAmount,
+          returned_items: selectedItems,
+          note: refundNote,
+          updated_at: Date.now()
+        };
+        if (orderDigits) {
+          overrides[orderDigits] = overrideEntry;
+          overrides[`YF-${orderDigits}`] = overrideEntry;
+          overrides[`#YF-${orderDigits}`] = overrideEntry;
+          overrides[`YF - ${orderDigits}`] = overrideEntry;
+          overrides[`#YF - ${orderDigits}`] = overrideEntry;
+          overrides[`YF – ${orderDigits}`] = overrideEntry;
+          overrides[`#YF – ${orderDigits}`] = overrideEntry;
+          overrides[`#${orderDigits}`] = overrideEntry;
+        }
+        if (tId) overrides[tId] = overrideEntry;
+        if (tNum) overrides[tNum] = overrideEntry;
+        localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
+
+        // Cập nhật yf_manager_orders để trang quản lý nhận được ngay lập tức
+        const mgrRaw = localStorage.getItem('yf_manager_orders');
+        if (mgrRaw) {
+          const mgrOrders = JSON.parse(mgrRaw);
+          if (Array.isArray(mgrOrders)) {
+            const updatedMgr = mgrOrders.map(m => {
+              const mId = String(m.order_id || '').trim();
+              const mNum = String(m.order_number || m.order_code || '').trim();
+              const mDigits = (mNum || mId).replace(/\D/g, '');
+              const isMatch =
+                (tId && (mId === tId || mNum === tId)) ||
+                (tNum && (mId === tNum || mNum === tNum)) ||
+                (orderDigits && mDigits && orderDigits === mDigits);
+              if (isMatch) {
+                return {
+                  ...m,
+                  order_status: 'RETURNED',
+                  status: 'RETURNED',
+                  status_label: 'Đổi trả',
+                  refund_decision: 'PENDING',
+                  refund_reason: `${finalReason}${itemsDesc}`,
+                  refund_bank: bankTrimmed,
+                  refund_amount: calculatedRefundAmount,
+                  returned_items: selectedItems,
+                  note: refundNote,
+                };
+              }
+              return m;
+            });
+            localStorage.setItem('yf_manager_orders', JSON.stringify(updatedMgr));
+          }
+        }
+
+        // Phát event storage đa tab & BroadcastChannel
+        const statusPayload = {
+          orderId: tId,
+          orderNumber: tNum,
+          orderDigits: orderDigits,
+          digits: orderDigits,
+          orderCode: orderDisplayCode,
+          status: 'RETURNED',
+          statusLabel: 'Đổi trả',
+          customerLabel: 'ĐỔI TRẢ',
+          refund_bank: bankTrimmed,
+          refund_reason: `${finalReason}${itemsDesc}`,
+          reason: `${finalReason}${itemsDesc}`,
+          refund_amount: calculatedRefundAmount,
+          returned_items: selectedItems,
+          refund_decision: 'PENDING',
+          note: refundNote,
+          timestamp: Date.now()
+        };
+        localStorage.setItem('yf_last_status_event', JSON.stringify(statusPayload));
+        window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: statusPayload }));
+        window.dispatchEvent(new CustomEvent('order_status_updated', { detail: statusPayload }));
+
+        try {
+          const bc = new BroadcastChannel('yf_orders_sync_channel');
+          bc.postMessage(statusPayload);
+          bc.close();
+        } catch (e) {}
+      } catch (e) {
+        console.warn('Lỗi lưu localStorage khi hoàn tiền:', e);
+      }
+
+      // 4. Gửi thông báo đến chuông thông báo & gửi email Gmail
+      try {
+        sendOrderStatusNotification(ord, 'RETURNED', {
+          newStatusLabel: 'Đổi trả',
+          reason: `${finalReason}${itemsDesc}`,
+          bank_info: bankTrimmed,
+          refund_bank: bankTrimmed,
+          refund_reason: `${finalReason}${itemsDesc}`,
+          refund_amount: calculatedRefundAmount,
+        });
+      } catch (e) {}
 
       setOrderAlert({
         type: 'success',
@@ -3967,13 +4023,7 @@ const ProfilePage = () => {
                                   )}
                                   <button
                                     className="btn-order-action btn-neutral-outline"
-                                    onClick={() => {
-                                      setRefundReason('Sản phẩm không vừa kích cỡ (Size)');
-                                      setCustomRefundReason('');
-                                      setRefundBankInfo('');
-                                      setRefundBankError('');
-                                      setRefundModalOrder(ord);
-                                    }}
+                                    onClick={() => openRefundModal(ord)}
                                   >
                                     Yêu Cầu Hoàn Tiền
                                   </button>
@@ -3996,13 +4046,7 @@ const ProfilePage = () => {
                                   </button>
                                   <button
                                     className="btn-order-action btn-neutral-outline"
-                                    onClick={() => {
-                                      setRefundReason('Sản phẩm không vừa kích cỡ (Size)');
-                                      setCustomRefundReason('');
-                                      setRefundBankInfo('');
-                                      setRefundBankError('');
-                                      setRefundModalOrder(ord);
-                                    }}
+                                    onClick={() => openRefundModal(ord)}
                                   >
                                     Yêu Cầu Hoàn Tiền
                                   </button>
@@ -4089,13 +4133,7 @@ const ProfilePage = () => {
                                   })() && (
                                     <button
                                       className="btn-order-action btn-purple-outline"
-                                      onClick={() => {
-                                        setRefundReason('Shop đã hủy đơn hàng - Yêu cầu hoàn tiền');
-                                        setCustomRefundReason('');
-                                        setRefundBankInfo('');
-                                        setRefundBankError('');
-                                        setRefundModalOrder(ord);
-                                      }}
+                                      onClick={() => openRefundModal(ord, 'Shop đã hủy đơn hàng - Yêu cầu hoàn tiền')}
                                       title="Yêu cầu Shop chuyển tiền hoàn trả về số tài khoản ngân hàng của bạn"
                                     >
                                       <RotateCcw size={13} />
@@ -5603,145 +5641,339 @@ const ProfilePage = () => {
       )}
 
       {/* Modal 5: Yêu Cầu Hoàn Tiền */}
-      {refundModalOrder && (
-        <div className="profile-modal-overlay animate-fade-in" onClick={() => !isRefunding && setRefundModalOrder(null)}>
-          <div className="profile-modal-box cancel-modal-box" onClick={e => e.stopPropagation()}>
-            <div className="modal-header-row">
-              <div>
-                <span className="modal-super-title" style={{ color: '#7e22ce' }}>CHÍNH SÁCH ĐỔI TRẢ & HOÀN TIỀN</span>
-                <h3 className="modal-title font-serif">Mã Đơn #{refundModalOrder.order_code || refundModalOrder.order_id}</h3>
-              </div>
-              <button className="modal-close-btn" disabled={isRefunding} onClick={() => setRefundModalOrder(null)}>
-                <X size={18} />
-              </button>
-            </div>
+      {refundModalOrder && (() => {
+        const orderItems = refundModalOrder.items || [];
+        const isMultiItem = orderItems.length > 1;
+        const selectedCount = selectedRefundItemIndices.length;
+        const isAllSelected = orderItems.length > 0 && selectedCount === orderItems.length;
+        const selectedItems = orderItems.filter((_, idx) => selectedRefundItemIndices.includes(idx));
 
-            <div style={{ padding: '16px 0', borderBottom: '1px solid #f1f3f5' }}>
-              <div style={{
-                background: '#faf5ff',
-                border: '1px solid #e9d5ff',
-                borderRadius: '8px',
-                padding: '12px 14px',
-                marginBottom: '16px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <span style={{ fontSize: '12.5px', color: '#6b21a8', fontWeight: 600 }}>Số tiền hoàn dự kiến:</span>
-                <strong style={{ fontSize: '15px', color: '#7e22ce' }}>
-                  {Number(refundModalOrder.total_amount || 0).toLocaleString('vi-VN')}₫
-                </strong>
-              </div>
+        const calculatedRefundAmount = (isAllSelected || orderItems.length === 0)
+          ? Number(refundModalOrder.total_amount || 0)
+          : selectedItems.reduce((sum, it) => sum + (Number(it.price || it.unit_price || 0) * (Number(it.quantity) || 1)), 0);
 
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1c1917', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                Vui lòng chọn lý do yêu cầu hoàn tiền:
-              </label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {(resolveCancelInfo(refundModalOrder).isShopCancelled
-                  ? [
-                      'Shop đã hủy đơn hàng - Yêu cầu hoàn tiền',
-                      'Đơn hàng bị hủy do hết hàng / sự cố kho',
-                      'Khách hàng yêu cầu nhận lại tiền hoàn qua STK ngân hàng',
-                      'Lý do khác'
-                    ]
-                  : [
-                      'Sản phẩm không vừa kích cỡ (Size)',
-                      'Sản phẩm lỗi đường may / chất liệu vải',
-                      'Giao sai mẫu / sai màu sắc so với ảnh',
-                      'Không ưng ý sau khi nhận sản phẩm',
-                      'Lý do khác'
-                    ]
-                ).map((reason) => (
-                  <label key={reason} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#44403c', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="refund_reason"
-                      value={reason}
-                      checked={refundReason === reason}
-                      onChange={(e) => setRefundReason(e.target.value)}
-                      style={{ accentColor: '#7e22ce', cursor: 'pointer' }}
-                    />
-                    <span>{reason}</span>
-                  </label>
-                ))}
+        const toggleItemSelect = (idx) => {
+          setSelectedRefundItemIndices(prev =>
+            prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
+          );
+        };
+
+        const toggleSelectAll = () => {
+          if (isAllSelected) {
+            setSelectedRefundItemIndices([]);
+          } else {
+            setSelectedRefundItemIndices(orderItems.map((_, i) => i));
+          }
+        };
+
+        const isSubmitDisabled = isRefunding || (orderItems.length > 0 && selectedCount === 0);
+
+        return (
+          <div className="profile-modal-overlay animate-fade-in" onClick={() => !isRefunding && setRefundModalOrder(null)}>
+            <div className="profile-modal-box cancel-modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', width: '92%' }}>
+              <div className="modal-header-row">
+                <div>
+                  <span className="modal-super-title" style={{ color: '#7e22ce' }}>CHÍNH SÁCH ĐỔI TRẢ & HOÀN TIỀN</span>
+                  <h3 className="modal-title font-serif">Mã Đơn #{refundModalOrder.order_code || refundModalOrder.order_id}</h3>
+                </div>
+                <button className="modal-close-btn" disabled={isRefunding} onClick={() => setRefundModalOrder(null)}>
+                  <X size={18} />
+                </button>
               </div>
 
-              {refundReason === 'Lý do khác' && (
-                <textarea
-                  placeholder="Nhập lý do chi tiết..."
-                  value={customRefundReason}
-                  onChange={(e) => setCustomRefundReason(e.target.value)}
-                  style={{
-                    width: '100%',
-                    marginTop: '12px',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid #d6d3d1',
-                    fontSize: '13px',
-                    minHeight: '64px',
-                    outline: 'none',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              )}
+              <div style={{ padding: '16px 0', borderBottom: '1px solid #f1f3f5', maxHeight: '72vh', overflowY: 'auto' }}>
+                {/* 1. Danh sách sản phẩm trong đơn để tick chọn */}
+                {orderItems.length > 0 && (
+                  <div style={{ marginBottom: '18px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1c1917', textTransform: 'uppercase', letterSpacing: '0.4px', margin: 0 }}>
+                        Chọn sản phẩm muốn hoàn trả ({selectedCount}/{orderItems.length}) <span style={{ color: '#dc2626' }}>*</span>:
+                      </label>
+                      {isMultiItem && (
+                        <button
+                          type="button"
+                          onClick={toggleSelectAll}
+                          disabled={isRefunding}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#7e22ce',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            padding: '2px 4px',
+                            textDecoration: 'underline'
+                          }}
+                        >
+                          {isAllSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                        </button>
+                      )}
+                    </div>
 
-              <div style={{ marginTop: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1c1917', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                  Thông tin tài khoản nhận tiền hoàn (STK / Ngân hàng / Chủ tài khoản) <span style={{ color: '#dc2626' }}>* (Bắt buộc)</span>:
-                </label>
-                <input
-                  type="text"
-                  placeholder="VD: 1903688888 - Techcombank - NGUYEN VAN A"
-                  value={refundBankInfo}
-                  onChange={(e) => {
-                    setRefundBankInfo(e.target.value);
-                    if (refundBankError) setRefundBankError('');
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: refundBankError ? '1.5px solid #dc2626' : '1px solid #d6d3d1',
-                    fontSize: '13px',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                    backgroundColor: refundBankError ? '#fef2f2' : '#ffffff'
-                  }}
-                />
-                {refundBankError ? (
-                  <span style={{ display: 'block', fontSize: '12px', color: '#dc2626', fontWeight: 600, marginTop: '6px' }}>
-                    ⚠️ {refundBankError}
-                  </span>
-                ) : (
-                  <span style={{ display: 'block', fontSize: '11.5px', color: '#6b21a8', fontWeight: 500, marginTop: '5px' }}>
-                    * Bắt buộc: Quý khách vui lòng cung cấp Số tài khoản, Tên ngân hàng và Tên chủ tài khoản để Youth Fashion tiến hành hoàn tiền.
-                  </span>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      maxHeight: '230px',
+                      overflowY: 'auto',
+                      paddingRight: '2px'
+                    }}>
+                      {orderItems.map((item, idx) => {
+                        const isChecked = selectedRefundItemIndices.includes(idx);
+                        const itemImg = resolveOrderItemImage(item) || item.image || '/placeholder.png';
+                        const itemPrice = Number(item.price || item.unit_price || 0);
+                        const itemQty = Number(item.quantity) || 1;
+                        const itemTotal = itemPrice * itemQty;
+
+                        return (
+                          <div
+                            key={item.id || idx}
+                            onClick={() => !isRefunding && toggleItemSelect(idx)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              border: isChecked ? '1.5px solid #7e22ce' : '1px solid #e7e5e4',
+                              backgroundColor: isChecked ? '#faf5ff' : '#ffffff',
+                              cursor: isRefunding ? 'not-allowed' : 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '4px',
+                                border: isChecked ? '2px solid #7e22ce' : '2px solid #a8a29e',
+                                backgroundColor: isChecked ? '#7e22ce' : '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {isChecked && <Check size={14} color="#ffffff" strokeWidth={3} />}
+                            </div>
+
+                            <img
+                              src={itemImg}
+                              alt={item.name || item.product_name}
+                              style={{
+                                width: '48px',
+                                height: '48px',
+                                objectFit: 'cover',
+                                borderRadius: '6px',
+                                border: '1px solid #e7e5e4',
+                                flexShrink: 0
+                              }}
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = '/placeholder.png';
+                              }}
+                            />
+
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <h5 style={{
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                color: '#1c1917',
+                                margin: '0 0 3px 0',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}>
+                                {item.name || item.product_name || 'Sản phẩm'}
+                              </h5>
+                              <div style={{ fontSize: '11.5px', color: '#78716c', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                {item.size && <span>Size: <strong style={{ color: '#44403c' }}>{item.size}</strong></span>}
+                                {item.size && item.color && <span>•</span>}
+                                {item.color && <span>Màu: <strong style={{ color: '#44403c' }}>{item.color}</strong></span>}
+                                <span>•</span>
+                                <span>SL: <strong style={{ color: '#44403c' }}>{String(itemQty).padStart(2, '0')}</strong></span>
+                              </div>
+                            </div>
+
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                              <strong style={{ fontSize: '13px', color: isChecked ? '#7e22ce' : '#44403c' }}>
+                                {itemTotal.toLocaleString('vi-VN')}₫
+                              </strong>
+                              {itemQty > 1 && (
+                                <div style={{ fontSize: '10.5px', color: '#a8a29e' }}>
+                                  ({itemPrice.toLocaleString('vi-VN')}₫/sp)
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {selectedCount === 0 && (
+                      <div style={{
+                        marginTop: '8px',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        backgroundColor: '#fef2f2',
+                        border: '1px solid #fecaca',
+                        color: '#dc2626',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <AlertCircle size={14} />
+                        <span>Vui lòng tick chọn ít nhất 1 sản phẩm bạn muốn hoàn trả.</span>
+                      </div>
+                    )}
+                  </div>
                 )}
-              </div>
-            </div>
 
-            <div className="modal-footer-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '18px' }}>
-              <button
-                type="button"
-                className="btn-order-action btn-dark-outline"
-                disabled={isRefunding}
-                onClick={() => setRefundModalOrder(null)}
-              >
-                QUAY LẠI
-              </button>
-              <button
-                type="button"
-                className="btn-order-action btn-black-solid"
-                disabled={isRefunding}
-                onClick={() => confirmRefundOrder(refundModalOrder)}
-                style={{ backgroundColor: '#7e22ce', borderColor: '#7e22ce', color: '#ffffff' }}
-              >
-                {isRefunding ? 'ĐANG GỬI...' : 'XÁC NHẬN HOÀN TIỀN'}
-              </button>
+                {/* Box số tiền hoàn dự kiến */}
+                <div style={{
+                  background: '#faf5ff',
+                  border: '1px solid #e9d5ff',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <span style={{ fontSize: '12.5px', color: '#6b21a8', fontWeight: 600 }}>Số tiền hoàn dự kiến:</span>
+                    {orderItems.length > 0 && (
+                      <div style={{ fontSize: '11px', color: '#9333ea', marginTop: '2px' }}>
+                        {isAllSelected
+                          ? '(Toàn bộ đơn hàng)'
+                          : selectedCount > 0
+                          ? `(Tính theo ${selectedCount} sản phẩm đã tick chọn)`
+                          : '(Chưa chọn sản phẩm nào)'}
+                      </div>
+                    )}
+                  </div>
+                  <strong style={{ fontSize: '16px', color: '#7e22ce' }}>
+                    {calculatedRefundAmount.toLocaleString('vi-VN')}₫
+                  </strong>
+                </div>
+
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1c1917', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                  Vui lòng chọn lý do yêu cầu hoàn tiền:
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {(resolveCancelInfo(refundModalOrder).isShopCancelled
+                    ? [
+                        'Shop đã hủy đơn hàng - Yêu cầu hoàn tiền',
+                        'Đơn hàng bị hủy do hết hàng / sự cố kho',
+                        'Khách hàng yêu cầu nhận lại tiền hoàn qua STK ngân hàng',
+                        'Lý do khác'
+                      ]
+                    : [
+                        'Sản phẩm không vừa kích cỡ (Size)',
+                        'Sản phẩm lỗi đường may / chất liệu vải',
+                        'Giao sai mẫu / sai màu sắc so với ảnh',
+                        'Không ưng ý sau khi nhận sản phẩm',
+                        'Lý do khác'
+                      ]
+                  ).map((reason) => (
+                    <label key={reason} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#44403c', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="refund_reason"
+                        value={reason}
+                        checked={refundReason === reason}
+                        onChange={(e) => setRefundReason(e.target.value)}
+                        style={{ accentColor: '#7e22ce', cursor: 'pointer' }}
+                      />
+                      <span>{reason}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {refundReason === 'Lý do khác' && (
+                  <textarea
+                    placeholder="Nhập lý do chi tiết..."
+                    value={customRefundReason}
+                    onChange={(e) => setCustomRefundReason(e.target.value)}
+                    style={{
+                      width: '100%',
+                      marginTop: '12px',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #d6d3d1',
+                      fontSize: '13px',
+                      minHeight: '64px',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                )}
+
+                <div style={{ marginTop: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1c1917', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                    Thông tin tài khoản nhận tiền hoàn (STK / Ngân hàng / Chủ tài khoản) <span style={{ color: '#dc2626' }}>* (Bắt buộc)</span>:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="VD: 1903688888 - Techcombank - NGUYEN VAN A"
+                    value={refundBankInfo}
+                    onChange={(e) => {
+                      setRefundBankInfo(e.target.value);
+                      if (refundBankError) setRefundBankError('');
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      border: refundBankError ? '1.5px solid #dc2626' : '1px solid #d6d3d1',
+                      fontSize: '13px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      backgroundColor: refundBankError ? '#fef2f2' : '#ffffff'
+                    }}
+                  />
+                  {refundBankError ? (
+                    <span style={{ display: 'block', fontSize: '12px', color: '#dc2626', fontWeight: 600, marginTop: '6px' }}>
+                      ⚠️ {refundBankError}
+                    </span>
+                  ) : (
+                    <span style={{ display: 'block', fontSize: '11.5px', color: '#6b21a8', fontWeight: 500, marginTop: '5px' }}>
+                      * Bắt buộc: Quý khách vui lòng cung cấp Số tài khoản, Tên ngân hàng và Tên chủ tài khoản để Youth Fashion tiến hành hoàn tiền.
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="modal-footer-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '18px' }}>
+                <button
+                  type="button"
+                  className="btn-order-action btn-dark-outline"
+                  disabled={isRefunding}
+                  onClick={() => setRefundModalOrder(null)}
+                >
+                  QUAY LẠI
+                </button>
+                <button
+                  type="button"
+                  className="btn-order-action btn-black-solid"
+                  disabled={isSubmitDisabled}
+                  onClick={() => confirmRefundOrder(refundModalOrder)}
+                  style={{
+                    backgroundColor: isSubmitDisabled ? '#a8a29e' : '#7e22ce',
+                    borderColor: isSubmitDisabled ? '#a8a29e' : '#7e22ce',
+                    color: '#ffffff',
+                    cursor: isSubmitDisabled ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isRefunding ? 'ĐANG GỬI...' : 'XÁC NHẬN HOÀN TIỀN'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Modal 6: Chọn Sản Phẩm Mua Lại (Reorder Popup) */}
       {reorderModalOrder && (
