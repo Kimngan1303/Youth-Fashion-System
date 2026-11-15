@@ -763,9 +763,6 @@ export const cancelOrder = async (orderIdOrNumber, reason = 'Khách hàng yêu c
   });
 };
 
-  return null;
-};
-
 export const updatePaymentStatus = async (orderId, paymentStatus, extra = {}) => {
   return await prisma.payment.updateMany({
     where: { order_id: BigInt(orderId) },
