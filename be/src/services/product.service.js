@@ -249,6 +249,28 @@ export const createProductService = async (body, files = []) => {
     }
   }
 
+  // Kiểm tra không cho phép số âm đối với tồn kho và giá sản phẩm
+  if (variants && Array.isArray(variants)) {
+    for (const v of variants) {
+      if (v.stock !== undefined && v.stock !== null && v.stock !== '') {
+        const stockNum = Number(v.stock);
+        if (isNaN(stockNum) || stockNum < 0) {
+          const error = new Error(`Số lượng tồn kho không được là số âm (tối thiểu là 0)!`);
+          error.statusCode = 400;
+          throw error;
+        }
+      }
+      if (v.price !== undefined && v.price !== null && v.price !== '') {
+        const priceNum = Number(v.price);
+        if (isNaN(priceNum) || priceNum < 0) {
+          const error = new Error(`Giá sản phẩm không được là số âm!`);
+          error.statusCode = 400;
+          throw error;
+        }
+      }
+    }
+  }
+
   // Upload hình ảnh lên Cloudinary nếu có file đính kèm
   const uploadedImages = [];
   if (files && files.length > 0) {
@@ -310,6 +332,28 @@ export const updateProductService = async (productId, body, files = []) => {
       variants = typeof body.variants === 'string' ? JSON.parse(body.variants) : body.variants;
     } catch (e) {
       variants = [];
+    }
+
+    // Kiểm tra không cho phép số âm đối với tồn kho và giá sản phẩm khi cập nhật
+    if (variants && Array.isArray(variants)) {
+      for (const v of variants) {
+        if (v.stock !== undefined && v.stock !== null && v.stock !== '') {
+          const stockNum = Number(v.stock);
+          if (isNaN(stockNum) || stockNum < 0) {
+            const error = new Error(`Số lượng tồn kho không được là số âm (tối thiểu là 0)!`);
+            error.statusCode = 400;
+            throw error;
+          }
+        }
+        if (v.price !== undefined && v.price !== null && v.price !== '') {
+          const priceNum = Number(v.price);
+          if (isNaN(priceNum) || priceNum < 0) {
+            const error = new Error(`Giá sản phẩm không được là số âm!`);
+            error.statusCode = 400;
+            throw error;
+          }
+        }
+      }
     }
   }
 
