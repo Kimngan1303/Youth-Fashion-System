@@ -1032,7 +1032,7 @@ export default function ForgotPassword() {
                   </Link>
                 </div>
                 <div>
-                  Chưa có tài khoản hội viên?
+                  Chưa có tài khoản?
                   <Link to="/register" className="auth-link-bold">
                     Đăng ký tài khoản ngay
                   </Link>
