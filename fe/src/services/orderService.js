@@ -82,9 +82,10 @@ export const orderService = {
   /**
    * Cập nhật trạng thái đơn hàng (Dành cho Quản trị viên & Quản lý)
    */
-  updateOrderStatus: async (orderId, status, note) => {
+  updateOrderStatus: async (orderId, status, note, extraData = {}) => {
     try {
-      const res = await axiosClient.patch(`/orders/${orderId}/status`, { status, note });
+      const { status: _ignoredStatus, ...cleanExtra } = extraData || {};
+      const res = await axiosClient.patch(`/orders/${orderId}/status`, { ...cleanExtra, status, note });
       return res.data;
     } catch (error) {
       throw error;
@@ -112,6 +113,42 @@ export const orderService = {
       return res.data;
     } catch (error) {
       return { status: false };
+    }
+  },
+
+  /**
+   * Khách hàng hủy đơn hàng (chỉ khi đơn đang PENDING)
+   */
+  customerCancelOrder: async (orderIdOrNumber, reason) => {
+    try {
+      const res = await axiosClient.patch(`/orders/customer/${orderIdOrNumber}/cancel`, { reason });
+      return res.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Khách hàng gửi yêu cầu hoàn tiền (cho đơn PayOS bị shop hủy)
+   */
+  customerRequestRefund: async (orderIdOrNumber, refundData) => {
+    try {
+      const res = await axiosClient.post(`/orders/customer/${orderIdOrNumber}/refund-request`, refundData);
+      return res.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Khách hàng xác nhận đã nhận được hàng
+   */
+  customerConfirmDelivered: async (orderIdOrNumber) => {
+    try {
+      const res = await axiosClient.patch(`/orders/customer/${orderIdOrNumber}/confirm-delivered`);
+      return res.data;
+    } catch (error) {
+      throw error;
     }
   },
 };

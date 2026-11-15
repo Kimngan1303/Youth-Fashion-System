@@ -109,7 +109,7 @@ export default function ProductDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, wishlist, toggleWishlist, addToCart } = useAuth();
-  const { showSuccess, showInfo } = useToast();
+  const { showSuccess, showInfo, showError } = useToast();
 
   const [product, setProduct] = useState(FIGMA_COAT_DATA);
   const [loading, setLoading] = useState(false);
@@ -956,6 +956,28 @@ export default function ProductDetailPage() {
               <span className="reviews-gold-sub">FEEDBACK TỪ KHÁCH HÀNG</span>
               <h2 className="reviews-title font-serif">Đánh Giá Thực Tế</h2>
             </div>
+            {/* Rating Summary Card */}
+            <div className="rating-summary-banner">
+              <div className="rating-score-col">
+                <span className="banner-score font-serif">{averageRating}</span>
+                <div className="banner-stars">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star key={s} size={11} fill={s <= Math.round(Number(averageRating)) ? "#F59E0B" : "none"} color="#F59E0B" />
+                  ))}
+                </div>
+              </div>
+
+              <div className="rating-meta-col">
+                <span className="meta-verified-text">
+                  {reviewsCount} ĐÁNH GIÁ
+                </span>
+                <span className="meta-satisfaction">
+                  {reviewsCount > 0 
+                    ? `${satisfiedPercent}% khách hàng hài lòng về chất liệu & form dáng`
+                    : 'Chưa có đánh giá nào từ khách hàng'}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Review Cards Grid */}
@@ -1279,7 +1301,7 @@ export default function ProductDetailPage() {
             <div className="modal-card-header">
               <div>
                 <h3 className="modal-title font-serif">Tất Cả Đánh Giá Từ Khách Hàng</h3>
-                <span className="modal-sub-count">{localReviews.length} đánh giá đã xác thực • {satisfiedPercent}% hài lòng</span>
+                <span className="modal-sub-count">{localReviews.length} đánh giá • {satisfiedPercent}% hài lòng</span>
               </div>
               <button 
                 type="button" 

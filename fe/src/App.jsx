@@ -39,6 +39,53 @@ import SystemConfig from './pages/manager/SystemConfig';
 import ChatManagement from './pages/manager/ChatManagement';
 import RevenueReport from './pages/manager/RevenueReport';
 
+class GlobalErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('GlobalErrorBoundary caught an error:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '60px 20px', textAlign: 'center', background: '#FAFAFA', minHeight: '60vh' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#111827', marginBottom: '8px' }}>
+            Đang cập nhật dữ liệu hiển thị...
+          </h2>
+          <p style={{ color: '#6B7280', fontSize: '14px', marginBottom: '16px' }}>
+            Vui lòng nhấn nút bên dưới để làm mới nội dung trang.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              window.location.reload();
+            }}
+            style={{
+              padding: '10px 24px',
+              backgroundColor: '#111827',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '13.5px'
+            }}
+          >
+            Làm mới trang
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useContext(AuthContext);
   return isAuthenticated ? children : <Navigate to="/login" replace />;
@@ -75,7 +122,8 @@ function AppContent() {
       {!hideHeaderFooter && <Header onOpenAISearch={() => setIsAISearchOpen(true)} />}
 
       <main className="app-main">
-        <Routes>
+        <GlobalErrorBoundary>
+          <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
@@ -259,19 +307,11 @@ function AppContent() {
           />
           <Route
             path="/manager/system-config"
-            element={
-              <AdminRoute>
-                <SystemConfig />
-              </AdminRoute>
-            }
+            element={<Navigate to="/manager/dashboard" replace />}
           />
           <Route
             path="/admin/system-config"
-            element={
-              <AdminRoute>
-                <SystemConfig />
-              </AdminRoute>
-            }
+            element={<Navigate to="/manager/dashboard" replace />}
           />
           <Route
             path="/manager/chat"
@@ -296,6 +336,7 @@ function AppContent() {
             element={<HomePage onOpenAISearch={() => setIsAISearchOpen(true)} />} 
           />
         </Routes>
+        </GlobalErrorBoundary>
       </main>
 
       {!hideHeaderFooter && <Footer />}

@@ -352,6 +352,10 @@ Youth Fashion Team`;
 // Bộ nhớ đệm chống gửi trùng lặp email thông báo đơn hàng trong thời gian ngắn (10 giây)
 const recentOrderEmails = new Map();
 
+export const emailHooks = {
+  sendOrderNotificationEmail: null,
+};
+
 /**
  * Service gửi Email thông báo trạng thái đơn hàng đến Gmail của khách hàng
  * Hỗ trợ các trạng thái: PENDING/ORDER_CREATED, CONFIRMED/PAID, PROCESSING, SHIPPED, DELIVERED, CANCELLED, REFUND (APPROVED/REJECTED)
@@ -362,6 +366,15 @@ export const sendOrderNotificationEmail = async ({
   status,
   extraData = {},
 }) => {
+  if (typeof emailHooks.sendOrderNotificationEmail === 'function') {
+    return await emailHooks.sendOrderNotificationEmail({
+      toEmail,
+      order,
+      status,
+      extraData,
+    });
+  }
+
   const isDev = process.env.NODE_ENV !== 'production';
 
   const recipient = (
@@ -431,51 +444,104 @@ export const sendOrderNotificationEmail = async ({
     badgeColor = '#1D4ED8';
     headline = 'Đơn hàng đang trên đường giao tới bạn';
     messageBody = `Đơn hàng <strong>#${orderNumber}</strong> đã được bàn giao cho đối tác vận chuyển hỏa tốc Express. Shipper sẽ liên hệ với Quý khách trước khi giao hàng.`;
-  } else if (s === 'DELIVERED' || s === 'COMPLETED' || s === 'SUCCESS') {
+  } else if (s === 'COMPLETED') {
+    subject = `Youth Fashion - Đơn hàng #${orderNumber} đã hoàn tất thành công`;
+    badgeText = 'HOÀN TẤT ĐƠN HÀNG';
+    badgeBg = '#DCFCE7';
+    badgeColor = '#15803D';
+    headline = 'Đơn hàng đã hoàn tất thành công';
+    messageBody = `Đơn hàng <strong>#${orderNumber}</strong> đã hoàn tất thành công. Youth Fashion xin chân thành cảm ơn sự tin tưởng và đồng hành của Quý khách!`;
+  } else if (s === 'DELIVERED' || s === 'SUCCESS') {
     subject = `Youth Fashion - Đơn hàng #${orderNumber} đã giao thành công`;
     badgeText = 'GIAO HÀNG THÀNH CÔNG';
     badgeBg = '#DCFCE7';
     badgeColor = '#15803D';
     headline = 'Đơn hàng đã được giao tận tay Quý khách';
-    messageBody = `Đơn hàng <strong>#${orderNumber}</strong> đã được phát thành công. Youth Fashion xin chân thành cảm ơn sự tin tưởng và đồng hành của Quý khách!`;
+    messageBody = `Đơn hàng <strong>#${orderNumber}</strong> đã được phát thành công. Quý khách vui lòng kiểm tra sản phẩm và bấm xác nhận nhận hàng. Cảm ơn Quý khách!`;
   } else if (s === 'CANCELLED') {
-    const isShop = extraData?.cancelledBy === 'SHOP' || extraData?.isShopCancelled;
-    subject = `Youth Fashion - Đơn hàng #${orderNumber} đã bị hủy`;
+    const isShop = extraData?.cancelledBy === 'SHOP' ||
+                   extraData?.isShopCancelled ||
+                   String(extraData?.note || extraData?.reason || order?.note || '').toLowerCase().includes('shop');
+    subject = isShop ? `Youth Fashion - Shop đã hủy đơn hàng #${orderNumber}` : `Youth Fashion - Đơn hàng #${orderNumber} đã hủy`;
     badgeText = isShop ? 'SHOP HỦY ĐƠN' : 'ĐÃ HỦY ĐƠN';
     badgeBg = '#FEE2E2';
     badgeColor = '#B91C1C';
-    headline = 'Thông báo hủy đơn hàng';
+    headline = isShop ? 'Shop đã hủy đơn hàng của Quý khách' : 'Thông báo hủy đơn hàng';
     messageBody = isShop
-      ? `Đơn hàng <strong>#${orderNumber}</strong> đã bị hủy từ phía Shop.`
-      : `Đơn hàng <strong>#${orderNumber}</strong> đã được hủy theo yêu cầu của Quý khách.`;
+      ? `Đơn hàng <strong>#${orderNumber}</strong> đã được phía Quản trị viên Shop hủy. Lý do từ Shop: "<strong>${reason || 'Sản phẩm tạm thời hết hàng trong kho'}</strong>". Quý khách vui lòng liên hệ hotline hoặc nhắn tin trực tiếp với shop nếu cần hỗ trợ thêm.`
+      : `Đơn hàng <strong>#${orderNumber}</strong> đã được hủy theo yêu cầu của Quý khách. Lý do: "${reason || 'Khách yêu cầu hủy đơn'}".`;
     alertBox = {
-      title: 'Lý do hủy đơn hàng',
-      content: reason || 'Sản phẩm tạm thời hết hàng trong kho hoặc có thay đổi nhu cầu.',
+      title: isShop ? 'Lý do Shop hủy đơn hàng' : 'Lý do hủy đơn hàng',
+      content: reason || (isShop ? 'Sản phẩm tạm thời hết hàng trong kho.' : 'Khách yêu cầu hủy đơn.'),
       color: '#991B1B',
       bg: '#FEF2F2',
       border: '#FCA5A5',
     };
-  } else if (s === 'APPROVED' || s === 'REFUND_APPROVED' || s === 'RETURNED') {
-    subject = `Youth Fashion - Xác nhận hoàn tiền cho đơn hàng #${orderNumber}`;
+  } else if (
+    s === 'APPROVED' ||
+    s === 'REFUND_APPROVED' ||
+    (s === 'RETURNED' && (
+      extraData?.refund_decision === 'APPROVED' ||
+      extraData?.status === 'APPROVED' ||
+      extraData?.returnRequest?.status === 'APPROVED' ||
+      extraData?.returnRequest?.status === 'COMPLETED' ||
+      String(reason).toLowerCase().includes('đã xác nhận hoàn tiền') ||
+      String(reason).toLowerCase().includes('đã hoàn tiền')
+    ))
+  ) {
+    subject = `Youth Fashion - Xác nhận hoàn tiền thành công cho đơn hàng #${orderNumber}`;
     badgeText = 'ĐÃ HOÀN TIỀN';
     badgeBg = '#DCFCE7';
     badgeColor = '#15803D';
-    headline = 'Yêu cầu đổi trả & hoàn tiền đã được xử lý';
-    messageBody = `Shop đã phê duyệt yêu cầu đổi trả và hoàn tất thủ tục hoàn tiền cho đơn hàng <strong>#${orderNumber}</strong>. Quý khách vui lòng kiểm tra biến động tài khoản ngân hàng.`;
-  } else if (s === 'REJECTED' || s === 'REFUND_REJECTED') {
-    subject = `Youth Fashion - Phản hồi yêu cầu hoàn tiền đơn hàng #${orderNumber}`;
+    headline = 'Yêu cầu đổi trả & hoàn tiền đã hoàn tất';
+    messageBody = `Shop đã phê duyệt yêu cầu đổi trả và hoàn tất thủ tục hoàn trả tiền về tài khoản ngân hàng của Quý khách cho đơn hàng <strong>#${orderNumber}</strong>. Quý khách vui lòng kiểm tra biến động số dư tài khoản.`;
+  } else if (
+    s === 'REJECTED' ||
+    s === 'REFUND_REJECTED' ||
+    (s === 'RETURNED' && (
+      extraData?.refund_decision === 'REJECTED' ||
+      extraData?.status === 'REJECTED' ||
+      extraData?.returnRequest?.status === 'REJECTED' ||
+      String(reason).toLowerCase().includes('từ chối hoàn tiền')
+    ))
+  ) {
+    subject = `Youth Fashion - Phản hồi từ chối yêu cầu hoàn tiền đơn hàng #${orderNumber}`;
     badgeText = 'TỪ CHỐI HOÀN TIỀN';
     badgeBg = '#FEE2E2';
     badgeColor = '#B91C1C';
     headline = 'Từ chối yêu cầu đổi trả / hoàn tiền';
-    messageBody = `Shop rất tiếc phải thông báo yêu cầu đổi trả & hoàn tiền cho đơn hàng <strong>#${orderNumber}</strong> chưa thể phê duyệt do chưa thỏa mãn chính sách đổi trả.`;
+    messageBody = `Shop rất tiếc phải thông báo yêu cầu đổi trả & hoàn tiền cho đơn hàng <strong>#${orderNumber}</strong> chưa thể phê duyệt do chưa thỏa mãn chính sách đổi trả của Youth Fashion.`;
+    let cleanRejectReason = rejectReason || extraData?.reject_reason;
+    if (!cleanRejectReason && reason) {
+      if (reason.includes('Từ chối hoàn tiền:')) {
+        cleanRejectReason = reason.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim();
+      } else {
+        cleanRejectReason = reason;
+      }
+    }
     alertBox = {
       title: 'Lý do từ chối từ Shop',
-      content: rejectReason || reason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo quy định của Youth Fashion.',
+      content: cleanRejectReason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo quy định của Youth Fashion.',
       color: '#991B1B',
       bg: '#FEF2F2',
       border: '#FCA5A5',
     };
+  } else if (s === 'RETURNED') {
+    subject = `Youth Fashion - Đã tiếp nhận yêu cầu đổi trả & hoàn tiền đơn hàng #${orderNumber}`;
+    badgeText = 'CHỜ HOÀN TIỀN';
+    badgeBg = '#F3E8FF';
+    badgeColor = '#7E22CE';
+    headline = 'Yêu cầu đổi trả & hoàn tiền đang được xem xét';
+    messageBody = `Shop đã tiếp nhận yêu cầu đổi trả & hoàn tiền của Quý khách cho đơn hàng <strong>#${orderNumber}</strong>. Bộ phận chăm sóc khách hàng đang kiểm tra và sẽ phản hồi trong thời gian sớm nhất.`;
+    if (reason || extraData?.bank_info || extraData?.refund_bank) {
+      alertBox = {
+        title: 'Thông tin yêu cầu hoàn tiền',
+        content: `${reason ? `Lý do: ${reason}` : ''}${extraData?.bank_info || extraData?.refund_bank ? ` | STK: ${extraData.bank_info || extraData.refund_bank}` : ''}`.trim(),
+        color: '#6B21A8',
+        bg: '#FAF5FF',
+        border: '#E9D5FF',
+      };
+    }
   } else if (s === 'DELIVERY_FAILED' || s === 'FAILED_DELIVERY') {
     const willRetry = extraData?.willRetry || extraData?.retryDate;
     subject = willRetry

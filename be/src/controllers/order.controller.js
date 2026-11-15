@@ -63,6 +63,28 @@ export const getOrderByNumber = async (req, res, next) => {
   try {
     const { orderNumber } = req.params;
     const order = await orderService.getOrderByNumberService(orderNumber);
+
+    const user = req.user;
+    const isStaff = user && ['ADMIN', 'MANAGER', 'STAFF'].includes(user.role?.toUpperCase());
+    const isOwner = user && (
+      (order.customer_id && String(user.id) === String(order.customer_id)) ||
+      (order.recipient_email && user.email && order.recipient_email.toLowerCase() === user.email.toLowerCase()) ||
+      (order.customer?.email && user.email && order.customer.email.toLowerCase() === user.email.toLowerCase())
+    );
+
+    if (!isStaff && !isOwner) {
+      // Khách vãng lai thì ẩn địa chỉ và SĐT để bảo mật thông tin
+      const maskedOrder = {
+        ...order,
+        recipient_phone: order.recipient_phone ? order.recipient_phone.replace(/(\d{3})\d+(\d{2})/, '$1****$2') : '***',
+        shipping_address_line: '*** (Đã ẩn vì lý do bảo mật)',
+        shipping_ward: '***',
+        shipping_district: '***',
+        shipping_city: '***',
+      };
+      return BaseResponse.success(res, 'Lấy thông tin đơn hàng thành công', maskedOrder);
+    }
+
     return BaseResponse.success(res, 'Lấy thông tin đơn hàng thành công', order);
   } catch (error) {
     next(error);
@@ -100,6 +122,45 @@ export const cancelOrder = async (req, res, next) => {
   }
 };
 
+export const customerCancelOrder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+    const customerId = req.user?.id || req.user?.customer_id;
+    const result = await orderService.customerCancelOrderService(id, customerId, reason);
+    return BaseResponse.success(res, 'Hủy đơn hàng thành công', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const customerRefundRequest = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason, bank_info, images } = req.body || {};
+    const customerId = req.user?.id || req.user?.customer_id;
+    const result = await orderService.customerRefundRequestService(id, customerId, {
+      reason,
+      bank_info,
+      images,
+    });
+    return BaseResponse.success(res, 'Gửi yêu cầu hoàn tiền thành công', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const customerConfirmDelivered = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const customerId = req.user?.id || req.user?.customer_id;
+    const result = await orderService.customerConfirmDeliveredService(id, customerId);
+    return BaseResponse.success(res, 'Xác nhận đã nhận hàng thành công', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getAllOrders = async (req, res, next) => {
   try {
     const orders = await orderService.getAllOrdersService();
@@ -112,13 +173,14 @@ export const getAllOrders = async (req, res, next) => {
 export const updateOrderStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status, note, returnRequest } = req.body || {};
+    const { status, note, returnRequest, ...extraData } = req.body || {};
     const isEmployee = req.user && String(req.user.user_type || '').toUpperCase() === 'EMPLOYEE';
     const employeeId = isEmployee ? (req.user.id || req.user.employee_id || null) : null;
 
     const result = await orderService.updateOrderStatusService(id, status, note, {
       employeeId,
       returnRequestData: returnRequest,
+      ...extraData,
     });
     return BaseResponse.success(res, 'Cập nhật trạng thái đơn hàng thành công', result);
   } catch (error) {

@@ -12,6 +12,7 @@ import { cartService } from '../../services/cartService';
 import VIETNAM_PROVINCES from '../../data/vietnamAddresses.json';
 import CustomSelect from '../../components/CustomSelect';
 import { resolveOrderItemImage } from '../../utils/productImageUtils';
+import { sendOrderStatusNotification } from '../../services/notificationService';
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -646,6 +647,13 @@ export default function CheckoutPage() {
                 return !mockSet.has(rawId) && !mockSet.has(rawCode);
               });
               localStorage.setItem('yf_manager_orders', JSON.stringify([newOrderEntry, ...mgrExisting]));
+            } catch (e) {}
+
+            // Tạo thông báo đơn hàng mới cho tài khoản người mua
+            try {
+              sendOrderStatusNotification(newOrderEntry, 'PENDING', {
+                newStatusLabel: 'Chờ xác nhận',
+              });
             } catch (e) {}
           } catch (e) {}
 
