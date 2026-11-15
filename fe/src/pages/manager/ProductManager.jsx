@@ -25,7 +25,6 @@ import {
   X,
   Loader2,
   AlertCircle,
-  ChevronDown,
 } from "lucide-react";
 
 const productManagerStyles = `
@@ -819,34 +818,22 @@ const productManagerStyles = `
     color: #6B7280;
   }
 
-  /* --- CỘT TRẠNG THÁI: NÚT BẤM ĐỔI TRẠNG THÁI & DROPDOWN --- */
-  .status-dropdown-container {
-    position: relative;
-    display: inline-block;
-  }
-
-  .status-interactive-pill {
+  /* --- CỘT TRẠNG THÁI: HIỂN THỊ TỰ ĐỘNG HOÀN TOÀN THEO TỒN KHO & CSDL (KHÔNG DROPDOWN) --- */
+  .status-auto-pill {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
     padding: 5px 12px;
     border-radius: 9999px;
     font-size: 11.5px;
     font-weight: 600;
-    cursor: pointer;
     border: 1px solid transparent;
-    transition: all 0.15s ease;
     white-space: nowrap;
     user-select: none;
+    cursor: default;
   }
 
-  .status-interactive-pill:hover {
-    filter: brightness(0.96);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    transform: translateY(-0.5px);
-  }
-
-  /* 4 kiểu nút trạng thái */
+  /* 4 kiểu badge trạng thái tự động */
   .status-pill-selling {
     background: #DCFCE7;
     color: #15803D;
@@ -870,69 +857,6 @@ const productManagerStyles = `
     color: #6B7280;
     border-color: #E5E7EB;
   }
-
-  /* Popover Menu khi bấm vào pill trạng thái */
-  .status-menu-popover {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: #FFFFFF;
-    border: 1px solid #E5E7EB;
-    border-radius: 8px;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
-    z-index: 1000;
-    min-width: 145px;
-    padding: 4px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    animation: popoverFadeIn 0.15s ease-out;
-  }
-
-  @keyframes popoverFadeIn {
-    from { opacity: 0; transform: translate(-50%, -4px); }
-    to { opacity: 1; transform: translate(-50%, 0); }
-  }
-
-  .status-menu-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 7px 10px;
-    border: none;
-    background: transparent;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 500;
-    color: #374151;
-    cursor: pointer;
-    text-align: left;
-    transition: background 0.1s ease;
-  }
-
-  .status-menu-item:hover {
-    background: #F3F4F6;
-    color: #111827;
-  }
-
-  .status-menu-item.active {
-    font-weight: 600;
-    background: #F8FAFC;
-  }
-
-  .status-dot-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 9999px;
-    flex-shrink: 0;
-  }
-
-  .dot-selling { background: #16A34A; }
-  .dot-low { background: #EAB308; }
-  .dot-out { background: #EF4444; }
-  .dot-hidden { background: #9CA3AF; }
 
   .action-buttons-cell {
     display: flex;
@@ -1382,7 +1306,6 @@ export default function ProductManager() {
   const [selectedTab, setSelectedTab] = useState("ALL"); // 'ALL' | 'SELLING' | 'LOW_STOCK' | 'OUT_OF_STOCK' | 'DRAFT'
   const [sortBy, setSortBy] = useState("newest_update");
   const [selectedProductIds, setSelectedProductIds] = useState([]);
-  const [activeStatusMenuId, setActiveStatusMenuId] = useState(null);
   const [statusCounts, setStatusCounts] = useState({
     all: 0,
     selling: 0,
@@ -1562,21 +1485,11 @@ export default function ProductManager() {
     }
   };
 
-  // Lắng nghe click ngoài màn hình để đóng popover menu trạng thái
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (!e.target.closest(".status-dropdown-container")) {
-        setActiveStatusMenuId(null);
-      }
-    };
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
-
-  // Helper tính trạng thái và tồn kho theo đúng quy tắc người dùng yêu cầu:
-  // - Nếu tồn kho <= 5: tự động hiện Gần hết hàng
-  // - Nếu tồn kho === 0: tự động hiện Hết hàng
-  // - Có thể đổi thủ công: Đang bán, Gần hết hàng, Hết hàng, Tạm ẩn
+  // Helper tính trạng thái tự động hoàn toàn theo tồn kho và CSDL:
+  // - Nếu status === 'INACTIVE' hoặc 'DRAFT': Tạm ẩn (xám)
+  // - Nếu tồn kho === 0 hoặc status === 'OUT_OF_STOCK': Hết hàng (đỏ)
+  // - Nếu tồn kho <= 5: Gần hết hàng (vàng)
+  // - Nếu tồn kho > 5: Đang bán (xanh lá)
   const getProductStateInfo = (product) => {
     const totalStock =
       product.variants?.reduce(
@@ -1584,26 +1497,7 @@ export default function ProductManager() {
         0,
       ) || 0;
 
-    // 1. Nếu người dùng vừa chủ động chọn trạng thái bằng menu dropdown:
-    if (product.custom_status) {
-      if (product.custom_status === "HIDDEN") {
-        return { key: "HIDDEN", label: "Tạm ẩn", totalStock };
-      }
-      if (product.custom_status === "OUT_OF_STOCK") {
-        return { key: "OUT_OF_STOCK", label: "Hết hàng", totalStock };
-      }
-      if (product.custom_status === "LOW_STOCK") {
-        if (totalStock <= 5) {
-          return { key: "LOW_STOCK", label: "Gần hết hàng", totalStock };
-        }
-      }
-      if (product.custom_status === "SELLING") {
-        return { key: "SELLING", label: "Đang bán", totalStock };
-      }
-    }
-
-    // 2. Logic tự động theo CSDL và số lượng tồn kho:
-    if (product.status === "INACTIVE") {
+    if (product.status === "INACTIVE" || product.status === "DRAFT") {
       return { key: "HIDDEN", label: "Tạm ẩn", totalStock };
     }
     if (product.status === "OUT_OF_STOCK" || totalStock === 0) {
@@ -1614,68 +1508,6 @@ export default function ProductManager() {
     }
 
     return { key: "SELLING", label: "Đang bán", totalStock };
-  };
-
-  // Hàm xử lý đổi nhanh trạng thái khi bấm vào các nút trong menu
-  const handleQuickChangeStatus = async (product, newKey) => {
-    setActiveStatusMenuId(null);
-
-    const totalStock =
-      product.variants?.reduce(
-        (sum, v) => sum + (Number(v.stock) || 0),
-        0,
-      ) || 0;
-
-    // Kiểm tra điều kiện: Chỉ cho phép đổi sang "Gần hết hàng" nếu số lượng sản phẩm <= 5
-    if (newKey === "LOW_STOCK" && totalStock > 5) {
-      showError(
-        `Không thể đổi trạng thái! Chỉ có thể chuyển sang "Gần hết hàng" khi số lượng sản phẩm ≤ 5 (Hiện tại: ${totalStock} sản phẩm).`
-      );
-      return;
-    }
-
-    let dbStatus = "ACTIVE";
-    let statusLabel = "Đang bán";
-
-    if (newKey === "HIDDEN") {
-      dbStatus = "INACTIVE";
-      statusLabel = "Tạm ẩn";
-    } else if (newKey === "OUT_OF_STOCK") {
-      dbStatus = "OUT_OF_STOCK";
-      statusLabel = "Hết hàng";
-    } else if (newKey === "LOW_STOCK") {
-      dbStatus = "ACTIVE";
-      statusLabel = "Gần hết hàng";
-    } else {
-      dbStatus = "ACTIVE";
-      statusLabel = "Đang bán";
-    }
-
-    // Cập nhật ngay local state để UI phản hồi mượt mà không độ trễ
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.product_id === product.product_id
-          ? {
-              ...p,
-              status: dbStatus,
-              custom_status: newKey,
-            }
-          : p,
-      ),
-    );
-
-    showSuccess(`Đã chuyển trạng thái sang "${statusLabel}"`);
-
-    try {
-      await productService.updateProduct(product.product_id, {
-        status: dbStatus,
-      });
-      fetchMeta();
-    } catch (err) {
-      console.error("Lỗi cập nhật trạng thái:", err);
-      showError("Không thể lưu trạng thái mới vào CSDL");
-      fetchProducts();
-    }
   };
 
   useEffect(() => {
@@ -2460,67 +2292,12 @@ export default function ProductManager() {
                                   : "status-pill-hidden";
 
                               return (
-                                <div className="status-dropdown-container">
-                                  <button
-                                    type="button"
-                                    className={`status-interactive-pill ${pillClass}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveStatusMenuId(
-                                        activeStatusMenuId === p.product_id ? null : p.product_id,
-                                      );
-                                    }}
-                                    title="Bấm để thay đổi trạng thái"
-                                  >
-                                    <span>{stateInfo.label}</span>
-                                    <ChevronDown size={11} />
-                                  </button>
-
-                                  {activeStatusMenuId === p.product_id && (
-                                    <div
-                                      className="status-menu-popover"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <button
-                                        type="button"
-                                        className={`status-menu-item ${stateInfo.key === "SELLING" ? "active" : ""}`}
-                                        onClick={() => handleQuickChangeStatus(p, "SELLING")}
-                                      >
-                                        <span className="status-dot-indicator dot-selling" />
-                                        <span>Đang bán</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className={`status-menu-item ${stateInfo.key === "LOW_STOCK" ? "active" : ""}`}
-                                        onClick={() => handleQuickChangeStatus(p, "LOW_STOCK")}
-                                        title={
-                                          totalStock > 5
-                                            ? `Tồn kho hiện có ${totalStock} sản phẩm (> 5), không thể chọn "Gần hết hàng"`
-                                            : "Chuyển sang Gần hết hàng"
-                                        }
-                                      >
-                                        <span className="status-dot-indicator dot-low" />
-                                        <span>Gần hết hàng</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className={`status-menu-item ${stateInfo.key === "OUT_OF_STOCK" ? "active" : ""}`}
-                                        onClick={() => handleQuickChangeStatus(p, "OUT_OF_STOCK")}
-                                      >
-                                        <span className="status-dot-indicator dot-out" />
-                                        <span>Hết hàng</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className={`status-menu-item ${stateInfo.key === "HIDDEN" ? "active" : ""}`}
-                                        onClick={() => handleQuickChangeStatus(p, "HIDDEN")}
-                                      >
-                                        <span className="status-dot-indicator dot-hidden" />
-                                        <span>Tạm ẩn</span>
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
+                                <span
+                                  className={`status-auto-pill ${pillClass}`}
+                                  title={`Trạng thái tự động theo tồn kho: ${stateInfo.label}`}
+                                >
+                                  {stateInfo.label}
+                                </span>
                               );
                             })()}
                           </td>
@@ -2699,18 +2476,20 @@ export default function ProductManager() {
                   </div>
                   <div>
                     Trạng thái:{" "}
-                    <strong
-                      style={{
-                        color:
-                          currentProduct.status === "ACTIVE"
-                            ? "#15803D"
-                            : "#D97706",
-                      }}
-                    >
-                      {currentProduct.status === "ACTIVE"
-                        ? "Đang bán"
-                        : "Tạm ẩn"}
-                    </strong>
+                    {(() => {
+                      const info = getProductStateInfo(currentProduct);
+                      const color =
+                        info.key === "SELLING"
+                          ? "#15803D"
+                          : info.key === "LOW_STOCK"
+                          ? "#A16207"
+                          : info.key === "OUT_OF_STOCK"
+                          ? "#DC2626"
+                          : "#6B7280";
+                      return (
+                        <strong style={{ color }}>{info.label}</strong>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
