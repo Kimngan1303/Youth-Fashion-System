@@ -845,7 +845,7 @@ export default function Register() {
 
               {/* Footer link to Login */}
               <div className="registration-footer">
-                <span>Đã có tài khoản hội viên?</span>
+                <span>Đã có tài khoản?</span>
                 <Link to="/login" className="login-now-link">
                   Đăng nhập ngay
                 </Link>
