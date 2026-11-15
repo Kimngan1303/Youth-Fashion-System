@@ -14,6 +14,7 @@ import { productService } from '../services/productService';
 import { resolveOrderItemImage } from '../utils/productImageUtils';
 import { ensureOrderCacheReset } from '../utils/orderCacheReset';
 import { sendOrderStatusNotification } from '../services/notificationService';
+import { useToast } from '../context/ToastContext';
 
 // Chuẩn hóa ngày hiển thị sang dạng DD/MM/YYYY
 const normalizeDobToVn = (dob) => {
@@ -872,6 +873,7 @@ const normalizeInitialOrderStatus = (order) => {
 
 const ProfilePage = () => {
   const { user, updateUserProfile, changePassword, orders, wishlist, logout, addToCart } = useAuth();
+  const { showSuccess, showError, showInfo } = useToast();
   const isManagerOrAdmin = Boolean(
     user && (
       String(user.role || '').toUpperCase() === 'MANAGER' ||
@@ -2697,6 +2699,7 @@ const ProfilePage = () => {
         });
       } catch (e) {}
 
+      showSuccess(`Đã hủy thành công đơn hàng #${orderDisplayCode}!`);
       setOrderAlert({
         type: 'success',
         message: `Đã hủy thành công đơn hàng #${orderDisplayCode}!`,
@@ -2704,6 +2707,7 @@ const ProfilePage = () => {
       setTimeout(() => setOrderAlert({ type: '', message: '' }), 4000);
     } catch (err) {
       console.error('Lỗi khi hủy đơn:', err);
+      showError(err?.response?.data?.message || err?.message || 'Có lỗi khi hủy đơn hàng');
     } finally {
       setIsCancelling(false);
       setCancelModalOrder(null);
@@ -2786,6 +2790,7 @@ const ProfilePage = () => {
     const items = refundModalOrder?.items || ord.items || [];
     if (items.length > 0 && selectedRefundItemIndices.length === 0) {
       setRefundSelectError('Vui lòng tick chọn ít nhất 1 sản phẩm bạn muốn hoàn tiền!');
+      showError('Vui lòng tick chọn ít nhất 1 sản phẩm bạn muốn hoàn tiền!');
       setOrderAlert({
         type: 'error',
         message: 'Vui lòng tick chọn ít nhất 1 sản phẩm bạn muốn hoàn tiền!',
@@ -2798,6 +2803,7 @@ const ProfilePage = () => {
     const bankTrimmed = String(refundBankInfo || '').trim();
     if (!bankTrimmed) {
       setRefundBankError('Vui lòng nhập đầy đủ thông tin tài khoản ngân hàng (STK, Tên ngân hàng, Tên chủ thẻ)!');
+      showError('Bắt buộc nhập thông tin tài khoản ngân hàng (Số tài khoản, Tên ngân hàng, Chủ tài khoản) để nhận tiền hoàn!');
       setOrderAlert({
         type: 'error',
         message: 'Bắt buộc nhập thông tin tài khoản ngân hàng (Số tài khoản, Tên ngân hàng, Chủ tài khoản) để nhận tiền hoàn!',
@@ -3090,6 +3096,7 @@ const ProfilePage = () => {
         });
       } catch (e) {}
 
+      showSuccess(`Đã gửi yêu cầu hoàn tiền đơn hàng #${orderDisplayCode} thành công!`);
       setOrderAlert({
         type: 'success',
         message: `Đã gửi yêu cầu hoàn tiền đơn hàng #${orderDisplayCode} thành công! Đơn hàng đã chuyển sang trạng thái "Đổi trả".`,
@@ -3097,6 +3104,7 @@ const ProfilePage = () => {
       setTimeout(() => setOrderAlert({ type: '', message: '' }), 4500);
     } catch (err) {
       console.error('Lỗi khi gửi yêu cầu hoàn tiền:', err);
+      showError(err?.response?.data?.message || err?.message || 'Có lỗi khi gửi yêu cầu hoàn tiền');
     } finally {
       setIsRefunding(false);
       setRefundModalOrder(null);
@@ -3108,9 +3116,6 @@ const ProfilePage = () => {
     if (!ord) return;
     const orderDisplayCode = ord.order_code || ord.order_number || ord.order_id;
     const tId = String(ord.order_id || ord.order_number || '').trim();
-    if (!window.confirm(`Bạn có chắc chắn đã nhận được toàn bộ sản phẩm của đơn hàng #${orderDisplayCode}?`)) {
-      return;
-    }
     try {
       await orderService.customerConfirmDelivered(tId);
       const nowIso = new Date().toISOString();
@@ -3176,15 +3181,18 @@ const ProfilePage = () => {
       window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: { orderId: tId, status: 'COMPLETED' } }));
       window.dispatchEvent(new Event('order_status_updated'));
 
+      showSuccess(`Xác nhận nhận hàng thành công! Đơn hàng #${orderDisplayCode} đã hoàn tất.`);
       setOrderAlert({
         type: 'success',
         message: `Cảm ơn bạn! Đơn hàng #${orderDisplayCode} đã hoàn tất thành công.`,
       });
       setTimeout(() => setOrderAlert({ type: '', message: '' }), 4000);
     } catch (err) {
+      const errMsg = err?.response?.data?.message || err?.message || 'Có lỗi khi xác nhận nhận hàng';
+      showError(errMsg);
       setOrderAlert({
         type: 'error',
-        message: err?.response?.data?.message || err?.message || 'Có lỗi khi xác nhận nhận hàng',
+        message: errMsg,
       });
       setTimeout(() => setOrderAlert({ type: '', message: '' }), 4000);
     }
