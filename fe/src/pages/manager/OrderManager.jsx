@@ -704,6 +704,8 @@ export default function OrderManager() {
               status_label: statusLabel,
               note: ord.note || '',
               return_requests: ord.return_requests,
+              refund_amount: Number(ord.return_requests?.[0]?.refund_amount || ord.refund_amount || (ord.note && ord.note.includes('Số tiền hoàn:') ? ord.note.split('Số tiền hoàn:')[1]?.split('|')[0]?.replace(/\D/g, '') : 0) || ord.total_amount || 0),
+              return_items: ord.return_requests?.[0]?.images?.return_items || (typeof ord.return_requests?.[0]?.images === 'object' && ord.return_requests?.[0]?.images?.return_items) || ord.return_items || null,
               refund_decision: ord.return_requests?.[0]?.status === 'COMPLETED' ? 'APPROVED' : (ord.return_requests?.[0]?.status === 'REJECTED' ? 'REJECTED' : (ord.return_requests?.[0]?.status === 'APPROVED' ? 'APPROVED' : (ordNoteLow.includes('đã xác nhận') ? 'APPROVED' : (ordNoteLow.includes('từ chối') ? 'REJECTED' : (isRet ? 'PENDING' : ''))))),
               refund_bank: ord.return_requests?.[0]?.bank_info || (ord.note && ord.note.includes('STK:') ? ord.note.split('STK:')[1]?.trim() : ''),
               refund_reason: ord.return_requests?.[0]?.reason || (ord.note && ord.note.includes('Khách yêu cầu hoàn tiền:') ? ord.note.replace('Khách yêu cầu hoàn tiền:', '').split('STK:')[0].replace('|', '').trim() : ''),
@@ -909,6 +911,8 @@ export default function OrderManager() {
           refund_bank: isRetEvt ? detail.refund_bank : '',
           refund_decision: isRetEvt ? (detail.refund_decision || (isApprDecision ? 'APPROVED' : (isRejDecision ? 'REJECTED' : 'PENDING'))) : '',
           reject_reason: detail.reject_reason || '',
+          refund_amount: detail.refund_amount !== undefined ? Number(detail.refund_amount) : undefined,
+          return_items: detail.return_items || undefined,
           note: isRetEvt
             ? (detail.note || `Khách yêu cầu hoàn tiền: ${detail.reason || detail.refund_reason || 'Đổi trả'}${detail.refund_bank ? ` | STK: ${detail.refund_bank}` : ''}`)
             : (isCancEvt ? (detail.cancel_note || `Khách hủy đơn: ${detail.cancel_reason || detail.reason || 'Đổi ý, không muốn mua nữa'}`) : detail.note),
@@ -959,6 +963,8 @@ export default function OrderManager() {
               refund_bank: isRetEvt ? (detail.refund_bank || ord.refund_bank) : ord.refund_bank,
               refund_decision: detail.refund_decision || ord.refund_decision,
               reject_reason: detail.reject_reason || ord.reject_reason,
+              refund_amount: detail.refund_amount !== undefined ? Number(detail.refund_amount) : ord.refund_amount,
+              return_items: detail.return_items || ord.return_items,
               note: isRetEvt
                 ? (detail.note || ord.note)
                 : (isCancEvt ? (detail.cancel_note || `Khách hủy đơn: ${detail.cancel_reason || detail.reason || ord.cancel_reason || 'Đổi ý, không muốn mua nữa'}`) : (detail.note || ord.note)),
@@ -2359,7 +2365,8 @@ export default function OrderManager() {
     const digits = (tNum || tId).replace(/\D/g, '');
 
     const bankInfo = (overrideBank && String(overrideBank).trim()) || targetOrder.refund_bank || (targetOrder.note && targetOrder.note.includes('STK:') ? targetOrder.note.split('STK:')[1]?.trim() : '');
-    const refundAmt = Number(targetOrder.total_amount || 0).toLocaleString('vi-VN');
+    const refundAmtNum = Number(targetOrder.refund_amount || targetOrder.return_requests?.[0]?.refund_amount || (targetOrder.note && targetOrder.note.includes('Số tiền hoàn:') ? targetOrder.note.split('Số tiền hoàn:')[1]?.split('|')[0]?.replace(/\D/g, '') : 0) || targetOrder.total_amount || 0);
+    const refundAmt = refundAmtNum.toLocaleString('vi-VN');
 
     const newStatus = 'RETURNED';
     const newStatusLabel = 'Đã hoàn tiền';
@@ -2367,18 +2374,64 @@ export default function OrderManager() {
     const extraNote = overrideNote && String(overrideNote).trim() ? ` | Ghi chú: ${String(overrideNote).trim()}` : '';
     const updatedNote = `Đã xác nhận hoàn tiền: ${refundAmt}₫ | ${targetOrder.refund_reason ? `Lý do: ${targetOrder.refund_reason} | ` : ''}STK: ${bankInfo}${extraNote}`;
 
+    // Tìm thông tin người mua thực sự từ bộ nhớ và đơn hàng
+    let buyerEmail = targetOrder.recipient_email || targetOrder.customer?.email || targetOrder.email || targetOrder.customer_email || '';
+    let buyerId = targetOrder.customer_id || targetOrder.customer?.customer_id || targetOrder.customer?.id || targetOrder.user_id || '';
+    let buyerPhone = targetOrder.recipient_phone || targetOrder.customer?.phone || targetOrder.phone || '';
+    let buyerName = targetOrder.recipient_name || targetOrder.customer?.name || targetOrder.customer?.full_name || '';
+
+    if (!buyerEmail || buyerEmail.endsWith('@example.com') || !buyerId) {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('yf_customer_orders') || k === 'yf_manager_orders' || k.startsWith('yf_notifications_'))) {
+          try {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                const matched = list.find(it => {
+                  if (!it) return false;
+                  const iId = String(it.order_id || '').trim();
+                  const iNum = String(it.order_number || it.order_code || '').trim();
+                  const iDig = (iNum || iId).replace(/\D/g, '');
+                  return (tId && (iId === tId || iNum === tId)) ||
+                         (tNum && (iId === tNum || iNum === tNum)) ||
+                         (digits && iDig && digits === iDig);
+                });
+                if (matched) {
+                  const mEmail = matched.recipient_email || matched.customer?.email || matched.email || matched.customer_email;
+                  if (mEmail && mEmail.includes('@') && !mEmail.endsWith('@example.com')) {
+                    buyerEmail = mEmail;
+                  }
+                  if (!buyerId) buyerId = matched.customer_id || matched.customer?.customer_id || matched.customer?.id || matched.user_id;
+                  if (!buyerPhone) buyerPhone = matched.recipient_phone || matched.customer?.phone || matched.phone;
+                  if (!buyerName) buyerName = matched.recipient_name || matched.customer?.name || matched.customer?.full_name;
+                }
+              }
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
     // 1. Cập nhật MySQL DB backend trước, bắt buộc await và dừng nếu lỗi
     const targetApiId = tId || tNum || digits;
     const extraPayload = {
       refund_decision: 'APPROVED',
       refundBank: bankInfo,
       bank_info: bankInfo,
-      recipientEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
-      customerEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
-      userEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
+      refund_amount: refundAmtNum,
+      return_items: targetOrder.return_items || targetOrder.return_requests?.[0]?.images?.return_items || null,
+      recipientEmail: buyerEmail,
+      customerEmail: buyerEmail,
+      userEmail: buyerEmail,
+      recipientName: buyerName,
+      recipientPhone: buyerPhone,
       returnRequest: {
         status: 'APPROVED',
         bank_info: bankInfo,
+        refund_amount: refundAmtNum,
+        images: targetOrder.return_requests?.[0]?.images || (targetOrder.return_items ? { return_items: targetOrder.return_items } : null)
       }
     };
     try {
@@ -2401,6 +2454,8 @@ export default function OrderManager() {
         refund_decision: 'APPROVED',
         refund_bank: bankInfo,
         refund_reason: targetOrder.refund_reason || '',
+        refund_amount: refundAmtNum,
+        return_items: targetOrder.return_items || targetOrder.return_requests?.[0]?.images?.return_items || null,
         note: updatedNote,
         updated_at: Date.now(),
       };
@@ -2440,6 +2495,8 @@ export default function OrderManager() {
           status_label: newStatusLabel,
           refund_decision: 'APPROVED',
           refund_bank: bankInfo,
+          refund_amount: refundAmtNum,
+          return_items: targetOrder.return_items || targetOrder.return_requests?.[0]?.images?.return_items || null,
           note: updatedNote,
           payment_status: 'REFUNDED',
           payment_label: 'Đã hoàn tiền',
@@ -2462,6 +2519,8 @@ export default function OrderManager() {
       customerLabel,
       refund_decision: 'APPROVED',
       refund_bank: bankInfo,
+      refund_amount: refundAmtNum,
+      return_items: targetOrder.return_items || targetOrder.return_requests?.[0]?.images?.return_items || null,
       note: updatedNote,
       timestamp: Date.now()
     };
@@ -2480,7 +2539,11 @@ export default function OrderManager() {
       sendOrderStatusNotification(targetOrder, 'APPROVED', {
         newStatusLabel: 'Đã hoàn tiền',
         refundBank: bankInfo,
-        refundAmount: refundAmt
+        refundAmount: refundAmt,
+        recipientEmail: buyerEmail,
+        customerEmail: buyerEmail,
+        recipientName: buyerName,
+        recipientPhone: buyerPhone,
       });
     } catch (err) {
       console.error('Lỗi gửi thông báo hoàn tiền cho người mua:', err);
@@ -2493,6 +2556,8 @@ export default function OrderManager() {
       status_label: newStatusLabel,
       refund_decision: 'APPROVED',
       refund_bank: bankInfo,
+      refund_amount: refundAmtNum,
+      return_items: targetOrder.return_items || targetOrder.return_requests?.[0]?.images?.return_items || null,
       note: updatedNote,
       payment_status: 'REFUNDED',
       payment_label: 'Đã hoàn tiền',
@@ -2594,10 +2659,14 @@ export default function OrderManager() {
       rejectReason,
       reject_reason: rejectReason,
       reason: rejectReason,
+      refund_amount: Number(targetOrder.refund_amount || targetOrder.return_requests?.[0]?.refund_amount || 0),
+      bank_info: targetOrder.refund_bank || (targetOrder.note && targetOrder.note.includes('STK:') ? targetOrder.note.split('STK:')[1]?.trim() : ''),
+      return_items: targetOrder.return_items || targetOrder.return_requests?.[0]?.images?.return_items || null,
       recipientEmail: buyerEmail,
       customerEmail: buyerEmail,
       userEmail: buyerEmail,
       recipientName: buyerName,
+      recipientPhone: buyerPhone,
       returnRequest: {
         status: 'REJECTED',
         reject_reason: rejectReason,
@@ -3157,6 +3226,7 @@ export default function OrderManager() {
                   ) : (
                     paginatedOrders.map((ord) => {
                       const cat = getCategoryFromStatus(ord.order_status, ord.status_label, ord.note, ord);
+                      const isRet = cat === 'RETURNED' || isOrderReturned(ord.order_status, ord.status_label, ord.note, ord);
                       const isSelected = selectedOrderIds.includes(ord.order_id);
                       const firstItem = ord.items?.[0] || {};
                       const itemImg = resolveOrderItemImage(firstItem);
@@ -3221,6 +3291,17 @@ export default function OrderManager() {
                                 <span className="product-meta-sub">
                                   {firstItem.size || 'Size M'} • x{firstItem.quantity || 1} (Tổng {totalCount} món)
                                 </span>
+                                {(cat === 'RETURNED' || isRet) && (() => {
+                                  const retItems = ord.return_items || ord.return_requests?.[0]?.images?.return_items || [];
+                                  if (retItems.length > 0) {
+                                    return (
+                                      <span style={{ fontSize: '11px', color: '#7E22CE', fontWeight: 600, display: 'block', marginTop: '2px' }}>
+                                        • Yêu cầu hoàn {retItems.length} món
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
                             </div>
                           </td>
@@ -3231,6 +3312,17 @@ export default function OrderManager() {
                               <span className="amount-text">
                                 {Number(ord.total_amount || 0).toLocaleString('vi-VN')}đ
                               </span>
+                              {(cat === 'RETURNED' || isRet) && (() => {
+                                const reqAmt = Number(ord.refund_amount || ord.return_requests?.[0]?.refund_amount || (ord.note && ord.note.includes('Số tiền hoàn:') ? ord.note.split('Số tiền hoàn:')[1]?.split('|')[0]?.replace(/\D/g, '') : 0) || 0);
+                                if (reqAmt > 0 && reqAmt < Number(ord.total_amount || 0)) {
+                                  return (
+                                    <span style={{ fontSize: '11px', color: '#7E22CE', fontWeight: 600, display: 'block', marginTop: '1px' }}>
+                                      Hoàn: {reqAmt.toLocaleString('vi-VN')}đ
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
                               {ord.payment_method === 'DIRECT' ? (
                                 <span className="payment-pill pill-direct">Thanh toán trực tiếp</span>
                               ) : (ord.payment_method === 'COD' || !ord.payment_method || String(ord.payment_method || '').toUpperCase().includes('COD')) ? (
@@ -3518,16 +3610,54 @@ export default function OrderManager() {
                   &lt; Trang trước
                 </button>
 
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                  <button
-                    key={page}
-                    type="button"
-                    className={`page-number-btn ${currentPage === page ? 'active' : ''}`}
-                    onClick={() => setCurrentPage(page)}
-                  >
-                    {page}
-                  </button>
-                ))}
+                {(() => {
+                  const getPaginationItems = (current, total) => {
+                    if (total <= 7) {
+                      return Array.from({ length: total }, (_, i) => i + 1);
+                    }
+                    if (current <= 3) {
+                      return [1, 2, 3, '...', total];
+                    }
+                    if (current >= total - 2) {
+                      return [1, '...', total - 2, total - 1, total];
+                    }
+                    return [1, '...', current - 1, current, current + 1, '...', total];
+                  };
+
+                  return getPaginationItems(currentPage, totalPages).map((item, idx) => {
+                    if (item === '...') {
+                      return (
+                        <span
+                          key={`ellipsis-${idx}`}
+                          className="page-ellipsis"
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            color: '#9CA3AF',
+                            userSelect: 'none'
+                          }}
+                        >
+                          ...
+                        </span>
+                      );
+                    }
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        className={`page-number-btn ${currentPage === item ? 'active' : ''}`}
+                        onClick={() => setCurrentPage(item)}
+                      >
+                        {item}
+                      </button>
+                    );
+                  });
+                })()}
 
                 <button
                   type="button"
@@ -3683,10 +3813,60 @@ export default function OrderManager() {
                         </div>
                       )}
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px', fontSize: '12px', color: '#6B21A8' }}>
-                        <span style={{ minWidth: '135px' }}>Số tiền hoàn dự kiến:</span>
-                        <strong style={{ fontSize: '14px', color: '#7E22CE' }}>
-                          {Number(editingOrder.total_amount || 0).toLocaleString('vi-VN')}₫
+                      {/* Danh sách sản phẩm khách chọn hoàn tiền */}
+                      {(() => {
+                        const editRetItems = editingOrder.return_items ||
+                          editingOrder.return_requests?.[0]?.images?.return_items ||
+                          (typeof editingOrder.return_requests?.[0]?.images === 'object' && editingOrder.return_requests?.[0]?.images?.return_items) ||
+                          [];
+                        if (!editRetItems || editRetItems.length === 0) return null;
+                        return (
+                          <div style={{ marginTop: '10px', borderTop: '1px dashed #D8B4FE', paddingTop: '8px' }}>
+                            <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#6B21A8', marginBottom: '6px', textTransform: 'uppercase' }}>
+                              Sản phẩm yêu cầu hoàn ({editRetItems.length}):
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '140px', overflowY: 'auto' }}>
+                              {editRetItems.map((item, idx) => (
+                                <div key={idx} style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  background: '#FFFFFF',
+                                  padding: '6px 10px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #E9D5FF'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    {item.image && (
+                                      <img
+                                        src={item.image}
+                                        alt={item.name}
+                                        style={{ width: '32px', height: '32px', borderRadius: '4px', objectFit: 'cover' }}
+                                      />
+                                    )}
+                                    <div>
+                                      <div style={{ fontSize: '12px', fontWeight: 600, color: '#1F2937' }}>{item.name || item.product_name}</div>
+                                      <div style={{ fontSize: '11px', color: '#6B7280' }}>
+                                        {item.size ? `Size: ${item.size} ` : ''}
+                                        {item.color ? `• Màu: ${item.color} ` : ''}
+                                        &bull; SL: {item.quantity || 1}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <strong style={{ fontSize: '12px', color: '#7E22CE' }}>
+                                    {Number(item.total_price || (item.price * (item.quantity || 1))).toLocaleString('vi-VN')}₫
+                                  </strong>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', fontSize: '12px', color: '#6B21A8', borderTop: '1px dashed #D8B4FE', paddingTop: '6px' }}>
+                        <span style={{ fontWeight: 600 }}>Số tiền hoàn dự kiến:</span>
+                        <strong style={{ fontSize: '15px', color: '#7E22CE' }}>
+                          {Number(editingOrder.refund_amount || editingOrder.return_requests?.[0]?.refund_amount || (editingOrder.note && editingOrder.note.includes('Số tiền hoàn:') ? editingOrder.note.split('Số tiền hoàn:')[1]?.split('|')[0]?.replace(/\D/g, '') : 0) || editingOrder.total_amount || 0).toLocaleString('vi-VN')}₫
                         </strong>
                       </div>
 
@@ -4816,12 +4996,90 @@ export default function OrderManager() {
                     </span>
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #D8B4FE', paddingTop: '6px' }}>
-                  <span style={{ color: '#6B7280' }}>Số tiền hoàn trả:</span>
-                  <strong style={{ color: '#7E22CE', fontSize: '15px' }}>
-                    {Number(returnOrder.total_amount || 0).toLocaleString('vi-VN')} ₫
-                  </strong>
-                </div>
+                {/* Danh sách sản phẩm khách đã tick chọn hoàn tiền */}
+                {(() => {
+                  const retItems = returnOrder.return_items ||
+                    returnOrder.return_requests?.[0]?.images?.return_items ||
+                    (typeof returnOrder.return_requests?.[0]?.images === 'object' && returnOrder.return_requests?.[0]?.images?.return_items) ||
+                    (returnOrder.images?.return_items) ||
+                    [];
+                  if (!retItems || retItems.length === 0) return null;
+                  return (
+                    <div style={{ margin: '12px 0 10px 0', borderTop: '1px dashed #D8B4FE', paddingTop: '10px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#6B21A8', marginBottom: '8px', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Sản phẩm khách chọn hoàn tiền:</span>
+                        <span style={{ color: '#7E22CE' }}>({retItems.length} sản phẩm)</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '160px', overflowY: 'auto', paddingRight: '2px' }}>
+                        {retItems.map((item, idx) => (
+                          <div key={idx} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: '#FFFFFF',
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid #E9D5FF'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              {item.image && (
+                                <img
+                                  src={item.image}
+                                  alt={item.name}
+                                  style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover', border: '1px solid #E5E7EB' }}
+                                />
+                              )}
+                              <div>
+                                <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#1F2937' }}>{item.name || item.product_name}</div>
+                                <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '1px' }}>
+                                  {item.size ? `Size: ${item.size} ` : ''}
+                                  {item.color ? `• Màu: ${item.color} ` : ''}
+                                  <span style={{ fontWeight: 600, color: '#4B5563' }}>&bull; SL: {item.quantity || 1}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <strong style={{ fontSize: '13px', color: '#7E22CE' }}>
+                              {Number(item.total_price || (item.price * (item.quantity || 1))).toLocaleString('vi-VN')}₫
+                            </strong>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Hàng số tiền hoàn trả */}
+                {(() => {
+                  const retItems = returnOrder.return_items ||
+                    returnOrder.return_requests?.[0]?.images?.return_items ||
+                    (typeof returnOrder.return_requests?.[0]?.images === 'object' && returnOrder.return_requests?.[0]?.images?.return_items) ||
+                    (returnOrder.images?.return_items) ||
+                    [];
+                  const reqRefundAmt = Number(returnOrder.refund_amount || returnOrder.return_requests?.[0]?.refund_amount || (returnOrder.note && returnOrder.note.includes('Số tiền hoàn:') ? returnOrder.note.split('Số tiền hoàn:')[1]?.split('|')[0]?.replace(/\D/g, '') : 0) || returnOrder.total_amount || 0);
+
+                  return (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #D8B4FE', paddingTop: '8px', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ color: '#6B7280', fontWeight: 600 }}>Số tiền hoàn trả:</span>
+                        {retItems.length > 0 && (
+                          <div style={{ fontSize: '11px', color: '#7E22CE' }}>
+                            (Hoàn {retItems.length}/{returnOrder.items?.length || retItems.length} sản phẩm)
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <strong style={{ color: '#7E22CE', fontSize: '16px' }}>
+                          {reqRefundAmt.toLocaleString('vi-VN')} ₫
+                        </strong>
+                        {Number(returnOrder.total_amount) > reqRefundAmt && (
+                          <div style={{ fontSize: '11px', color: '#9CA3AF', textDecoration: 'line-through' }}>
+                            Tổng đơn: {Number(returnOrder.total_amount || 0).toLocaleString('vi-VN')}₫
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Lựa chọn kết quả: Đã hoàn tiền HOẶC Từ chối hoàn */}

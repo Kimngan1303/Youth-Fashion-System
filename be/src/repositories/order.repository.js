@@ -626,6 +626,7 @@ export const updateOrderStatus = async (orderIdOrNumber, status, note = null, op
               where: { return_request_id: existingReturn.return_request_id },
               data: {
                 status: reqStatus,
+                ...(returnData.refund_amount !== undefined ? { refund_amount: refundAmt } : {}),
                 ...(bankInfo ? { bank_info: bankInfo.slice(0, 500) } : {}),
                 reject_reason: reqStatus === 'REJECTED' ? (rejectReason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop').slice(0, 500) : null,
                 ...(employeeId ? { processed_by_employee_id: employeeId } : {}),

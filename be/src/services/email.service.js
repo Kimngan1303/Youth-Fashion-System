@@ -390,6 +390,12 @@ export const sendOrderNotificationEmail = async ({
     return { success: false, reason: 'Invalid or missing recipient email' };
   }
 
+  // Bỏ qua gửi email SMTP thực tế khi chạy test hoặc khi gặp địa chỉ email mẫu giả lập
+  if (process.env.NODE_ENV === 'test' || recipient.endsWith('@example.com')) {
+    console.log(`ℹ️ [Email Test/Mock] Bỏ qua gửi SMTP thực tế tới email mẫu: ${recipient}`);
+    return { success: true, simulated: true };
+  }
+
   const orderNumber = order?.order_number || order?.order_code || (order?.order_id ? `YF-${order.order_id}` : 'YF-ORDER');
   const orderDigits = String(orderNumber).replace(/\D/g, '') || String(order?.order_id || '');
   const s = String(status || order?.order_status || '').toUpperCase();
@@ -485,16 +491,54 @@ export const sendOrderNotificationEmail = async ({
       extraData?.status === 'APPROVED' ||
       extraData?.returnRequest?.status === 'APPROVED' ||
       extraData?.returnRequest?.status === 'COMPLETED' ||
+      extraData?.returnRequestData?.status === 'APPROVED' ||
+      extraData?.returnRequestData?.status === 'COMPLETED' ||
       String(reason).toLowerCase().includes('đã xác nhận hoàn tiền') ||
       String(reason).toLowerCase().includes('đã hoàn tiền')
     ))
   ) {
     subject = `Youth Fashion - Xác nhận hoàn tiền thành công cho đơn hàng #${orderNumber}`;
-    badgeText = 'ĐÃ HOÀN TIỀN';
+    badgeText = 'HOÀN TIỀN THÀNH CÔNG';
     badgeBg = '#DCFCE7';
     badgeColor = '#15803D';
-    headline = 'Yêu cầu đổi trả & hoàn tiền đã hoàn tất';
-    messageBody = `Shop đã phê duyệt yêu cầu đổi trả và hoàn tất thủ tục hoàn trả tiền về tài khoản ngân hàng của Quý khách cho đơn hàng <strong>#${orderNumber}</strong>. Quý khách vui lòng kiểm tra biến động số dư tài khoản.`;
+    headline = 'Yêu cầu đổi trả & hoàn tiền đã hoàn tất thành công';
+    messageBody = `Shop đã phê duyệt yêu cầu đổi trả và hoàn tất thủ tục hoàn trả tiền về tài khoản ngân hàng của Quý khách cho đơn hàng <strong>#${orderNumber}</strong>. Quý khách vui lòng kiểm tra biến động số dư tài khoản ngân hàng.`;
+
+    let approvedRefundAmount = extraData?.refund_amount ||
+                               extraData?.refundAmount ||
+                               extraData?.returnRequest?.refund_amount ||
+                               extraData?.returnRequestData?.refund_amount ||
+                               order?.return_requests?.[0]?.refund_amount;
+    if (!approvedRefundAmount && reason && reason.includes('Đã xác nhận hoàn tiền:')) {
+      const parsed = reason.split('Đã xác nhận hoàn tiền:')[1]?.split('|')[0]?.replace(/\D/g, '');
+      if (parsed) approvedRefundAmount = Number(parsed);
+    }
+    if (!approvedRefundAmount && reason && reason.includes('Số tiền hoàn:')) {
+      const parsed = reason.split('Số tiền hoàn:')[1]?.split('|')[0]?.replace(/\D/g, '');
+      if (parsed) approvedRefundAmount = Number(parsed);
+    }
+    if (!approvedRefundAmount) {
+      approvedRefundAmount = Number(order?.total_amount || 0);
+    }
+
+    let approvedBankInfo = extraData?.bank_info ||
+                           extraData?.bankInfo ||
+                           extraData?.refund_bank ||
+                           extraData?.refundBank ||
+                           extraData?.returnRequest?.bank_info ||
+                           extraData?.returnRequestData?.bank_info ||
+                           order?.return_requests?.[0]?.bank_info;
+    if (!approvedBankInfo && reason && reason.includes('STK:')) {
+      approvedBankInfo = reason.split('STK:')[1]?.split('|')[0]?.trim();
+    }
+
+    alertBox = {
+      title: 'Chi tiết hoàn tiền thành công',
+      content: `Số tiền đã hoàn: <strong style="color: #15803D; font-size: 15px;">${Number(approvedRefundAmount).toLocaleString('vi-VN')} ₫</strong>${approvedBankInfo ? `<br/>Tài khoản nhận tiền: <strong>${approvedBankInfo}</strong>` : ''}<br/>Trạng thái xử lý: <strong>Đã hoàn tiền thành công</strong>`,
+      color: '#15803D',
+      bg: '#F0FDF4',
+      border: '#86EFAC',
+    };
   } else if (
     s === 'REJECTED' ||
     s === 'REFUND_REJECTED' ||
@@ -502,6 +546,7 @@ export const sendOrderNotificationEmail = async ({
       extraData?.refund_decision === 'REJECTED' ||
       extraData?.status === 'REJECTED' ||
       extraData?.returnRequest?.status === 'REJECTED' ||
+      extraData?.returnRequestData?.status === 'REJECTED' ||
       String(reason).toLowerCase().includes('từ chối hoàn tiền')
     ))
   ) {
@@ -510,8 +555,13 @@ export const sendOrderNotificationEmail = async ({
     badgeBg = '#FEE2E2';
     badgeColor = '#B91C1C';
     headline = 'Từ chối yêu cầu đổi trả / hoàn tiền';
-    messageBody = `Shop rất tiếc phải thông báo yêu cầu đổi trả & hoàn tiền cho đơn hàng <strong>#${orderNumber}</strong> chưa thể phê duyệt do chưa thỏa mãn chính sách đổi trả của Youth Fashion.`;
-    let cleanRejectReason = rejectReason || extraData?.reject_reason;
+    messageBody = `Shop rất tiếc phải thông báo yêu cầu đổi trả & hoàn tiền cho đơn hàng <strong>#${orderNumber}</strong> chưa thể phê duyệt do chưa đáp ứng đầy đủ điều kiện hoặc chính sách đổi trả của Youth Fashion.`;
+    let cleanRejectReason = rejectReason ||
+                            extraData?.reject_reason ||
+                            extraData?.rejectReason ||
+                            extraData?.returnRequest?.reject_reason ||
+                            extraData?.returnRequestData?.reject_reason ||
+                            order?.return_requests?.[0]?.reject_reason;
     if (!cleanRejectReason && reason) {
       if (reason.includes('Từ chối hoàn tiền:')) {
         cleanRejectReason = reason.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim();
@@ -533,15 +583,43 @@ export const sendOrderNotificationEmail = async ({
     badgeColor = '#7E22CE';
     headline = 'Yêu cầu đổi trả & hoàn tiền đang được xem xét';
     messageBody = `Shop đã tiếp nhận yêu cầu đổi trả & hoàn tiền của Quý khách cho đơn hàng <strong>#${orderNumber}</strong>. Bộ phận chăm sóc khách hàng đang kiểm tra và sẽ phản hồi trong thời gian sớm nhất.`;
-    if (reason || extraData?.bank_info || extraData?.refund_bank) {
-      alertBox = {
-        title: 'Thông tin yêu cầu hoàn tiền',
-        content: `${reason ? `Lý do: ${reason}` : ''}${extraData?.bank_info || extraData?.refund_bank ? ` | STK: ${extraData.bank_info || extraData.refund_bank}` : ''}`.trim(),
-        color: '#6B21A8',
-        bg: '#FAF5FF',
-        border: '#E9D5FF',
-      };
+
+    let requestedRefundAmount = extraData?.refund_amount ||
+                                extraData?.refundAmount ||
+                                extraData?.returnRequest?.refund_amount ||
+                                extraData?.returnRequestData?.refund_amount ||
+                                order?.return_requests?.[0]?.refund_amount;
+    if (!requestedRefundAmount && reason && reason.includes('Số tiền hoàn:')) {
+      const parsed = reason.split('Số tiền hoàn:')[1]?.split('|')[0]?.replace(/\D/g, '');
+      if (parsed) requestedRefundAmount = Number(parsed);
     }
+    if (!requestedRefundAmount) {
+      requestedRefundAmount = Number(order?.total_amount || 0);
+    }
+
+    let reqBank = extraData?.bank_info ||
+                  extraData?.bankInfo ||
+                  extraData?.refund_bank ||
+                  extraData?.refundBank ||
+                  extraData?.returnRequest?.bank_info ||
+                  extraData?.returnRequestData?.bank_info ||
+                  order?.return_requests?.[0]?.bank_info;
+    if (!reqBank && reason && reason.includes('STK:')) {
+      reqBank = reason.split('STK:')[1]?.split('|')[0]?.trim();
+    }
+
+    let cleanReqReason = reason;
+    if (cleanReqReason && cleanReqReason.includes('[Yêu cầu hoàn tiền]:')) {
+      cleanReqReason = cleanReqReason.replace('[Yêu cầu hoàn tiền]:', '').split('|')[0].trim();
+    }
+
+    alertBox = {
+      title: 'Thông tin yêu cầu hoàn tiền',
+      content: `Số tiền hoàn dự kiến: <strong style="color: #6B21A8; font-size: 15px;">${Number(requestedRefundAmount).toLocaleString('vi-VN')} ₫</strong>${reqBank ? `<br/>Tài khoản nhận tiền: <strong>${reqBank}</strong>` : ''}${cleanReqReason ? `<br/>Lý do: <strong>${cleanReqReason}</strong>` : ''}`,
+      color: '#6B21A8',
+      bg: '#FAF5FF',
+      border: '#E9D5FF',
+    };
   } else if (s === 'DELIVERY_FAILED' || s === 'FAILED_DELIVERY') {
     const willRetry = extraData?.willRetry || extraData?.retryDate;
     subject = willRetry
@@ -579,7 +657,43 @@ export const sendOrderNotificationEmail = async ({
   const totalAmount = Number(order?.total_amount || 0);
   const paymentMethod = order?.payments?.[0]?.payment_method || order?.payment_method || 'Thanh toán trực tuyến';
 
-  // Tạo HTML danh sách sản phẩm
+  // Danh sách sản phẩm đổi trả / hoàn tiền (nếu có lựa chọn sản phẩm)
+  const returnItems = extraData?.return_items ||
+                      extraData?.returnItems ||
+                      extraData?.returnRequest?.images?.return_items ||
+                      extraData?.returnRequestData?.images?.return_items ||
+                      order?.return_requests?.[0]?.images?.return_items ||
+                      null;
+
+  let returnItemsHtml = '';
+  if (Array.isArray(returnItems) && returnItems.length > 0) {
+    returnItemsHtml = returnItems
+      .map((item) => {
+        const name = item.name || item.product_name || item.title || 'Sản phẩm đổi trả';
+        const size = item.size || item.variant?.size || 'Tiêu chuẩn';
+        const color = item.color || item.variant?.color || '';
+        const qty = item.quantity || 1;
+        const price = Number(item.price || item.unit_price || 0);
+        const subtotal = Number(item.subtotal || price * qty);
+
+        return `
+          <tr style="border-bottom: 1px solid #F3F4F6;">
+            <td style="padding: 12px 8px; vertical-align: top;">
+              <div style="font-weight: 600; font-size: 14px; color: #111827;">${name}</div>
+              <div style="font-size: 12px; color: #6B7280; margin-top: 2px;">
+                Phân loại: <strong>${size}</strong> ${color ? `| Màu: <strong>${color}</strong>` : ''} &bull; Số lượng hoàn: <strong style="color: #7E22CE;">x${qty}</strong>
+              </div>
+            </td>
+            <td style="padding: 12px 8px; text-align: right; vertical-align: top; font-size: 14px; font-weight: 600; color: #7E22CE; white-space: nowrap;">
+              ${subtotal.toLocaleString('vi-VN')} ₫
+            </td>
+          </tr>
+        `;
+      })
+      .join('');
+  }
+
+  // Tạo HTML danh sách sản phẩm đặt mua
   let itemsHtml = '';
   if (items.length > 0) {
     itemsHtml = items
@@ -666,7 +780,7 @@ Trân trọng,
           ${messageBody}
         </p>
 
-        <!-- Alert Box nếu có lý do hủy hoặc từ chối -->
+        <!-- Alert Box nếu có lý do hủy hoặc từ chối hoặc hoàn tiền -->
         ${
           alertBox
             ? `
@@ -675,8 +789,26 @@ Trân trọng,
               ${alertBox.title}
             </div>
             <div style="font-size: 14px; color: #1E293B; line-height: 20px;">
-              "${alertBox.content}"
+              ${alertBox.content}
             </div>
+          </div>
+        `
+            : ''
+        }
+
+        <!-- Bảng Sản phẩm Đổi trả / Hoàn tiền (nếu có lựa chọn sản phẩm) -->
+        ${
+          returnItemsHtml
+            ? `
+          <div style="margin-bottom: 24px; border: 1px solid #DDD6FE; border-radius: 12px; overflow: hidden; background-color: #FAF5FF;">
+            <div style="background-color: #F3E8FF; padding: 12px 16px; border-bottom: 1px solid #DDD6FE; font-size: 12.5px; font-weight: 700; color: #6B21A8; text-transform: uppercase; letter-spacing: 0.5px;">
+              Sản phẩm yêu cầu đổi trả & hoàn tiền
+            </div>
+            <table style="width: 100%; border-collapse: collapse; padding: 8px;">
+              <tbody>
+                ${returnItemsHtml}
+              </tbody>
+            </table>
           </div>
         `
             : ''
