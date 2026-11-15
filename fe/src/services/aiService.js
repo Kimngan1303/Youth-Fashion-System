@@ -78,7 +78,7 @@ export const aiService = {
    * Lấy lịch sử tìm kiếm người dùng (đã đăng nhập)
    * @param {number} limit - Số lượng từ khóa gần nhất
    */
-  getSearchHistory: async (limit = 15) => {
+  getSearchHistory: async (limit = 5) => {
     const response = await axiosClient.get(`/ai/search/history?limit=${limit}`);
     return response.data;
   },
