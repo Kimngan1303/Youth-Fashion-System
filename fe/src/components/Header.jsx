@@ -79,7 +79,13 @@ const Header = ({ onOpenAISearch }) => {
       };
     } catch (e) {}
 
+    // Polling định kỳ mỗi 3.5 giây để cập nhật trạng thái đơn hàng realtime từ hệ thống
+    const pollInterval = setInterval(() => {
+      refreshNotifications();
+    }, 3500);
+
     return () => {
+      clearInterval(pollInterval);
       window.removeEventListener('yf_notification_added', handleNotifAdded);
       window.removeEventListener('yf_notifications_updated', handleNotifUpdated);
       window.removeEventListener('yf_order_status_changed', handleNotifAdded);

@@ -27,6 +27,25 @@ export const formatNotificationTime = (timestampOrIso) => {
   });
 };
 
+// Ánh xạ màu sắc cho huy hiệu thông báo
+export const resolveBadgeStyle = (badge, status) => {
+  const b = String(badge || '').toUpperCase();
+  const s = String(status || '').toUpperCase();
+  if (b.includes('HOÀN TIỀN') || b.includes('ĐỔI TRẢ') || s === 'RETURNED') {
+    if (b.includes('TỪ CHỐI')) return { badgeColor: '#B91C1C', badgeBg: '#FEE2E2' };
+    if (b.includes('ĐÃ HOÀN')) return { badgeColor: '#15803D', badgeBg: '#DCFCE7' };
+    return { badgeColor: '#7E22CE', badgeBg: '#F3E8FF' };
+  }
+  if (b.includes('ĐÃ GIAO') || s === 'DELIVERED') return { badgeColor: '#15803D', badgeBg: '#DCFCE7' };
+  if (b.includes('HOÀN TẤT') || b.includes('ĐÃ GIAO HÀNG') || s === 'COMPLETED' || s === 'SUCCESS') return { badgeColor: '#15803D', badgeBg: '#DCFCE7' };
+  if (b.includes('VẬN CHUYỂN') || s === 'SHIPPING' || s === 'SHIPPED') return { badgeColor: '#1D4ED8', badgeBg: '#DBEAFE' };
+  if (b.includes('XÁC NHẬN') || s === 'CONFIRMED') return { badgeColor: '#0369A1', badgeBg: '#E0F2FE' };
+  if (b.includes('HỦY') || s === 'CANCELLED') return { badgeColor: '#B91C1C', badgeBg: '#FEE2E2' };
+  if (b.includes('THẤT BẠI') || s === 'DELIVERY_FAILED') return { badgeColor: '#B91C1C', badgeBg: '#FEE2E2' };
+  if (b.includes('GIAO LẠI')) return { badgeColor: '#D97706', badgeBg: '#FEF3C7' };
+  return { badgeColor: '#4B5563', badgeBg: '#F3F4F6' };
+};
+
 // Tạo nội dung thông báo dựa trên trạng thái đơn hàng
 export const buildNotificationContent = (order, newStatus, extraData = {}) => {
   const rawCode = order.order_number || order.order_code || order.order_id || 'Đơn hàng';
@@ -50,27 +69,37 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
     case 'CONFIRMED':
       return {
         type: 'ORDER_CONFIRMED',
-        title: `Đơn hàng ${displayCode} đã được xác nhận`,
-        message: `Đơn hàng ${displayCode} của bạn đã được Quản trị viên Shop xác nhận thành công và chuyển sang khâu đóng gói Haute Couture.`,
+        title: `Đơn hàng đã được xác nhận`,
+        message: `Đơn hàng ${displayCode} đã được Shop xác nhận thành công và đang chuyển sang khâu đóng gói.`,
         badge: 'ĐÃ XÁC NHẬN',
         badgeColor: '#0369A1',
         badgeBg: '#E0F2FE',
       };
     case 'SHIPPING':
+    case 'SHIPPED':
       return {
         type: 'ORDER_SHIPPING',
-        title: `Đơn hàng ${displayCode} đang được vận chuyển`,
-        message: `Đơn hàng ${displayCode} đã hoàn tất đóng gói và bàn giao cho đơn vị vận chuyển Giao Hàng Nhanh (Express VIP). Kiện hàng đang trên đường giao tới bạn.`,
+        title: `Đơn hàng đang được vận chuyển`,
+        message: `Đơn hàng ${displayCode} đang trên đường giao tới bạn. Shipper sẽ liên hệ trước khi phát.`,
         badge: 'ĐANG VẬN CHUYỂN',
         badgeColor: '#1D4ED8',
         badgeBg: '#DBEAFE',
       };
+    case 'DELIVERED':
+      return {
+        type: 'ORDER_DELIVERED',
+        title: `Đơn hàng đã giao thành công`,
+        message: `Đơn hàng ${displayCode} đã được giao tận tay bạn. Vui lòng kiểm tra và xác nhận đã nhận hàng.`,
+        badge: 'ĐÃ GIAO',
+        badgeColor: '#15803D',
+        badgeBg: '#DCFCE7',
+      };
     case 'COMPLETED':
       return {
         type: 'ORDER_COMPLETED',
-        title: `Đơn hàng ${displayCode} đã giao thành công`,
-        message: `Đơn hàng ${displayCode} đã được giao tận tay bạn thành công. Cảm ơn quý khách đã tin tưởng mua sắm tại Youth Fashion!`,
-        badge: 'ĐÃ GIAO HÀNG',
+        title: `Đơn hàng đã hoàn tất`,
+        message: `Đơn hàng ${displayCode} đã hoàn tất thành công. Cảm ơn quý khách đã tin tưởng mua sắm tại Youth Fashion!`,
+        badge: 'HOÀN TẤT',
         badgeColor: '#15803D',
         badgeBg: '#DCFCE7',
       };
@@ -111,15 +140,20 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
         badgeColor: '#B91C1C',
         badgeBg: '#FEE2E2',
       };
-    case 'RETURNED':
+    case 'RETURNED': {
+      const refundAmt = extraData.refund_amount || extraData.refundAmount;
+      const refundAmtStr = refundAmt
+        ? ` (${Number(refundAmt).toLocaleString('vi-VN')}đ)`
+        : '';
       return {
         type: 'ORDER_RETURNED',
-        title: `Yêu cầu đổi trả ${displayCode} đang được xử lý`,
-        message: `Shop đã tiếp nhận yêu cầu đổi trả & hoàn tiền của bạn cho đơn hàng ${displayCode} và đang tiến hành kiểm tra xét duyệt.`,
-        badge: 'CHỜ XỬ LÝ HOÀN',
+        title: `Đã gửi yêu cầu hoàn tiền`,
+        message: `Yêu cầu hoàn tiền${refundAmtStr} cho đơn hàng ${displayCode} đã được gửi đến Shop và đang chờ xử lý.`,
+        badge: 'CHỜ HOÀN TIỀN',
         badgeColor: '#7E22CE',
         badgeBg: '#F3E8FF',
       };
+    }
     case 'DELIVERY_FAILED':
     case 'FAILED_DELIVERY':
       if (extraData.willRetry || extraData.retryDate) {
@@ -341,8 +375,11 @@ export const getNotificationsForUser = (user = null) => {
                 return;
               }
               seenIds.add(notifKey);
+              const style = resolveBadgeStyle(item.badge, item.status);
               aggregated.push({
                 ...item,
+                badgeColor: item.badgeColor || style.badgeColor,
+                badgeBg: item.badgeBg || style.badgeBg,
                 time: formatNotificationTime(item.created_at || item.timestamp)
               });
             }
@@ -382,19 +419,36 @@ export const addDeletedNotificationId = (id) => {
 };
 
 // Tải thông báo mới nhất từ API backend và cập nhật bộ nhớ tạm
-export const fetchNotificationsFromApi = async () => {
+export const fetchNotificationsFromApi = async (user = null) => {
   try {
     const res = await axiosClient.get('/notifications');
     if (res.data?.data && Array.isArray(res.data.data)) {
       const deletedIds = new Set(getDeletedNotificationIds());
       const apiList = res.data.data
         .filter(n => !deletedIds.has(String(n.id || n.notification_id)))
-        .map(n => ({
-          ...n,
-          time: formatNotificationTime(n.created_at || n.timestamp)
-        }));
-      localStorage.setItem('yf_customer_notifications', JSON.stringify(apiList));
-      return apiList;
+        .map(n => {
+          const style = resolveBadgeStyle(n.badge, n.status);
+          return {
+            ...n,
+            badgeColor: n.badgeColor || style.badgeColor,
+            badgeBg: n.badgeBg || style.badgeBg,
+            time: formatNotificationTime(n.created_at || n.timestamp)
+          };
+        });
+
+      // Hợp nhất với các thông báo cục bộ hiện có (nếu chưa lưu hoặc vừa sinh ra)
+      const localList = getNotificationsForUser(user);
+      const apiIdSet = new Set(apiList.map(item => String(item.id || item.notification_id)));
+      const extraLocals = localList.filter(item => {
+        const id = String(item.id || item.notification_id || '');
+        return !apiIdSet.has(id);
+      });
+      const merged = [...apiList, ...extraLocals].sort(
+        (a, b) => (b.timestamp || new Date(b.created_at).getTime() || 0) - (a.timestamp || new Date(a.created_at).getTime() || 0)
+      );
+
+      localStorage.setItem('yf_customer_notifications', JSON.stringify(merged.slice(0, 50)));
+      return merged;
     }
   } catch (e) {
     // Không làm gián đoạn UI nếu chưa đăng nhập hoặc mạng offline

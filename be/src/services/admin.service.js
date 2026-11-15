@@ -126,16 +126,30 @@ export const getAllUsersService = async ({ search = '', role = 'ALL', status = '
     };
   });
 
+  // Danh sách email của khách hàng
+  const customerEmailSet = new Set(
+    formattedCustomers.map((c) => (c.email || '').toLowerCase())
+  );
+
+  // Nếu employee là INACTIVE và email đó đã có tài khoản CUSTOMER,
+  // điều này có nghĩa là tài khoản đã được chuyển vai trò thành Khách hàng -> không hiển thị bản ghi nhân viên INACTIVE này
+  const filteredEmployees = formattedEmployees.filter((emp) => {
+    if (emp.status === 'LOCKED' && customerEmailSet.has((emp.email || '').toLowerCase())) {
+      return false;
+    }
+    return true;
+  });
+
   // Ghép chung danh sách, loại bỏ trùng lặp nếu email đã là nhân sự đang hoạt động
   const activeEmployeeEmails = new Set(
-    formattedEmployees
+    filteredEmployees
       .filter((e) => e.status === 'ACTIVE')
       .map((e) => (e.email || '').toLowerCase())
   );
   const dedupedCustomers = formattedCustomers.filter(
     (c) => !activeEmployeeEmails.has((c.email || '').toLowerCase())
   );
-  let combined = [...formattedEmployees, ...dedupedCustomers];
+  let combined = [...filteredEmployees, ...dedupedCustomers];
 
   // Lọc theo search
   if (normalizedSearch) {
@@ -329,17 +343,13 @@ export const updateUserRoleService = async ({ type, id, role }) => {
       });
       return { id: updated.employee_id.toString(), role: 'MANAGER' };
     } else {
-      // Chuyển nhân sự thành Khách hàng (CUSTOMER / VIP): Khóa quyền nhân viên
-      await prisma.employee.update({
-        where: { employee_id: BigInt(id) },
-        data: { status: 'INACTIVE' },
-      });
-      // Đảm bảo khách hàng có mặt trong bảng customers
-      const existingCust = await prisma.customer.findUnique({
+      // Chuyển nhân sự thành Khách hàng (CUSTOMER):
+      // 1. Đảm bảo khách hàng có mặt trong bảng customers và có trạng thái ACTIVE
+      let existingCust = await prisma.customer.findUnique({
         where: { email: emp.email },
       });
       if (!existingCust) {
-        await prisma.customer.create({
+        existingCust = await prisma.customer.create({
           data: {
             full_name: emp.full_name,
             email: emp.email,
@@ -348,8 +358,26 @@ export const updateUserRoleService = async ({ type, id, role }) => {
             status: 'ACTIVE',
           },
         });
+      } else {
+        existingCust = await prisma.customer.update({
+          where: { customer_id: existingCust.customer_id },
+          data: { status: 'ACTIVE' },
+        });
       }
-      return { id, role: 'CUSTOMER' };
+
+      // 2. Xóa tài khoản nhân viên (hoặc đặt INACTIVE nếu có liên kết dữ liệu cũ)
+      try {
+        await prisma.employee.delete({
+          where: { employee_id: BigInt(id) },
+        });
+      } catch (delErr) {
+        await prisma.employee.update({
+          where: { employee_id: BigInt(id) },
+          data: { status: 'INACTIVE' },
+        });
+      }
+
+      return { id: existingCust.customer_id.toString(), role: 'CUSTOMER' };
     }
   } else {
     // type === 'CUSTOMER'
@@ -389,15 +417,26 @@ export const updateUserRoleService = async ({ type, id, role }) => {
       return { id, role: 'MANAGER' };
     } else {
       // role === 'CUSTOMER'
-      // Nếu có tài khoản employee cùng email thì vô hiệu hóa quyền nhân sự
+      // Đảm bảo khách hàng có status ACTIVE
+      await prisma.customer.update({
+        where: { customer_id: customer.customer_id },
+        data: { status: 'ACTIVE' },
+      });
+      // Nếu có tài khoản employee cùng email thì xóa hoặc vô hiệu hóa
       const existingEmp = await prisma.employee.findUnique({
         where: { email: customer.email },
       });
       if (existingEmp && existingEmp.employee_role !== 'ADMIN') {
-        await prisma.employee.update({
-          where: { employee_id: existingEmp.employee_id },
-          data: { status: 'INACTIVE' },
-        });
+        try {
+          await prisma.employee.delete({
+            where: { employee_id: existingEmp.employee_id },
+          });
+        } catch (delErr) {
+          await prisma.employee.update({
+            where: { employee_id: existingEmp.employee_id },
+            data: { status: 'INACTIVE' },
+          });
+        }
       }
       return { id, role: 'CUSTOMER' };
     }
