@@ -1,6 +1,7 @@
 import {
   getConversationsByUserId,
   getOrCreateConversation,
+  createNewConversation,
   getMessagesByConversationId,
   createMessage,
 } from '../repositories/conversation.repository.js';
@@ -28,7 +29,8 @@ export const getConversationsController = async (req, res, next) => {
       customer_id = userId;
     }
 
-    let list = await getConversationsByUserId({ customer_id, employee_id });
+    const isManager = userRole === 'MANAGER' || userRole === 'ADMIN' || userType === 'EMPLOYEE';
+    let list = await getConversationsByUserId({ customer_id, employee_id, is_manager: isManager });
 
     // Nếu khách hàng thật đã đăng nhập nhưng chưa có hội thoại nào, khởi tạo 1 phòng chat với nhân viên quản lý tư vấn
     if (list.length === 0 && customer_id) {
@@ -55,11 +57,70 @@ export const getConversationsController = async (req, res, next) => {
 export const getMessagesController = async (req, res, next) => {
   try {
     const { conversation_id } = req.params;
+    const userRole = req.user?.role;
+    const userType = req.user?.user_type;
+    const isManager = userRole === 'MANAGER' || userRole === 'ADMIN' || userType === 'EMPLOYEE';
+
+    // Đánh dấu đã đọc các tin nhắn từ đối phương khi mở cuộc trò chuyện
+    try {
+      if (isManager) {
+        await prisma.message.updateMany({
+          where: {
+            conversation_id: BigInt(conversation_id),
+            sender_customer_id: { not: null },
+            is_read: false,
+          },
+          data: { is_read: true },
+        });
+      } else {
+        await prisma.message.updateMany({
+          where: {
+            conversation_id: BigInt(conversation_id),
+            sender_employee_id: { not: null },
+            is_read: false,
+          },
+          data: { is_read: true },
+        });
+      }
+    } catch (e) {}
 
     // Chỉ lấy đúng tin nhắn thực tế đã lưu trong CSDL
     const messages = await getMessagesByConversationId(conversation_id);
 
     return BaseResponse.success(res, 'Lấy danh sách tin nhắn thành công', messages);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const markConversationReadController = async (req, res, next) => {
+  try {
+    const { conversation_id } = req.params;
+    const userRole = req.user?.role;
+    const userType = req.user?.user_type;
+    const isManager = userRole === 'MANAGER' || userRole === 'ADMIN' || userType === 'EMPLOYEE';
+
+    if (isManager) {
+      await prisma.message.updateMany({
+        where: {
+          conversation_id: BigInt(conversation_id),
+          sender_customer_id: { not: null },
+          is_read: false,
+        },
+        data: { is_read: true },
+      });
+    } else {
+      await prisma.message.updateMany({
+        where: {
+          conversation_id: BigInt(conversation_id),
+          sender_employee_id: { not: null },
+          is_read: false,
+        },
+        data: { is_read: true },
+      });
+    }
+
+    return BaseResponse.success(res, 'Đánh dấu đã đọc thành công', { conversation_id });
   } catch (error) {
     next(error);
   }
@@ -92,17 +153,13 @@ export const sendMessageController = async (req, res, next) => {
     }
 
     let finalContent = content;
-    if (product_card) {
+    const productCards = req.body.product_cards || (product_card ? (Array.isArray(product_card) ? product_card : [product_card]) : null);
+
+    if (productCards && productCards.length > 0) {
       finalContent = JSON.stringify({
-        text: content || `Mình muốn hỏi về sản phẩm: ${product_card.name}`,
-        product_card: {
-          id: String(product_card.id),
-          sku: product_card.sku || `YF-${product_card.id}`,
-          name: product_card.name,
-          price: product_card.price,
-          image: product_card.image,
-          description: product_card.description || '',
-        },
+        text: content || (productCards.length === 1 ? `Mình muốn hỏi về sản phẩm: ${productCards[0].name}` : `Mình cần tư vấn về ${productCards.length} sản phẩm đã chọn`),
+        product_cards: productCards,
+        product_card: productCards[0],
       });
     }
 
@@ -115,19 +172,43 @@ export const sendMessageController = async (req, res, next) => {
       message_type: attachment_url ? 'IMAGE' : 'TEXT',
     });
 
-    const parsedContent = product_card ? (content || `Mình muốn hỏi về sản phẩm: ${product_card.name}`) : newMsg.content;
+    const parsedContent = (productCards && productCards.length > 0)
+      ? (content || (productCards.length === 1 ? `Mình muốn hỏi về sản phẩm: ${productCards[0].name}` : `Mình cần tư vấn về ${productCards.length} sản phẩm đã chọn`))
+      : newMsg.content;
+
+    // Lấy thông tin hội thoại để biết customer_id, employee_id và họ tên chính xác
+    const conv = await prisma.conversation.findUnique({
+      where: { conversation_id: BigInt(conversation_id) },
+      include: {
+        customer: { select: { customer_id: true, full_name: true, email: true } },
+        employee: { select: { employee_id: true, full_name: true, email: true } },
+      },
+    });
+
+    let senderName = req.user?.full_name;
+    let senderEmail = req.user?.email || null;
+
+    if (sender_customer_id) {
+      senderName = conv?.customer?.full_name || req.user?.full_name || 'Khách hàng';
+      senderEmail = conv?.customer?.email || req.user?.email || null;
+    } else if (sender_employee_id) {
+      senderName = conv?.employee?.full_name || req.user?.full_name || 'Quản Lý Youth Fashion';
+      senderEmail = conv?.employee?.email || req.user?.email || null;
+    }
 
     // Phát sự kiện realtime SSE tới tất cả các client (Quản lý & Khách hàng)
     chatEvents.emit('new_message', {
       conversation_id: String(conversation_id),
       message_id: String(newMsg.message_id),
+      customer_id: conv?.customer_id ? String(conv.customer_id) : (sender_customer_id ? String(sender_customer_id) : ''),
       sender_type: newMsg.sender_type,
       sender_id: String(sender_customer_id || sender_employee_id),
-      sender_name: req.user?.full_name || (sender_customer_id ? 'Khách hàng' : 'Quản Lý Youth Fashion'),
-      sender_email: req.user?.email || null,
+      sender_name: senderName,
+      sender_email: senderEmail,
       content: parsedContent,
       attachment_url: newMsg.attachment_url,
-      product_card: product_card || null,
+      product_card: productCards ? productCards[0] : null,
+      product_cards: productCards || null,
       message_type: newMsg.message_type,
       created_at: newMsg.created_at,
     });
@@ -138,7 +219,8 @@ export const sendMessageController = async (req, res, next) => {
       {
         ...newMsg,
         content: parsedContent,
-        product_card: product_card || null,
+        product_card: productCards ? productCards[0] : null,
+        product_cards: productCards || null,
       },
       201
     );
@@ -157,15 +239,13 @@ export const createConversationController = async (req, res, next) => {
       return BaseResponse.error(res, 'Vui lòng đăng nhập để tạo hội thoại', [], 401);
     }
 
-    let customer_id = null;
-    let employee_id = req.body.employee_id || null;
-
+    // Chỉ có tài khoản CUSTOMER mới được chủ động tạo hội thoại liên hệ tư vấn
     if (userRole === 'MANAGER' || userRole === 'ADMIN' || userType === 'EMPLOYEE') {
-      employee_id = userId;
-      customer_id = req.body.customer_id;
-    } else {
-      customer_id = userId;
+      return BaseResponse.error(res, 'Tài khoản Quản lý / Nhân viên không được phép tạo hội thoại tư vấn', [], 403);
     }
+
+    const customer_id = userId;
+    let employee_id = req.body.employee_id || null;
 
     if (!employee_id) {
       let staff = await prisma.employee.findFirst({
@@ -179,30 +259,54 @@ export const createConversationController = async (req, res, next) => {
       return BaseResponse.error(res, 'Không tìm thấy thông tin khách hàng hoặc nhân viên tư vấn', [], 400);
     }
 
-    const conversation = await getOrCreateConversation({
+    // Luôn tạo cuộc hội thoại mới riêng biệt cho từng sản phẩm / yêu cầu tư vấn
+    const conversation = await createNewConversation({
       customer_id,
       employee_id,
     });
 
-    if (req.body.initial_message) {
+    const productCards = req.body.product_cards || (req.body.product_card ? (Array.isArray(req.body.product_card) ? req.body.product_card : [req.body.product_card]) : null);
+
+    if (req.body.initial_message || productCards) {
+      let finalContent = req.body.initial_message || '';
+      if (productCards && productCards.length > 0) {
+        finalContent = JSON.stringify({
+          text: req.body.initial_message || (productCards.length === 1 ? `Mình muốn hỏi về sản phẩm: ${productCards[0].name}` : `Mình cần tư vấn về ${productCards.length} sản phẩm đã chọn`),
+          product_cards: productCards,
+          product_card: productCards[0],
+        });
+      }
+
       const initMsg = await createMessage({
         conversation_id: conversation.conversation_id,
         sender_customer_id: customer_id,
         sender_employee_id: null,
-        content: req.body.initial_message,
+        content: finalContent,
         attachment_url: req.body.attachment_url || null,
-        message_type: req.body.message_type || 'TEXT',
+        message_type: req.body.attachment_url ? 'IMAGE' : 'TEXT',
+      });
+
+      const parsedInitContent = (productCards && productCards.length > 0)
+        ? (req.body.initial_message || (productCards.length === 1 ? `Mình muốn hỏi về sản phẩm: ${productCards[0].name}` : `Mình cần tư vấn về ${productCards.length} sản phẩm đã chọn`))
+        : initMsg.content;
+
+      const custInfo = await prisma.customer.findUnique({
+        where: { customer_id: BigInt(customer_id) },
+        select: { full_name: true, email: true },
       });
 
       chatEvents.emit('new_message', {
         conversation_id: String(conversation.conversation_id),
         message_id: String(initMsg.message_id),
+        customer_id: String(customer_id),
         sender_type: 'CUSTOMER',
         sender_id: String(customer_id),
-        sender_name: req.user?.full_name || 'Khách hàng',
-        sender_email: req.user?.email || null,
-        content: initMsg.content,
+        sender_name: custInfo?.full_name || conversation.customer_name || req.user?.full_name || 'Khách hàng',
+        sender_email: custInfo?.email || req.user?.email || null,
+        content: parsedInitContent,
         attachment_url: initMsg.attachment_url,
+        product_card: productCards ? productCards[0] : null,
+        product_cards: productCards || null,
         message_type: initMsg.message_type,
         created_at: initMsg.created_at,
       });

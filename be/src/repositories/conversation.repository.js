@@ -1,6 +1,6 @@
 import { prisma } from './prisma.js';
 
-export const getConversationsByUserId = async ({ customer_id, employee_id }) => {
+export const getConversationsByUserId = async ({ customer_id, employee_id, is_manager = false }) => {
   const where = {};
   if (customer_id) {
     where.customer_id = BigInt(customer_id);
@@ -59,6 +59,10 @@ export const getConversationsByUserId = async ({ customer_id, employee_id }) => 
           const parsed = JSON.parse(text);
           if (parsed.product_card) {
             attached_product = parsed.product_card;
+            break;
+          } else if (parsed.product_cards && parsed.product_cards.length > 0) {
+            attached_product = parsed.product_cards[0];
+            break;
           }
         } catch (e) {}
       }
@@ -77,6 +81,7 @@ export const getConversationsByUserId = async ({ customer_id, employee_id }) => 
               image: foundProd.images[0]?.image_url || 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800',
               description: foundProd.description || 'Thiết kế thời trang cao cấp YOUTH FASHION.',
             };
+            break;
           }
         }
       }
@@ -85,7 +90,7 @@ export const getConversationsByUserId = async ({ customer_id, employee_id }) => 
     const lastMsgObj = c.messages[c.messages.length - 1];
     if (lastMsgObj) {
       let t = lastMsgObj.message_content || '';
-      if (t.startsWith('{') && t.endsWith('}')) {
+      if (t.startsWith('{') && textStarts(t)) {
         try {
           const p = JSON.parse(t);
           t = p.text || (p.product_card ? `Hỏi về sản phẩm: ${p.product_card.name}` : t);
@@ -94,10 +99,24 @@ export const getConversationsByUserId = async ({ customer_id, employee_id }) => 
       lastMsgContent = t;
     }
 
+    const convTitle = attached_product
+      ? `Tư vấn ${attached_product.name}`
+      : `Tư vấn cùng ${c.employee?.full_name || 'Quản Lý Youth Fashion'}`;
+
+    // Tính số lượng tin nhắn chưa đọc từ đối phương
+    let unread_count = 0;
+    if (is_manager) {
+      unread_count = c.messages.filter((m) => m.sender_customer_id !== null && !m.is_read).length;
+    } else {
+      unread_count = c.messages.filter((m) => m.sender_employee_id !== null && !m.is_read).length;
+    }
+    const is_unread = unread_count > 0;
+
     return {
       conversation_id: c.conversation_id.toString(),
       customer_id: c.customer_id.toString(),
       employee_id: c.employee_id.toString(),
+      title: convTitle,
       customer_name: c.customer.full_name,
       customer_avatar: c.customer.avatar_url,
       customer_email: c.customer.email,
@@ -108,24 +127,58 @@ export const getConversationsByUserId = async ({ customer_id, employee_id }) => 
       last_message: lastMsgContent,
       last_message_at: lastMsgObj?.created_at || c.created_at,
       updated_at: c.updated_at,
+      unread_count,
+      is_unread,
     };
   });
+};
+
+const textStarts = (str) => typeof str === 'string' && str.startsWith('{') && str.endsWith('}');
+
+export const createNewConversation = async ({ customer_id, employee_id }) => {
+  const cId = BigInt(customer_id);
+  const eId = BigInt(employee_id);
+
+  const conv = await prisma.conversation.create({
+    data: {
+      customer_id: cId,
+      employee_id: eId,
+      status: 'OPEN',
+    },
+    include: {
+      customer: true,
+      employee: true,
+    },
+  });
+
+  return {
+    conversation_id: conv.conversation_id.toString(),
+    customer_id: conv.customer_id.toString(),
+    employee_id: conv.employee_id.toString(),
+    customer_name: conv.customer?.full_name || 'Khách hàng',
+    manager_name: conv.employee?.full_name || 'Quản Lý Youth Fashion',
+    status: conv.status,
+    created_at: conv.created_at,
+    updated_at: conv.updated_at,
+  };
 };
 
 export const getOrCreateConversation = async ({ customer_id, employee_id }) => {
   const cId = BigInt(customer_id);
   const eId = BigInt(employee_id);
 
-  let conv = await prisma.conversation.findUnique({
+  let conv = await prisma.conversation.findFirst({
     where: {
-      customer_id_employee_id: {
-        customer_id: cId,
-        employee_id: eId,
-      },
+      customer_id: cId,
+      employee_id: eId,
+      status: 'OPEN',
     },
     include: {
       customer: true,
       employee: true,
+    },
+    orderBy: {
+      updated_at: 'desc',
     },
   });
 
@@ -147,8 +200,8 @@ export const getOrCreateConversation = async ({ customer_id, employee_id }) => {
     conversation_id: conv.conversation_id.toString(),
     customer_id: conv.customer_id.toString(),
     employee_id: conv.employee_id.toString(),
-    customer_name: conv.customer.full_name,
-    manager_name: conv.employee.full_name,
+    customer_name: conv.customer?.full_name || 'Khách hàng',
+    manager_name: conv.employee?.full_name || 'Quản Lý Youth Fashion',
     status: conv.status,
     created_at: conv.created_at,
     updated_at: conv.updated_at,
@@ -179,13 +232,15 @@ export const getMessagesByConversationId = async (conversation_id) => {
   return messages.map((m) => {
     let text = m.message_content || '';
     let product_card = null;
+    let product_cards = null;
 
     if (text.startsWith('{') && text.endsWith('}')) {
       try {
         const parsed = JSON.parse(text);
-        if (parsed.product_card) {
+        if (parsed.product_card || parsed.product_cards) {
           text = parsed.text || '';
-          product_card = parsed.product_card;
+          product_card = parsed.product_card || (parsed.product_cards ? parsed.product_cards[0] : null);
+          product_cards = parsed.product_cards || (product_card ? [product_card] : null);
         }
       } catch (e) {}
     }
@@ -204,6 +259,7 @@ export const getMessagesByConversationId = async (conversation_id) => {
             image: foundProd.images[0]?.image_url || 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800',
             description: foundProd.description || 'Thiết kế thời trang cao cấp YOUTH FASHION.',
           };
+          product_cards = [product_card];
         }
       }
     }
@@ -218,6 +274,7 @@ export const getMessagesByConversationId = async (conversation_id) => {
       attachment_url: m.attachment_url,
       message_type: m.message_type,
       product_card,
+      product_cards: product_cards || (product_card ? [product_card] : null),
       is_read: m.is_read,
       created_at: m.created_at,
     };

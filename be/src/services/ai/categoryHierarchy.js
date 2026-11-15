@@ -154,6 +154,18 @@ export const CANONICAL_CATEGORY_MAP = {
   'đồ đông': 'Đồ Đông & Áo Len',
   'do dong': 'Đồ Đông & Áo Len',
 
+  // Quần Dài
+  'quần dài': 'Quần Dài',
+  'quan dai': 'Quần Dài',
+  'quần ống dài': 'Quần Dài',
+  'quan ong dai': 'Quần Dài',
+  'quần vải dài': 'Quần Dài',
+  'quan vai dai': 'Quần Dài',
+  'quần dài nam': 'Quần Dài',
+  'quan dai nam': 'Quần Dài',
+  'quần dài nữ': 'Quần Dài',
+  'quan dai nu': 'Quần Dài',
+
   // Quần Jeans
   'quần jeans': 'Quần Jeans',
   'quan jeans': 'Quần Jeans',
@@ -311,6 +323,7 @@ export const CATEGORY_TO_FAMILIES = {
   'Áo Vest & Blazer': ['OUTERWEAR'],
   'Áo Hoodie & Sweater': ['OUTERWEAR'],
   'Đồ Đông & Áo Len': ['OUTERWEAR'],
+  'Quần Dài': ['BOTTOMS_LONG'],
   'Quần Jeans': ['BOTTOMS_LONG'],
   'Quần Kaki & Chino': ['BOTTOMS_LONG'],
   'Quần Tây & Trouser': ['BOTTOMS_LONG'],
@@ -386,9 +399,21 @@ export function getCategoryRelationship(requestedCategory, productCategory) {
     };
   }
 
-  // 2. RELATED MATCH: Hai danh mục cùng chia sẻ ít nhất một họ danh mục (Shared Family)
   const familiesReq = CATEGORY_TO_FAMILIES[canonReq] || [];
   const familiesProd = CATEGORY_TO_FAMILIES[canonProd] || [];
+
+  // Trường hợp mở rộng danh mục chung: "Quần Dài" khớp chuẩn xác với mọi loại quần dài (BOTTOMS_LONG)
+  if (canonReq === 'Quần Dài' && familiesProd.includes('BOTTOMS_LONG')) {
+    return {
+      type: 'EXACT',
+      weight: 1.0,
+      canonicalReq: canonReq,
+      canonicalProd: canonProd,
+      sharedFamily: 'BOTTOMS_LONG',
+    };
+  }
+
+  // 2. RELATED MATCH: Hai danh mục cùng chia sẻ ít nhất một họ danh mục (Shared Family)
   const sharedFamily = familiesReq.find((f) => familiesProd.includes(f));
 
   if (sharedFamily) {

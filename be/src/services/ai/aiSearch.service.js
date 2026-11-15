@@ -34,6 +34,29 @@ function isMatchingBroadCategory(broadCategory, categoryName, productName) {
   const name = (productName || '').toLowerCase();
 
   if (broadCategory === 'TOPS') {
+    // Không được thuộc các nhóm ngành hàng khác (quần, mũ, nón, giày dép, túi xách, phụ kiện)
+    if (
+      cat.includes('quần') ||
+      name.includes('quần') ||
+      cat.includes('mũ') ||
+      cat.includes('nón') ||
+      name.includes('mũ') ||
+      name.includes('nón') ||
+      cat.includes('giày') ||
+      cat.includes('sandal') ||
+      cat.includes('dép') ||
+      name.includes('giày') ||
+      cat.includes('túi') ||
+      cat.includes('balo') ||
+      name.includes('túi') ||
+      name.includes('balo') ||
+      cat.includes('thắt lưng') ||
+      cat.includes('ví') ||
+      cat.includes('kính') ||
+      cat.includes('khăn')
+    ) {
+      return false;
+    }
     return (
       cat.includes('áo') ||
       cat.includes('sweater') ||
@@ -44,11 +67,36 @@ function isMatchingBroadCategory(broadCategory, categoryName, productName) {
       cat.includes('polo') ||
       cat.includes('len') ||
       cat.includes('gilet') ||
-      cat.includes('thể thao') ||
-      name.includes('áo')
+      name.includes('áo') ||
+      name.includes('sweater') ||
+      name.includes('hoodie') ||
+      name.includes('blazer') ||
+      name.includes('jacket') ||
+      name.includes('vest') ||
+      name.includes('polo') ||
+      name.includes('t-shirt') ||
+      name.includes('shirt')
     );
   }
   if (broadCategory === 'BOTTOMS') {
+    if (
+      cat.includes('áo') ||
+      name.includes('áo') ||
+      cat.includes('mũ') ||
+      cat.includes('nón') ||
+      name.includes('mũ') ||
+      name.includes('nón') ||
+      cat.includes('giày') ||
+      name.includes('giày') ||
+      cat.includes('túi') ||
+      cat.includes('balo') ||
+      cat.includes('thắt lưng') ||
+      cat.includes('ví') ||
+      cat.includes('kính') ||
+      cat.includes('khăn')
+    ) {
+      return false;
+    }
     return (
       cat.includes('quần') ||
       cat.includes('jean') ||
@@ -57,10 +105,14 @@ function isMatchingBroadCategory(broadCategory, categoryName, productName) {
       cat.includes('kaki') ||
       cat.includes('chino') ||
       cat.includes('trouser') ||
-      name.includes('quần')
+      name.includes('quần') ||
+      name.includes('short') ||
+      name.includes('jean') ||
+      name.includes('trouser')
     );
   }
   if (broadCategory === 'DRESSES_SKIRTS') {
+    if (cat.includes('quần') || name.includes('quần')) return false;
     return (
       cat.includes('váy') ||
       cat.includes('đầm') ||
@@ -70,15 +122,19 @@ function isMatchingBroadCategory(broadCategory, categoryName, productName) {
     );
   }
   if (broadCategory === 'HEADWEAR') {
+    if (cat.includes('áo') || cat.includes('quần') || cat.includes('giày') || cat.includes('túi')) return false;
     return cat.includes('mũ') || cat.includes('nón') || name.includes('mũ') || name.includes('nón');
   }
   if (broadCategory === 'FOOTWEAR') {
+    if (cat.includes('áo') || cat.includes('quần') || cat.includes('mũ')) return false;
     return (
       cat.includes('giày') ||
       cat.includes('sandal') ||
       cat.includes('dép') ||
       cat.includes('sneaker') ||
-      name.includes('giày')
+      name.includes('giày') ||
+      name.includes('sandal') ||
+      name.includes('dép')
     );
   }
   if (broadCategory === 'BAGS') {
@@ -164,7 +220,21 @@ export async function searchByImageService({ imageBuffer, topK = 10, minThreshol
     let categoryMultiplier = 1.0;
     if (detectedBroadCategory) {
       const isMatch = isMatchingBroadCategory(detectedBroadCategory, item.category_name, item.product_name);
-      categoryMultiplier = isMatch ? 1.0 : 0.20;
+      categoryMultiplier = isMatch ? 1.0 : 0.0;
+    }
+
+    if (categoryMultiplier === 0) {
+      return {
+        product_id: item.product_id,
+        product_name: item.product_name,
+        category_name: item.category_name,
+        brand_name: item.brand_name,
+        price: item.price,
+        colors: item.colors,
+        image_url: item.image_url,
+        similarity: 0.0,
+        similarity_percent: '0.0%',
+      };
     }
 
     // Hệ số màu sắc thị giác:
@@ -177,7 +247,7 @@ export async function searchByImageService({ imageBuffer, topK = 10, minThreshol
     }
 
     // Đảm bảo nguyên tắc ưu tiên thị giác: không bị kéo tụt dưới điểm visualSim nếu cùng danh mục
-    const visualFloor = (visualSim >= 0.80 && categoryMultiplier > 0) ? visualSim : 0.0;
+    const visualFloor = (visualSim >= 0.80 && categoryMultiplier >= 1.0) ? visualSim : 0.0;
     const finalSimilarity = Number(
       Math.min(1.0, Math.max(0.0, Math.max(visualFloor, visualSim * categoryMultiplier * colorMultiplier))).toFixed(4)
     );
@@ -368,7 +438,7 @@ export async function searchHybridService({
       }
     } else if (effectiveBroadCategory) {
       const isMatch = isMatchingBroadCategory(effectiveBroadCategory, item.category_name, item.product_name);
-      categoryMultiplier = isMatch ? 1.0 : 0.20;
+      categoryMultiplier = isMatch ? 1.0 : 0.0;
     }
 
     if (categoryMultiplier === 0) {
@@ -417,7 +487,7 @@ export async function searchHybridService({
     // Đảm bảo nguyên tắc ưu tiên Vector Thị giác: Nếu ảnh khớp chuẩn xác (>= 80%) và cùng danh mục hợp lệ,
     // điểm số không được phép bị text kéo tụt xuống dưới điểm thị giác (normImgSim)
     const fusedSim = combinedSim * categoryMultiplier * colorMultiplier;
-    const visualFloor = (normImgSim >= 0.80 && categoryMultiplier > 0) ? normImgSim : 0.0;
+    const visualFloor = (normImgSim >= 0.80 && categoryMultiplier >= 1.0) ? normImgSim : 0.0;
     const finalSimilarity = Number(
       Math.min(1.0, Math.max(0.0, Math.max(visualFloor, fusedSim))).toFixed(4)
     );

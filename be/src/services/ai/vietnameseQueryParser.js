@@ -267,6 +267,18 @@ export const FASHION_CATEGORIES = [
     ],
   },
   {
+    canonical: 'Quần Dài',
+    dbCategory: 'Quần Dài',
+    en: 'pants trousers',
+    broadCategory: 'BOTTOMS',
+    synonyms: ['quần dài', 'quần dài nam', 'quần dài nữ', 'quần ống dài', 'quần tây', 'quần âu', 'trousers', 'pants'],
+    patterns: [
+      'quan ong dai', 'quần ống dài',
+      'quan vai dai', 'quần vải dài',
+      'quan dai', 'quần dài',
+    ],
+  },
+  {
     canonical: 'Quần Tây & Trouser',
     dbCategory: 'Quần Tây & Trouser',
     en: 'tailored trousers dress pants',

@@ -848,19 +848,44 @@ export default function ProductDetailPage() {
                 <button
                   type="button"
                   className="btn-contact-seller"
-                  onClick={() => navigate('/chat', {
-                    state: {
-                      initialProduct: {
-                        id: product.id || product.product_id,
-                        name: product.product_name || product.name,
-                        price: product.price,
-                        image: activeImage,
-                        category: product.category_name,
-                        sku: product.sku || `YF-${product.id || product.product_id || 'PROD'}`,
-                        description: product.description || product.short_description || 'Thiết kế thời trang cao cấp, chất liệu cao cấp và kiểu dáng hiện đại từ YOUTH FASHION.',
-                      }
+                  onClick={() => {
+                    if (!user) {
+                      showInfo('Vui lòng đăng nhập để kết nối với chuyên viên tư vấn!');
+                      navigate('/login', { state: { from: `/products/${product.id || product.product_id}` } });
+                      return;
                     }
-                  })}
+                    if (
+                      user.role === 'MANAGER' ||
+                      user.role === 'ADMIN' ||
+                      user.user_type === 'EMPLOYEE' ||
+                      user.employee_role === 'ADMIN' ||
+                      user.employee_role === 'MANAGER'
+                    ) {
+                      showInfo('Tài khoản Quản lý không thể tạo cuộc trò chuyện tư vấn với tư cách khách hàng.');
+                      return;
+                    }
+                    const pName = product.product_name || product.name || 'Sản phẩm';
+                    const prodObj = {
+                      id: String(product.id || product.product_id),
+                      name: pName,
+                      price: Number(product.price || 0),
+                      image: activeImage || product.images?.[0]?.image_url || 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800',
+                      category: product.category_name || 'Thời trang',
+                      sku: product.sku || `YF-${product.id || product.product_id || 'PROD'}`,
+                      description: product.description || product.short_description || 'Thiết kế thời trang cao cấp YOUTH FASHION.',
+                    };
+                    const inquiryKey = `prod_inq_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+                    navigate('/chat', {
+                      state: {
+                        inquiryType: 'PRODUCT_INQUIRY',
+                        inquiryKey,
+                        initialTitle: `Tư vấn ${pName}`,
+                        initialMessage: `Chào shop, mình quan tâm đến sản phẩm "${pName}". Shop tư vấn giúp mình nhé!`,
+                        initialProduct: prodObj,
+                        selectedProducts: [prodObj],
+                      }
+                    });
+                  }}
                 >
                   <MessageSquare size={15} color="#1A1C1A" />
                   <span>LIÊN HỆ NGƯỜI BÁN</span>

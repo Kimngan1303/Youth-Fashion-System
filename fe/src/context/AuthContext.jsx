@@ -60,7 +60,7 @@ export function AuthProvider({ children }) {
       const saved = userKey ? localStorage.getItem(userKey) : null;
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) return parsed.map((item) => ({ ...item, selected: false }));
       }
       return [];
     } catch (e) {
@@ -110,7 +110,8 @@ export function AuthProvider({ children }) {
     if (cartKey) {
       try {
         const saved = localStorage.getItem(cartKey);
-        setCart(saved ? JSON.parse(saved) : []);
+        const parsed = saved ? JSON.parse(saved) : [];
+        setCart(parsed.map((item) => ({ ...item, selected: false })));
       } catch (e) {
         setCart([]);
       }
@@ -135,7 +136,7 @@ export function AuthProvider({ children }) {
             quantity: item.quantity,
             stock: item.stock,
             image: item.image,
-            selected: true,
+            selected: false,
           }));
           setCart(apiItems);
           if (cartKey) {
@@ -350,7 +351,7 @@ export function AuthProvider({ children }) {
             quantity: item.quantity,
             stock: item.stock,
             image: item.image,
-            selected: true,
+            selected: false,
           }));
           setCart(apiItems);
           const cartKey = getUserStorageKey('youth_fashion_cart', user);
@@ -397,7 +398,7 @@ export function AuthProvider({ children }) {
           image: product.image || product.images?.[0]?.image_url || 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&q=80&w=800',
           badge: product.badge || product.badgeTop || null,
           badgeBg: product.badgeBg || product.badgeTopBg || '#000000',
-          selected: true,
+          selected: false,
         };
         next = [newItem, ...prev];
       }

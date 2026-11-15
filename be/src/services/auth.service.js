@@ -304,6 +304,7 @@ export const loginService = async ({ email, password, user_type }) => {
   const tokenPayload = {
     id: userId.toString(),
     email: user.email,
+    full_name: user.full_name,
     role,
     user_type,
   };
@@ -421,6 +422,7 @@ export const googleLoginService = async ({ credential, email: directEmail, name:
   const tokenPayload = {
     id: customer.customer_id.toString(),
     email: customer.email,
+    full_name: customer.full_name,
     role: 'CUSTOMER',
     user_type: 'CUSTOMER',
   };

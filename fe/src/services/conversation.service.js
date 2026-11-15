@@ -44,7 +44,8 @@ export const conversationService = {
           attached_product: c.attached_product || null,
           last_message: c.last_message || 'Bắt đầu cuộc trò chuyện...',
           last_message_at: c.last_message_at || c.updated_at || new Date().toISOString(),
-          unread_count: 0,
+          unread_count: c.unread_count || 0,
+          is_unread: Boolean(c.is_unread || (c.unread_count > 0)),
         })),
       };
     } catch (err) {
@@ -56,6 +57,18 @@ export const conversationService = {
   /**
    * Lấy danh sách toàn bộ khách hàng cần tư vấn cho Quản Lý từ CSDL Backend
    */
+  /**
+   * Đánh dấu cuộc hội thoại đã được đọc
+   */
+  markConversationAsRead: async (conversationId) => {
+    try {
+      await axiosClient.put(`/conversations/${conversationId}/read`);
+      return { status: true };
+    } catch (err) {
+      return { status: false };
+    }
+  },
+
   getManagerConversations: async (user = null) => {
     try {
       const response = await axiosClient.get('/conversations');
@@ -75,7 +88,8 @@ export const conversationService = {
           attached_product: c.attached_product || null,
           last_message: c.last_message || 'Bắt đầu cuộc trò chuyện...',
           last_message_at: c.last_message_at || c.updated_at || new Date().toISOString(),
-          unread_count: 0,
+          unread_count: c.unread_count || 0,
+          is_unread: Boolean(c.is_unread || (c.unread_count > 0)),
         })),
       };
     } catch (err) {
@@ -123,6 +137,7 @@ export const conversationService = {
           text: m.content || '',
           attachment_url: m.attachment_url || null,
           product_card: m.product_card || null,
+          product_cards: m.product_cards || (m.product_card ? (Array.isArray(m.product_card) ? m.product_card : [m.product_card]) : []),
         };
       });
 
@@ -138,15 +153,17 @@ export const conversationService = {
    */
   sendMessage: async (
     conversationId,
-    { content, attachment_url = null, message_type = 'TEXT', product_card = null },
+    { content, attachment_url = null, message_type = 'TEXT', product_card = null, product_cards = null },
     user = null
   ) => {
     try {
+      const pCards = product_cards || (product_card ? (Array.isArray(product_card) ? product_card : [product_card]) : null);
       const response = await axiosClient.post(`/conversations/${conversationId}/messages`, {
         content,
         attachment_url,
-        message_type: attachment_url ? 'IMAGE' : (product_card ? 'PRODUCT' : 'TEXT'),
-        product_card,
+        message_type: attachment_url ? 'IMAGE' : 'TEXT',
+        product_card: pCards ? pCards[0] : null,
+        product_cards: pCards,
       });
 
       const saved = response.data?.data;
@@ -158,7 +175,8 @@ export const conversationService = {
           authorName: user?.full_name || 'Bạn',
           text: content,
           attachment_url,
-          product_card: product_card || saved?.product_card || null,
+          product_card: pCards ? pCards[0] : null,
+          product_cards: pCards || [],
           time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           created_at: saved?.created_at || new Date().toISOString(),
         },
@@ -174,15 +192,17 @@ export const conversationService = {
    */
   managerSendMessage: async (
     conversationId,
-    { content, attachment_url = null, product_card = null },
+    { content, attachment_url = null, product_card = null, product_cards = null },
     user = null
   ) => {
     try {
+      const pCards = product_cards || (product_card ? (Array.isArray(product_card) ? product_card : [product_card]) : null);
       const response = await axiosClient.post(`/conversations/${conversationId}/messages`, {
         content,
         attachment_url,
-        message_type: attachment_url ? 'IMAGE' : (product_card ? 'PRODUCT' : 'TEXT'),
-        product_card,
+        message_type: attachment_url ? 'IMAGE' : (pCards ? 'PRODUCT' : 'TEXT'),
+        product_card: pCards ? pCards[0] : null,
+        product_cards: pCards,
       });
 
       const saved = response.data?.data;
@@ -194,7 +214,8 @@ export const conversationService = {
           authorName: user?.full_name || 'Bạn (Quản lý)',
           text: content,
           attachment_url,
-          product_card: product_card || saved?.product_card || null,
+          product_card: pCards ? pCards[0] : null,
+          product_cards: pCards || [],
           time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           created_at: saved?.created_at || new Date().toISOString(),
         },
@@ -208,11 +229,14 @@ export const conversationService = {
   /**
    * Khách hàng tạo cuộc hội thoại mới với CSDL MySQL
    */
-  createConversation: async ({ title, initial_message, attached_product = null }, user = null) => {
+  createConversation: async ({ title, initial_message, attached_product = null, product_card = null, product_cards = null }, user = null) => {
     try {
+      const pCards = product_cards || (product_card ? (Array.isArray(product_card) ? product_card : [product_card]) : (attached_product ? (Array.isArray(attached_product) ? attached_product : [attached_product]) : null));
       const response = await axiosClient.post('/conversations', {
         initial_message,
         title,
+        product_card: pCards ? pCards[0] : null,
+        product_cards: pCards,
       });
 
       return { status: true, data: response.data?.data };
