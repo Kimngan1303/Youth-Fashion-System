@@ -1049,7 +1049,6 @@ const ProfilePage = () => {
   const loadOrders = useCallback(() => {
     if (localStorage.getItem('yf_orders_reset_all_v3') !== 'true') {
       try {
-        orderService.clearAllOrders().catch(() => { });
         localStorage.removeItem('yf_manager_orders');
         localStorage.removeItem('yf_customer_orders');
         localStorage.removeItem('yf_deleted_order_ids');
@@ -3799,7 +3798,7 @@ const ProfilePage = () => {
                                       : 'Chi Tiết Hủy Đơn'}
                                   </button>
 
-                                  {/* Nếu Shop hủy đơn của khách (đặc biệt khi đang chờ xác nhận), hiển thị thêm nút Yêu Cầu Hoàn Tiền */}
+                                  {/* Nếu Shop hủy đơn của khách (đặc biệt khi đang chờ xác nhận), chỉ hiển thị nút Yêu Cầu Hoàn Tiền nếu là PayOS đã thanh toán */}
                                   {statusCat === 'CANCELLED' && (() => {
                                     const cancelInfo = resolveCancelInfo(ord);
                                     const isShopCanc = cancelInfo.isShopCancelled ||
@@ -3807,7 +3806,20 @@ const ProfilePage = () => {
                                                        ord.cancelled_by === 'MANAGER' ||
                                                        String(ord.note || '').toLowerCase().includes('shop hủy') ||
                                                        String(ord.cancel_reason || '').toLowerCase().includes('shop hủy');
-                                    return isShopCanc;
+
+                                    if (!isShopCanc) return false;
+
+                                    const payMethod = String(ord.payment_method || ord.paymentMethod || ord.payments?.[0]?.payment_method || '').toUpperCase();
+                                    const isPayos = payMethod === 'PAYOS' || ord.payments?.some(p => String(p.payment_method).toUpperCase() === 'PAYOS');
+                                    if (!isPayos) return false;
+
+                                    const payStatus = String(ord.payment_status || ord.paymentStatus || ord.payments?.[0]?.payment_status || '').toUpperCase();
+                                    const isPaid = payStatus === 'SUCCESS' || payStatus === 'PAID' || ord.payments?.some(p => ['SUCCESS', 'PAID'].includes(String(p.payment_status).toUpperCase()));
+                                    if (!isPaid) return false;
+
+                                    // Nếu đã yêu cầu hoàn tiền hoặc đơn đã ở trạng thái đổi trả thì không hiện lại
+                                    const alreadyRequested = isOrderReturned(ord.status, ord.status_label, ord.note, ord) || (ord.return_requests && ord.return_requests.length > 0);
+                                    return !alreadyRequested;
                                   })() && (
                                     <button
                                       className="btn-order-action btn-purple-outline"
