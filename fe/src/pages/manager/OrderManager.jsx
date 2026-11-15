@@ -370,12 +370,16 @@ const applyStatusOverrides = (ordersList) => {
       const ovStatus = String(ov?.status || '').toUpperCase();
       const curStatus = String(ord.order_status || ord.status || '').toUpperCase();
       const ovLabel = String(ov?.status_label || ov?.status_label_manager || '');
-      const isExplicitCanc = curStatus === 'CANCELLED' || ovStatus === 'CANCELLED' || ovLabel.includes('Hủy');
+
+      // Kiểm tra có yêu cầu đổi trả / hoàn tiền không (kể cả khi đơn hàng trước đó đã bị Shop hủy)
+      const hasRefundRequest = isOrderReturned(ord.order_status, ord.status_label, ord.note, ord) || (ov && isOrderReturned(ov.status, ov.status_label, ov.note, ov));
+      const isRet = hasRefundRequest;
+      const isExplicitCanc = !isRet && (curStatus === 'CANCELLED' || ovStatus === 'CANCELLED' || ovLabel.includes('Hủy'));
 
       // NGĂN CHẶN NHẢY CÓC & DỌN DẸP OVERRIDE LỖI:
-      // Nếu đơn hàng trong CSDL thực tế đang ở PENDING hoặc CONFIRMED mà chưa hề được giao:
-      // Tuyệt đối không thể ở trạng thái RETURNED (Đổi trả / Hoàn tiền). Dọn dẹp override nhảy cóc sai.
-      if ((curStatus === 'PENDING' || curStatus === 'CONFIRMED') && (ovStatus === 'RETURNED' || isOrderReturned(ovStatus, ovLabel, ov?.note, ov))) {
+      // Nếu đơn hàng trong CSDL thực tế đang ở PENDING hoặc CONFIRMED mà chưa hề được giao và chưa từng phát sinh hủy đơn:
+      // Tuyệt đối không thể ở trạng thái RETURNED. Dọn dẹp override nhảy cóc sai.
+      if (!isRet && (curStatus === 'PENDING' || curStatus === 'CONFIRMED') && (ovStatus === 'RETURNED')) {
         if (digits) {
           delete overrides[digits];
           delete overrides[`YF-${digits}`];
@@ -397,26 +401,7 @@ const applyStatusOverrides = (ordersList) => {
         };
       }
 
-      // Tương tự, nếu đơn đã CANCELLED trong CSDL thì không thể là RETURNED
-      if (curStatus === 'CANCELLED' && (ovStatus === 'RETURNED' || isOrderReturned(ovStatus, ovLabel, ov?.note, ov))) {
-        if (digits) {
-          delete overrides[digits];
-          delete overrides[`YF-${digits}`];
-          delete overrides[`#YF-${digits}`];
-        }
-        if (rawId) delete overrides[rawId];
-        if (rawCode) delete overrides[rawCode];
-        overridesModified = true;
-        return {
-          ...ord,
-          order_status: 'CANCELLED',
-          status: 'CANCELLED',
-          status_label: 'Đã hủy',
-        };
-      }
-
-      // 1. Nếu là đơn Đổi trả / Hoàn tiền (chỉ khi không phải đơn hủy rõ ràng)
-      const isRet = !isExplicitCanc && (isOrderReturned(ord.order_status, ord.status_label, ord.note, ord) || (ov && isOrderReturned(ov.status, ov.status_label, ov.note, ov)));
+      // 1. Nếu là đơn Đổi trả / Hoàn tiền
       if (isRet) {
         let bestLabel = 'Đổi trả';
         const rawL = String(ov?.status_label_manager || ov?.status_label || ord.status_label || '').toUpperCase();
@@ -1660,6 +1645,9 @@ export default function OrderManager() {
     const tNum = String(targetOrder.order_number || targetOrder.order_code || '').trim();
     const digits = (tNum || tId).replace(/\D/g, '');
 
+    const currentCat = getCategoryFromStatus(targetOrder.order_status, targetOrder.status_label, targetOrder.note, targetOrder);
+    const wasPending = currentCat === 'PENDING' || !currentCat;
+
     const newStatus = 'CANCELLED';
     const newStatusLabel = 'Đã hủy';
     const customerLabel = 'ĐÃ HỦY';
@@ -1676,6 +1664,8 @@ export default function OrderManager() {
         status_label_customer: customerLabel,
         cancel_reason: reason,
         cancelled_by: cancelledBy,
+        cancelled_from_status: currentCat || 'PENDING',
+        was_pending: wasPending,
         note: updatedNote,
         updated_at: Date.now(),
       };
@@ -1715,6 +1705,8 @@ export default function OrderManager() {
           status_label: newStatusLabel,
           cancel_reason: reason,
           cancelled_by: cancelledBy,
+          cancelled_from_status: currentCat || 'PENDING',
+          was_pending: wasPending,
           note: updatedNote,
         };
       }
@@ -1723,7 +1715,7 @@ export default function OrderManager() {
     saveOrders(updated);
 
     // 3. Đồng bộ storage của khách hàng
-    syncCustomerOrdersStorage(tId, tNum, newStatus, newStatusLabel, customerLabel, reason, cancelledBy, updatedNote);
+    syncCustomerOrdersStorage(tId, tNum, newStatus, newStatusLabel, customerLabel, reason, cancelledBy, updatedNote, currentCat);
 
     // 4. Gửi API backend cập nhật CSDL MySQL kèm thông tin gửi Email hủy đơn
     try {
@@ -1819,7 +1811,7 @@ export default function OrderManager() {
   };
 
   // Đồng bộ trạng thái đơn hàng sang bộ nhớ người dùng (Customer Profile)
-  const syncCustomerOrdersStorage = (targetOrderId, orderNumber, newStatus, newStatusLabel, customerLabel, cancelReason = '', cancelledBy = '', updatedNote = '') => {
+  const syncCustomerOrdersStorage = (targetOrderId, orderNumber, newStatus, newStatusLabel, customerLabel, cancelReason = '', cancelledBy = '', updatedNote = '', cancelledFromStatus = '') => {
     try {
       const orderDigits = String(orderNumber || targetOrderId || '').replace(/\D/g, '');
       const tId = String(targetOrderId || '').trim();
@@ -1854,6 +1846,8 @@ export default function OrderManager() {
           refund_decision: isAppDec ? 'APPROVED' : (isRejDec ? 'REJECTED' : prevOv.refund_decision),
           cancel_reason: (newStatus === 'CANCELLED' && cancelReason) ? cancelReason : (prevOv.cancel_reason || cancelReason),
           cancelled_by: (newStatus === 'CANCELLED' && cancelledBy) ? cancelledBy : (prevOv.cancelled_by || cancelledBy),
+          cancelled_from_status: (newStatus === 'CANCELLED' && cancelledFromStatus) ? cancelledFromStatus : (prevOv.cancelled_from_status || 'PENDING'),
+          was_pending: (newStatus === 'CANCELLED') ? (cancelledFromStatus === 'PENDING' || !cancelledFromStatus || prevOv.was_pending) : prevOv.was_pending,
           note: (newStatus === 'CANCELLED' && updatedNote) ? updatedNote : (prevOv.note || updatedNote),
           updated_at: Date.now(),
         };
@@ -1919,8 +1913,6 @@ export default function OrderManager() {
                   delivered_date: newStatus === 'COMPLETED' ? (cOrd.delivered_date || formattedDate) : cOrd.delivered_date,
                   cancel_reason: (newStatus === 'CANCELLED' && cancelReason) ? cancelReason : cOrd.cancel_reason,
                   cancelled_by: (newStatus === 'CANCELLED' && cancelledBy) ? cancelledBy : cOrd.cancelled_by,
-                  cancelled_from_status: (newStatus === 'CANCELLED' && cancelledFromStatus) ? cancelledFromStatus : (cOrd.cancelled_from_status || 'PENDING'),
-                  was_pending: (newStatus === 'CANCELLED') ? (cancelledFromStatus === 'PENDING' || !cancelledFromStatus || cOrd.was_pending) : cOrd.was_pending,
                   note: (newStatus === 'CANCELLED' && updatedNote) ? updatedNote : cOrd.note,
                 };
               }
@@ -2232,53 +2224,6 @@ export default function OrderManager() {
         k && (k.startsWith('yf_customer_orders') || k === 'yf_manager_orders' || k === 'orders')
       );
       if (!allKeys.includes('yf_customer_orders')) allKeys.push('yf_customer_orders');
-
-      // Cập nhật yf_order_status_overrides để đồng bộ tức thời với ProfilePage và applyStatusOverrides
-      try {
-        const rawOv = localStorage.getItem('yf_order_status_overrides');
-        const ovs = rawOv ? JSON.parse(rawOv) : {};
-        const ovUpdate = {
-          status: 'RETURNED',
-          order_status: 'RETURNED',
-          status_label: newStatusLabel,
-          status_label_manager: newStatusLabel,
-          status_label_customer: customerLabel,
-          refund_decision: decision,
-          reject_reason: rejectReason || '',
-          refund_reason: refundReason || '',
-          refund_bank: refundBank || '',
-          note: updatedNote,
-          payment_status: decision === 'APPROVED' ? 'REFUNDED' : 'UNPAID',
-          payment_label: decision === 'APPROVED' ? 'Đã hoàn tiền' : 'Từ chối hoàn',
-          updated_at: Date.now(),
-        };
-
-        const keysToSet = new Set();
-        if (orderDigits) {
-          keysToSet.add(orderDigits);
-          keysToSet.add(`YF-${orderDigits}`);
-          keysToSet.add(`#YF-${orderDigits}`);
-          keysToSet.add(`YF - ${orderDigits}`);
-          keysToSet.add(`#YF - ${orderDigits}`);
-          keysToSet.add(`YF – ${orderDigits}`);
-          keysToSet.add(`#YF – ${orderDigits}`);
-          keysToSet.add(`#${orderDigits}`);
-        }
-        if (tId) keysToSet.add(tId);
-        if (tNum) keysToSet.add(tNum);
-
-        for (const k of Object.keys(ovs)) {
-          if (orderDigits && k.replace(/\D/g, '') === orderDigits) {
-            keysToSet.add(k);
-          }
-        }
-
-        keysToSet.forEach(k => {
-          ovs[k] = { ...(ovs[k] || {}), ...ovUpdate };
-        });
-
-        localStorage.setItem('yf_order_status_overrides', JSON.stringify(ovs));
-      } catch (errOv) {}
 
       allKeys.forEach(k => {
         try {
@@ -2604,7 +2549,7 @@ export default function OrderManager() {
   };
 
   // Mở modal xác nhận kết quả đổi trả & hoàn tiền (Đã hoàn tiền HOẶC Từ chối hoàn kèm lý do)
-  const handleOpenReturnModal = (ord) => {
+  const handleOpenReturnModal = (ord, forceResult = null) => {
     if (!ord) return;
     const currentCat = getCategoryFromStatus(ord.order_status, ord.status_label, ord.note, ord);
     if (currentCat !== 'COMPLETED' && currentCat !== 'RETURNED') {
@@ -2613,7 +2558,7 @@ export default function OrderManager() {
     }
     setReturnOrder(ord);
     const isRej = ord.refund_decision === 'REJECTED' || String(ord.status_label || '').toUpperCase().includes('TỪ CHỐI') || String(ord.note || '').toLowerCase().includes('từ chối hoàn tiền');
-    setReturnResult(isRej ? 'REJECTED' : 'APPROVED');
+    setReturnResult(forceResult || (isRej ? 'REJECTED' : 'APPROVED'));
 
     const standardReasons = [
       'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop',
@@ -3240,34 +3185,131 @@ export default function OrderManager() {
                                 (() => {
                                   const isRej = ord.refund_decision === 'REJECTED' || String(ord.status_label || '').toUpperCase().includes('TỪ CHỐI') || String(ord.note || '').toLowerCase().includes('từ chối hoàn tiền');
                                   const isApp = !isRej && (ord.refund_decision === 'APPROVED' || String(ord.status_label || '').toUpperCase().includes('ĐÃ HOÀN') || String(ord.note || '').toLowerCase().includes('đã xác nhận hoàn tiền'));
+
+                                  if (isApp) {
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenReturnModal(ord)}
+                                        className="status-select-pill status-pill-approved status-pill-completed"
+                                        style={{
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          padding: '5px 14px',
+                                          borderRadius: '20px',
+                                          fontSize: '11.5px',
+                                          textAlign: 'center',
+                                          border: '1.5px solid #BBF7D0',
+                                          backgroundColor: '#DCFCE7',
+                                          color: '#15803D',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '5px'
+                                        }}
+                                        title="Đã hoàn tiền thành công - Bấm để xem chi tiết"
+                                      >
+                                        <Check size={12} strokeWidth={2.5} />
+                                        Đã hoàn tiền
+                                      </button>
+                                    );
+                                  }
+
+                                  if (isRej) {
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenReturnModal(ord)}
+                                        className="status-select-pill status-pill-rejected status-pill-cancelled"
+                                        style={{
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          padding: '5px 14px',
+                                          borderRadius: '20px',
+                                          fontSize: '11.5px',
+                                          textAlign: 'center',
+                                          border: '1.5px solid #FECACA',
+                                          backgroundColor: '#FEF2F2',
+                                          color: '#DC2626',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '5px'
+                                        }}
+                                        title={ord.reject_reason ? `Lý do: ${ord.reject_reason} (Bấm để xem chi tiết & cập nhật)` : "Đã từ chối hoàn tiền"}
+                                      >
+                                        <X size={12} strokeWidth={2.5} />
+                                        Từ chối hoàn
+                                      </button>
+                                    );
+                                  }
+
                                   return (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenReturnModal(ord)}
-                                      className={`status-select-pill ${
-                                        isRej
-                                          ? 'status-pill-rejected status-pill-cancelled'
-                                          : (isApp ? 'status-pill-approved status-pill-completed' : 'status-pill-returned')
-                                      }`}
-                                      style={{
-                                        fontWeight: 700,
-                                        cursor: 'pointer',
-                                        padding: '5px 14px',
-                                        borderRadius: '20px',
-                                        fontSize: '11.5px',
-                                        textAlign: 'center',
-                                        border: isRej ? '1.5px solid #FECACA' : (isApp ? '1.5px solid #BBF7D0' : '1.5px solid #E9D5FF'),
-                                        backgroundColor: isRej ? '#FEF2F2' : (isApp ? '#DCFCE7' : '#FAF5FF'),
-                                        color: isRej ? '#DC2626' : (isApp ? '#15803D' : '#9333EA'),
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '5px'
-                                      }}
-                                      title={isRej && ord.reject_reason ? `Lý do: ${ord.reject_reason} (Bấm để xem chi tiết & cập nhật)` : "Bấm để mở bảng chọn kết quả đổi trả & hoàn tiền"}
-                                    >
-                                      <RotateCcw size={12} />
-                                      {isRej ? 'Từ chối hoàn' : (isApp ? 'Đã hoàn tiền' : 'Đổi trả')}
-                                    </button>
+                                    <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenReturnModal(ord)}
+                                        className="status-select-pill status-pill-returned"
+                                        style={{
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          padding: '4px 12px',
+                                          borderRadius: '20px',
+                                          fontSize: '11.5px',
+                                          textAlign: 'center',
+                                          border: '1.5px solid #D8B4FE',
+                                          backgroundColor: '#FAF5FF',
+                                          color: '#7E22CE',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '5px'
+                                        }}
+                                        title="Khách yêu cầu hoàn tiền - Bấm để mở bảng xử lý"
+                                      >
+                                        <RotateCcw size={12} />
+                                        Chờ hoàn tiền
+                                      </button>
+                                      <div style={{ display: 'inline-flex', gap: '4px' }}>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenReturnModal(ord, 'APPROVED')}
+                                          style={{
+                                            padding: '2px 8px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            background: '#DCFCE7',
+                                            color: '#15803D',
+                                            border: '1px solid #86EFAC',
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '2px'
+                                          }}
+                                          title="Đồng ý hoàn tiền cho khách"
+                                        >
+                                          <Check size={11} strokeWidth={2.5} /> Đồng ý
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenReturnModal(ord, 'REJECTED')}
+                                          style={{
+                                            padding: '2px 8px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            background: '#FEE2E2',
+                                            color: '#DC2626',
+                                            border: '1px solid #FCA5A5',
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '2px'
+                                          }}
+                                          title="Từ chối yêu cầu hoàn tiền"
+                                        >
+                                          <X size={11} strokeWidth={2.5} /> Từ chối
+                                        </button>
+                                      </div>
+                                    </div>
                                   );
                                 })()
                               ) : (
@@ -3404,17 +3446,71 @@ export default function OrderManager() {
                                   <Truck size={14} />
                                 </button>
                               )}
-                              {cat === 'RETURNED' && (
-                                <button
-                                  type="button"
-                                  className="action-icon-btn"
-                                  style={{ color: '#7E22CE', background: '#FAF5FF', border: '1px solid #E9D5FF' }}
-                                  title="Xử lý đổi trả (Đã hoàn tiền / Từ chối hoàn)"
-                                  onClick={() => handleOpenReturnModal(ord)}
-                                >
-                                  <RotateCcw size={14} />
-                                </button>
-                              )}
+                              {cat === 'RETURNED' && (() => {
+                                const isRej = ord.refund_decision === 'REJECTED' || String(ord.status_label || '').toUpperCase().includes('TỪ CHỐI') || String(ord.note || '').toLowerCase().includes('từ chối hoàn tiền');
+                                const isApp = !isRej && (ord.refund_decision === 'APPROVED' || String(ord.status_label || '').toUpperCase().includes('ĐÃ HOÀN') || String(ord.note || '').toLowerCase().includes('đã xác nhận hoàn tiền'));
+
+                                if (!isApp && !isRej) {
+                                  return (
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                      <button
+                                        type="button"
+                                        style={{
+                                          padding: '4px 8px',
+                                          background: '#DCFCE7',
+                                          color: '#15803D',
+                                          border: '1.5px solid #86EFAC',
+                                          borderRadius: '6px',
+                                          fontSize: '11.5px',
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '3px',
+                                          whiteSpace: 'nowrap'
+                                        }}
+                                        title="Đồng ý hoàn tiền đơn hàng này"
+                                        onClick={() => handleOpenReturnModal(ord, 'APPROVED')}
+                                      >
+                                        <Check size={13} strokeWidth={2.5} /> Đồng ý hoàn
+                                      </button>
+                                      <button
+                                        type="button"
+                                        style={{
+                                          padding: '4px 8px',
+                                          background: '#FEE2E2',
+                                          color: '#DC2626',
+                                          border: '1.5px solid #FCA5A5',
+                                          borderRadius: '6px',
+                                          fontSize: '11.5px',
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '3px',
+                                          whiteSpace: 'nowrap'
+                                        }}
+                                        title="Từ chối hoàn tiền đơn hàng này"
+                                        onClick={() => handleOpenReturnModal(ord, 'REJECTED')}
+                                      >
+                                        <X size={13} strokeWidth={2.5} /> Từ chối
+                                      </button>
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <button
+                                    type="button"
+                                    className="action-icon-btn"
+                                    style={{ color: isApp ? '#15803D' : '#DC2626', background: isApp ? '#F0FDF4' : '#FEF2F2', border: `1px solid ${isApp ? '#BBF7D0' : '#FECACA'}` }}
+                                    title={isApp ? "Xem chi tiết đã hoàn tiền" : "Xem chi tiết từ chối hoàn"}
+                                    onClick={() => handleOpenReturnModal(ord)}
+                                  >
+                                    <RotateCcw size={14} />
+                                  </button>
+                                );
+                              })()}
                               <button
                                 type="button"
                                 className="action-icon-btn edit-btn"

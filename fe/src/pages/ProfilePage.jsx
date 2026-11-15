@@ -2658,6 +2658,7 @@ const ProfilePage = () => {
         status_label: 'Đổi trả',
         status_label_manager: 'Đổi trả',
         status_label_customer: 'ĐỔI TRẢ',
+        refund_decision: 'PENDING',
         refund_reason: finalReason,
         refund_bank: bankTrimmed,
         note: refundNote,
@@ -2668,6 +2669,10 @@ const ProfilePage = () => {
         overrides[`YF-${orderDigits}`] = overrideEntry;
         overrides[`#YF-${orderDigits}`] = overrideEntry;
         overrides[`YF - ${orderDigits}`] = overrideEntry;
+        overrides[`#YF - ${orderDigits}`] = overrideEntry;
+        overrides[`YF – ${orderDigits}`] = overrideEntry;
+        overrides[`#YF – ${orderDigits}`] = overrideEntry;
+        overrides[`#${orderDigits}`] = overrideEntry;
       }
       if (tId) overrides[tId] = overrideEntry;
       if (tNum) overrides[tNum] = overrideEntry;
@@ -2692,6 +2697,7 @@ const ProfilePage = () => {
                 order_status: 'RETURNED',
                 status: 'RETURNED',
                 status_label: 'Đổi trả',
+                refund_decision: 'PENDING',
                 refund_reason: finalReason,
                 refund_bank: bankTrimmed,
                 note: refundNote,
@@ -2716,6 +2722,7 @@ const ProfilePage = () => {
         refund_bank: bankTrimmed,
         refund_reason: finalReason,
         reason: finalReason,
+        refund_decision: 'PENDING',
         note: refundNote,
         timestamp: Date.now()
       };
@@ -2735,9 +2742,16 @@ const ProfilePage = () => {
     // 3. Đồng bộ lên Backend MySQL CSDL
     try {
       if (orderService.updateOrderStatus) {
-        if (tId) await orderService.updateOrderStatus(tId, 'RETURNED', refundNote).catch(() => {});
-        if (tNum && tNum !== tId) await orderService.updateOrderStatus(tNum, 'RETURNED', refundNote).catch(() => {});
-        if (orderDigits && orderDigits !== tId && orderDigits !== tNum) await orderService.updateOrderStatus(orderDigits, 'RETURNED', refundNote).catch(() => {});
+        const payloadExtra = {
+          refund_reason: finalReason,
+          refund_bank: bankTrimmed,
+          reason: finalReason,
+          bank_info: bankTrimmed,
+          status: 'PENDING'
+        };
+        if (tId) await orderService.updateOrderStatus(tId, 'RETURNED', refundNote, payloadExtra).catch((e) => console.warn('Cập nhật DB tId:', e));
+        if (tNum && tNum !== tId) await orderService.updateOrderStatus(tNum, 'RETURNED', refundNote, payloadExtra).catch((e) => console.warn('Cập nhật DB tNum:', e));
+        if (orderDigits && orderDigits !== tId && orderDigits !== tNum) await orderService.updateOrderStatus(orderDigits, 'RETURNED', refundNote, payloadExtra).catch((e) => console.warn('Cập nhật DB orderDigits:', e));
       }
     } catch (err) {
       console.warn('Cập nhật hoàn tiền DB:', err?.message);
