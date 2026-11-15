@@ -372,6 +372,49 @@ const applyStatusOverrides = (ordersList) => {
       const ovLabel = String(ov?.status_label || ov?.status_label_manager || '');
       const isExplicitCanc = curStatus === 'CANCELLED' || ovStatus === 'CANCELLED' || ovLabel.includes('Hủy');
 
+      // NGĂN CHẶN NHẢY CÓC & DỌN DẸP OVERRIDE LỖI:
+      // Nếu đơn hàng trong CSDL thực tế đang ở PENDING hoặc CONFIRMED mà chưa hề được giao:
+      // Tuyệt đối không thể ở trạng thái RETURNED (Đổi trả / Hoàn tiền). Dọn dẹp override nhảy cóc sai.
+      if ((curStatus === 'PENDING' || curStatus === 'CONFIRMED') && (ovStatus === 'RETURNED' || isOrderReturned(ovStatus, ovLabel, ov?.note, ov))) {
+        if (digits) {
+          delete overrides[digits];
+          delete overrides[`YF-${digits}`];
+          delete overrides[`#YF-${digits}`];
+          delete overrides[`YF - ${digits}`];
+          delete overrides[`#YF - ${digits}`];
+        }
+        if (rawId) delete overrides[rawId];
+        if (rawCode) delete overrides[rawCode];
+        overridesModified = true;
+        return {
+          ...ord,
+          order_status: curStatus,
+          status: curStatus,
+          status_label: curStatus === 'CONFIRMED' ? 'Đã xác nhận' : 'Chờ xác nhận',
+          refund_decision: undefined,
+          refund_reason: '',
+          refund_bank: '',
+        };
+      }
+
+      // Tương tự, nếu đơn đã CANCELLED trong CSDL thì không thể là RETURNED
+      if (curStatus === 'CANCELLED' && (ovStatus === 'RETURNED' || isOrderReturned(ovStatus, ovLabel, ov?.note, ov))) {
+        if (digits) {
+          delete overrides[digits];
+          delete overrides[`YF-${digits}`];
+          delete overrides[`#YF-${digits}`];
+        }
+        if (rawId) delete overrides[rawId];
+        if (rawCode) delete overrides[rawCode];
+        overridesModified = true;
+        return {
+          ...ord,
+          order_status: 'CANCELLED',
+          status: 'CANCELLED',
+          status_label: 'Đã hủy',
+        };
+      }
+
       // 1. Nếu là đơn Đổi trả / Hoàn tiền (chỉ khi không phải đơn hủy rõ ràng)
       const isRet = !isExplicitCanc && (isOrderReturned(ord.order_status, ord.status_label, ord.note, ord) || (ov && isOrderReturned(ov.status, ov.status_label, ov.note, ov)));
       if (isRet) {
@@ -1223,12 +1266,12 @@ export default function OrderManager() {
       return;
     }
 
-    // Quy tắc chuyển trạng thái hợp lệ (đồng bộ với Backend Order State Machine)
+    // Quy tắc chuyển trạng thái hợp lệ tuần tự từng bước 1 (đồng bộ với Backend Order State Machine)
     const allowedTransitionsUI = {
       PENDING: ['CONFIRMED', 'CANCELLED'],
       CONFIRMED: ['SHIPPING', 'CANCELLED'],
       PROCESSING: ['SHIPPING', 'CANCELLED'],
-      SHIPPING: ['COMPLETED', 'RETURNED'],
+      SHIPPING: ['COMPLETED', 'CANCELLED'],
       COMPLETED: ['RETURNED'],
       CANCELLED: [],
       RETURNED: ['RETURNED'],
@@ -1394,6 +1437,11 @@ export default function OrderManager() {
   // Mở modal xác nhận kết quả giao hàng khi chọn trạng thái "Đã giao"
   const handleOpenDeliveryModal = (ord) => {
     if (!ord) return;
+    const currentCat = getCategoryFromStatus(ord.order_status, ord.status_label, ord.note, ord);
+    if (currentCat !== 'SHIPPING' && currentCat !== 'COMPLETED') {
+      showError('Chỉ đơn hàng đang ở trạng thái Đang vận chuyển (SHIPPING) mới có thể cập nhật kết quả giao hàng! Vui lòng thực hiện tuần tự từng bước.');
+      return;
+    }
     setDeliveryOrder(ord);
     setDeliveryResult('SUCCESS');
     setFailReason('Không liên lạc được với khách hàng (gọi 3 lần không bắt máy)');
@@ -2454,6 +2502,11 @@ export default function OrderManager() {
   // Mở modal xác nhận kết quả đổi trả & hoàn tiền (Đã hoàn tiền HOẶC Từ chối hoàn kèm lý do)
   const handleOpenReturnModal = (ord) => {
     if (!ord) return;
+    const currentCat = getCategoryFromStatus(ord.order_status, ord.status_label, ord.note, ord);
+    if (currentCat !== 'COMPLETED' && currentCat !== 'RETURNED') {
+      showError('Đơn hàng chưa giao thành công (COMPLETED) không thể thực hiện đổi trả / hoàn tiền! Vui lòng cập nhật trạng thái theo đúng tuần tự từng bước.');
+      return;
+    }
     setReturnOrder(ord);
     const isRej = ord.refund_decision === 'REJECTED' || String(ord.status_label || '').toUpperCase().includes('TỪ CHỐI') || String(ord.note || '').toLowerCase().includes('từ chối hoàn tiền');
     setReturnResult(isRej ? 'REJECTED' : 'APPROVED');
@@ -3115,30 +3168,77 @@ export default function OrderManager() {
                                 })()
                               ) : (
                                 <div>
-                                  <select
-                                    className={`status-select-pill status-pill-${cat.toLowerCase()}`}
-                                    value={cat}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      if (val === 'CANCELLED') {
-                                        handleOpenShopCancelModal(ord);
-                                      } else if (val === 'COMPLETED') {
-                                        handleOpenDeliveryModal(ord);
-                                      } else if (val === 'RETURNED') {
-                                        handleOpenReturnModal(ord);
-                                      } else {
-                                        updateSingleOrderStatus(ord, val);
+                                  {(() => {
+                                    const getStepOptions = (currentCat) => {
+                                      switch (currentCat) {
+                                        case 'PENDING':
+                                          return [
+                                            { val: 'PENDING', label: 'Chờ xác nhận' },
+                                            { val: 'CONFIRMED', label: 'Đã xác nhận' },
+                                            { val: 'CANCELLED', label: 'Hủy đơn hàng' },
+                                          ];
+                                        case 'CONFIRMED':
+                                          return [
+                                            { val: 'CONFIRMED', label: 'Đã xác nhận' },
+                                            { val: 'SHIPPING', label: 'Đang vận chuyển' },
+                                            { val: 'CANCELLED', label: 'Hủy đơn hàng' },
+                                          ];
+                                        case 'SHIPPING':
+                                          return [
+                                            { val: 'SHIPPING', label: 'Đang vận chuyển' },
+                                            { val: 'COMPLETED', label: 'Đã giao' },
+                                            { val: 'CANCELLED', label: 'Hủy đơn (Giao thất bại)' },
+                                          ];
+                                        case 'COMPLETED':
+                                          return [
+                                            { val: 'COMPLETED', label: 'Đã giao' },
+                                            { val: 'RETURNED', label: 'Đổi trả / Hoàn tiền' },
+                                          ];
+                                        default:
+                                          return [
+                                            { val: currentCat, label: currentCat === 'CANCELLED' ? 'Đã hủy' : 'Đổi trả' }
+                                          ];
                                       }
-                                    }}
-                                    title="Bấm để chuyển trạng thái đơn hàng"
-                                  >
-                                    <option value="PENDING">Chờ xác nhận</option>
-                                    <option value="CONFIRMED">Đã xác nhận</option>
-                                    <option value="SHIPPING">Đang vận chuyển</option>
-                                    <option value="COMPLETED">Đã giao</option>
-                                    <option value="RETURNED">Đổi trả</option>
-                                    <option value="CANCELLED">Đã hủy</option>
-                                  </select>
+                                    };
+
+                                    const validOptions = getStepOptions(cat);
+
+                                    return (
+                                      <select
+                                        className={`status-select-pill status-pill-${cat.toLowerCase()}`}
+                                        value={cat}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          if (val === cat) return;
+                                          const allowedTargets = validOptions.map(o => o.val);
+                                          if (!allowedTargets.includes(val)) {
+                                            showError('Không thể nhảy cóc trạng thái! Vui lòng chuyển theo đúng tuần tự từng bước 1.');
+                                            return;
+                                          }
+                                          if (val === 'CANCELLED') {
+                                            handleOpenShopCancelModal(ord);
+                                          } else if (val === 'COMPLETED') {
+                                            handleOpenDeliveryModal(ord);
+                                          } else if (val === 'RETURNED') {
+                                            if (cat !== 'COMPLETED' && cat !== 'RETURNED') {
+                                              showError('Chỉ đơn hàng đã giao thành công (COMPLETED) mới có thể chuyển sang Đổi trả / Hoàn tiền!');
+                                              return;
+                                            }
+                                            handleOpenReturnModal(ord);
+                                          } else {
+                                            updateSingleOrderStatus(ord, val);
+                                          }
+                                        }}
+                                        title="Bấm để chuyển trạng thái theo tuần tự từng bước"
+                                      >
+                                        {validOptions.map(opt => (
+                                          <option key={opt.val} value={opt.val}>
+                                            {opt.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    );
+                                  })()}
 
                                   {Boolean(ord.delivery_status === 'FAILED_RETRY' || ord.will_retry || String(ord.status_label || '').includes('Hẹn giao lại')) && (
                                     <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -3707,30 +3807,77 @@ export default function OrderManager() {
                     </div>
                   ) : (
                     <div>
-                      <select
-                        className="form-control-input"
-                        style={{ width: '100%', height: '42px', fontSize: '13.5px', borderRadius: '8px', border: '1px solid #D1D5DB', background: '#FFFFFF', cursor: 'pointer' }}
-                        value={editingOrder.order_status}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === 'CANCELLED') {
-                            handleOpenShopCancelModal(editingOrder);
-                          } else if (val === 'COMPLETED') {
-                            handleOpenDeliveryModal(editingOrder);
-                          } else if (val === 'RETURNED') {
-                            handleOpenReturnModal(editingOrder);
-                          } else {
-                            setEditingOrder({ ...editingOrder, order_status: val });
+                      {(() => {
+                        const editCat = getCategoryFromStatus(editingOrder.order_status, editingOrder.status_label, editingOrder.note, editingOrder);
+                        const getStepOptions = (currentCat) => {
+                          switch (currentCat) {
+                            case 'PENDING':
+                              return [
+                                { val: 'PENDING', label: 'Chờ xác nhận' },
+                                { val: 'CONFIRMED', label: 'Đã xác nhận' },
+                                { val: 'CANCELLED', label: 'Hủy đơn hàng' },
+                              ];
+                            case 'CONFIRMED':
+                              return [
+                                { val: 'CONFIRMED', label: 'Đã xác nhận' },
+                                { val: 'SHIPPING', label: 'Đang vận chuyển' },
+                                { val: 'CANCELLED', label: 'Hủy đơn hàng' },
+                              ];
+                            case 'SHIPPING':
+                              return [
+                                { val: 'SHIPPING', label: 'Đang vận chuyển' },
+                                { val: 'COMPLETED', label: 'Đã giao' },
+                                { val: 'CANCELLED', label: 'Hủy đơn (Giao thất bại)' },
+                              ];
+                            case 'COMPLETED':
+                              return [
+                                { val: 'COMPLETED', label: 'Đã giao' },
+                                { val: 'RETURNED', label: 'Đổi trả / Hoàn tiền' },
+                              ];
+                            default:
+                              return [
+                                { val: currentCat, label: currentCat === 'CANCELLED' ? 'Đã hủy' : 'Đổi trả' }
+                              ];
                           }
-                        }}
-                      >
-                        <option value="PENDING">Chờ xác nhận</option>
-                        <option value="CONFIRMED">Đã xác nhận</option>
-                        <option value="SHIPPING">Đang vận chuyển</option>
-                        <option value="COMPLETED">Đã giao</option>
-                        <option value="RETURNED">Đổi trả</option>
-                        <option value="CANCELLED">Đã hủy</option>
-                      </select>
+                        };
+                        const validOptions = getStepOptions(editCat);
+
+                        return (
+                          <select
+                            className="form-control-input"
+                            style={{ width: '100%', height: '42px', fontSize: '13.5px', borderRadius: '8px', border: '1px solid #D1D5DB', background: '#FFFFFF', cursor: 'pointer' }}
+                            value={editCat}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === editCat) return;
+                              const allowedTargets = validOptions.map(o => o.val);
+                              if (!allowedTargets.includes(val)) {
+                                showError('Không thể nhảy cóc trạng thái! Vui lòng chuyển theo đúng tuần tự từng bước 1.');
+                                return;
+                              }
+                              if (val === 'CANCELLED') {
+                                handleOpenShopCancelModal(editingOrder);
+                              } else if (val === 'COMPLETED') {
+                                handleOpenDeliveryModal(editingOrder);
+                              } else if (val === 'RETURNED') {
+                                if (editCat !== 'COMPLETED' && editCat !== 'RETURNED') {
+                                  showError('Chỉ đơn hàng đã giao thành công (COMPLETED) mới có thể chuyển sang Đổi trả / Hoàn tiền!');
+                                  return;
+                                }
+                                handleOpenReturnModal(editingOrder);
+                              } else {
+                                setEditingOrder({ ...editingOrder, order_status: val });
+                              }
+                            }}
+                          >
+                            {validOptions.map(opt => (
+                              <option key={opt.val} value={opt.val}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()}
 
                       {Boolean(editingOrder.delivery_fail_reason) && (
                         <div style={{

@@ -558,6 +558,14 @@ export const updateOrderStatus = async (orderIdOrNumber, status, note = null, op
             },
           });
         }
+
+        // Cập nhật trạng thái thanh toán sang REFUNDED khi hoàn tiền thành công
+        if (reqStatus === 'COMPLETED' || noteLow.includes('đã xác nhận hoàn tiền') || noteLow.includes('đã hoàn tiền')) {
+          await tx.payment.updateMany({
+            where: { order_id: existingOrder.order_id },
+            data: { payment_status: 'REFUNDED' },
+          });
+        }
       }
 
       return updatedOrder;

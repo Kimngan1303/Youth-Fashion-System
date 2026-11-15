@@ -478,6 +478,20 @@ const applyStatusOverrides = (ordersList) => {
         });
       }
 
+      // Ngăn chặn nhảy cóc: Nếu đơn hàng trong CSDL thực tế đang ở PENDING hoặc CONFIRMED mà chưa hề được giao:
+      // Tuyệt đối không thể ở trạng thái RETURNED. Dọn dẹp override nhảy cóc sai để trả về đúng trạng thái.
+      if ((curStatus === 'PENDING' || curStatus === 'CONFIRMED') && (ov?.status === 'RETURNED' || isOrderReturned(ov?.status, ov?.status_label, ov?.note, ov))) {
+        if (digits) {
+          delete overrides[digits];
+          delete overrides[`YF-${digits}`];
+          delete overrides[`#YF-${digits}`];
+        }
+        if (rawId) delete overrides[rawId];
+        if (rawCode) delete overrides[rawCode];
+        overridesModified = true;
+        return ord;
+      }
+
       // Nếu Manager đã từ chối hoặc hoàn tiền trong yf_manager_orders thì ưu tiên áp dụng ngay
       if (mgrOrd) {
         const mgrL = String(mgrOrd.status_label || '').toUpperCase();
@@ -1111,20 +1125,28 @@ const ProfilePage = () => {
 
             if (isReturned) {
               const apiNoteLow = apiNote.toLowerCase();
-              if (apiNoteLow.includes('đã xác nhận hoàn tiền') || apiNoteLow.includes('đã hoàn tiền')) {
+              const retReq = apiOrd.return_requests?.[0];
+              const isRetCompleted = retReq && (retReq.status === 'COMPLETED' || retReq.status === 'APPROVED' || retReq.status === 'REFUNDED');
+              const isRetRejected = retReq && retReq.status === 'REJECTED';
+              const isPaymentRefunded = apiOrd.payment_status === 'REFUNDED' || apiOrd.payments?.some(p => p.payment_status === 'REFUNDED');
+
+              if (apiNoteLow.includes('đã xác nhận hoàn tiền') || apiNoteLow.includes('đã hoàn tiền') || isRetCompleted || isPaymentRefunded) {
                 refundDecision = 'APPROVED';
                 currentStatusLabel = 'ĐÃ HOÀN TIỀN';
-              } else if (apiNoteLow.includes('từ chối hoàn tiền') || apiNoteLow.includes('từ chối hoàn')) {
+              } else if (apiNoteLow.includes('từ chối hoàn tiền') || apiNoteLow.includes('từ chối hoàn') || isRetRejected) {
                 refundDecision = 'REJECTED';
                 currentStatusLabel = 'TỪ CHỐI HOÀN';
-                rejectReason = apiNote.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim();
+                rejectReason = retReq?.reject_reason || (apiNote.includes('Từ chối hoàn tiền:') ? apiNote.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim() : '');
               } else {
                 currentStatusLabel = 'ĐỔI TRẢ';
               }
-              if (apiNote.includes('STK:')) {
+              if (retReq?.bank_info) refundBank = retReq.bank_info;
+              else if (apiNote.includes('STK:')) {
                 refundBank = apiNote.split('STK:')[1]?.trim();
-                const rPart = apiNote.split('STK:')[0].replace('Khách yêu cầu hoàn tiền:', '').replace('Đã xác nhận hoàn tiền:', '').replace('|', '').trim();
-                if (rPart && !rPart.includes('₫') && !rPart.includes('đ')) refundReason = rPart;
+              }
+              if (retReq?.reason) refundReason = retReq.reason;
+              else if (apiNote.includes('Khách yêu cầu hoàn tiền:')) {
+                refundReason = apiNote.replace('Khách yêu cầu hoàn tiền:', '').split('STK:')[0].replace('|', '').trim();
               }
             }
 
