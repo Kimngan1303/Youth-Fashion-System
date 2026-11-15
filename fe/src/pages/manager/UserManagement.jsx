@@ -854,7 +854,7 @@ export default function UserManagement() {
     }
     const nextStatus = user.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
     try {
-      await adminService.updateUserStatus(user.type, user.id, nextStatus);
+      await adminService.updateUserStatus(user.type, user.id, nextStatus, user.email);
       await fetchData();
       showSuccess(`Đã ${nextStatus === 'ACTIVE' ? 'mở khóa' : 'khóa'} tài khoản "${user.full_name}"`);
     } catch (err) {

@@ -20,8 +20,36 @@ export const adminService = {
   },
 
   // Cập nhật trạng thái tài khoản (Khóa / Mở khóa)
-  updateUserStatus: async (type, id, status) => {
+  updateUserStatus: async (type, id, status, userEmail = null) => {
     const response = await axiosClient.put(`/admin/users/${type}/${id}/status`, { status });
+    if (status === 'LOCKED') {
+      try {
+        const bc = new BroadcastChannel('yf_role_sync_channel');
+        bc.postMessage({
+          type: 'ACCOUNT_LOCKED',
+          userId: id,
+          email: userEmail,
+        });
+        bc.close();
+      } catch (e) {}
+
+      try {
+        localStorage.setItem(
+          'yf_last_lock_event',
+          JSON.stringify({
+            type: 'ACCOUNT_LOCKED',
+            userId: id,
+            email: userEmail,
+            timestamp: Date.now(),
+          })
+        );
+        window.dispatchEvent(
+          new CustomEvent('yf_account_locked_broadcast', {
+            detail: { email: userEmail, userId: id },
+          })
+        );
+      } catch (e) {}
+    }
     return response.data;
   },
 
