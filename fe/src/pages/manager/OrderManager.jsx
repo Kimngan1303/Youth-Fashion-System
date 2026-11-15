@@ -670,9 +670,14 @@ export default function OrderManager() {
             return {
               order_id: String(ord.order_id || ord.order_number),
               order_number: ord.order_number?.startsWith('YF') ? ord.order_number : `YF - ${ord.order_number || ord.order_id}`,
+              customer_id: ord.customer_id || ord.customer?.customer_id || ord.customer?.id || ord.user_id,
+              recipient_name: ord.recipient_name || ord.customer?.full_name || 'Khách hàng',
+              recipient_phone: ord.recipient_phone || ord.customer?.phone || '090****000',
+              recipient_email: ord.recipient_email || ord.customer?.email || '',
               created_at: orderDateStr,
               created_date: ord.created_at || new Date().toISOString(),
               customer: {
+                id: ord.customer_id || ord.customer?.customer_id || ord.customer?.id || ord.user_id,
                 name: ord.recipient_name || ord.customer?.full_name || 'Khách hàng',
                 phone: ord.recipient_phone || ord.customer?.phone || '090****000',
                 is_vip: false,
@@ -1426,7 +1431,12 @@ export default function OrderManager() {
 
     // Gửi thông báo đến tài khoản người mua đơn hàng
     try {
-      sendOrderStatusNotification(targetOrder, newStatus, { newStatusLabel });
+      sendOrderStatusNotification(targetOrder, newStatus, {
+        newStatusLabel,
+        reason: targetOrder.cancel_reason || (newStatus === 'CANCELLED' ? 'Sản phẩm tạm thời hết hàng trong kho' : ''),
+        cancelledBy: newStatus === 'CANCELLED' ? 'SHOP' : targetOrder.cancelled_by,
+        isShopCancelled: newStatus === 'CANCELLED'
+      });
     } catch (err) {
       console.error('Lỗi gửi thông báo cho người mua:', err);
     }
@@ -1747,7 +1757,18 @@ export default function OrderManager() {
 
     // Gửi thông báo hủy đơn đến tài khoản người mua đơn hàng
     try {
-      sendOrderStatusNotification(targetOrder, 'CANCELLED', {
+      const enrichedOrder = {
+        ...targetOrder,
+        order_id: tId,
+        order_number: tNum,
+        customer_id: targetOrder.customer_id || targetOrder.customer?.id,
+        recipient_name: targetOrder.recipient_name || targetOrder.customer?.name,
+        recipient_email: targetOrder.recipient_email || targetOrder.customer?.email,
+        recipient_phone: targetOrder.recipient_phone || targetOrder.customer?.phone,
+        cancel_reason: reason,
+        cancelled_by: cancelledBy,
+      };
+      sendOrderStatusNotification(enrichedOrder, 'CANCELLED', {
         reason,
         cancelledBy,
         isShopCancelled: cancelledBy === 'SHOP',
@@ -1892,6 +1913,23 @@ export default function OrderManager() {
           }
         } catch (err) {}
       });
+
+      if (newStatus === 'CANCELLED') {
+        try {
+          const fakeTarget = {
+            order_id: tId,
+            order_number: tNum,
+            cancel_reason: cancelReason,
+            cancelled_by: cancelledBy,
+          };
+          sendOrderStatusNotification(fakeTarget, 'CANCELLED', {
+            reason: cancelReason,
+            cancelledBy: cancelledBy,
+            isShopCancelled: cancelledBy === 'SHOP',
+            newStatusLabel: newStatusLabel || 'Đã hủy'
+          });
+        } catch (e) {}
+      }
 
       try {
         const lastRaw = sessionStorage.getItem('yf_last_completed_order');

@@ -29,7 +29,9 @@ export const formatNotificationTime = (timestampOrIso) => {
 
 // Tạo nội dung thông báo dựa trên trạng thái đơn hàng
 export const buildNotificationContent = (order, newStatus, extraData = {}) => {
-  const code = order.order_number || order.order_code || order.order_id || 'Đơn hàng';
+  const rawCode = order.order_number || order.order_code || order.order_id || 'Đơn hàng';
+  const cleanDigits = String(rawCode).replace(/\D/g, '');
+  const displayCode = cleanDigits ? `#YF-${cleanDigits}` : `#${String(rawCode).replace(/^#+/, '')}`;
   const s = String(newStatus || '').toUpperCase();
   const reason = extraData.reason || order.cancel_reason || '';
   const rejectReason = extraData.rejectReason || order.reject_reason || '';
@@ -38,8 +40,8 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
     case 'CONFIRMED':
       return {
         type: 'ORDER_CONFIRMED',
-        title: `Đơn hàng #${code} đã được xác nhận`,
-        message: `Đơn hàng #${code} của bạn đã được Quản trị viên Shop xác nhận thành công và chuyển sang khâu đóng gói Haute Couture.`,
+        title: `Đơn hàng ${displayCode} đã được xác nhận`,
+        message: `Đơn hàng ${displayCode} của bạn đã được Quản trị viên Shop xác nhận thành công và chuyển sang khâu đóng gói Haute Couture.`,
         badge: 'ĐÃ XÁC NHẬN',
         badgeColor: '#0369A1',
         badgeBg: '#E0F2FE',
@@ -47,8 +49,8 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
     case 'SHIPPING':
       return {
         type: 'ORDER_SHIPPING',
-        title: `Đơn hàng #${code} đang được vận chuyển`,
-        message: `Đơn hàng #${code} đã hoàn tất đóng gói và bàn giao cho đơn vị vận chuyển Giao Hàng Nhanh (Express VIP). Kiện hàng đang trên đường giao tới bạn.`,
+        title: `Đơn hàng ${displayCode} đang được vận chuyển`,
+        message: `Đơn hàng ${displayCode} đã hoàn tất đóng gói và bàn giao cho đơn vị vận chuyển Giao Hàng Nhanh (Express VIP). Kiện hàng đang trên đường giao tới bạn.`,
         badge: 'ĐANG VẬN CHUYỂN',
         badgeColor: '#1D4ED8',
         badgeBg: '#DBEAFE',
@@ -56,8 +58,8 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
     case 'COMPLETED':
       return {
         type: 'ORDER_COMPLETED',
-        title: `Đơn hàng #${code} đã giao thành công`,
-        message: `Đơn hàng #${code} đã được giao tận tay bạn thành công. Cảm ơn quý khách đã tin tưởng mua sắm tại Youth Fashion!`,
+        title: `Đơn hàng ${displayCode} đã giao thành công`,
+        message: `Đơn hàng ${displayCode} đã được giao tận tay bạn thành công. Cảm ơn quý khách đã tin tưởng mua sắm tại Youth Fashion!`,
         badge: 'ĐÃ GIAO HÀNG',
         badgeColor: '#15803D',
         badgeBg: '#DCFCE7',
@@ -66,8 +68,8 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
       if (extraData.cancelledBy === 'SHOP' || extraData.isShopCancelled) {
         return {
           type: 'ORDER_CANCELLED_BY_SHOP',
-          title: `Shop đã hủy đơn hàng #${code}`,
-          message: `Đơn hàng #${code} đã được phía Shop hủy. Lý do từ Shop: "${reason || 'Sản phẩm tạm thời hết hàng trong kho'}". Quý khách vui lòng liên hệ hotline/chat nếu cần hỗ trợ thêm.`,
+          title: `Shop đã hủy đơn hàng ${displayCode}`,
+          message: `Đơn hàng ${displayCode} đã được phía Shop hủy. Lý do từ Shop: "${reason || 'Sản phẩm tạm thời hết hàng trong kho'}". Quý khách vui lòng liên hệ hotline/chat nếu cần hỗ trợ thêm.`,
           badge: 'SHOP HỦY ĐƠN',
           badgeColor: '#B91C1C',
           badgeBg: '#FEE2E2',
@@ -75,8 +77,8 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
       }
       return {
         type: 'ORDER_CANCELLED',
-        title: `Đơn hàng #${code} đã hủy thành công`,
-        message: `Đơn hàng #${code} đã được hủy theo yêu cầu của bạn. Lý do: "${reason || 'Khách yêu cầu hủy đơn'}".`,
+        title: `Đơn hàng ${displayCode} đã hủy thành công`,
+        message: `Đơn hàng ${displayCode} đã được hủy theo yêu cầu của bạn. Lý do: "${reason || 'Khách yêu cầu hủy đơn'}".`,
         badge: 'ĐÃ HỦY',
         badgeColor: '#B91C1C',
         badgeBg: '#FEE2E2',
@@ -84,8 +86,8 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
     case 'APPROVED':
       return {
         type: 'REFUND_APPROVED',
-        title: `Shop đã hoàn tiền đơn hàng #${code}`,
-        message: `Shop đã đồng ý yêu cầu đổi trả và hoàn tất chuyển tiền hoàn trả về tài khoản ngân hàng của bạn cho đơn hàng #${code}. Quý khách vui lòng kiểm tra biến động số dư.`,
+        title: `Shop đã hoàn tiền đơn hàng ${displayCode}`,
+        message: `Shop đã đồng ý yêu cầu đổi trả và hoàn tất chuyển tiền hoàn trả về tài khoản ngân hàng của bạn cho đơn hàng ${displayCode}. Quý khách vui lòng kiểm tra biến động số dư.`,
         badge: 'ĐÃ HOÀN TIỀN',
         badgeColor: '#15803D',
         badgeBg: '#DCFCE7',
@@ -93,8 +95,8 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
     case 'REJECTED':
       return {
         type: 'REFUND_REJECTED',
-        title: `Shop đã từ chối yêu cầu hoàn tiền #${code}`,
-        message: `Shop đã từ chối yêu cầu đổi trả & hoàn tiền cho đơn hàng #${code}. Lý do từ Shop: "${rejectReason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop'}".`,
+        title: `Shop đã từ chối yêu cầu hoàn tiền ${displayCode}`,
+        message: `Shop đã từ chối yêu cầu đổi trả & hoàn tiền cho đơn hàng ${displayCode}. Lý do từ Shop: "${rejectReason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop'}".`,
         badge: 'TỪ CHỐI HOÀN',
         badgeColor: '#B91C1C',
         badgeBg: '#FEE2E2',
@@ -102,8 +104,8 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
     case 'RETURNED':
       return {
         type: 'ORDER_RETURNED',
-        title: `Yêu cầu đổi trả #${code} đang được xử lý`,
-        message: `Shop đã tiếp nhận yêu cầu đổi trả & hoàn tiền của bạn cho đơn hàng #${code} và đang tiến hành kiểm tra xét duyệt.`,
+        title: `Yêu cầu đổi trả ${displayCode} đang được xử lý`,
+        message: `Shop đã tiếp nhận yêu cầu đổi trả & hoàn tiền của bạn cho đơn hàng ${displayCode} và đang tiến hành kiểm tra xét duyệt.`,
         badge: 'CHỜ XỬ LÝ HOÀN',
         badgeColor: '#7E22CE',
         badgeBg: '#F3E8FF',
@@ -114,8 +116,8 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
         const formattedDate = extraData.retryDate ? new Date(extraData.retryDate).toLocaleDateString('vi-VN') : 'ngày tiếp theo';
         return {
           type: 'ORDER_DELIVERY_FAILED_RETRY',
-          title: `Giao hàng chưa thành công #${code} - Hẹn giao lại`,
-          message: `Đơn vị vận chuyển đã cố gắng phát đơn hàng #${code} nhưng chưa thành công. Lý do: "${reason || 'Không liên lạc được với người nhận'}". Đơn vị sẽ giao lại vào ${formattedDate}. Vui lòng chú ý điện thoại.`,
+          title: `Giao hàng chưa thành công ${displayCode} - Hẹn giao lại`,
+          message: `Đơn vị vận chuyển đã cố gắng phát đơn hàng ${displayCode} nhưng chưa thành công. Lý do: "${reason || 'Không liên lạc được với người nhận'}". Đơn vị sẽ giao lại vào ${formattedDate}. Vui lòng chú ý điện thoại.`,
           badge: 'HẸN GIAO LẠI',
           badgeColor: '#D97706',
           badgeBg: '#FEF3C7',
@@ -123,8 +125,8 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
       }
       return {
         type: 'ORDER_DELIVERY_FAILED',
-        title: `Giao hàng không thành công #${code}`,
-        message: `Đơn hàng #${code} giao không thành công. Lý do: "${reason || 'Không thể liên lạc hoặc khách từ chối nhận'}". Đơn hàng sẽ được chuyển hoàn về kho.`,
+        title: `Giao hàng không thành công ${displayCode}`,
+        message: `Đơn hàng ${displayCode} giao không thành công. Lý do: "${reason || 'Không thể liên lạc hoặc khách từ chối nhận'}". Đơn hàng sẽ được chuyển hoàn về kho.`,
         badge: 'GIAO THẤT BẠI',
         badgeColor: '#B91C1C',
         badgeBg: '#FEE2E2',
@@ -132,8 +134,8 @@ export const buildNotificationContent = (order, newStatus, extraData = {}) => {
     default:
       return {
         type: 'ORDER_STATUS_CHANGED',
-        title: `Cập nhật trạng thái đơn hàng #${code}`,
-        message: `Đơn hàng #${code} của bạn đã được cập nhật sang trạng thái "${extraData.newStatusLabel || newStatus}".`,
+        title: `Cập nhật trạng thái đơn hàng ${displayCode}`,
+        message: `Đơn hàng ${displayCode} của bạn đã được cập nhật sang trạng thái "${extraData.newStatusLabel || newStatus}".`,
         badge: extraData.newStatusLabel || 'CẬP NHẬT',
         badgeColor: '#4B5563',
         badgeBg: '#F3F4F6',
@@ -149,6 +151,10 @@ export const sendOrderStatusNotification = (order, newStatus, extraData = {}) =>
   const orderId = String(order.order_id || '').trim();
   const orderNumber = String(order.order_number || order.order_code || '').trim();
   const orderDigits = (orderNumber || orderId).replace(/\D/g, '');
+
+  const customerId = order.customer_id || order.customer?.customer_id || order.customer?.id || order.user_id || '';
+  const customerEmail = (order.recipient_email || order.customer?.email || order.email || '').toLowerCase().trim();
+  const customerPhone = (order.recipient_phone || order.customer?.phone || order.phone || '').trim();
 
   const newNotif = {
     id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -168,16 +174,28 @@ export const sendOrderStatusNotification = (order, newStatus, extraData = {}) =>
     is_read: false,
     link: `/profile?tab=orders&order=${orderDigits}`,
     // Thông tin định danh người mua để lọc chính xác
-    customer_id: order.customer_id || order.customer?.customer_id || order.customer?.id || order.user_id || '',
-    customer_email: order.recipient_email || order.customer?.email || order.email || '',
-    customer_phone: order.recipient_phone || order.customer?.phone || order.phone || '',
+    customer_id: customerId,
+    customer_email: customerEmail,
+    customer_phone: customerPhone,
   };
 
   // 1. Lưu vào danh sách các khóa liên quan trong localStorage
   const keysToUpdate = new Set(['yf_customer_notifications', 'yf_all_notifications']);
-  if (newNotif.customer_id) keysToUpdate.add(`yf_notifications_${newNotif.customer_id}`);
-  if (newNotif.customer_email) keysToUpdate.add(`yf_notifications_${newNotif.customer_email.toLowerCase()}`);
-  if (newNotif.customer_phone) keysToUpdate.add(`yf_notifications_${newNotif.customer_phone.replace(/\D/g, '')}`);
+  if (customerId) keysToUpdate.add(`yf_notifications_${customerId}`);
+  if (customerEmail) keysToUpdate.add(`yf_notifications_${customerEmail}`);
+  if (customerPhone) keysToUpdate.add(`yf_notifications_${customerPhone.replace(/\D/g, '')}`);
+
+  // Thêm các key của tài khoản đang đăng nhập hiện tại nếu có
+  try {
+    const rawUser = localStorage.getItem('user');
+    if (rawUser) {
+      const activeUser = JSON.parse(rawUser);
+      if (activeUser?.customer_id) keysToUpdate.add(`yf_notifications_${activeUser.customer_id}`);
+      if (activeUser?.id) keysToUpdate.add(`yf_notifications_${activeUser.id}`);
+      if (activeUser?.email) keysToUpdate.add(`yf_notifications_${activeUser.email.toLowerCase()}`);
+      if (activeUser?.phone) keysToUpdate.add(`yf_notifications_${activeUser.phone.replace(/\D/g, '')}`);
+    }
+  } catch (e) {}
 
   // Tìm các key yf_customer_orders_* để gắn cùng key tương ứng
   for (let i = 0; i < localStorage.length; i++) {
@@ -193,9 +211,17 @@ export const sendOrderStatusNotification = (order, newStatus, extraData = {}) =>
       const raw = localStorage.getItem(k);
       const list = raw ? JSON.parse(raw) : [];
       if (Array.isArray(list)) {
-        list.unshift(newNotif);
-        // Giữ tối đa 50 thông báo gần nhất
-        localStorage.setItem(k, JSON.stringify(list.slice(0, 50)));
+        // Tránh trùng lặp thông báo cùng sự kiện trong khoảng thời gian ngắn (5s)
+        const isDuplicate = list.some(item =>
+          item.order_digits === newNotif.order_digits &&
+          item.type === newNotif.type &&
+          Math.abs((item.timestamp || 0) - newNotif.timestamp) < 5000
+        );
+        if (!isDuplicate) {
+          list.unshift(newNotif);
+          // Giữ tối đa 50 thông báo gần nhất
+          localStorage.setItem(k, JSON.stringify(list.slice(0, 50)));
+        }
       }
     } catch (e) {}
   });
@@ -262,12 +288,28 @@ export const getNotificationsForUser = (user = null) => {
   const aggregated = [];
   const seenIds = new Set();
 
-  const keysToCheck = ['yf_customer_notifications'];
-  if (user) {
-    if (user.customer_id) keysToCheck.push(`yf_notifications_${user.customer_id}`);
-    if (user.id) keysToCheck.push(`yf_notifications_${user.id}`);
-    if (user.email) keysToCheck.push(`yf_notifications_${user.email.toLowerCase()}`);
-    if (user.phone) keysToCheck.push(`yf_notifications_${user.phone.replace(/\D/g, '')}`);
+  let effectiveUser = user;
+  if (!effectiveUser) {
+    try {
+      const rawUser = localStorage.getItem('user');
+      if (rawUser) effectiveUser = JSON.parse(rawUser);
+    } catch (e) {}
+  }
+
+  const keysToCheck = new Set(['yf_customer_notifications', 'yf_all_notifications']);
+  if (effectiveUser) {
+    if (effectiveUser.customer_id) keysToCheck.add(`yf_notifications_${effectiveUser.customer_id}`);
+    if (effectiveUser.id) keysToCheck.add(`yf_notifications_${effectiveUser.id}`);
+    if (effectiveUser.email) keysToCheck.add(`yf_notifications_${effectiveUser.email.toLowerCase()}`);
+    if (effectiveUser.phone) keysToCheck.add(`yf_notifications_${effectiveUser.phone.replace(/\D/g, '')}`);
+  }
+
+  // Quét qua tất cả các key thông báo người dùng có trong localStorage
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('yf_notifications_')) {
+      keysToCheck.add(k);
+    }
   }
 
   keysToCheck.forEach(k => {
@@ -289,6 +331,115 @@ export const getNotificationsForUser = (user = null) => {
       }
     } catch (e) {}
   });
+
+  // TỰ ĐỘNG ĐỐI SOÁT & BỔ SUNG THÔNG BÁO CHO CÁC ĐƠN HÀNG ĐÃ BỊ HỦY BỞI SHOP
+  try {
+    const cancelledOrders = [];
+    const rawOverrides = localStorage.getItem('yf_order_status_overrides');
+    const overrides = rawOverrides ? JSON.parse(rawOverrides) : {};
+
+    Object.keys(overrides).forEach(key => {
+      const entry = overrides[key];
+      if (entry && (entry.status === 'CANCELLED' || String(entry.status_label || '').toUpperCase().includes('HỦY'))) {
+        const digits = key.replace(/\D/g, '');
+        if (digits && !cancelledOrders.some(c => c.digits === digits)) {
+          cancelledOrders.push({
+            digits,
+            order_id: entry.order_id || digits,
+            order_number: entry.order_number || `YF-${digits}`,
+            cancel_reason: entry.cancel_reason || 'Sản phẩm tạm thời hết hàng trong kho',
+            cancelled_by: entry.cancelled_by || 'SHOP',
+            updated_at: entry.updated_at || Date.now()
+          });
+        }
+      }
+    });
+
+    ['yf_customer_orders', 'yf_manager_orders'].forEach(storageKey => {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            list.forEach(ord => {
+              const s = String(ord.status || ord.order_status || '').toUpperCase();
+              const l = String(ord.status_label || '').toUpperCase();
+              if (s === 'CANCELLED' || l.includes('HỦY')) {
+                const digits = String(ord.order_number || ord.order_code || ord.order_id || '').replace(/\D/g, '');
+                if (digits && !cancelledOrders.some(c => c.digits === digits)) {
+                  cancelledOrders.push({
+                    digits,
+                    order_id: ord.order_id || digits,
+                    order_number: ord.order_number || `YF-${digits}`,
+                    cancel_reason: ord.cancel_reason || (ord.note?.includes('Shop hủy đơn:') ? ord.note.replace('Shop hủy đơn:', '').trim() : 'Sản phẩm tạm thời hết hàng trong kho'),
+                    cancelled_by: ord.cancelled_by || 'SHOP',
+                    updated_at: ord.updated_at || Date.now()
+                  });
+                }
+              }
+            });
+          }
+        }
+      } catch (e) {}
+    });
+
+    cancelledOrders.forEach(cancOrd => {
+      const hasNotif = aggregated.some(n =>
+        (n.order_digits === cancOrd.digits || String(n.order_number || '').replace(/\D/g, '') === cancOrd.digits) &&
+        (n.type?.includes('CANCEL') || n.status === 'CANCELLED' || n.badge?.includes('HỦY'))
+      );
+
+      if (!hasNotif) {
+        const fakeOrder = {
+          order_id: cancOrd.order_id,
+          order_number: cancOrd.order_number,
+          cancel_reason: cancOrd.cancel_reason,
+          customer_id: effectiveUser?.customer_id || effectiveUser?.id,
+          recipient_email: effectiveUser?.email,
+          recipient_phone: effectiveUser?.phone
+        };
+        const content = buildNotificationContent(fakeOrder, 'CANCELLED', {
+          reason: cancOrd.cancel_reason,
+          cancelledBy: cancOrd.cancelled_by,
+          isShopCancelled: cancOrd.cancelled_by === 'SHOP'
+        });
+        const autoNotif = {
+          id: `notif_auto_cancel_${cancOrd.digits}`,
+          order_id: cancOrd.order_id,
+          order_number: cancOrd.order_number,
+          order_digits: cancOrd.digits,
+          title: content.title,
+          message: content.message,
+          badge: content.badge,
+          badgeColor: content.badgeColor,
+          badgeBg: content.badgeBg,
+          status: 'CANCELLED',
+          type: content.type,
+          time: formatNotificationTime(cancOrd.updated_at),
+          created_at: new Date(cancOrd.updated_at).toISOString(),
+          timestamp: cancOrd.updated_at,
+          is_read: false,
+          link: `/profile?tab=orders&order=${cancOrd.digits}`,
+          customer_id: effectiveUser?.customer_id || effectiveUser?.id || '',
+          customer_email: effectiveUser?.email || '',
+          customer_phone: effectiveUser?.phone || ''
+        };
+        aggregated.push(autoNotif);
+        seenIds.add(autoNotif.id);
+
+        try {
+          const rawCustNotifs = localStorage.getItem('yf_customer_notifications');
+          const custNotifs = rawCustNotifs ? JSON.parse(rawCustNotifs) : [];
+          if (Array.isArray(custNotifs)) {
+            custNotifs.unshift(autoNotif);
+            localStorage.setItem('yf_customer_notifications', JSON.stringify(custNotifs.slice(0, 50)));
+          }
+        } catch (e) {}
+      }
+    });
+  } catch (e) {
+    console.warn('Lỗi tự động đối soát thông báo hủy đơn:', e);
+  }
 
   // Sắp xếp thông báo mới nhất lên đầu
   aggregated.sort((a, b) => (b.timestamp || new Date(b.created_at).getTime() || 0) - (a.timestamp || new Date(a.created_at).getTime() || 0));

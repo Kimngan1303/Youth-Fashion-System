@@ -320,7 +320,13 @@ const Header = ({ onOpenAISearch }) => {
                             markNotificationAsRead(item.id, user);
                             refreshNotifications();
                             setShowNotifications(false);
-                            navigate('/notifications');
+                            if (item.order_digits) {
+                              navigate(`/profile?tab=orders&order=${item.order_digits}`);
+                            } else if (item.link) {
+                              navigate(item.link);
+                            } else {
+                              navigate('/notifications');
+                            }
                           }}
                           style={{
                             cursor: 'pointer',
