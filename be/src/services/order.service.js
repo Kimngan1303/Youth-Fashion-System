@@ -556,7 +556,7 @@ export const customerCancelOrderService = async (orderIdOrNumber, customerId, re
 /**
  * Khách hàng yêu cầu hoàn tiền cho đơn PayOS bị shop hủy hoặc đổi trả đơn đã giao
  */
-export const customerRefundRequestService = async (orderIdOrNumber, customerId, { reason, bank_info, images } = {}) => {
+export const customerRefundRequestService = async (orderIdOrNumber, customerId, { reason, bank_info, images, refund_amount, return_items } = {}) => {
   const existingOrder = await orderRepo.findOrderByIdOrNumber(orderIdOrNumber);
   if (!existingOrder) {
     throw createServiceError('Không tìm thấy đơn hàng', 404);
@@ -577,7 +577,35 @@ export const customerRefundRequestService = async (orderIdOrNumber, customerId, 
   }
 
   const refundReason = reason ? String(reason).trim() : 'Khách yêu cầu hoàn tiền';
-  const updatedNote = `[Yêu cầu hoàn tiền]: ${refundReason}${bank_info ? ` | STK: ${bank_info}` : ''}`;
+
+  // Tính toán số tiền hoàn dự kiến dựa trên các sản phẩm đã chọn
+  let calculatedAmount = 0;
+  let itemsSummary = '';
+  const parsedItems = Array.isArray(return_items) ? return_items : [];
+
+  if (parsedItems.length > 0) {
+    calculatedAmount = parsedItems.reduce((sum, item) => {
+      const p = Number(item.price || item.unit_price || 0);
+      const q = Number(item.quantity || 1);
+      return sum + (p * q);
+    }, 0);
+    itemsSummary = parsedItems
+      .map((it) => `${it.name || it.product_name} (x${it.quantity || 1})`)
+      .join(', ');
+  }
+
+  const finalRefundAmount = (refund_amount !== undefined && Number(refund_amount) > 0)
+    ? Number(refund_amount)
+    : (calculatedAmount > 0 ? calculatedAmount : Number(existingOrder.total_amount || 0));
+
+  const itemsTag = itemsSummary ? ` [Sản phẩm hoàn: ${itemsSummary}]` : '';
+  const updatedNote = `[Yêu cầu hoàn tiền]: ${refundReason}${itemsTag} | Số tiền hoàn: ${Number(finalRefundAmount).toLocaleString('vi-VN')}₫${bank_info ? ` | STK: ${bank_info}` : ''}`;
+
+  const payloadImages = {
+    ...(typeof images === 'object' && images !== null && !Array.isArray(images) ? images : { images: Array.isArray(images) ? images : [] }),
+    return_items: parsedItems,
+    refund_amount: finalRefundAmount,
+  };
 
   return await prisma.$transaction(async (tx) => {
     // 1. Tạo ReturnRequest
@@ -587,9 +615,9 @@ export const customerRefundRequestService = async (orderIdOrNumber, customerId, 
         reason: refundReason,
         type: 'REFUND',
         status: 'PENDING',
-        refund_amount: existingOrder.total_amount,
+        refund_amount: finalRefundAmount,
         bank_info: bank_info || null,
-        images: images || null,
+        images: payloadImages,
       },
     });
 
@@ -619,13 +647,15 @@ export const customerRefundRequestService = async (orderIdOrNumber, customerId, 
         customer_id: existingOrder.customer_id,
         notification_type: 'ORDER',
         title: 'Đã gửi yêu cầu hoàn tiền',
-        message: `Yêu cầu hoàn tiền cho đơn hàng #${existingOrder.order_number} đã được gửi đến Shop và đang chờ xử lý.`,
+        message: `Yêu cầu hoàn tiền (${Number(finalRefundAmount).toLocaleString('vi-VN')}₫) cho đơn hàng #${existingOrder.order_number} đã được gửi đến Shop và đang chờ xử lý.`,
         reference_id: existingOrder.order_id,
         link: `/profile?tab=orders&order=${digits}`,
         data: {
           order_number: existingOrder.order_number,
           status: 'RETURNED',
           badge: 'CHỜ HOÀN TIỀN',
+          refund_amount: finalRefundAmount,
+          return_items: parsedItems,
         },
       },
     });
@@ -637,11 +667,11 @@ export const customerRefundRequestService = async (orderIdOrNumber, customerId, 
         toEmail: targetEmail,
         order: existingOrder,
         status: 'RETURNED',
-        extraData: { reason: refundReason, bank_info },
+        extraData: { reason: refundReason, bank_info, refund_amount: finalRefundAmount, return_items: parsedItems },
       }).catch((e) => console.warn('Lỗi gửi email yêu cầu hoàn tiền:', e.message));
     }
 
-    return { ...updatedOrder, return_request: rr };
+    return { ...updatedOrder, return_request: rr, return_items: parsedItems, refund_amount: finalRefundAmount };
   });
 };
 

@@ -137,12 +137,14 @@ export const customerCancelOrder = async (req, res, next) => {
 export const customerRefundRequest = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { reason, bank_info, images } = req.body || {};
+    const { reason, bank_info, images, refund_amount, return_items, items } = req.body || {};
     const customerId = req.user?.id || req.user?.customer_id;
     const result = await orderService.customerRefundRequestService(id, customerId, {
       reason,
       bank_info,
       images,
+      refund_amount,
+      return_items: return_items || items,
     });
     return BaseResponse.success(res, 'Gửi yêu cầu hoàn tiền thành công', result);
   } catch (error) {
