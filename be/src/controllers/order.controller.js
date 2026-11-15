@@ -112,8 +112,14 @@ export const getAllOrders = async (req, res, next) => {
 export const updateOrderStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status, note } = req.body;
-    const result = await orderService.updateOrderStatusService(id, status, note);
+    const { status, note, returnRequest } = req.body || {};
+    const isEmployee = req.user && String(req.user.user_type || '').toUpperCase() === 'EMPLOYEE';
+    const employeeId = isEmployee ? (req.user.id || req.user.employee_id || null) : null;
+
+    const result = await orderService.updateOrderStatusService(id, status, note, {
+      employeeId,
+      returnRequestData: returnRequest,
+    });
     return BaseResponse.success(res, 'Cập nhật trạng thái đơn hàng thành công', result);
   } catch (error) {
     next(error);

@@ -531,13 +531,17 @@ export default function CheckoutPage() {
           total_amount: finalTotal,
           items: checkoutItems.map(item => ({
             id: item.id || item.variant_id,
+            product_id: item.productId || item.product_id || (item.id && !String(item.id).includes('-') ? item.id : (item.id && String(item.id).includes('-') ? item.id.split('-')[0] : null)),
+            productId: item.productId || item.product_id,
+            variant_id: item.variant_id,
+            sku: item.sku,
             name: item.title || item.product_name,
             image: resolveOrderItemImage(item),
             size: item.size || 'Size M',
             color: item.colorName || item.color || 'Tiêu chuẩn',
             quantity: Number(item.quantity || 1),
             price: Number(item.price || 0),
-            collection_tag: 'FALL/WINTER COUTURE ATELIER',
+            collection_tag: item.categoryTag || 'FALL/WINTER COUTURE ATELIER',
           })),
           stepper: {
             estimated_delivery: 'Dự kiến: Trong 24-48 giờ tới',
@@ -955,7 +959,7 @@ export default function CheckoutPage() {
                         <span className="option-title">Giao Hàng Hỏa Tốc</span>
                         <span className="badge-recommended">KHUYÊN DÙNG</span>
                       </div>
-                      <p className="option-desc">Giao trong 2-4 giờ tại nội thành Hà Nội &amp; TP.HCM.</p>
+                      <p className="option-desc">Giao trong 2-4 giờ tại nội thành Hà Nội.</p>
                     </div>
                   </div>
 
@@ -1151,7 +1155,7 @@ export default function CheckoutPage() {
               </div>
 
               <div className="calc-row">
-                <span className="calc-label">Vận Chuyển VIP</span>
+                <span className="calc-label">Vận Chuyển</span>
                 <span className="calc-value font-semibold text-amber-900">MIỄN PHÍ (0đ)</span>
               </div>
 

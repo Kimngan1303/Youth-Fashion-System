@@ -10,6 +10,7 @@ import { authService } from '../services/auth.service';
 import ProductCard from '../components/ProductCard';
 import { voucherService } from '../services/voucherService';
 import { orderService } from '../services/orderService';
+import { productService } from '../services/productService';
 import { resolveOrderItemImage } from '../utils/productImageUtils';
 import { ensureOrderCacheReset } from '../utils/orderCacheReset';
 
@@ -734,7 +735,7 @@ const ProfilePage = () => {
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [orderCurrentPage, setOrderCurrentPage] = useState(1);
-  const ordersPerPage = 10;
+  const ordersPerPage = 3;
 
   // Lịch sử đơn hàng: Chỉ tải các đơn hàng thực tế mà người dùng đã đặt thành công
   const [customerOrders, setCustomerOrders] = useState(() => {
@@ -820,6 +821,8 @@ const ProfilePage = () => {
         ...order,
         items: (order.items || []).map(item => ({
           ...item,
+          product_id: item.product_id || item.productId || (item.variant?.product_id) || (item.sku && String(item.sku).startsWith('YF-') ? item.sku.replace('YF-', '') : null),
+          productId: item.product_id || item.productId,
           image: resolveOrderItemImage(item),
         }))
       })));
@@ -828,9 +831,17 @@ const ProfilePage = () => {
     }
   });
 
+  // Modal chọn sản phẩm mua lại (Reorder Popup)
+  const [reorderModalOrder, setReorderModalOrder] = useState(null);
+  const [selectedReorderItemIndex, setSelectedReorderItemIndex] = useState(0);
+  const [allProductsList, setAllProductsList] = useState([]);
+
   // Modal theo dõi hành trình, đánh giá, bảo hành, hủy đơn, hoàn tiền
   const [trackingModalOrder, setTrackingModalOrder] = useState(null);
   const [reviewModalOrder, setReviewModalOrder] = useState(null);
+  const [productReviewsData, setProductReviewsData] = useState({});
+  const [reviewModalError, setReviewModalError] = useState('');
+  const [selectedReviewItemIndex, setSelectedReviewItemIndex] = useState(0);
   const [warrantyModalOpen, setWarrantyModalOpen] = useState(false);
   const [refundModalOrder, setRefundModalOrder] = useState(null);
   const [refundReason, setRefundReason] = useState('Sản phẩm không vừa kích cỡ (Size)');
@@ -847,6 +858,31 @@ const ProfilePage = () => {
   const [selectedReviewTags, setSelectedReviewTags] = useState(['Chất liệu thượng hạng', 'Đường may tinh xảo']);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewSubmittedAlert, setReviewSubmittedAlert] = useState('');
+  const [storedReviewsList, setStoredReviewsList] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('yf_product_reviews') || '[]');
+      let changed = false;
+      const cleaned = (Array.isArray(stored) ? stored : []).map(r => {
+        if (!r) return r;
+        const c = String(r.content || '').trim();
+        const autoTexts = [
+          'Chất lượng sản phẩm rất tuyệt vời, đúng kỳ vọng và phom dáng chuẩn!',
+          'Chất lượng sản phẩm rất tuyệt vời, đúng với kỳ vọng và phom dáng chuẩn!'
+        ];
+        if (autoTexts.includes(c) || (Array.isArray(r.tags) && r.tags.length > 0 && c === r.tags.join(', '))) {
+          changed = true;
+          return { ...r, content: '' };
+        }
+        return r;
+      });
+      if (changed) {
+        localStorage.setItem('yf_product_reviews', JSON.stringify(cleaned));
+      }
+      return cleaned;
+    } catch (e) {
+      return [];
+    }
+  });
   const [reviewedOrdersMap, setReviewedOrdersMap] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('yf_reviewed_orders') || '{}');
@@ -859,6 +895,20 @@ const ProfilePage = () => {
     const handleSyncReviews = () => {
       try {
         setReviewedOrdersMap(JSON.parse(localStorage.getItem('yf_reviewed_orders') || '{}'));
+        const stored = JSON.parse(localStorage.getItem('yf_product_reviews') || '[]');
+        const cleaned = (Array.isArray(stored) ? stored : []).map(r => {
+          if (!r) return r;
+          const c = String(r.content || '').trim();
+          const autoTexts = [
+            'Chất lượng sản phẩm rất tuyệt vời, đúng kỳ vọng và phom dáng chuẩn!',
+            'Chất lượng sản phẩm rất tuyệt vời, đúng với kỳ vọng và phom dáng chuẩn!'
+          ];
+          if (autoTexts.includes(c) || (Array.isArray(r.tags) && r.tags.length > 0 && c === r.tags.join(', '))) {
+            return { ...r, content: '' };
+          }
+          return r;
+        });
+        setStoredReviewsList(cleaned);
       } catch (e) {}
     };
     window.addEventListener('yf_reviews_updated', handleSyncReviews);
@@ -928,6 +978,8 @@ const ProfilePage = () => {
         ...order,
         items: (order.items || []).map(item => ({
           ...item,
+          product_id: item.product_id || item.productId || (item.variant?.product_id) || (item.sku && String(item.sku).startsWith('YF-') ? item.sku.replace('YF-', '') : null),
+          productId: item.product_id || item.productId,
           image: resolveOrderItemImage(item),
         }))
       }));
@@ -1095,6 +1147,10 @@ const ProfilePage = () => {
               refund_bank: refundBank,
               items: (apiOrd.order_items || []).map((i) => ({
                 id: i.order_item_id || i.variant_id,
+                product_id: i.variant?.product_id || i.variant?.product?.product_id || i.product_id || (i.sku && String(i.sku).startsWith('YF-') ? i.sku.replace('YF-', '') : null),
+                productId: i.variant?.product_id || i.variant?.product?.product_id || i.product_id,
+                variant_id: i.variant_id || i.variant?.variant_id,
+                sku: i.sku || i.variant?.sku,
                 name: i.product_name,
                 size: `Size ${i.size || 'M'}`,
                 color: `Màu ${i.color || 'Tiêu chuẩn'}`,
@@ -1117,6 +1173,8 @@ const ProfilePage = () => {
                 ...item,
                 items: (item.items || []).map(it => ({
                   ...it,
+                  product_id: it.product_id || it.productId || (it.variant?.product_id) || (it.sku && String(it.sku).startsWith('YF-') ? it.sku.replace('YF-', '') : null),
+                  productId: it.product_id || it.productId,
                   image: resolveOrderItemImage(it),
                 }))
               }));
@@ -1150,6 +1208,8 @@ const ProfilePage = () => {
             ...ord,
             items: (ord.items || []).map(it => ({
               ...it,
+              product_id: it.product_id || it.productId || (it.variant?.product_id) || (it.sku && String(it.sku).startsWith('YF-') ? it.sku.replace('YF-', '') : null),
+              productId: it.product_id || it.productId,
               image: resolveOrderItemImage(it),
             }))
           })));
@@ -1921,23 +1981,254 @@ const ProfilePage = () => {
   const startIndex = (orderCurrentPage - 1) * ordersPerPage;
   const currentOrders = filteredOrders.slice(startIndex, startIndex + ordersPerPage);
 
-  const handleReorder = async (ord) => {
-    if (!ord || !ord.items || ord.items.length === 0) return;
-    for (const item of ord.items) {
-      if (addToCart) {
-        await addToCart({
-          id: item.id || 1,
-          title: item.name,
-          price: item.price,
-          image: item.image,
-        }, item.size?.replace('Size ', '') || 'M', item.quantity || 1);
+  // Bảng tra cứu trực tiếp ID sản phẩm từ tên sản phẩm (đảm bảo điều hướng chính xác 100%)
+  const KNOWN_PRODUCT_NAME_TO_ID = {
+    "ví đựng thẻ lacoste nữ": "46",
+    "áo khoác tweed ivory cropped": "41",
+    "áo măng tô dạ camel cashmere": "37",
+    "áo len cổ lọ cream knitwear": "38",
+    "quần âu ống suông wool tencel": "39",
+    "đầm lụa emerald pleated gown": "40",
+    "quần tây slim fit black": "42",
+    "áo blazer kẻ sọc pinstripe": "43",
+    "sơ mi poplin cotton trắng": "44",
+    "bốt da nappa cổ điển": "45",
+    "quần short cargo hàn quốc nhiều túi": "10",
+    "quần tây trouser xếp ly lưng cao": "12",
+    "quần jogger thể thao bo gấu năng động": "13",
+    "chân váy xếp ly dáng a midi công sở": "14",
+    "áo len cổ lọ wool mềm mịn thu đông": "15",
+    "áo thun unisex acid wash streetwear": "16",
+    "áo sơ mi linen cổ tàu thoáng mát": "17",
+    "áo sweater nỉ bông in chữ typography": "18",
+    "balo canvas vintage chống nước chứa laptop": "19",
+    "túi xách da pu thêu họa tiết cao cấp": "20",
+    "giày sneaker retro leather phối màu": "21",
+    "sandal da quai ngang đế trấu tự nhiên": "22",
+    "mũ beanie dệt kim phong cách minimalist": "23",
+    "quần kaki chino form slimfit công sở": "11",
+    "thắt lưng da bò thật khóa kim tinh tế": "25",
+    "kính mát chống tia uv gọng kim loại": "26",
+    "khăn quàng len cashmere ấm áp mùa đông": "27",
+    "bộ đồ tập gym yoga co giãn 4 chiều": "28",
+    "bộ đồ mặc nhà silk pyjama cao cấp": "29",
+    "áo khoác denim vintage oversize unisex": "30",
+    "đầm dạ hội cổ lệch đính đá điệu đà": "31",
+    "áo bơi bikini 2 mảnh mùa hè rực rỡ": "32",
+    "áo sơ mi flannel kẻ caro phong cách grunge": "33",
+    "quần jeans rách gối korean street style": "34",
+    "áo gilet vest không tay phong cách preppy": "35",
+    "áo vest & blazer european fit ca rô": "6",
+    "áo sơ mi oxford form rộng minimalist": "2",
+    "quần jeans straight fit dáng suông vintage": "3",
+    "áo hoodie streetwear zip pocket nỉ thêu": "4",
+    "mũ cap lưỡi trai thêu logo vintage": "24",
+    "áo khoác bomber unisex water-resistant": "5",
+    "váy đầm lụa satin cổ v xếp ly sang trọng": "7",
+    "áo măng tô dạ tuyết dáng dài thu đông": "8",
+    "áo polo dệt kim co giãn thoáng khí": "9",
+    "áo thun ba lỗ ribbed tank top ôm dáng": "36",
+    "áo thun oversize youth graphic cotton 100%": "1"
+  };
+
+  const normalizeProdName = (str) =>
+    String(str || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/[^a-z0-9]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  // Tải danh sách toàn bộ sản phẩm để ánh xạ chính xác sang trang chi tiết khi mua lại
+  useEffect(() => {
+    let isMounted = true;
+    productService.getProducts({ limit: 100 })
+      .then(res => {
+        if (!isMounted || !res) return;
+        const list = res.data?.products || res.products || res.data?.items || (Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []));
+        if (Array.isArray(list)) {
+          setAllProductsList(list);
+        }
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
+
+  // Hàm suy luận ID sản phẩm để điều hướng chính xác vào trang chi tiết /products/:id
+  const resolveProductDetailPageId = (item) => {
+    if (!item) return 'default';
+
+    const rawName = String(item.name || item.product_name || '').toLowerCase().trim();
+    const normRaw = normalizeProdName(rawName);
+
+    // 1. Kiểm tra chính xác tên sản phẩm trong bảng tra cứu chuẩn
+    if (rawName && KNOWN_PRODUCT_NAME_TO_ID[rawName]) {
+      return KNOWN_PRODUCT_NAME_TO_ID[rawName];
+    }
+
+    // 2. Khớp theo tên không dấu trong bảng tra cứu
+    if (normRaw) {
+      for (const [key, val] of Object.entries(KNOWN_PRODUCT_NAME_TO_ID)) {
+        const normKey = normalizeProdName(key);
+        if (normKey === normRaw || normRaw.includes(normKey) || normKey.includes(normRaw)) {
+          return val;
+        }
       }
     }
-    setProfileAlert({
-      type: 'success',
-      message: `Đã thêm các sản phẩm từ đơn hàng #${ord.order_code || ord.order_id} vào giỏ hàng thành công!`
+
+    // 3. Khớp tên sản phẩm trong allProductsList đã tải từ backend
+    if (Array.isArray(allProductsList) && allProductsList.length > 0) {
+      const found = allProductsList.find(p => {
+        const pName = String(p.product_name || p.name || '').toLowerCase().trim();
+        const normPName = normalizeProdName(pName);
+        return pName === rawName || normPName === normRaw || (normRaw && normPName && (normRaw.includes(normPName) || normPName.includes(normRaw)));
+      });
+      if (found?.product_id || found?.id) {
+        return String(found.product_id || found.id);
+      }
+    }
+
+    // 4. Nếu item có product_id hoặc productId hợp lệ trong khoảng sản phẩm hệ thống (1 -> 46)
+    const directId = item.product_id || item.productId || item.variant?.product_id || item.variant?.product?.product_id;
+    if (directId && !isNaN(Number(directId)) && Number(directId) > 0 && Number(directId) <= 46) {
+      return String(directId);
+    }
+
+    return 'default';
+  };
+
+  // Mở popup chọn sản phẩm mua lại từ đơn hàng
+  const handleOpenReorderModal = (ord) => {
+    if (!ord || !ord.items || ord.items.length === 0) return;
+    setReorderModalOrder(ord);
+    setSelectedReorderItemIndex(0);
+  };
+
+  // Xác nhận sản phẩm đã chọn và chuyển hướng sang trang chi tiết sản phẩm đó
+  const handleConfirmReorderSelection = () => {
+    if (!reorderModalOrder || !reorderModalOrder.items) return;
+    const item = reorderModalOrder.items[selectedReorderItemIndex] || reorderModalOrder.items[0];
+    if (!item) return;
+
+    const targetId = resolveProductDetailPageId(item);
+    setReorderModalOrder(null);
+    navigate(`/products/${targetId}`, {
+      state: {
+        preSelectedSize: item.size,
+        preSelectedColor: item.color,
+        productName: item.name || item.product_name,
+      }
     });
-    setTimeout(() => navigate('/cart'), 700);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Tìm đánh giá đã có của một sản phẩm trong đơn hàng
+  const findItemReview = useCallback((ord, item) => {
+    if (!ord || !item) return null;
+    const allReviews = Array.isArray(storedReviewsList) && storedReviewsList.length > 0
+      ? storedReviewsList
+      : (() => {
+          try {
+            return JSON.parse(localStorage.getItem('yf_product_reviews') || '[]');
+          } catch (e) {
+            return [];
+          }
+        })();
+
+    const oId = String(ord.order_id || ord.id || '').trim();
+    const oCode = String(ord.order_code || ord.order_number || ord.order_id || '').trim();
+    const digits = (oCode || oId).replace(/\D/g, '');
+    const prodId = String(resolveProductDetailPageId(item)).trim();
+    const itemName = String(item.name || item.product_name || '').toLowerCase().trim();
+    const normItem = normalizeProdName(itemName);
+
+    return allReviews.find(r => {
+      if (!r) return false;
+      const rOId = String(r.order_id || '').trim();
+      const rOCode = String(r.order_code || '').trim();
+      const rDigits = (rOCode || rOId).replace(/\D/g, '');
+
+      // 1. Kiểm tra đơn hàng có khớp không
+      const orderMatch = Boolean(
+        (oId && rOId && oId === rOId) ||
+        (oCode && rOCode && oCode === rOCode) ||
+        (digits && rDigits && digits === rDigits)
+      );
+      if (!orderMatch) return false;
+
+      // 2. Khớp sản phẩm theo id hoặc tên
+      const rProdId = String(r.product_id || '').trim();
+      const rProdName = String(r.product_name || '').toLowerCase().trim();
+      const normRProdName = normalizeProdName(rProdName);
+
+      if (r.order_item_id && (item.id || item.order_item_id) && String(r.order_item_id) === String(item.id || item.order_item_id)) {
+        return true;
+      }
+
+      if (prodId && rProdId && prodId !== 'default' && prodId === rProdId) {
+        return true;
+      }
+
+      if (normItem && normRProdName && (normItem === normRProdName || normItem.includes(normRProdName) || normRProdName.includes(normItem))) {
+        return true;
+      }
+
+      return false;
+    }) || null;
+  }, [storedReviewsList]);
+
+  // Đếm số lượng sản phẩm trong đơn đã được đánh giá
+  const getOrderReviewedCount = useCallback((ord) => {
+    if (!ord || !Array.isArray(ord.items) || ord.items.length === 0) return 0;
+    return ord.items.filter(it => Boolean(findItemReview(ord, it))).length;
+  }, [findItemReview]);
+
+  // Mở popup đánh giá đơn hàng (phân biệt rõ ràng sản phẩm đã đánh giá và sản phẩm chưa đánh giá)
+  const openReviewModal = (ord) => {
+    if (!ord) return;
+    setReviewModalError('');
+    const initialData = {};
+    (ord.items || []).forEach((item, idx) => {
+      const existing = findItemReview(ord, item);
+      if (existing) {
+        let existingComment = String(existing.content || '').trim();
+        const autoTexts = [
+          'Chất lượng sản phẩm rất tuyệt vời, đúng kỳ vọng và phom dáng chuẩn!',
+          'Chất lượng sản phẩm rất tuyệt vời, đúng với kỳ vọng và phom dáng chuẩn!'
+        ];
+        if (autoTexts.includes(existingComment) || (Array.isArray(existing.tags) && existing.tags.length > 0 && existingComment === existing.tags.join(', '))) {
+          existingComment = '';
+        }
+
+        initialData[idx] = {
+          isAlreadyReviewed: true,
+          existingReview: existing,
+          checked: false,
+          rating: Number(existing.rating || 5),
+          tags: Array.isArray(existing.tags) ? existing.tags : [],
+          comment: existingComment
+        };
+      } else {
+        initialData[idx] = {
+          isAlreadyReviewed: false,
+          existingReview: null,
+          checked: false,
+          rating: 0,
+          tags: [],
+          comment: ''
+        };
+      }
+    });
+
+    setProductReviewsData(initialData);
+    setSelectedReviewItemIndex(0);
+    setReviewModalOrder(ord);
+  };
+
+  const handleReorder = (ord) => {
+    handleOpenReorderModal(ord);
   };
 
   const confirmCancelOrder = async (ord) => {
@@ -2809,8 +3100,19 @@ const ProfilePage = () => {
             {activeTab === 'orders' && (
               <div className="content-inner animate-fade-in">
                 {reviewSubmittedAlert && (
-                  <div className="profile-alert alert-success animate-fade-in" style={{ marginBottom: 16 }}>
-                    <CheckCircle size={16} /> {reviewSubmittedAlert}
+                  <div className="profile-alert alert-success animate-fade-in" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <CheckCircle size={18} style={{ color: '#16a34a', flexShrink: 0 }} />
+                      <span style={{ fontWeight: 600 }}>{reviewSubmittedAlert}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReviewSubmittedAlert('')}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#16a34a', display: 'flex', alignItems: 'center' }}
+                      title="Đóng thông báo"
+                    >
+                      <X size={16} />
+                    </button>
                   </div>
                 )}
 
@@ -2979,8 +3281,15 @@ const ProfilePage = () => {
                             </div>
                           </div>
 
-                          {/* Items List */}
-                          <div className="order-items-wrapper">
+                          {/* Items List (Tối đa hiển thị 2 sản phẩm, nhiều hơn sẽ cuộn xuống) */}
+                          <div
+                            className="order-items-wrapper"
+                            style={ord.items && ord.items.length > 2 ? {
+                              maxHeight: '210px',
+                              overflowY: 'auto',
+                              paddingRight: '10px'
+                            } : {}}
+                          >
                             {ord.items.map((item, idx) => {
                               const itemImg = resolveOrderItemImage(item);
                               return (
@@ -3236,26 +3545,21 @@ const ProfilePage = () => {
                                   >
                                     Xem Chi Tiết
                                   </button>
-                                  {isOrderReviewed(ord) ? (
-                                    <button
-                                      className="btn-order-action btn-gold-outline"
-                                      onClick={() => {
-                                        const firstItem = ord.items?.[0] || {};
-                                        const prodId = firstItem.product_id || firstItem.id || 'YF-COAT-CAMEL-01';
-                                        navigate(`/product/${prodId}#customer-reviews`);
-                                      }}
-                                      title="Xem đánh giá thực tế của bạn trên trang chi tiết sản phẩm"
-                                    >
-                                      ★ Đã Đánh Giá (Xem Feedback)
-                                    </button>
-                                  ) : (
-                                    <button
-                                      className="btn-order-action btn-gold-outline"
-                                      onClick={() => setReviewModalOrder(ord)}
-                                    >
-                                      ★ Viết Đánh Giá
-                                    </button>
-                                  )}
+                                  {(() => {
+                                    const reviewedCount = getOrderReviewedCount(ord);
+                                    const totalCount = ord.items?.length || 0;
+                                    return (
+                                      <button
+                                        className="btn-order-action btn-gold-outline"
+                                        onClick={() => openReviewModal(ord)}
+                                        title={reviewedCount > 0 ? `Đã đánh giá ${reviewedCount}/${totalCount} sản phẩm (Bấm để xem lại hoặc đánh giá tiếp)` : "Viết đánh giá sản phẩm"}
+                                      >
+                                        {reviewedCount > 0
+                                          ? `★ Đã đánh giá (${reviewedCount}/${totalCount})`
+                                          : '★ Viết Đánh Giá'}
+                                      </button>
+                                    );
+                                  })()}
                                   <button
                                     className="btn-order-action btn-neutral-outline"
                                     onClick={() => {
@@ -4116,150 +4420,514 @@ const ProfilePage = () => {
       {/* Modal 2: Viết Đánh Giá*/}
       {reviewModalOrder && (
         <div className="profile-modal-overlay animate-fade-in" onClick={() => setReviewModalOrder(null)}>
-          <div className="profile-modal-box review-modal-box" onClick={e => e.stopPropagation()}>
-            <div className="modal-header-row">
-              <div>
-                <span className="modal-super-title gold-text">★ ĐẶC QUYỀN THÀNH VIÊN VIP</span>
+          <div className="profile-modal-box review-modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px', width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="modal-header-row" style={{ marginBottom: '14px', paddingBottom: '12px' }}>
+              <div style={{ flex: 1 }}>
                 <h3 className="modal-title font-serif">Viết Đánh Giá Sản Phẩm</h3>
+                <span style={{ fontSize: '12.5px', color: '#78716c', marginTop: '4px', display: 'block' }}>
+                  Tick chọn sản phẩm bạn muốn đánh giá trong đơn hàng #{reviewModalOrder.order_code || reviewModalOrder.order_id}:
+                </span>
+                {reviewModalError && (
+                  <div style={{
+                    marginTop: '10px',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    color: '#dc2626',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    animation: 'fadeIn 0.2s ease-in-out'
+                  }}>
+                    <AlertCircle size={16} style={{ flexShrink: 0, color: '#dc2626' }} />
+                    <span>{reviewModalError}</span>
+                  </div>
+                )}
               </div>
               <button className="modal-close-btn" onClick={() => setReviewModalOrder(null)}>
                 <X size={18} />
               </button>
             </div>
 
-            <div className="review-reward-banner">
-              <span>🎉 Nhận ngay <strong>+100 Điểm Thưởng VIP</strong> sau khi hoàn thành đánh giá!</span>
-            </div>
+            {/* Danh sách cuộn dọc các sản phẩm trong đơn hàng */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              paddingRight: '6px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '18px',
+              marginBottom: '16px'
+            }}>
+              {(reviewModalOrder.items || []).map((it, idx) => {
+                const itemData = productReviewsData[idx] || {
+                  isAlreadyReviewed: false,
+                  checked: false,
+                  rating: 0,
+                  tags: [],
+                  comment: ''
+                };
+                const isAlreadyReviewed = Boolean(itemData.isAlreadyReviewed);
+                const isChecked = Boolean(itemData.checked);
+                const currentRating = Number(itemData.rating || 0);
+                const currentTags = Array.isArray(itemData.tags) ? itemData.tags : [];
+                const itemImg = resolveOrderItemImage(it);
 
-            <div className="review-product-preview">
-              <img
-                src={resolveOrderItemImage(reviewModalOrder.items?.[0])}
-                alt=""
-                className="review-thumb"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = resolveOrderItemImage(reviewModalOrder.items?.[0]);
-                }}
-              />
-              <div>
-                <h4 className="review-prod-title font-serif">{reviewModalOrder.items?.[0]?.name}</h4>
-                <span className="review-prod-specs">Mã đơn: #{reviewModalOrder.order_code || reviewModalOrder.order_id}</span>
-              </div>
-            </div>
+                if (isAlreadyReviewed) {
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        border: '1.5px solid #86efac',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        backgroundColor: '#f0fdf4',
+                        boxShadow: '0 2px 8px rgba(34, 197, 94, 0.05)',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {/* Hàng trạng thái đã đánh giá & Nút Xem đánh giá */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: '12px',
+                        paddingBottom: '10px',
+                        borderBottom: '1px solid #dcfce7'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            borderRadius: '20px',
+                            backgroundColor: '#dcfce7',
+                            color: '#15803d',
+                            fontSize: '12px',
+                            fontWeight: 700
+                          }}>
+                            <CheckCircle size={14} color="#16a34a" />
+                            <span>Sản phẩm đã được đánh giá</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const prodId = resolveProductDetailPageId(it);
+                            setReviewModalOrder(null);
+                            navigate(`/products/${prodId}#customer-reviews`, {
+                              state: {
+                                productName: it.name || it.product_name,
+                              }
+                            });
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '6px 14px',
+                            borderRadius: '6px',
+                            backgroundColor: '#1c1917',
+                            border: '1px solid #1c1917',
+                            color: '#ffffff',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <span>Xem đánh giá</span>
+                          <ArrowRight size={13} />
+                        </button>
+                      </div>
 
-            <div className="review-rating-stars">
-              <span className="rating-prompt">Chất lượng sản phẩm & độ vừa vặn:</span>
-              <div className="stars-row">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    className={`star-btn ${star <= reviewRating ? 'selected' : ''}`}
-                    onClick={() => setReviewRating(star)}
+                      {/* Xem trước sản phẩm */}
+                      <div className="review-product-preview" style={{ marginBottom: '12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+                        <img
+                          src={itemImg}
+                          alt=""
+                          className="review-thumb"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = itemImg;
+                          }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <h4 className="review-prod-title font-serif" style={{ fontSize: '14px', fontWeight: 600, color: '#1c1917', margin: '0 0 3px' }}>
+                            {it.name || it.product_name}
+                          </h4>
+                          <span className="review-prod-specs" style={{ fontSize: '12px', color: '#78716c' }}>
+                            Mã đơn: #{reviewModalOrder.order_code || reviewModalOrder.order_id}
+                            {it.size ? ` • Size: ${it.size}` : ''}
+                            {it.color ? ` • Màu: ${it.color}` : ''}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Tóm tắt đánh giá đã gửi */}
+                      <div style={{
+                        backgroundColor: '#ffffff',
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ display: 'flex', color: '#f59e0b', fontSize: '16px', letterSpacing: '1px' }}>
+                            {[1, 2, 3, 4, 5].map(st => (
+                              <span key={st} style={{ color: st <= (itemData.rating || 5) ? '#f59e0b' : '#d6d3d1' }}>★</span>
+                            ))}
+                          </div>
+                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#b45309' }}>
+                            {itemData.rating === 5 ? 'Cực kỳ hài lòng (5/5)' : `${itemData.rating}/5 sao`}
+                          </span>
+                        </div>
+                        {itemData.tags && itemData.tags.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
+                            {itemData.tags.map((tg, tIdx) => (
+                              <span key={tIdx} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#f1f5f9', color: '#475569', fontWeight: 500 }}>
+                                {tg}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {itemData.comment && itemData.comment.trim() && (
+                          <p style={{ fontSize: '12.5px', color: '#334155', margin: '4px 0 0', fontStyle: 'italic', lineHeight: 1.4 }}>
+                            "{itemData.comment.trim()}"
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      border: isChecked ? '1.5px solid #1c1917' : '1px solid #e7e5e4',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      backgroundColor: isChecked ? '#ffffff' : '#fafaf9',
+                      boxShadow: isChecked ? '0 2px 8px rgba(0,0,0,0.03)' : 'none',
+                      transition: 'all 0.2s ease'
+                    }}
                   >
-                    ★
-                  </button>
-                ))}
-                <span className="rating-label-text">
-                  {reviewRating === 5 ? 'Cực kỳ hài lòng (5/5)' : reviewRating === 4 ? 'Rất tốt (4/5)' : `${reviewRating}/5 sao`}
-                </span>
-              </div>
+                    {/* Hàng Checkbox tick chọn sản phẩm chưa đánh giá */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: '12px',
+                      paddingBottom: '10px',
+                      borderBottom: '1px solid #f5f5f4'
+                    }}>
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        cursor: 'pointer',
+                        margin: 0,
+                        userSelect: 'none'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setReviewModalError('');
+                            setProductReviewsData(prev => ({
+                              ...prev,
+                              [idx]: {
+                                ...(prev[idx] || {
+                                  isAlreadyReviewed: false,
+                                  rating: 0,
+                                  tags: [],
+                                  comment: ''
+                                }),
+                                checked
+                              }
+                            }));
+                          }}
+                          style={{
+                            width: '18px',
+                            height: '18px',
+                            cursor: 'pointer',
+                            accentColor: '#1c1917'
+                          }}
+                        />
+                        <span style={{
+                          fontSize: '13.5px',
+                          fontWeight: 600,
+                          color: isChecked ? '#1c1917' : '#78716c'
+                        }}>
+                          Đánh giá sản phẩm này
+                        </span>
+                      </label>
+                      <span style={{
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        color: isChecked ? '#15803d' : '#a8a29e'
+                      }}>
+                        {isChecked ? '✓ Đã chọn đánh giá' : 'Chưa đánh giá'}
+                      </span>
+                    </div>
+
+                    {/* Product preview card (Image 2 style) */}
+                    <div className="review-product-preview" style={{ marginBottom: isChecked ? '16px' : '0' }}>
+                      <img
+                        src={itemImg}
+                        alt=""
+                        className="review-thumb"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = itemImg;
+                        }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h4 className="review-prod-title font-serif" style={{ fontSize: '14px', fontWeight: 600, color: '#1c1917', margin: '0 0 3px' }}>
+                          {it.name || it.product_name}
+                        </h4>
+                        <span className="review-prod-specs" style={{ fontSize: '12px', color: '#78716c' }}>
+                          Mã đơn: #{reviewModalOrder.order_code || reviewModalOrder.order_id}
+                          {it.size ? ` • Size: ${it.size}` : ''}
+                          {it.color ? ` • Màu: ${it.color}` : ''}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Form đánh giá khi được tick chọn */}
+                    {isChecked ? (
+                      <div>
+                        <div className="review-rating-stars">
+                          <span className="rating-prompt">Chất lượng sản phẩm & độ vừa vặn:</span>
+                          <div className="stars-row">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <button
+                                key={star}
+                                type="button"
+                                className={`star-btn ${star <= currentRating ? 'selected' : ''}`}
+                                onClick={() => {
+                                  setReviewModalError('');
+                                  setProductReviewsData(prev => ({
+                                    ...prev,
+                                    [idx]: {
+                                      ...(prev[idx] || {}),
+                                      checked: true,
+                                      rating: star
+                                    }
+                                  }));
+                                }}
+                              >
+                                ★
+                              </button>
+                            ))}
+                            <span className="rating-label-text">
+                              {currentRating === 5
+                                ? 'Cực kỳ hài lòng (5/5)'
+                                : currentRating === 4
+                                ? 'Rất tốt (4/5)'
+                                : currentRating === 3
+                                ? 'Hài lòng (3/5)'
+                                : currentRating === 2
+                                ? 'Tạm được (2/5)'
+                                : currentRating === 1
+                                ? 'Chưa hài lòng (1/5)'
+                                : '(Chạm vào sao để đánh giá)'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="review-quick-tags">
+                          {['Chất liệu thượng hạng', 'Đường may tinh xảo', 'Chuẩn phom dáng', 'Đóng gói sang trọng'].map((tag, tagIdx) => {
+                            const isActive = currentTags.includes(tag);
+                            return (
+                              <button
+                                key={tagIdx}
+                                type="button"
+                                className={`quick-tag-chip ${isActive ? 'active' : ''}`}
+                                onClick={() => {
+                                  setReviewModalError('');
+                                  const nextTags = isActive
+                                    ? currentTags.filter(t => t !== tag)
+                                    : [...currentTags, tag];
+                                  setProductReviewsData(prev => ({
+                                    ...prev,
+                                    [idx]: {
+                                      ...(prev[idx] || {}),
+                                      checked: true,
+                                      tags: nextTags
+                                    }
+                                  }));
+                                }}
+                              >
+                                {tag}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="review-textarea-wrap" style={{ marginBottom: 0 }}>
+                          <textarea
+                            rows={3}
+                            placeholder="Chia sẻ thêm cảm nhận của bạn về chất vải, phom dáng và dịch vụ may đo..."
+                            value={itemData.comment || ''}
+                            onChange={e => {
+                              const commentVal = e.target.value;
+                              setReviewModalError('');
+                              setProductReviewsData(prev => ({
+                                ...prev,
+                                [idx]: {
+                                  ...(prev[idx] || {}),
+                                  checked: true,
+                                  comment: commentVal
+                                }
+                              }));
+                            }}
+                            className="review-textarea"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{
+                        fontSize: '12px',
+                        color: '#a8a29e',
+                        fontStyle: 'italic',
+                        paddingTop: '6px'
+                      }}>
+                        (Sản phẩm này chưa được gửi đánh giá. Bạn có thể tick chọn để đánh giá tiếp)
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="review-quick-tags">
-              {['Chất liệu thượng hạng', 'Đường may tinh xảo', 'Chuẩn phom dáng', 'Đóng gói sang trọng'].map((tag, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  className={`quick-tag-chip ${selectedReviewTags.includes(tag) ? 'active' : ''}`}
-                  onClick={() => {
-                    setSelectedReviewTags(prev =>
-                      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-                    );
-                  }}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
+            <div className="modal-footer-actions" style={{ borderTop: '1px solid #f1f3f5', paddingTop: '14px', marginTop: 0 }}>
+              {(() => {
+                const items = reviewModalOrder?.items || [];
+                const unreviewedItems = items
+                  .map((item, idx) => ({ item, idx, data: productReviewsData[idx] }))
+                  .filter(entry => !entry.data?.isAlreadyReviewed);
 
-            <div className="review-textarea-wrap">
-              <textarea
-                rows={3}
-                placeholder="Chia sẻ thêm cảm nhận của bạn về chất vải, phom dáng và dịch vụ may đo..."
-                value={reviewComment}
-                onChange={e => setReviewComment(e.target.value)}
-                className="review-textarea"
-              />
-            </div>
+                if (unreviewedItems.length === 0) {
+                  return (
+                    <button
+                      className="btn-modal-primary"
+                      onClick={() => setReviewModalOrder(null)}
+                      style={{ width: '100%' }}
+                    >
+                      ĐÃ HOÀN TẤT ĐÁNH GIÁ (ĐÓNG)
+                    </button>
+                  );
+                }
 
-            <div className="modal-footer-actions">
-              <button className="btn-modal-cancel" onClick={() => setReviewModalOrder(null)}>
-                HỦY
-              </button>
-              <button
-                className="btn-modal-primary"
-                onClick={() => {
-                  const firstItem = reviewModalOrder?.items?.[0] || {};
-                  const prodId = String(firstItem.product_id || firstItem.id || 'YF-COAT-CAMEL-01');
-                  const prodName = firstItem.name || 'Áo Măng Tô Belted Dạ Camel Cashmere';
-                  const variantParts = [firstItem.size ? `Size ${firstItem.size}` : '', firstItem.color ? `${firstItem.color}` : ''].filter(Boolean);
-                  const variantStr = variantParts.length > 0 ? variantParts.join(' • ') : 'Tiêu chuẩn';
+                return (
+                  <>
+                    <button className="btn-modal-cancel" onClick={() => setReviewModalOrder(null)}>
+                      HỦY
+                    </button>
+                    <button
+                      className="btn-modal-primary"
+                      onClick={() => {
+                        const checkedEntries = unreviewedItems.filter(entry => Boolean(entry.data?.checked));
 
-                  const authorName = user?.full_name || user?.name || (user?.email ? user.email.split('@')[0] : 'Khách hàng VIP');
-                  const oId = String(reviewModalOrder?.order_id || reviewModalOrder?.id || '').trim();
-                  const oCode = String(reviewModalOrder?.order_code || reviewModalOrder?.order_number || reviewModalOrder?.order_id || '').trim();
-                  const digits = (oCode || oId).replace(/\D/g, '');
+                        if (checkedEntries.length === 0) {
+                          setReviewModalError('Vui lòng tick chọn ít nhất một sản phẩm chưa đánh giá để gửi!');
+                          return;
+                        }
 
-                  const newReview = {
-                    id: 'rev_' + Date.now(),
-                    product_id: prodId,
-                    product_name: prodName,
-                    author: authorName,
-                    customer_id: String(user?.customer_id || user?.id || ''),
-                    is_verified: true,
-                    date: new Date().toLocaleDateString('vi-VN'),
-                    created_at: new Date().toISOString(),
-                    variant: variantStr,
-                    rating: Number(reviewRating || 5),
-                    content: reviewComment.trim() || (selectedReviewTags.length > 0 ? selectedReviewTags.join(', ') : 'Chất lượng sản phẩm rất tuyệt vời, đúng kỳ vọng và phom dáng chuẩn!'),
-                    tags: selectedReviewTags || [],
-                    likes: 0,
-                    order_id: oId,
-                    order_code: oCode,
-                  };
+                        const unrated = checkedEntries.find(entry => !entry.data?.rating || Number(entry.data.rating) <= 0);
+                        if (unrated) {
+                          setReviewModalError(`Vui lòng chọn số sao đánh giá cho sản phẩm "${unrated.item.name || unrated.item.product_name}"!`);
+                          return;
+                        }
 
-                  try {
-                    const existing = JSON.parse(localStorage.getItem('yf_product_reviews') || '[]');
-                    const updated = [newReview, ...existing.filter(r => !(r.order_id === oId && r.product_id === prodId))];
-                    localStorage.setItem('yf_product_reviews', JSON.stringify(updated));
-                  } catch (e) {}
+                        const authorName = user?.full_name || user?.name || (user?.email ? user.email.split('@')[0] : 'Khách hàng VIP');
+                        const oId = String(reviewModalOrder?.order_id || reviewModalOrder?.id || '').trim();
+                        const oCode = String(reviewModalOrder?.order_code || reviewModalOrder?.order_number || reviewModalOrder?.order_id || '').trim();
+                        const digits = (oCode || oId).replace(/\D/g, '');
 
-                  try {
-                    const revMap = JSON.parse(localStorage.getItem('yf_reviewed_orders') || '{}');
-                    if (oId) revMap[oId] = true;
-                    if (oCode) revMap[oCode] = true;
-                    if (digits) revMap[digits] = true;
-                    localStorage.setItem('yf_reviewed_orders', JSON.stringify(revMap));
-                    setReviewedOrdersMap(revMap);
-                  } catch (e) {}
+                        const newReviews = checkedEntries.map(({ item, idx, data }) => {
+                          const prodId = resolveProductDetailPageId(item);
+                          const prodName = item.name || item.product_name || 'Sản phẩm Youth Fashion';
+                          const variantParts = [item.size ? `Size ${item.size}` : '', item.color ? `${item.color}` : ''].filter(Boolean);
+                          const variantStr = variantParts.length > 0 ? variantParts.join(' • ') : 'Tiêu chuẩn';
+                          const ratingVal = Number(data?.rating || 5);
+                          const tagsVal = Array.isArray(data?.tags) ? data.tags : [];
+                          const commentVal = (data?.comment || '').trim();
+                          const contentVal = commentVal; // Chỉ lưu nhận xét do người dùng tự nhập, không tự động sinh text mặc định
 
-                  try {
-                    window.dispatchEvent(new CustomEvent('yf_reviews_updated', { detail: newReview }));
-                    const bc = new BroadcastChannel('yf_reviews_sync_channel');
-                    bc.postMessage(newReview);
-                    bc.close();
-                  } catch (e) {}
+                          return {
+                            id: 'rev_' + Date.now() + '_' + idx + '_' + Math.random().toString(36).substring(2, 6),
+                            order_item_id: item.id || item.order_item_id || item.variant_id || idx,
+                            product_id: String(prodId),
+                            product_name: prodName,
+                            author: authorName,
+                            customer_id: String(user?.customer_id || user?.id || ''),
+                            is_verified: true,
+                            date: new Date().toLocaleDateString('vi-VN'),
+                            created_at: new Date().toISOString(),
+                            variant: variantStr,
+                            rating: ratingVal,
+                            content: contentVal,
+                            tags: tagsVal,
+                            likes: 0,
+                            order_id: oId,
+                            order_code: oCode,
+                          };
+                        });
 
-                  setReviewSubmittedAlert(`Cảm ơn bạn! Đánh giá đã được ghi nhận thành công. Đang chuyển đến trang đánh giá sản phẩm...`);
-                  setReviewModalOrder(null);
-                  setTimeout(() => {
-                    navigate(`/product/${prodId}#customer-reviews`);
-                  }, 600);
-                }}
-              >
-                GỬI ĐÁNH GIÁ
-              </button>
+                        // 1. Lưu đánh giá vào localStorage (thêm các sản phẩm mới vào danh sách)
+                        let updatedReviews = [];
+                        try {
+                          const existing = JSON.parse(localStorage.getItem('yf_product_reviews') || '[]');
+                          const newProdIds = new Set(newReviews.map(r => String(r.product_id)));
+                          const filteredExisting = existing.filter(r => !(
+                            (r.order_id === oId || r.order_code === oCode) &&
+                            newProdIds.has(String(r.product_id))
+                          ));
+                          updatedReviews = [...newReviews, ...filteredExisting];
+                          localStorage.setItem('yf_product_reviews', JSON.stringify(updatedReviews));
+                          setStoredReviewsList(updatedReviews);
+                        } catch (e) {}
+
+                        // 2. Cập nhật trạng thái đã đánh giá cho đơn hàng
+                        try {
+                          const revMap = JSON.parse(localStorage.getItem('yf_reviewed_orders') || '{}');
+                          if (oId) revMap[oId] = true;
+                          if (oCode) revMap[oCode] = true;
+                          if (digits) revMap[digits] = true;
+                          localStorage.setItem('yf_reviewed_orders', JSON.stringify(revMap));
+                          setReviewedOrdersMap(revMap);
+                        } catch (e) {}
+
+                        // 3. Đồng bộ sự kiện realtime
+                        try {
+                          window.dispatchEvent(new CustomEvent('yf_reviews_updated', { detail: updatedReviews }));
+                          const bc = new BroadcastChannel('yf_reviews_sync_channel');
+                          bc.postMessage(updatedReviews);
+                          bc.close();
+                        } catch (e) {}
+
+                        // 4. Đóng popup và hiển thị thông báo thành công (KHÔNG chuyển hướng sang chi tiết sản phẩm)
+                        setReviewSubmittedAlert(`Gửi feedback thành công cho ${newReviews.length} sản phẩm! Cảm ơn bạn đã đóng góp đánh giá.`);
+                        setReviewModalOrder(null);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                    >
+                      GỬI ĐÁNH GIÁ
+                    </button>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -4528,6 +5196,179 @@ const ProfilePage = () => {
                 style={{ backgroundColor: '#7e22ce', borderColor: '#7e22ce', color: '#ffffff' }}
               >
                 {isRefunding ? 'ĐANG GỬI...' : 'XÁC NHẬN HOÀN TIỀN'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 6: Chọn Sản Phẩm Mua Lại (Reorder Popup) */}
+      {reorderModalOrder && (
+        <div className="profile-modal-overlay animate-fade-in" onClick={() => setReorderModalOrder(null)}>
+          <div className="profile-modal-box cancel-modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '580px', width: '92%' }}>
+            <div className="modal-header-row">
+              <div>
+                <span className="modal-super-title" style={{ color: '#1c1917', letterSpacing: '0.6px' }}>
+                  CHỌN SẢN PHẨM MUA LẠI
+                </span>
+                <h3 className="modal-title font-serif" style={{ fontSize: '18px', marginTop: '2px' }}>
+                  Đơn Hàng #{reorderModalOrder.order_code || reorderModalOrder.order_id}
+                </h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setReorderModalOrder(null)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '10px 0 4px 0' }}>
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                marginBottom: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span style={{ fontSize: '12.5px', color: '#334155' }}>
+                  Đơn hàng của bạn có <strong>{reorderModalOrder.items?.length || 1} sản phẩm</strong>. Vui lòng tick chọn sản phẩm bạn muốn xem chi tiết và mua lại:
+                </span>
+              </div>
+
+              <div style={{
+                maxHeight: '360px',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                paddingRight: '2px'
+              }}>
+                {(reorderModalOrder.items || []).map((item, idx) => {
+                  const isSelected = selectedReorderItemIndex === idx;
+                  const itemPrice = Number(item.price || item.unit_price || 0);
+
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => setSelectedReorderItemIndex(idx)}
+                      onDoubleClick={handleConfirmReorderSelection}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '14px',
+                        padding: '12px 14px',
+                        borderRadius: '10px',
+                        border: isSelected ? '2px solid #1c1917' : '1px solid #e7e5e4',
+                        backgroundColor: isSelected ? '#fafaf9' : '#ffffff',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
+                      }}
+                    >
+                      {/* Checkbox / Radio Tick Icon */}
+                      <div
+                        style={{
+                          width: '22px',
+                          height: '22px',
+                          borderRadius: '50%',
+                          border: isSelected ? '2px solid #1c1917' : '2px solid #d6d3d1',
+                          backgroundColor: isSelected ? '#1c1917' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {isSelected && <Check size={14} color="#ffffff" strokeWidth={3} />}
+                      </div>
+
+                      {/* Product Thumbnail */}
+                      <div style={{
+                        width: '56px',
+                        height: '56px',
+                        borderRadius: '6px',
+                        overflow: 'hidden',
+                        backgroundColor: '#f5f5f4',
+                        border: '1px solid #e7e5e4',
+                        flexShrink: 0
+                      }}>
+                        <img
+                          src={item.image || '/placeholder.png'}
+                          alt={item.name || item.product_name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => { e.target.src = '/placeholder.png'; }}
+                        />
+                      </div>
+
+                      {/* Product Details */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {item.collection_tag && (
+                          <div style={{
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            color: '#c2410c',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.4px',
+                            marginBottom: '2px'
+                          }}>
+                            {item.collection_tag}
+                          </div>
+                        )}
+                        <div style={{
+                          fontSize: '13.5px',
+                          fontWeight: 600,
+                          color: '#1c1917',
+                          lineHeight: 1.3,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {item.name || item.product_name}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#78716c', marginTop: '3px' }}>
+                          {[item.size, item.color, item.quantity ? `SL: ${String(item.quantity).padStart(2, '0')}` : null].filter(Boolean).join(' • ')}
+                        </div>
+                      </div>
+
+                      {/* Product Price */}
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#1c1917' }}>
+                          {itemPrice.toLocaleString('vi-VN')}₫
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="modal-footer-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '18px', paddingTop: '14px', borderTop: '1px solid #f1f3f5' }}>
+              <button
+                type="button"
+                className="btn-order-action btn-neutral-outline"
+                onClick={() => setReorderModalOrder(null)}
+              >
+                ĐÓNG
+              </button>
+              <button
+                type="button"
+                className="btn-order-action btn-black-solid"
+                onClick={handleConfirmReorderSelection}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: '#1c1917',
+                  color: '#ffffff',
+                  padding: '9px 18px',
+                  fontSize: '13px',
+                  fontWeight: 600
+                }}
+              >
+                <span>XEM CHI TIẾT SẢN PHẨM</span>
+                <ArrowRight size={15} />
               </button>
             </div>
           </div>
