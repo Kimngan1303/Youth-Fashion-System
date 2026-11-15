@@ -20,8 +20,7 @@ import {
   Calendar, 
   TrendingUp,
   Filter,
-  ArrowRight,
-  Check
+  ArrowRight
 } from 'lucide-react';
 
 
@@ -415,11 +414,9 @@ const voucherPageStyles = `
   }
 
   .dropdown-menu-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 9px 12px;
+    display: block;
+    width: 100%;
+    padding: 9px 14px;
     border-radius: 6px;
     font-size: 13px;
     color: #44403C;
@@ -429,7 +426,6 @@ const voucherPageStyles = `
     text-align: left;
     white-space: nowrap;
     transition: all 0.15s ease;
-    width: 100%;
     box-sizing: border-box;
   }
 
@@ -439,7 +435,7 @@ const voucherPageStyles = `
   }
 
   .dropdown-menu-item.selected {
-    background: #FAF8F5;
+    background: #EDEAE3;
     color: #111111;
     font-weight: 600;
   }
@@ -958,10 +954,10 @@ export default function VoucherManager() {
   }, []);
 
   const OFFER_TYPE_OPTIONS = [
-    { value: 'all', label: 'Tất cả loại ưu đãi', shortLabel: 'Tất cả', icon: <Tag size={13} color="#78716C" /> },
-    { value: 'percent', label: 'Giảm theo phần trăm (%)', shortLabel: 'Giảm %', icon: <Percent size={13} color="#111111" /> },
-    { value: 'fixed', label: 'Giảm tiền mặt (₫)', shortLabel: 'Giảm tiền', icon: <Gift size={13} color="#D97706" /> },
-    { value: 'shipping', label: 'Miễn phí vận chuyển (Freeship)', shortLabel: 'Freeship', icon: <Truck size={13} color="#2563EB" /> },
+    { value: 'all', label: 'Tất cả loại ưu đãi', shortLabel: 'Tất cả' },
+    { value: 'percent', label: 'Giảm theo phần trăm (%)', shortLabel: 'Giảm %' },
+    { value: 'fixed', label: 'Giảm tiền mặt (₫)', shortLabel: 'Giảm tiền' },
+    { value: 'shipping', label: 'Miễn phí vận chuyển (Freeship)', shortLabel: 'Freeship' },
   ];
 
   const SORT_OPTIONS = [
@@ -1474,11 +1470,7 @@ export default function VoucherManager() {
                             setIsOfferTypeOpen(false);
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {opt.icon}
-                            <span>{opt.label}</span>
-                          </div>
-                          {isSelected && <Check size={14} color="#111111" strokeWidth={2.5} />}
+                          <span>{opt.label}</span>
                         </button>
                       );
                     })}
@@ -1522,7 +1514,6 @@ export default function VoucherManager() {
                           }}
                         >
                           <span>{opt.label}</span>
-                          {isSelected && <Check size={14} color="#111111" strokeWidth={2.5} />}
                         </button>
                       );
                     })}
