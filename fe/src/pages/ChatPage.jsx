@@ -1,8 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { conversationService, getInitials } from '../services/conversation.service';
-import { productService } from '../services/productService';
+import React, { useState, useEffect, useRef } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import {
+  conversationService,
+  getInitials,
+} from "../services/conversation.service";
+import { productService } from "../services/productService";
+import { playNotificationSound } from "../utils/notificationSound";
 import {
   MessageSquare,
   Send,
@@ -29,7 +33,9 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-} from 'lucide-react';
+} from "lucide-react";
+
+const processedInquiryKeys = new Set();
 
 const chatStyles = `
   .chat-page-root {
@@ -274,6 +280,53 @@ const chatStyles = `
     width: 3.5px;
     background-color: #111827;
     border-radius: 0 4px 4px 0;
+  }
+
+  /* Trạng thái cuộc hội thoại chưa đọc: in đậm & chấm xanh nổi bật */
+  .conv-item.unread {
+    background-color: #FFFFFF !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  .unread-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #16A34A;
+    display: inline-block;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+  }
+
+  .conv-item.unread .conv-title,
+  .conv-title.unread-bold {
+    font-weight: 800 !important;
+    color: #000000 !important;
+  }
+
+  .conv-item.unread .conv-preview-text,
+  .conv-preview-text.unread-preview {
+    font-weight: 700 !important;
+    color: #111827 !important;
+  }
+
+  .conv-item.unread .conv-time,
+  .conv-time.unread-time {
+    font-weight: 700 !important;
+    color: #16A34A !important;
+  }
+
+  .unread-badge-pill {
+    background: #16A34A;
+    color: #FFFFFF;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 9999px;
+    padding: 1.5px 7px;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
   }
 
   .conv-avatar-box {
@@ -718,6 +771,21 @@ const chatStyles = `
   }
 
   /* Product Attachment Card inside Bubble */
+  .bubble-products-scroll-list::-webkit-scrollbar {
+    width: 5px;
+  }
+  .bubble-products-scroll-list::-webkit-scrollbar-track {
+    background: #F3F4F6;
+    border-radius: 4px;
+  }
+  .bubble-products-scroll-list::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 4px;
+  }
+  .bubble-products-scroll-list::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+  }
+
   .bubble-product-card {
     background: #FFFFFF;
     border: 1px solid #ECE7E1;
@@ -1137,8 +1205,8 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [inputText, setInputText] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [inputText, setInputText] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -1146,16 +1214,16 @@ export default function ChatPage() {
 
   // Modals
   const [showNewConvModal, setShowNewConvModal] = useState(false);
-  const [newConvType, setNewConvType] = useState('PRODUCT_INQUIRY');
-  const [newConvTitle, setNewConvTitle] = useState('');
-  const [newConvInitialMsg, setNewConvInitialMsg] = useState('');
+  const [newConvType, setNewConvType] = useState("PRODUCT_INQUIRY");
+  const [newConvTitle, setNewConvTitle] = useState("");
+  const [newConvInitialMsg, setNewConvInitialMsg] = useState("");
   const [newConvProduct, setNewConvProduct] = useState(null);
-  const [newConvOrderNumber, setNewConvOrderNumber] = useState('');
+  const [newConvOrderNumber, setNewConvOrderNumber] = useState("");
 
   // Product Picker Modal
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [storeProducts, setStoreProducts] = useState([]);
-  const [productSearch, setProductSearch] = useState('');
+  const [productSearch, setProductSearch] = useState("");
   const [loadingProducts, setLoadingProducts] = useState(false);
 
   // Lightbox Modal
@@ -1164,6 +1232,24 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
   const messagesScrollContainerRef = useRef(null);
   const fileInputRef = useRef(null);
+  const handledInquiryRef = useRef(false);
+  const activeConversationIdRef = useRef(activeConversationId);
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
+
+  // Tài khoản Quản lý / Nhân viên không được vào chat tư vấn khách hàng, chuyển hướng sang /manager/chats
+  useEffect(() => {
+    if (
+      user &&
+      (user.user_type === "EMPLOYEE" ||
+        user.role === "MANAGER" ||
+        user.role === "ADMIN")
+    ) {
+      navigate("/manager/chat", { replace: true });
+    }
+  }, [user, navigate]);
 
   // Giữ màn hình và khung chat cố định, không tự ý trượt xuống dưới
   const scrollToBottom = () => {};
@@ -1176,7 +1262,7 @@ export default function ChatPage() {
       const items = res.data?.products || res.products || [];
       setStoreProducts(items);
     } catch (err) {
-      console.warn('Lỗi khi tải danh sách sản phẩm cửa hàng:', err);
+      console.warn("Lỗi khi tải danh sách sản phẩm cửa hàng:", err);
     } finally {
       setLoadingProducts(false);
     }
@@ -1185,96 +1271,127 @@ export default function ChatPage() {
   // 1. Initial Load of Conversations
   useEffect(() => {
     // Luôn giữ đỉnh trang, tránh bị trượt khi load
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 
     const loadData = async () => {
       setLoading(true);
       try {
+        // Kiểm tra điều hướng có yêu cầu tư vấn đơn hàng hoặc sản phẩm
+        if (
+          location.state?.inquiryType === "ORDER_INQUIRY" ||
+          location.state?.inquiryType === "PRODUCT_INQUIRY" ||
+          location.state?.initialProduct
+        ) {
+          const inquiryKey =
+            location.state?.inquiryKey ||
+            `inq_${location.state?.initialProduct?.id || "cart"}_${Date.now()}`;
+
+          if (processedInquiryKeys.has(inquiryKey)) {
+            return;
+          }
+          processedInquiryKeys.add(inquiryKey);
+
+          const stateData = { ...location.state };
+          // Xóa state của history để không lặp lại khi người dùng F5 tải lại trang
+          window.history.replaceState({}, document.title);
+
+          const title =
+            stateData.initialTitle ||
+            (stateData.initialProduct
+              ? `Tư vấn ${stateData.initialProduct.name}`
+              : "Tư vấn sản phẩm");
+          const msg =
+            stateData.initialMessage ||
+            (stateData.initialProduct
+              ? `Chào shop, mình quan tâm đến sản phẩm "${stateData.initialProduct.name}". Shop tư vấn giúp mình nhé!`
+              : "Chào shop, mình cần hỗ trợ tư vấn.");
+          const prod = stateData.initialProduct || null;
+          const selectedProducts =
+            stateData.selectedProducts || (prod ? [prod] : []);
+
+          // Luôn tạo cuộc hội thoại mới riêng biệt cho từng sản phẩm / đơn hàng được yêu cầu
+          const createRes = await conversationService.createConversation(
+            {
+              title,
+              initial_message: msg,
+              product_card: prod,
+              product_cards:
+                selectedProducts.length > 0
+                  ? selectedProducts
+                  : prod
+                    ? [prod]
+                    : null,
+            },
+            user,
+          );
+
+          const newConvId = createRes?.data?.conversation_id;
+          const res = await conversationService.getConversations(user);
+          const convList = res.data || [];
+          setConversations(convList);
+
+          const activeId =
+            newConvId ||
+            (convList.length > 0 ? convList[0].conversation_id : null);
+          if (activeId) {
+            setActiveConversationId(activeId);
+            setMobileDetailView(true);
+            setConversations((prevList) =>
+              prevList.map((c) =>
+                String(c.conversation_id) === String(activeId)
+                  ? { ...c, unread_count: 0, is_unread: false }
+                  : c,
+              ),
+            );
+            conversationService.markConversationAsRead(activeId);
+            await loadMessages(activeId);
+          }
+          return;
+        }
+
         const res = await conversationService.getConversations(user);
         const convList = res.data || [];
         setConversations(convList);
 
-        // Check if navigated from Cart Page with order inquiry
-        if (location.state?.inquiryType === 'ORDER_INQUIRY') {
-          const title = location.state.initialTitle || 'Tư vấn đơn hàng & giỏ hàng';
-          const msg = location.state.initialMessage || 'Chào shop, mình cần tư vấn về các sản phẩm trong giỏ hàng!';
-          const prod = location.state.initialProduct || null;
+        if (convList.length > 0) {
+          const searchParams = new URLSearchParams(location.search);
+          const targetConvId =
+            searchParams.get("convId") || location.state?.focusConversationId;
 
-          let targetConv = convList.find(
-            (c) => c.title?.toLowerCase().includes('đơn hàng') || c.title?.toLowerCase().includes('giỏ hàng')
-          );
-
-          if (!targetConv && convList.length > 0) {
-            targetConv = convList[0];
-          }
-
-          if (targetConv) {
-            setActiveConversationId(targetConv.conversation_id);
-            setMobileDetailView(true);
-            await loadMessages(targetConv.conversation_id);
-            await conversationService.sendMessage(
-              targetConv.conversation_id,
-              {
-                content: msg,
-                product_card: prod,
-              },
-              user
-            );
-            await loadMessages(targetConv.conversation_id);
-            if (messagesScrollContainerRef.current) {
-              messagesScrollContainerRef.current.scrollTop = 0;
-            }
+          let selectedId = null;
+          if (
+            targetConvId &&
+            convList.some(
+              (c) => String(c.conversation_id) === String(targetConvId),
+            )
+          ) {
+            selectedId = targetConvId;
+          } else if (
+            activeConversationIdRef.current &&
+            convList.some(
+              (c) =>
+                String(c.conversation_id) ===
+                String(activeConversationIdRef.current),
+            )
+          ) {
+            selectedId = activeConversationIdRef.current;
           } else {
-            setNewConvType('ORDER_INQUIRY');
-            if (prod) setNewConvProduct(prod);
-            setNewConvTitle(title);
-            setNewConvInitialMsg(msg);
-            setShowNewConvModal(true);
+            selectedId = convList[0].conversation_id;
           }
-        } else if (location.state?.initialProduct) {
-          const prod = location.state.initialProduct;
-          let targetConv = convList.find(
-            (c) => c.attached_product && (String(c.attached_product.id) === String(prod.id) || c.attached_product.name === prod.name)
+
+          setActiveConversationId(selectedId);
+          setConversations((prevList) =>
+            prevList.map((c) =>
+              String(c.conversation_id) === String(selectedId)
+                ? { ...c, unread_count: 0, is_unread: false }
+                : c,
+            ),
           );
-
-          if (!targetConv && convList.length > 0) {
-            targetConv = convList[0];
-          }
-
-          if (targetConv) {
-            setActiveConversationId(targetConv.conversation_id);
-            setMobileDetailView(true);
-            await loadMessages(targetConv.conversation_id);
-            await conversationService.sendMessage(
-              targetConv.conversation_id,
-              {
-                content: `Chào shop, mình quan tâm đến sản phẩm "${prod.name}". Shop tư vấn giúp mình nhé!`,
-                product_card: prod,
-              },
-              user
-            );
-            await loadMessages(targetConv.conversation_id);
-            if (messagesScrollContainerRef.current) {
-              messagesScrollContainerRef.current.scrollTop = 0;
-            }
-          } else {
-            // Pre-fill and open New Conversation Modal for this product
-            setNewConvType('PRODUCT_INQUIRY');
-            setNewConvProduct(prod);
-            setNewConvTitle(`Tư vấn ${prod.name}`);
-            setNewConvInitialMsg(`Chào shop, mình quan tâm đến sản phẩm "${prod.name}". Shop tư vấn giúp mình nhé!`);
-            setShowNewConvModal(true);
-          }
-        } else if (convList.length > 0) {
-          const first = convList[0];
-          setActiveConversationId(first.conversation_id);
-          await loadMessages(first.conversation_id);
-          if (messagesScrollContainerRef.current) {
-            messagesScrollContainerRef.current.scrollTop = 0;
-          }
+          conversationService.markConversationAsRead(selectedId);
+          await loadMessages(selectedId);
         }
       } catch (err) {
-        console.error('Error loading conversations:', err);
+        console.error("Error loading conversations:", err);
       } finally {
         setLoading(false);
       }
@@ -1282,7 +1399,36 @@ export default function ChatPage() {
 
     loadData();
     fetchStoreProducts();
-  }, [user, location.state]);
+  }, [user]);
+
+  // Lắng nghe sự kiện click mở chat từ Notification Toast hoặc URL param convId
+  useEffect(() => {
+    const handleSelectCustomEvent = (e) => {
+      const targetId = e?.detail?.conversationId;
+      if (targetId) {
+        handleSelectConversation(targetId);
+      }
+    };
+    window.addEventListener(
+      "chat:select_conversation",
+      handleSelectCustomEvent,
+    );
+    return () => {
+      window.removeEventListener(
+        "chat:select_conversation",
+        handleSelectCustomEvent,
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const targetConvId =
+      searchParams.get("convId") || location.state?.focusConversationId;
+    if (targetConvId && String(targetConvId) !== String(activeConversationId)) {
+      handleSelectConversation(targetConvId);
+    }
+  }, [location.search, location.state]);
 
   // Load messages for a specific conversation
   const loadMessages = async (convId) => {
@@ -1290,28 +1436,32 @@ export default function ChatPage() {
       const res = await conversationService.getMessages(convId, user);
       setMessages(res.data || []);
     } catch (err) {
-      console.error('Error loading messages:', err);
+      console.error("Error loading messages:", err);
     }
   };
 
   // Lắng nghe tin nhắn phản hồi Realtime từ cả Khách hàng & Quản lý qua SSE
   useEffect(() => {
     const isManagerViewer =
-      user?.user_type === 'EMPLOYEE' ||
-      user?.role === 'MANAGER' ||
-      user?.role === 'ADMIN' ||
-      user?.employee_role === 'ADMIN' ||
-      user?.employee_role === 'MANAGER';
+      user?.user_type === "EMPLOYEE" ||
+      user?.role === "MANAGER" ||
+      user?.role === "ADMIN" ||
+      user?.employee_role === "ADMIN" ||
+      user?.employee_role === "MANAGER";
 
     const unsubscribe = conversationService.subscribeToChatStream(
       (newMsg) => {
+        if (!isManagerViewer && newMsg.sender_type === "EMPLOYEE") {
+          playNotificationSound();
+        }
         setActiveConversationId((currId) => {
           if (String(currId) === String(newMsg.conversation_id)) {
             setMessages((prev) => {
-              if (prev.some((m) => String(m.id) === String(newMsg.message_id))) return prev;
+              if (prev.some((m) => String(m.id) === String(newMsg.message_id)))
+                return prev;
               const isMe = isManagerViewer
-                ? newMsg.sender_type === 'EMPLOYEE'
-                : newMsg.sender_type === 'CUSTOMER';
+                ? newMsg.sender_type === "EMPLOYEE"
+                : newMsg.sender_type === "CUSTOMER";
 
               return [
                 ...prev,
@@ -1319,14 +1469,28 @@ export default function ChatPage() {
                   id: String(newMsg.message_id),
                   sender: newMsg.sender_type,
                   authorName: isMe
-                    ? (isManagerViewer ? 'Bạn (Quản lý)' : 'Bạn')
-                    : (newMsg.sender_name || (isManagerViewer ? 'Khách Hàng' : 'Quản Lý Youth Fashion')),
-                  text: newMsg.content || '',
+                    ? isManagerViewer
+                      ? "Bạn (Quản lý)"
+                      : "Bạn"
+                    : newMsg.sender_name ||
+                      (isManagerViewer
+                        ? "Khách Hàng"
+                        : "Quản Lý Youth Fashion"),
+                  text: newMsg.content || "",
                   attachment_url: newMsg.attachment_url || null,
                   product_card: newMsg.product_card || null,
-                  time: new Date(newMsg.created_at || Date.now()).toLocaleTimeString('vi-VN', {
-                    hour: '2-digit',
-                    minute: '2-digit',
+                  product_cards:
+                    newMsg.product_cards ||
+                    (newMsg.product_card
+                      ? Array.isArray(newMsg.product_card)
+                        ? newMsg.product_card
+                        : [newMsg.product_card]
+                      : []),
+                  time: new Date(
+                    newMsg.created_at || Date.now(),
+                  ).toLocaleTimeString("vi-VN", {
+                    hour: "2-digit",
+                    minute: "2-digit",
                   }),
                   created_at: newMsg.created_at || new Date().toISOString(),
                 },
@@ -1336,31 +1500,57 @@ export default function ChatPage() {
           return currId;
         });
 
-        // Cập nhật trạng thái và tin nhắn cuối trong danh sách hội thoại
-        setConversations((prev) =>
-          prev.map((c) =>
-            String(c.conversation_id) === String(newMsg.conversation_id)
-              ? { ...c, last_message: newMsg.content, last_message_at: new Date().toISOString() }
-              : c
-          )
-        );
+        // Cập nhật trạng thái, tin nhắn cuối và đánh dấu chưa đọc trong danh sách hội thoại
+        setConversations((prev) => {
+          const list = [...prev];
+          const idx = list.findIndex(
+            (c) => String(c.conversation_id) === String(newMsg.conversation_id),
+          );
+          const isViewingThis =
+            String(activeConversationIdRef.current) ===
+            String(newMsg.conversation_id);
+
+          if (isViewingThis) {
+            conversationService.markConversationAsRead(newMsg.conversation_id);
+          }
+
+          if (idx >= 0) {
+            const target = { ...list[idx] };
+            target.last_message = newMsg.content;
+            target.last_message_at =
+              newMsg.created_at || new Date().toISOString();
+            if (!isViewingThis && newMsg.sender_type === "EMPLOYEE") {
+              target.unread_count = (target.unread_count || 0) + 1;
+              target.is_unread = true;
+            } else if (isViewingThis) {
+              target.unread_count = 0;
+              target.is_unread = false;
+            }
+            list.splice(idx, 1);
+            return [target, ...list];
+          }
+          return prev;
+        });
       },
       (statusData) => {
         setConversations((prev) =>
           prev.map((c) =>
             String(c.conversation_id) === String(statusData.conversation_id)
               ? { ...c, status: statusData.status }
-              : c
-          )
+              : c,
+          ),
         );
-      }
+      },
     );
 
     // Polling dự phòng mỗi 3 giây để đảm bảo 100% dữ liệu đồng bộ
     const interval = setInterval(async () => {
       if (!activeConversationId) return;
       try {
-        const res = await conversationService.getMessages(activeConversationId, user);
+        const res = await conversationService.getMessages(
+          activeConversationId,
+          user,
+        );
         if (res.data && res.data.length > 0) {
           setMessages((prev) => {
             if (prev.length !== res.data.length) {
@@ -1380,10 +1570,21 @@ export default function ChatPage() {
     };
   }, [activeConversationId, user]);
 
-  // Handle select conversation
+  // Handle select conversation: xóa in đậm chưa đọc ngay lập tức và đồng bộ CSDL
   const handleSelectConversation = async (convId) => {
     setActiveConversationId(convId);
     setMobileDetailView(true);
+    // 1. Cập nhật ngay trên UI: xóa in đậm và xóa badge chưa đọc
+    setConversations((prev) =>
+      prev.map((c) =>
+        String(c.conversation_id) === String(convId)
+          ? { ...c, unread_count: 0, is_unread: false }
+          : c,
+      ),
+    );
+    // 2. Gửi API báo backend đánh dấu các tin nhắn trong hội thoại là đã đọc
+    conversationService.markConversationAsRead(convId);
+
     await loadMessages(convId);
     // Khi mở đoạn chat khác, giữ ở đầu trang tin nhắn để đọc từ đầu, KHÔNG tự động trượt xuống
     if (messagesScrollContainerRef.current) {
@@ -1394,14 +1595,17 @@ export default function ChatPage() {
   // Send Message
   const handleSendMessage = async (e, customPayload = null) => {
     e?.preventDefault();
-    const content = customPayload?.content !== undefined ? customPayload.content : inputText.trim();
+    const content =
+      customPayload?.content !== undefined
+        ? customPayload.content
+        : inputText.trim();
     const attachmentUrl = customPayload?.attachment_url || null;
     const productCard = customPayload?.product_card || null;
 
     if (!content && !attachmentUrl && !productCard) return;
     if (!activeConversationId) return;
 
-    setInputText('');
+    setInputText("");
     setSending(true);
 
     try {
@@ -1410,10 +1614,14 @@ export default function ChatPage() {
         {
           content,
           attachment_url: attachmentUrl,
-          message_type: attachmentUrl ? 'IMAGE' : (productCard ? 'PRODUCT' : 'TEXT'),
+          message_type: attachmentUrl
+            ? "IMAGE"
+            : productCard
+              ? "PRODUCT"
+              : "TEXT",
           product_card: productCard,
         },
-        user
+        user,
       );
 
       const savedMsg = res.data;
@@ -1424,20 +1632,23 @@ export default function ChatPage() {
       setConversations((prev) =>
         prev.map((c) =>
           String(c.conversation_id) === String(activeConversationId)
-            ? { ...c, last_message: content || '[Tập tin đính kèm]', last_message_at: new Date().toISOString() }
-            : c
-        )
+            ? {
+                ...c,
+                last_message: content || "[Tập tin đính kèm]",
+                last_message_at: new Date().toISOString(),
+              }
+            : c,
+        ),
       );
-
     } catch (err) {
-      console.error('Error sending message:', err);
+      console.error("Error sending message:", err);
     } finally {
       setSending(false);
     }
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -1456,7 +1667,7 @@ export default function ChatPage() {
           initial_message: newConvInitialMsg.trim(),
           attached_product: newConvProduct,
         },
-        user
+        user,
       );
 
       const created = res.data;
@@ -1469,12 +1680,12 @@ export default function ChatPage() {
       setMobileDetailView(true);
 
       // Reset modal fields
-      setNewConvTitle('');
-      setNewConvInitialMsg('');
+      setNewConvTitle("");
+      setNewConvInitialMsg("");
       setNewConvProduct(null);
-      setNewConvOrderNumber('');
+      setNewConvOrderNumber("");
     } catch (err) {
-      console.error('Error creating conversation:', err);
+      console.error("Error creating conversation:", err);
     } finally {
       setSending(false);
     }
@@ -1489,12 +1700,12 @@ export default function ChatPage() {
     reader.onload = (event) => {
       const base64Url = event.target.result;
       handleSendMessage(null, {
-        content: 'Đã gửi một hình ảnh đính kèm',
+        content: "Đã gửi một hình ảnh đính kèm",
         attachment_url: base64Url,
       });
     };
     reader.readAsDataURL(file);
-    e.target.value = '';
+    e.target.value = "";
   };
 
   // Attach selected product into chat message
@@ -1502,10 +1713,21 @@ export default function ChatPage() {
     const pCard = {
       id: prod.product_id || prod.id,
       name: prod.product_name || prod.name,
-      price: prod.price || (prod.variants?.[0]?.price ? Number(prod.variants[0].price) : 550000),
-      image: prod.images?.[0]?.image_url || prod.image || 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800',
-      sku: prod.sku || prod.variants?.[0]?.sku || `YF-${prod.product_id || prod.id}`,
-      description: prod.description || prod.short_description || 'Thiết kế thời trang cao cấp YOUTH FASHION.',
+      price:
+        prod.price ||
+        (prod.variants?.[0]?.price ? Number(prod.variants[0].price) : 550000),
+      image:
+        prod.images?.[0]?.image_url ||
+        prod.image ||
+        "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800",
+      sku:
+        prod.sku ||
+        prod.variants?.[0]?.sku ||
+        `YF-${prod.product_id || prod.id}`,
+      description:
+        prod.description ||
+        prod.short_description ||
+        "Thiết kế thời trang cao cấp YOUTH FASHION.",
     };
 
     handleSendMessage(null, {
@@ -1517,15 +1739,17 @@ export default function ChatPage() {
 
   // Active Conversation Object
   const activeConversation = conversations.find(
-    (c) => String(c.conversation_id) === String(activeConversationId)
+    (c) => String(c.conversation_id) === String(activeConversationId),
   );
 
   // Filter conversations
   const filteredConversations = conversations.filter((c) => {
     return (
-      (c.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.last_message || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.manager_name || '').toLowerCase().includes(searchQuery.toLowerCase())
+      (c.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.last_message || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      (c.manager_name || "").toLowerCase().includes(searchQuery.toLowerCase())
     );
   });
 
@@ -1536,7 +1760,9 @@ export default function ChatPage() {
       {/* 1. Breadcrumbs Bar */}
       <div className="chat-breadcrumb-bar">
         <div className="chat-breadcrumb-content">
-          <Link to="/" className="bc-link">TRANG CHỦ</Link>
+          <Link to="/" className="bc-link">
+            TRANG CHỦ
+          </Link>
           <span className="bc-sep">&gt;</span>
           <span className="bc-current">TƯ VẤN &amp; HỘI THOẠI</span>
         </div>
@@ -1548,7 +1774,8 @@ export default function ChatPage() {
           <div>
             <h1 className="chat-header-heading">Hộp Thư Tư Vấn Trực Tuyến</h1>
             <p className="chat-header-desc">
-              Kết nối trực tiếp cùng chuyên viên phong cách &amp; đội ngũ quản lý YOUTH FASHION
+              Kết nối trực tiếp cùng chuyên viên phong cách &amp; đội ngũ quản
+              lý YOUTH FASHION
             </p>
           </div>
         </div>
@@ -1556,7 +1783,9 @@ export default function ChatPage() {
         {/* Unified Chat Frame */}
         <div className="chat-unified-frame">
           {/* CỘT BÊN TRÁI: DANH SÁCH HỘI THOẠI */}
-          <aside className={`chat-sidebar-col ${mobileDetailView ? 'mobile-hidden' : ''}`}>
+          <aside
+            className={`chat-sidebar-col ${mobileDetailView ? "mobile-hidden" : ""}`}
+          >
             <div className="sidebar-header">
               <div className="sidebar-top-bar">
                 <span className="sidebar-title">Tin nhắn</span>
@@ -1606,39 +1835,75 @@ export default function ChatPage() {
                 </div>
               ) : (
                 filteredConversations.map((conv) => {
-                  const isActive = String(conv.conversation_id) === String(activeConversationId);
+                  const isActive =
+                    String(conv.conversation_id) ===
+                    String(activeConversationId);
+                  const isUnread = Boolean(
+                    conv.is_unread || conv.unread_count > 0,
+                  );
                   return (
                     <div
                       key={conv.conversation_id}
-                      className={`conv-item ${isActive ? 'active' : ''}`}
-                      onClick={() => handleSelectConversation(conv.conversation_id)}
+                      className={`conv-item ${isActive ? "active" : ""} ${isUnread ? "unread" : ""}`}
+                      onClick={() =>
+                        handleSelectConversation(conv.conversation_id)
+                      }
                     >
                       <div className="conv-avatar-box">
                         <div className="conv-avatar-initials">
-                          {getInitials(conv.manager_name || 'Quản Lý')}
+                          {getInitials(conv.manager_name || "Quản Lý")}
                         </div>
                         <span className="conv-online-dot" />
                       </div>
 
                       <div className="conv-body">
                         <div className="conv-top-line">
-                          <span className="conv-title">{conv.title}</span>
-                          <span className="conv-time">
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                              minWidth: 0,
+                              flex: 1,
+                            }}
+                          >
+                            {isUnread && <span className="unread-dot" />}
+                            <span
+                              className={`conv-title ${isUnread ? "unread-bold" : ""}`}
+                            >
+                              {conv.title}
+                            </span>
+                          </div>
+                          <span
+                            className={`conv-time ${isUnread ? "unread-time" : ""}`}
+                          >
                             {conv.last_message_at
-                              ? new Date(conv.last_message_at).toLocaleTimeString('vi-VN', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
+                              ? new Date(
+                                  conv.last_message_at,
+                                ).toLocaleTimeString("vi-VN", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
                                 })
-                              : 'Vừa xong'}
+                              : "Vừa xong"}
                           </span>
                         </div>
 
-                        <div className="conv-bottom-line" style={{ marginTop: 4 }}>
-                          <span className="conv-preview-text">
-                            {conv.last_message || 'Bắt đầu cuộc trò chuyện...'}
+                        <div
+                          className="conv-bottom-line"
+                          style={{ marginTop: 4 }}
+                        >
+                          <span
+                            className={`conv-preview-text ${isUnread ? "unread-preview" : ""}`}
+                          >
+                            {conv.last_message || "Bắt đầu cuộc trò chuyện..."}
                           </span>
-                          {conv.unread_count > 0 && (
-                            <span className="unread-count-pill">{conv.unread_count}</span>
+                          {isUnread && (
+                            <span className="unread-badge-pill">
+                              Chưa đọc
+                              {conv.unread_count > 1
+                                ? ` (${conv.unread_count})`
+                                : ""}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -1650,7 +1915,9 @@ export default function ChatPage() {
           </aside>
 
           {/* CỘT BÊN PHẢI: CHI TIẾT CUỘC HỘI THOẠI */}
-          <main className={`chat-detail-col ${!mobileDetailView ? 'mobile-hidden' : ''}`}>
+          <main
+            className={`chat-detail-col ${!mobileDetailView ? "mobile-hidden" : ""}`}
+          >
             {activeConversation ? (
               <>
                 {/* 5.1 Header hội thoại */}
@@ -1666,16 +1933,21 @@ export default function ChatPage() {
                     </button>
 
                     <div className="active-conv-avatar-initials">
-                      {getInitials(activeConversation.manager_name || 'Quản Lý Youth Fashion')}
+                      {getInitials(
+                        activeConversation.manager_name ||
+                          "Quản Lý Youth Fashion",
+                      )}
                     </div>
 
                     <div className="active-conv-meta">
                       <div className="active-conv-name-row">
                         <span className="active-conv-manager-name">
-                          {activeConversation.manager_name || 'Quản Lý Youth Fashion'}
+                          {activeConversation.manager_name ||
+                            "Quản Lý Youth Fashion"}
                         </span>
                         <span className="cskh-role-badge">
-                          {activeConversation.manager_role || 'QUẢN LÝ CỬA HÀNG'}
+                          {activeConversation.manager_role ||
+                            "QUẢN LÝ CỬA HÀNG"}
                         </span>
                       </div>
                       <span className="active-conv-topic">
@@ -1695,18 +1967,36 @@ export default function ChatPage() {
                         className="context-img"
                       />
                       <div className="context-title-box">
-                        <span className="context-tag-label">SẢN PHẨM ĐANG TƯ VẤN</span>
+                        <span className="context-tag-label">
+                          SẢN PHẨM ĐANG TƯ VẤN
+                        </span>
                         <span className="context-item-title">
                           {activeConversation.attached_product.name}
                         </span>
                         <span className="context-item-price">
-                          Mã hàng: <strong>{activeConversation.attached_product.sku || `YF-${activeConversation.attached_product.id}`}</strong> &bull; Giá:{' '}
-                          <strong style={{ color: '#16A34A' }}>
-                            {Number(activeConversation.attached_product.price).toLocaleString('vi-VN')}₫
+                          Mã hàng:{" "}
+                          <strong>
+                            {activeConversation.attached_product.sku ||
+                              `YF-${activeConversation.attached_product.id}`}
+                          </strong>{" "}
+                          &bull; Giá:{" "}
+                          <strong style={{ color: "#16A34A" }}>
+                            {Number(
+                              activeConversation.attached_product.price,
+                            ).toLocaleString("vi-VN")}
+                            ₫
                           </strong>
                         </span>
                         {activeConversation.attached_product.description && (
-                          <div style={{ fontSize: 11.5, color: '#4B5563', marginTop: 3, lineHeight: 1.4, maxWidth: 580 }}>
+                          <div
+                            style={{
+                              fontSize: 11.5,
+                              color: "#4B5563",
+                              marginTop: 3,
+                              lineHeight: 1.4,
+                              maxWidth: 580,
+                            }}
+                          >
                             {activeConversation.attached_product.description}
                           </div>
                         )}
@@ -1732,22 +2022,28 @@ export default function ChatPage() {
                           width: 40,
                           height: 40,
                           borderRadius: 8,
-                          background: '#EFF6FF',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#1E40AF',
+                          background: "#EFF6FF",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#1E40AF",
                         }}
                       >
                         <Package size={20} />
                       </div>
                       <div className="context-title-box">
-                        <span className="context-tag-label">ĐƠN HÀNG CẦN HỖ TRỢ</span>
+                        <span className="context-tag-label">
+                          ĐƠN HÀNG CẦN HỖ TRỢ
+                        </span>
                         <span className="context-item-title">
-                          Đơn hàng: {activeConversation.attached_order.order_number}
+                          Đơn hàng:{" "}
+                          {activeConversation.attached_order.order_number}
                         </span>
                         <span className="context-item-price">
-                          Trạng thái: <strong>{activeConversation.attached_order.status}</strong>
+                          Trạng thái:{" "}
+                          <strong>
+                            {activeConversation.attached_order.status}
+                          </strong>
                         </span>
                       </div>
                     </div>
@@ -1755,7 +2051,10 @@ export default function ChatPage() {
                 )}
 
                 {/* 5.3 Khu vực tin nhắn (Messages body) */}
-                <div className="chat-messages-scroll" ref={messagesScrollContainerRef}>
+                <div
+                  className="chat-messages-scroll"
+                  ref={messagesScrollContainerRef}
+                >
                   <div className="date-separator-pill">HÔM NAY</div>
 
                   {messages.length === 0 ? (
@@ -1763,52 +2062,62 @@ export default function ChatPage() {
                       <div className="chat-empty-icon-circle">
                         <MessageSquare size={26} />
                       </div>
-                      <h4 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px 0' }}>
+                      <h4
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 700,
+                          margin: "0 0 6px 0",
+                        }}
+                      >
                         Bắt đầu cuộc trò chuyện
                       </h4>
-                      <p style={{ fontSize: 13, color: '#6B7280', margin: 0 }}>
-                        Gửi câu hỏi hoặc yêu cầu tư vấn bên dưới, đội ngũ phong cách YOUTH FASHION sẽ phản hồi ngay!
+                      <p style={{ fontSize: 13, color: "#6B7280", margin: 0 }}>
+                        Gửi câu hỏi hoặc yêu cầu tư vấn bên dưới, đội ngũ phong
+                        cách YOUTH FASHION sẽ phản hồi ngay!
                       </p>
                     </div>
                   ) : (
                     messages.map((msg) => {
                       const isManagerViewer =
-                        user?.user_type === 'EMPLOYEE' ||
-                        user?.role === 'MANAGER' ||
-                        user?.role === 'ADMIN' ||
-                        user?.employee_role === 'ADMIN' ||
-                        user?.employee_role === 'MANAGER';
+                        user?.user_type === "EMPLOYEE" ||
+                        user?.role === "MANAGER" ||
+                        user?.role === "ADMIN" ||
+                        user?.employee_role === "ADMIN" ||
+                        user?.employee_role === "MANAGER";
 
                       // Người đang ngồi xem màn hình là người gửi tin nhắn này -> isMe = true
                       const isMe = isManagerViewer
-                        ? msg.sender === 'EMPLOYEE'
-                        : msg.sender === 'CUSTOMER';
+                        ? msg.sender === "EMPLOYEE"
+                        : msg.sender === "CUSTOMER";
 
                       // Tên hiển thị người gửi:
                       // - Phía người đang ngồi nhắn (isMe) -> Luôn là "Bạn" hoặc "Bạn (Quản lý)"
                       // - Phía đối phương (!isMe) -> Quản lý nhìn thấy tên Khách Hàng; Khách hàng nhìn thấy Quản Lý Youth Fashion
-                      let authorLabel = 'Bạn';
+                      let authorLabel = "Bạn";
                       if (isMe) {
-                        authorLabel = isManagerViewer ? 'Bạn (Quản lý)' : 'Bạn';
+                        authorLabel = isManagerViewer ? "Bạn (Quản lý)" : "Bạn";
                       } else {
                         authorLabel = isManagerViewer
-                          ? (activeConversation?.customer_name || 'Khách Hàng')
-                          : (activeConversation?.manager_name || 'Quản Lý Youth Fashion');
+                          ? activeConversation?.customer_name || "Khách Hàng"
+                          : activeConversation?.manager_name ||
+                            "Quản Lý Youth Fashion";
                       }
 
                       return (
                         <div
                           key={msg.id}
-                          className={`chat-msg-row ${isMe ? 'me' : 'them'}`}
+                          className={`chat-msg-row ${isMe ? "me" : "them"}`}
                         >
                           <div className="msg-meta-line">
                             <span>{authorLabel}</span>
                             <span>&bull;</span>
-                            <span>{msg.time || 'Vừa xong'}</span>
+                            <span>{msg.time || "Vừa xong"}</span>
                           </div>
 
                           <div className="msg-bubble">
-                            <div style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
+                            <div style={{ whiteSpace: "pre-wrap" }}>
+                              {msg.text}
+                            </div>
 
                             {/* Ảnh đính kèm */}
                             {msg.attachment_url && (
@@ -1816,42 +2125,109 @@ export default function ChatPage() {
                                 src={msg.attachment_url}
                                 alt="Ảnh đính kèm"
                                 className="msg-attachment-img"
-                                onClick={() => setLightboxImg(msg.attachment_url)}
+                                onClick={() =>
+                                  setLightboxImg(msg.attachment_url)
+                                }
                               />
                             )}
 
                             {/* Thẻ sản phẩm đính kèm */}
-                            {msg.product_card && (
-                              <Link
-                                to={`/products/${msg.product_card.id}`}
-                                className="bubble-product-card"
-                                target="_blank"
+                            {(msg.product_cards?.length > 0 ||
+                              msg.product_card) && (
+                              <div
+                                className="bubble-products-scroll-list"
+                                style={{
+                                  maxHeight:
+                                    (msg.product_cards?.length || 1) > 2
+                                      ? 230
+                                      : "none",
+                                  overflowY:
+                                    (msg.product_cards?.length || 1) > 2
+                                      ? "auto"
+                                      : "visible",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 8,
+                                  marginTop: 8,
+                                  paddingRight:
+                                    (msg.product_cards?.length || 1) > 2
+                                      ? 4
+                                      : 0,
+                                }}
                               >
-                                <img
-                                  src={msg.product_card.image}
-                                  alt={msg.product_card.name}
-                                  className="bubble-product-thumb"
-                                />
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 9.5, fontWeight: 700, color: '#B45309', letterSpacing: 0.5 }}>
-                                    MÃ HÀNG: {msg.product_card.sku || `YF-${msg.product_card.id}`}
-                                  </div>
-                                  <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginTop: 1 }}>
-                                    {msg.product_card.name}
-                                  </div>
-                                  <div style={{ fontSize: 12, fontWeight: 600, color: '#16A34A', marginTop: 2 }}>
-                                    {Number(msg.product_card.price).toLocaleString('vi-VN')}₫
-                                  </div>
-                                  {msg.product_card.description && (
-                                    <div className="bubble-product-desc">
-                                      {msg.product_card.description}
+                                {(msg.product_cards &&
+                                msg.product_cards.length > 0
+                                  ? msg.product_cards
+                                  : [msg.product_card]
+                                ).map((pCard, pIdx) => (
+                                  <Link
+                                    key={pIdx}
+                                    to={`/products/${pCard.id}`}
+                                    className="bubble-product-card"
+                                    target="_blank"
+                                  >
+                                    <img
+                                      src={pCard.image}
+                                      alt={pCard.name}
+                                      className="bubble-product-thumb"
+                                    />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div
+                                        style={{
+                                          fontSize: 9.5,
+                                          fontWeight: 700,
+                                          color: "#B45309",
+                                          letterSpacing: 0.5,
+                                        }}
+                                      >
+                                        MÃ HÀNG: {pCard.sku || `YF-${pCard.id}`}
+                                      </div>
+                                      <div
+                                        style={{
+                                          fontSize: 13,
+                                          fontWeight: 700,
+                                          color: "#111827",
+                                          marginTop: 1,
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        {pCard.name}
+                                      </div>
+                                      <div
+                                        style={{
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                          color: "#16A34A",
+                                          marginTop: 2,
+                                        }}
+                                      >
+                                        {Number(pCard.price).toLocaleString(
+                                          "vi-VN",
+                                        )}
+                                        ₫
+                                      </div>
+                                      {pCard.description && (
+                                        <div className="bubble-product-desc">
+                                          {pCard.description}
+                                        </div>
+                                      )}
+                                      <div
+                                        style={{
+                                          fontSize: 11,
+                                          color: "#111827",
+                                          fontWeight: 600,
+                                          marginTop: 4,
+                                          textDecoration: "underline",
+                                        }}
+                                      >
+                                        Xem chi tiết sản phẩm ↗
+                                      </div>
                                     </div>
-                                  )}
-                                  <div style={{ fontSize: 11, color: '#111827', fontWeight: 600, marginTop: 5, textDecoration: 'underline' }}>
-                                    Xem chi tiết sản phẩm ↗
-                                  </div>
-                                </div>
-                              </Link>
+                                  </Link>
+                                ))}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -1867,7 +2243,10 @@ export default function ChatPage() {
                         <span className="typing-dot" />
                         <span className="typing-dot" />
                       </div>
-                      <span>{activeConversation.manager_name} đang soạn câu trả lời...</span>
+                      <span>
+                        {activeConversation.manager_name} đang soạn câu trả
+                        lời...
+                      </span>
                     </div>
                   )}
 
@@ -1876,7 +2255,10 @@ export default function ChatPage() {
 
                 {/* 5.4 Khu vực nhập tin nhắn */}
                 <div className="chat-bottom-input-bar">
-                  <form onSubmit={handleSendMessage} className="input-container-shell">
+                  <form
+                    onSubmit={handleSendMessage}
+                    className="input-container-shell"
+                  >
                     <textarea
                       rows={1}
                       placeholder="Nhập câu hỏi hoặc yêu cầu tư vấn..."
@@ -1888,20 +2270,11 @@ export default function ChatPage() {
                     />
 
                     <div className="input-actions-cluster">
-                      {/* Nút đính kèm ảnh */}
-                      <button
-                        type="button"
-                        className="input-tool-icon-btn"
-                        title="Đính kèm hình ảnh"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <ImageIcon size={18} />
-                      </button>
                       <input
                         type="file"
                         ref={fileInputRef}
                         accept="image/*"
-                        style={{ display: 'none' }}
+                        style={{ display: "none" }}
                         onChange={handleImageFileChange}
                       />
 
@@ -1928,7 +2301,9 @@ export default function ChatPage() {
                   </form>
 
                   <div className="input-helper-footer">
-                    <span>Nhấn Enter để gửi &bull; Shift + Enter để xuống dòng</span>
+                    <span>
+                      Nhấn Enter để gửi &bull; Shift + Enter để xuống dòng
+                    </span>
                     <span>🔒 Bảo mật thông tin riêng tư khách hàng</span>
                   </div>
                 </div>
@@ -1938,14 +2313,17 @@ export default function ChatPage() {
                 <div className="guest-icon-badge">
                   <MessageSquare size={30} />
                 </div>
-                <h3 className="guest-title">Chào Mừng Đến Với Hộp Thư Tư Vấn</h3>
+                <h3 className="guest-title">
+                  Chào Mừng Đến Với Hộp Thư Tư Vấn
+                </h3>
                 <p className="guest-desc">
-                  Chọn một cuộc trò chuyện từ danh sách bên trái hoặc nhấn nút "Hội thoại mới" để bắt đầu được chuyên viên hỗ trợ.
+                  Chọn một cuộc trò chuyện từ danh sách bên trái hoặc nhấn nút
+                  "Hội thoại mới" để bắt đầu được chuyên viên hỗ trợ.
                 </p>
                 <button
                   type="button"
                   className="btn-new-conv"
-                  style={{ padding: '12px 24px', fontSize: 13 }}
+                  style={{ padding: "12px 24px", fontSize: 13 }}
                   onClick={() => setShowNewConvModal(true)}
                 >
                   <Plus size={16} />
@@ -1959,7 +2337,10 @@ export default function ChatPage() {
 
       {/* MODAL 1: BẮT ĐẦU CUỘC TRÒ CHUYỆN MỚI */}
       {showNewConvModal && (
-        <div className="modal-overlay" onClick={() => setShowNewConvModal(false)}>
+        <div
+          className="modal-overlay"
+          onClick={() => setShowNewConvModal(false)}
+        >
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">Bắt Đầu Cuộc Trò Chuyện Mới</h3>
@@ -1979,87 +2360,116 @@ export default function ChatPage() {
                   <label className="form-label">Chọn Loại Yêu Cầu Hỗ Trợ</label>
                   <div className="type-selection-grid">
                     <div
-                      className={`type-option-card ${newConvType === 'PRODUCT_INQUIRY' ? 'selected' : ''}`}
+                      className={`type-option-card ${newConvType === "PRODUCT_INQUIRY" ? "selected" : ""}`}
                       onClick={() => {
-                        setNewConvType('PRODUCT_INQUIRY');
-                        if (!newConvTitle) setNewConvTitle('Tư vấn sản phẩm');
+                        setNewConvType("PRODUCT_INQUIRY");
+                        if (!newConvTitle) setNewConvTitle("Tư vấn sản phẩm");
                       }}
                     >
                       <ShoppingBag size={18} />
                       <span className="type-card-title">Tư vấn sản phẩm</span>
-                      <span className="type-card-desc">Hỏi size, chất liệu, phối đồ</span>
+                      <span className="type-card-desc">
+                        Hỏi size, chất liệu, phối đồ
+                      </span>
                     </div>
 
                     <div
-                      className={`type-option-card ${newConvType === 'ORDER_SUPPORT' ? 'selected' : ''}`}
+                      className={`type-option-card ${newConvType === "ORDER_SUPPORT" ? "selected" : ""}`}
                       onClick={() => {
-                        setNewConvType('ORDER_SUPPORT');
-                        if (!newConvTitle) setNewConvTitle('Hỗ trợ đơn hàng');
+                        setNewConvType("ORDER_SUPPORT");
+                        if (!newConvTitle) setNewConvTitle("Hỗ trợ đơn hàng");
                       }}
                     >
                       <Package size={18} />
                       <span className="type-card-title">Hỗ trợ đơn hàng</span>
-                      <span className="type-card-desc">Kiểm tra tiến độ giao hàng</span>
+                      <span className="type-card-desc">
+                        Kiểm tra tiến độ giao hàng
+                      </span>
                     </div>
 
                     <div
-                      className={`type-option-card ${newConvType === 'RETURN_REFUND' ? 'selected' : ''}`}
+                      className={`type-option-card ${newConvType === "RETURN_REFUND" ? "selected" : ""}`}
                       onClick={() => {
-                        setNewConvType('RETURN_REFUND');
-                        if (!newConvTitle) setNewConvTitle('Yêu cầu đổi trả');
+                        setNewConvType("RETURN_REFUND");
+                        if (!newConvTitle) setNewConvTitle("Yêu cầu đổi trả");
                       }}
                     >
                       <RotateCcw size={18} />
                       <span className="type-card-title">Yêu cầu đổi trả</span>
-                      <span className="type-card-desc">Đổi size, mẫu mã tận nhà</span>
+                      <span className="type-card-desc">
+                        Đổi size, mẫu mã tận nhà
+                      </span>
                     </div>
 
                     <div
-                      className={`type-option-card ${newConvType === 'GENERAL' ? 'selected' : ''}`}
+                      className={`type-option-card ${newConvType === "GENERAL" ? "selected" : ""}`}
                       onClick={() => {
-                        setNewConvType('GENERAL');
-                        if (!newConvTitle) setNewConvTitle('Hỗ trợ chung');
+                        setNewConvType("GENERAL");
+                        if (!newConvTitle) setNewConvTitle("Hỗ trợ chung");
                       }}
                     >
                       <HelpCircle size={18} />
                       <span className="type-card-title">Yêu cầu khác</span>
-                      <span className="type-card-desc">Góp ý hoặc thắc mắc chung</span>
+                      <span className="type-card-desc">
+                        Góp ý hoặc thắc mắc chung
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Chọn sản phẩm nếu là Tư vấn sản phẩm */}
-                {newConvType === 'PRODUCT_INQUIRY' && (
+                {newConvType === "PRODUCT_INQUIRY" && (
                   <div className="form-group">
                     <label className="form-label">Sản phẩm cần tư vấn</label>
                     {newConvProduct ? (
                       <div
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          background: '#FAF9F6',
-                          border: '1px solid #E5E7EB',
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          background: "#FAF9F6",
+                          border: "1px solid #E5E7EB",
                           borderRadius: 8,
-                          padding: '8px 12px',
+                          padding: "8px 12px",
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                          }}
+                        >
                           <img
                             src={newConvProduct.image}
                             alt=""
-                            style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover' }}
+                            style={{
+                              width: 38,
+                              height: 38,
+                              borderRadius: 6,
+                              objectFit: "cover",
+                            }}
                           />
                           <div>
-                            <div style={{ fontSize: 12.5, fontWeight: 700 }}>{newConvProduct.name}</div>
-                            <div style={{ fontSize: 11.5, color: '#6B7280' }}>
-                              {Number(newConvProduct.price).toLocaleString('vi-VN')}₫
+                            <div style={{ fontSize: 12.5, fontWeight: 700 }}>
+                              {newConvProduct.name}
+                            </div>
+                            <div style={{ fontSize: 11.5, color: "#6B7280" }}>
+                              {Number(newConvProduct.price).toLocaleString(
+                                "vi-VN",
+                              )}
+                              ₫
                             </div>
                           </div>
                         </div>
                         <button
                           type="button"
-                          style={{ color: '#EF4444', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                          style={{
+                            color: "#EF4444",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
                           onClick={() => setNewConvProduct(null)}
                         >
                           Gỡ bỏ
@@ -2069,29 +2479,31 @@ export default function ChatPage() {
                       <button
                         type="button"
                         style={{
-                          background: '#FFFFFF',
-                          border: '1px dashed #D1D5DB',
+                          background: "#FFFFFF",
+                          border: "1px dashed #D1D5DB",
                           borderRadius: 8,
-                          padding: '10px 14px',
-                          color: '#4B5563',
+                          padding: "10px 14px",
+                          color: "#4B5563",
                           fontSize: 12.5,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                           gap: 6,
                         }}
                         onClick={() => setShowProductPicker(true)}
                       >
                         <ShoppingBag size={15} />
-                        <span>Chọn sản phẩm từ danh mục cửa hàng (Tùy chọn)</span>
+                        <span>
+                          Chọn sản phẩm từ danh mục cửa hàng (Tùy chọn)
+                        </span>
                       </button>
                     )}
                   </div>
                 )}
 
                 {/* Nhập mã đơn hàng nếu là Hỗ trợ đơn hàng */}
-                {newConvType === 'ORDER_SUPPORT' && (
+                {newConvType === "ORDER_SUPPORT" && (
                   <div className="form-group">
                     <label className="form-label">Mã đơn hàng</label>
                     <input
@@ -2106,7 +2518,9 @@ export default function ChatPage() {
 
                 {/* Tiêu đề cuộc trò chuyện */}
                 <div className="form-group">
-                  <label className="form-label">Tiêu đề cuộc trò chuyện *</label>
+                  <label className="form-label">
+                    Tiêu đề cuộc trò chuyện *
+                  </label>
                   <input
                     type="text"
                     required
@@ -2119,7 +2533,9 @@ export default function ChatPage() {
 
                 {/* Tin nhắn mở đầu */}
                 <div className="form-group">
-                  <label className="form-label">Nội dung tin nhắn ban đầu</label>
+                  <label className="form-label">
+                    Nội dung tin nhắn ban đầu
+                  </label>
                   <textarea
                     rows={3}
                     placeholder="Nhập nội dung bạn muốn hỏi hoặc cần hỗ trợ..."
@@ -2141,7 +2557,7 @@ export default function ChatPage() {
                 <button
                   type="submit"
                   className="btn-new-conv"
-                  style={{ padding: '9px 20px', fontSize: 12 }}
+                  style={{ padding: "9px 20px", fontSize: 12 }}
                   disabled={!newConvTitle.trim() || sending}
                 >
                   Bắt đầu hội thoại
@@ -2154,8 +2570,15 @@ export default function ChatPage() {
 
       {/* MODAL 2: ĐÍNH KÈM SẢN PHẨM CỬA HÀNG */}
       {showProductPicker && (
-        <div className="modal-overlay" onClick={() => setShowProductPicker(false)}>
-          <div className="modal-card" style={{ maxWidth: 580 }} onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={() => setShowProductPicker(false)}
+        >
+          <div
+            className="modal-card"
+            style={{ maxWidth: 580 }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h3 className="modal-title">Chọn Sản Phẩm YOUTH FASHION</h3>
               <button
@@ -2180,38 +2603,69 @@ export default function ChatPage() {
                 />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 380, overflowY: 'auto' }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  maxHeight: 380,
+                  overflowY: "auto",
+                }}
+              >
                 {loadingProducts ? (
-                  <div style={{ textAlign: 'center', padding: 20, color: '#9CA3AF' }}>
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: 20,
+                      color: "#9CA3AF",
+                    }}
+                  >
                     Đang tải sản phẩm...
                   </div>
                 ) : storeProducts.filter((p) =>
-                    (p.product_name || p.name || '').toLowerCase().includes(productSearch.toLowerCase())
+                    (p.product_name || p.name || "")
+                      .toLowerCase()
+                      .includes(productSearch.toLowerCase()),
                   ).length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 20, color: '#9CA3AF' }}>
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: 20,
+                      color: "#9CA3AF",
+                    }}
+                  >
                     Không tìm thấy sản phẩm nào
                   </div>
                 ) : (
                   storeProducts
                     .filter((p) =>
-                      (p.product_name || p.name || '').toLowerCase().includes(productSearch.toLowerCase())
+                      (p.product_name || p.name || "")
+                        .toLowerCase()
+                        .includes(productSearch.toLowerCase()),
                     )
                     .map((prod) => {
-                      const pImg = prod.images?.[0]?.image_url || prod.image || 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800';
-                      const pPrice = prod.price || (prod.variants?.[0]?.price ? Number(prod.variants[0].price) : 550000);
+                      const pImg =
+                        prod.images?.[0]?.image_url ||
+                        prod.image ||
+                        "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=800";
+                      const pPrice =
+                        prod.price ||
+                        (prod.variants?.[0]?.price
+                          ? Number(prod.variants[0].price)
+                          : 550000);
                       return (
                         <div
                           key={prod.product_id || prod.id}
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '10px 14px',
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "10px 14px",
                             borderRadius: 8,
-                            border: '1px solid #ECE7E1',
-                            cursor: 'pointer',
-                            background: '#FAF9F6',
-                            transition: 'background 0.15s',
+                            border: "1px solid #ECE7E1",
+                            cursor: "pointer",
+                            background: "#FAF9F6",
+                            transition: "background 0.15s",
                           }}
                           onClick={() => {
                             if (showNewConvModal) {
@@ -2228,25 +2682,42 @@ export default function ChatPage() {
                             }
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 12,
+                            }}
+                          >
                             <img
                               src={pImg}
                               alt=""
-                              style={{ width: 44, height: 44, borderRadius: 6, objectFit: 'cover' }}
+                              style={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: 6,
+                                objectFit: "cover",
+                              }}
                             />
                             <div>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>
+                              <div
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  color: "#111827",
+                                }}
+                              >
                                 {prod.product_name || prod.name}
                               </div>
-                              <div style={{ fontSize: 12, color: '#6B7280' }}>
-                                {Number(pPrice).toLocaleString('vi-VN')}₫
+                              <div style={{ fontSize: 12, color: "#6B7280" }}>
+                                {Number(pPrice).toLocaleString("vi-VN")}₫
                               </div>
                             </div>
                           </div>
                           <button
                             type="button"
                             className="btn-new-conv"
-                            style={{ padding: '6px 12px', fontSize: 11 }}
+                            style={{ padding: "6px 12px", fontSize: 11 }}
                           >
                             Đính kèm
                           </button>
@@ -2265,23 +2736,23 @@ export default function ChatPage() {
         <div className="modal-overlay" onClick={() => setLightboxImg(null)}>
           <div
             style={{
-              position: 'relative',
-              maxWidth: '90vw',
-              maxHeight: '90vh',
-              animation: 'fadeIn 0.2s',
+              position: "relative",
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+              animation: "fadeIn 0.2s",
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
               style={{
-                position: 'absolute',
+                position: "absolute",
                 top: -36,
                 right: 0,
-                color: '#FFFFFF',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
+                color: "#FFFFFF",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
               }}
               onClick={() => setLightboxImg(null)}
             >
@@ -2290,7 +2761,12 @@ export default function ChatPage() {
             <img
               src={lightboxImg}
               alt="Phóng to"
-              style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 12, objectFit: 'contain' }}
+              style={{
+                maxWidth: "100%",
+                maxHeight: "85vh",
+                borderRadius: 12,
+                objectFit: "contain",
+              }}
             />
           </div>
         </div>

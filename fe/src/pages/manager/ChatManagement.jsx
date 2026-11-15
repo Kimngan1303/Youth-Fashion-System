@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import ManagerSidebar from '../../components/ManagerSidebar';
 import ManagerHeader from '../../components/ManagerHeader';
@@ -20,7 +21,7 @@ import {
   Mail,
   HelpCircle,
   Sparkles,
-} from 'lucide-react';
+} from "lucide-react";
 
 const managerChatStyles = `
   .manager-chat-layout {
@@ -218,6 +219,53 @@ const managerChatStyles = `
   .manager-conv-item.active {
     background: #F4F1EA;
     border-color: #E2DDD5;
+  }
+
+  /* Trạng thái cuộc hội thoại chưa đọc: in đậm & chấm xanh nổi bật */
+  .manager-conv-item.unread {
+    background: #FFFFFF !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  .unread-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #16A34A;
+    display: inline-block;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+  }
+
+  .manager-conv-item.unread .customer-name-heading,
+  .customer-name-heading.unread-bold {
+    font-weight: 800 !important;
+    color: #000000 !important;
+  }
+
+  .manager-conv-item.unread .manager-topic-title,
+  .manager-topic-title.unread-topic {
+    font-weight: 700 !important;
+    color: #111827 !important;
+  }
+
+  .manager-conv-item.unread .manager-conv-time,
+  .manager-conv-time.unread-time {
+    font-weight: 700 !important;
+    color: #16A34A !important;
+  }
+
+  .manager-unread-badge {
+    background: #16A34A;
+    color: #FFFFFF;
+    font-size: 9.5px;
+    font-weight: 700;
+    border-radius: 9999px;
+    padding: 1.5px 6.5px;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
   }
 
   .customer-avatar-box {
@@ -430,6 +478,21 @@ const managerChatStyles = `
   }
 
   /* Bubble Product Attachment Card */
+  .manager-bubble-products-scroll-list::-webkit-scrollbar {
+    width: 5px;
+  }
+  .manager-bubble-products-scroll-list::-webkit-scrollbar-track {
+    background: #F3F4F6;
+    border-radius: 4px;
+  }
+  .manager-bubble-products-scroll-list::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 4px;
+  }
+  .manager-bubble-products-scroll-list::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+  }
+
   .manager-bubble-product-card {
     background: #FFFFFF;
     border: 1px solid #ECE7E1;
@@ -725,60 +788,31 @@ const managerChatStyles = `
 `;
 
 const QUICK_TEMPLATES = [
-  'Dạ Youth Fashion xin chào bạn! Em có thể hỗ trợ gì cho mình ạ?',
-  'Dạ mẫu này bên em hiện còn sẵn size M và L tại cửa hàng ạ.',
-  'Dạ Youth Fashion hỗ trợ đổi size miễn phí tận nhà trong 30 ngày ạ.',
-  'Em đã kiểm tra đơn hàng, bưu tá sẽ giao đến bạn trong chiều nay ạ.',
-  'Dạ bạn có thể cung cấp chiều cao và cân nặng để em chọn size vừa vặn nhất nhé!',
+  "Dạ Youth Fashion xin chào bạn! Em có thể hỗ trợ gì cho mình ạ?",
+  "Dạ mẫu này bên em hiện còn sẵn size M và L tại cửa hàng ạ.",
+  "Dạ Youth Fashion hỗ trợ đổi size miễn phí tận nhà trong 30 ngày ạ.",
+  "Em đã kiểm tra đơn hàng, bưu tá sẽ giao đến bạn trong chiều nay ạ.",
+  "Dạ bạn có thể cung cấp chiều cao và cân nặng để em chọn size vừa vặn nhất nhé!",
 ];
 
 export default function ChatManagement() {
   const { user } = useAuth();
+  const location = useLocation();
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [inputText, setInputText] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [inputText, setInputText] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [incomingNotification, setIncomingNotification] = useState(null);
 
   const messagesScrollRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const activeConversationIdRef = useRef(activeConversationId);
 
-  // Âm thanh thông báo nhẹ nhàng, thanh lịch chuẩn thời trang cao cấp bằng Web Audio API
-  const playNotificationSound = () => {
-    try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
-      osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.12); // E5
-      osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.24); // G5
-
-      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
-
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.6);
-    } catch (e) {
-      console.log('Audio playback info:', e);
-    }
-  };
-
-  // Tự động đóng banner thông báo sau 8 giây nếu Quản lý chưa click
   useEffect(() => {
-    if (!incomingNotification) return;
-    const t = setTimeout(() => {
-      setIncomingNotification(null);
-    }, 8000);
-    return () => clearTimeout(t);
-  }, [incomingNotification]);
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
 
   // 1. Initial Load of all Customer Conversations
   const fetchConversations = async () => {
@@ -788,12 +822,38 @@ export default function ChatManagement() {
       const list = res.data || [];
       setConversations(list);
 
-      if (list.length > 0 && !activeConversationId) {
-        setActiveConversationId(list[0].conversation_id);
-        await loadMessages(list[0].conversation_id);
+      const searchParams = new URLSearchParams(location.search);
+      const targetConvId = searchParams.get('convId') || location.state?.focusConversationId;
+
+      let selectedId = null;
+      if (targetConvId && list.some((c) => String(c.conversation_id) === String(targetConvId))) {
+        selectedId = targetConvId;
+      } else if (activeConversationIdRef.current && list.some((c) => String(c.conversation_id) === String(activeConversationIdRef.current))) {
+        selectedId = activeConversationIdRef.current;
+      } else if (list.length > 0) {
+        selectedId = list[0].conversation_id;
+      }
+
+      if (selectedId) {
+        setActiveConversationId(selectedId);
+        setConversations((prev) => {
+          const updated = prev.map((c) =>
+            String(c.conversation_id) === String(selectedId)
+              ? { ...c, unread_count: 0, is_unread: false }
+              : c
+          );
+          const stillHasUnread = updated.some((c) => Boolean(c.is_unread || (c.unread_count > 0)));
+          window.dispatchEvent(new CustomEvent('manager_chat:unread_updated', { detail: { hasUnread: stillHasUnread } }));
+          return updated;
+        });
+        conversationService.markConversationAsRead(selectedId);
+        await loadMessages(selectedId);
+      } else {
+        const stillHasUnread = list.some((c) => Boolean(c.is_unread || (c.unread_count > 0)));
+        window.dispatchEvent(new CustomEvent('manager_chat:unread_updated', { detail: { hasUnread: stillHasUnread } }));
       }
     } catch (err) {
-      console.error('Error fetching manager conversations:', err);
+      console.error("Error fetching manager conversations:", err);
     } finally {
       setLoading(false);
     }
@@ -803,84 +863,108 @@ export default function ChatManagement() {
     fetchConversations();
   }, [user]);
 
+  // Lắng nghe sự kiện click "Mở chat ngay" từ Notification Toast toàn cục
+  useEffect(() => {
+    const handleSelectCustomEvent = (e) => {
+      const targetId = e?.detail?.conversationId;
+      if (targetId) {
+        handleSelectConversation(targetId);
+      }
+    };
+    window.addEventListener('manager_chat:select_conversation', handleSelectCustomEvent);
+    return () => {
+      window.removeEventListener('manager_chat:select_conversation', handleSelectCustomEvent);
+    };
+  }, []);
+
+  // Lắng nghe thay đổi URL search param convId
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const targetConvId = searchParams.get('convId') || location.state?.focusConversationId;
+    if (targetConvId && String(targetConvId) !== String(activeConversationId)) {
+      handleSelectConversation(targetConvId);
+    }
+  }, [location.search, location.state]);
+
   // Lắng nghe Realtime Server-Sent Events (SSE) và Polling dự phòng
   useEffect(() => {
-    // Xin quyền Desktop Notification
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {});
-    }
-
     const unsubscribe = conversationService.subscribeToChatStream(
       (newMsg) => {
         // Chỉ xử lý tin nhắn từ Khách Hàng gửi tới
         if (newMsg.sender_type === 'CUSTOMER') {
-          playNotificationSound();
+          const rawCustName = (newMsg.sender_name || 'Khách Hàng').trim();
+          const cleanCustName = rawCustName.replace(/^Khách\s*hàng\s*/i, '').trim() || rawCustName;
 
-          // Hiển thị Banner Toast thông báo trên giao diện
-          setIncomingNotification({
-            customerName: newMsg.sender_name || 'Khách Hàng',
-            content: newMsg.content || (newMsg.attachment_url ? '[Hình ảnh đính kèm]' : 'Đã gửi tin nhắn'),
-            conversationId: newMsg.conversation_id,
-            timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-          });
+          let snippetText = newMsg.content || '';
+          if (snippetText.startsWith('{') && snippetText.endsWith('}')) {
+            try {
+              const p = JSON.parse(snippetText);
+              snippetText = p.text || (p.product_card ? `Hỏi về sản phẩm: ${p.product_card.name}` : snippetText);
+            } catch (e) {}
+          }
+          if (newMsg.attachment_url && !snippetText) {
+            snippetText = '[Hình ảnh đính kèm]';
+          }
 
-          // Hiển thị Desktop Notification nếu tab đang chạy ngầm / minimize
-          if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
-            new Notification('Youth Fashion - Tin nhắn khách hàng mới', {
-              body: `${newMsg.sender_name || 'Khách hàng'}: ${newMsg.content || 'Đã gửi một tin nhắn mới'}`,
-              icon: '/logo.png',
-            });
+          const isViewingThis = String(activeConversationIdRef.current) === String(newMsg.conversation_id);
+          if (isViewingThis) {
+            conversationService.markConversationAsRead(newMsg.conversation_id);
           }
 
           // Cập nhật tin nhắn vào khung chat nếu đang mở đúng cuộc trò chuyện
-          setActiveConversationId((currentId) => {
-            if (String(currentId) === String(newMsg.conversation_id)) {
-              setMessages((prev) => {
-                if (prev.some((m) => String(m.id) === String(newMsg.message_id))) return prev;
-                return [
-                  ...prev,
-                  {
-                    id: String(newMsg.message_id),
-                    sender: 'CUSTOMER',
-                    authorName: newMsg.sender_name || 'Khách Hàng',
-                    text: newMsg.content || '',
-                    attachment_url: newMsg.attachment_url || null,
-                    product_card: newMsg.product_card || null,
-                    time: new Date(newMsg.created_at || Date.now()).toLocaleTimeString('vi-VN', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    }),
-                    created_at: newMsg.created_at || new Date().toISOString(),
-                  },
-                ];
-              });
-            }
-            return currentId;
-          });
+          if (isViewingThis) {
+            setMessages((prev) => {
+              if (prev.some((m) => String(m.id) === String(newMsg.message_id))) return prev;
+              return [
+                ...prev,
+                {
+                  id: String(newMsg.message_id),
+                  sender: 'CUSTOMER',
+                  authorName: cleanCustName || 'Khách Hàng',
+                  text: newMsg.content || '',
+                  attachment_url: newMsg.attachment_url || null,
+                  product_card: newMsg.product_card || null,
+                  product_cards: newMsg.product_cards || (newMsg.product_card ? [newMsg.product_card] : []),
+                  time: new Date(newMsg.created_at || Date.now()).toLocaleTimeString('vi-VN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  }),
+                  created_at: newMsg.created_at || new Date().toISOString(),
+                },
+              ];
+            });
+          }
 
-          // Cập nhật danh sách hội thoại: đẩy lên đầu & tăng badge chưa đọc
+          // Cập nhật danh sách hội thoại: đẩy lên đầu & đánh dấu chưa đọc (in đậm) nếu chưa xem
           setConversations((prev) => {
             const list = [...prev];
             const idx = list.findIndex((c) => String(c.conversation_id) === String(newMsg.conversation_id));
             if (idx >= 0) {
               const target = { ...list[idx] };
-              target.last_message = newMsg.content || '[Hình ảnh đính kèm]';
+              target.last_message = snippetText || newMsg.content || '[Hình ảnh đính kèm]';
               target.last_message_at = newMsg.created_at || new Date().toISOString();
-              target.unread_count = (target.unread_count || 0) + 1;
               target.status = 'OPEN';
+              if (!isViewingThis) {
+                target.unread_count = (target.unread_count || 0) + 1;
+                target.is_unread = true;
+              } else {
+                target.unread_count = 0;
+                target.is_unread = false;
+              }
               list.splice(idx, 1);
               return [target, ...list];
             } else {
               const newConvItem = {
                 conversation_id: String(newMsg.conversation_id),
                 type: 'PRODUCT_INQUIRY',
-                title: `Tư vấn khách hàng: ${newMsg.sender_name || 'Khách Hàng'}`,
-                customer_name: newMsg.sender_name || 'Khách Hàng',
+                title: `Tư vấn khách hàng: ${cleanCustName || 'Khách Hàng'}`,
+                customer_name: cleanCustName || 'Khách Hàng',
                 customer_email: newMsg.sender_email || 'khachhang@youthfashion.vn',
                 customer_phone: '0988 123 456',
                 status: 'OPEN',
-                unread_count: 1,
-                last_message: newMsg.content || '[Tin nhắn mới]',
+                unread_count: isViewingThis ? 0 : 1,
+                is_unread: !isViewingThis,
+                last_message: snippetText || newMsg.content || '[Tin nhắn mới]',
                 last_message_at: new Date().toISOString(),
               };
               return [newConvItem, ...list];
@@ -896,11 +980,16 @@ export default function ChatManagement() {
         const res = await conversationService.getManagerConversations(user);
         if (res.data && Array.isArray(res.data) && res.data.length > 0) {
           setConversations((prev) => {
-            const unreadMap = new Map(prev.map((c) => [String(c.conversation_id), c.unread_count || 0]));
-            return res.data.map((c) => ({
-              ...c,
-              unread_count: unreadMap.get(String(c.conversation_id)) || c.unread_count || 0,
-            }));
+            const currentActiveId = activeConversationIdRef.current;
+            const updated = res.data.map((c) => {
+              if (String(c.conversation_id) === String(currentActiveId)) {
+                return { ...c, unread_count: 0, is_unread: false };
+              }
+              return c;
+            });
+            const stillHasUnread = updated.some((c) => Boolean(c.is_unread || (c.unread_count > 0)));
+            window.dispatchEvent(new CustomEvent('manager_chat:unread_updated', { detail: { hasUnread: stillHasUnread } }));
+            return updated;
           });
         }
       } catch (e) {}
@@ -918,13 +1007,27 @@ export default function ChatManagement() {
       const res = await conversationService.getMessages(convId, user);
       setMessages(res.data || []);
     } catch (err) {
-      console.error('Error loading messages:', err);
+      console.error("Error loading messages:", err);
     }
   };
 
-  // Switch conversation: KHÔNG tự động trượt xuống dưới, reset lên đầu trang để Quản lý đọc từ đầu
+  // Switch conversation: Xóa in đậm chưa đọc ngay lập tức và đồng bộ CSDL
   const handleSelectConversation = async (convId) => {
     setActiveConversationId(convId);
+    // 1. Cập nhật ngay trên UI: xóa in đậm và xóa badge chưa đọc
+    setConversations((prev) => {
+      const updated = prev.map((c) =>
+        String(c.conversation_id) === String(convId)
+          ? { ...c, unread_count: 0, is_unread: false }
+          : c
+      );
+      const stillHasUnread = updated.some((c) => Boolean(c.is_unread || (c.unread_count > 0)));
+      window.dispatchEvent(new CustomEvent('manager_chat:unread_updated', { detail: { hasUnread: stillHasUnread } }));
+      return updated;
+    });
+    // 2. Gửi API báo backend đánh dấu các tin nhắn trong hội thoại là đã đọc
+    conversationService.markConversationAsRead(convId);
+
     await loadMessages(convId);
     if (messagesScrollRef.current) {
       messagesScrollRef.current.scrollTop = 0;
@@ -937,14 +1040,14 @@ export default function ChatManagement() {
     const textToSend = customText !== null ? customText : inputText.trim();
     if (!textToSend || !activeConversationId) return;
 
-    setInputText('');
+    setInputText("");
     setSending(true);
 
     try {
       const res = await conversationService.managerSendMessage(
         activeConversationId,
         { content: textToSend },
-        user
+        user,
       );
 
       const savedMsg = res.data;
@@ -955,19 +1058,23 @@ export default function ChatManagement() {
       setConversations((prev) =>
         prev.map((c) =>
           String(c.conversation_id) === String(activeConversationId)
-            ? { ...c, last_message: textToSend, last_message_at: new Date().toISOString() }
-            : c
-        )
+            ? {
+                ...c,
+                last_message: textToSend,
+                last_message_at: new Date().toISOString(),
+              }
+            : c,
+        ),
       );
     } catch (err) {
-      console.error('Error sending manager message:', err);
+      console.error("Error sending manager message:", err);
     } finally {
       setSending(false);
     }
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -975,16 +1082,20 @@ export default function ChatManagement() {
 
   // Active Conversation
   const activeConv = conversations.find(
-    (c) => String(c.conversation_id) === String(activeConversationId)
+    (c) => String(c.conversation_id) === String(activeConversationId),
   );
 
   // Filters & Search
   const filteredConversations = conversations.filter((c) => {
     return (
-      (c.customer_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.customer_email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.last_message || '').toLowerCase().includes(searchQuery.toLowerCase())
+      (c.customer_name || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      (c.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.customer_email || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      (c.last_message || "").toLowerCase().includes(searchQuery.toLowerCase())
     );
   });
 
@@ -994,43 +1105,6 @@ export default function ChatManagement() {
     <div className="manager-chat-layout">
       <style>{managerChatStyles}</style>
 
-      {/* Realtime Floating Notification Toast cho Quản Lý */}
-      {incomingNotification && (
-        <div className="manager-incoming-toast">
-          <div className="toast-left">
-            <div className="toast-icon-pulse">
-              <MessageSquare size={18} color="#FFFFFF" />
-            </div>
-            <div className="toast-text-group">
-              <div className="toast-title">
-                <span>Khách hàng</span> <strong>{incomingNotification.customerName}</strong> <span>vừa nhắn:</span>
-              </div>
-              <div className="toast-snippet">{incomingNotification.content}</div>
-            </div>
-          </div>
-          <div className="toast-actions">
-            <button
-              type="button"
-              className="btn-toast-view"
-              onClick={() => {
-                handleSelectConversation(incomingNotification.conversationId);
-                setIncomingNotification(null);
-              }}
-            >
-              Mở chat ngay
-            </button>
-            <button
-              type="button"
-              className="btn-toast-close"
-              onClick={() => setIncomingNotification(null)}
-              title="Đóng thông báo"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Sidebar quản trị */}
       <ManagerSidebar activeMenu="support" />
 
@@ -1038,7 +1112,7 @@ export default function ChatManagement() {
       <div className="manager-chat-main-wrapper">
         <ManagerHeader
           showSearch={false}
-          userName={user?.full_name || 'Quản Lý Youth Fashion'}
+          userName={user?.full_name || "Quản Lý Youth Fashion"}
           userRole="Ban Quản Lý & CSKH"
         />
 
@@ -1046,23 +1120,26 @@ export default function ChatManagement() {
           {/* Header Title Bar */}
           <div className="manager-page-title-row">
             <div>
-              <h1 className="manager-page-heading">Tư Vấn &amp; Chăm Sóc Khách Hàng</h1>
+              <h1 className="manager-page-heading">
+                Tư Vấn &amp; Chăm Sóc Khách Hàng
+              </h1>
               <p className="manager-page-subtext">
-                Tiếp nhận, xử lý thắc mắc và hỗ trợ trực tiếp các yêu cầu của khách hàng toàn hệ thống
+                Tiếp nhận, xử lý thắc mắc và hỗ trợ trực tiếp các yêu cầu của
+                khách hàng toàn hệ thống
               </p>
             </div>
             <button
               type="button"
               style={{
-                background: '#FFFFFF',
-                border: '1px solid #E5E7EB',
+                background: "#FFFFFF",
+                border: "1px solid #E5E7EB",
                 borderRadius: 8,
-                padding: '8px 14px',
+                padding: "8px 14px",
                 fontSize: 12,
                 fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
                 gap: 6,
               }}
               onClick={fetchConversations}
@@ -1076,23 +1153,51 @@ export default function ChatManagement() {
           <div className="manager-kpi-row">
             <div className="manager-kpi-card">
               <div className="manager-kpi-info">
-                <span className="manager-kpi-label">Tổng Cuộc Trò Chuyện Khách Hàng</span>
+                <span className="manager-kpi-label">
+                  Tổng Cuộc Trò Chuyện Khách Hàng
+                </span>
                 <span className="manager-kpi-val">{totalCount}</span>
               </div>
-              <div className="manager-kpi-badge-icon" style={{ background: '#F5F4EF', color: '#111' }}>
+              <div
+                className="manager-kpi-badge-icon"
+                style={{ background: "#F5F4EF", color: "#111" }}
+              >
                 <MessageSquare size={18} />
               </div>
             </div>
 
             <div className="manager-kpi-card">
               <div className="manager-kpi-info">
-                <span className="manager-kpi-label">Trạng Thái Kết Nối Realtime</span>
-                <span className="manager-kpi-val" style={{ fontSize: '15px', color: '#16A34A', display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#16A34A', display: 'inline-block' }}></span>
+                <span className="manager-kpi-label">
+                  Trạng Thái Kết Nối Realtime
+                </span>
+                <span
+                  className="manager-kpi-val"
+                  style={{
+                    fontSize: "15px",
+                    color: "#16A34A",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginTop: 4,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      backgroundColor: "#16A34A",
+                      display: "inline-block",
+                    }}
+                  ></span>
                   Hệ Thống Sẵn Sàng
                 </span>
               </div>
-              <div className="manager-kpi-badge-icon" style={{ background: '#ECFDF5', color: '#16A34A' }}>
+              <div
+                className="manager-kpi-badge-icon"
+                style={{ background: "#ECFDF5", color: "#16A34A" }}
+              >
                 <Sparkles size={18} />
               </div>
             </div>
@@ -1104,7 +1209,16 @@ export default function ChatManagement() {
             <aside className="manager-conv-list-pane">
               <div className="manager-list-header">
                 <div className="manager-search-box" style={{ marginBottom: 0 }}>
-                  <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
+                  <Search
+                    size={14}
+                    style={{
+                      position: "absolute",
+                      left: 10,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      color: "#9CA3AF",
+                    }}
+                  />
                   <input
                     type="text"
                     placeholder="Tìm theo khách hàng, email, nội dung..."
@@ -1117,59 +1231,88 @@ export default function ChatManagement() {
 
               <div className="manager-items-stream">
                 {loading ? (
-                  <div style={{ textAlign: 'center', padding: 30, color: '#9CA3AF' }}>
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: 30,
+                      color: "#9CA3AF",
+                    }}
+                  >
                     Đang tải danh sách...
                   </div>
                 ) : filteredConversations.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 30, color: '#9CA3AF' }}>
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: 30,
+                      color: "#9CA3AF",
+                    }}
+                  >
                     Không có cuộc trò chuyện nào
                   </div>
                 ) : (
                   filteredConversations.map((conv) => {
-                    const isActive = String(conv.conversation_id) === String(activeConversationId);
+                    const isActive =
+                      String(conv.conversation_id) ===
+                      String(activeConversationId);
+                    const isUnread = Boolean(conv.is_unread || (conv.unread_count > 0));
                     return (
                       <div
                         key={conv.conversation_id}
-                        className={`manager-conv-item ${isActive ? 'active' : ''}`}
+                        className={`manager-conv-item ${isActive ? 'active' : ''} ${isUnread ? 'unread' : ''}`}
                         onClick={() => handleSelectConversation(conv.conversation_id)}
                       >
                         <div className="customer-avatar-box">
                           <div className="customer-avatar-img">
-                            {getInitials(conv.customer_name || 'Khách Hàng')}
+                            {getInitials(conv.customer_name || "Khách Hàng")}
                           </div>
                         </div>
 
                         <div className="manager-conv-info">
                           <div className="manager-conv-top">
-                            <span className="customer-name-heading">
-                              {conv.customer_name || 'Khách Hàng'}
-                            </span>
-                            <span className="manager-conv-time">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+                              {isUnread && <span className="unread-dot" />}
+                              <span className={`customer-name-heading ${isUnread ? 'unread-bold' : ''}`}>
+                                {conv.customer_name || "Khách Hàng"}
+                              </span>
+                            </div>
+                            <span className={`manager-conv-time ${isUnread ? 'unread-time' : ''}`}>
                               {conv.last_message_at
-                                ? new Date(conv.last_message_at).toLocaleTimeString('vi-VN', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
+                                ? new Date(
+                                    conv.last_message_at,
+                                  ).toLocaleTimeString("vi-VN", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
                                   })
-                                : 'Vừa xong'}
+                                : "Vừa xong"}
                             </span>
                           </div>
 
-                          <span className="manager-topic-title">
-                            {conv.title || 'Hỗ trợ khách hàng'}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                            <span className={`manager-topic-title ${isUnread ? 'unread-topic' : ''}`}>
+                              {conv.title || 'Hỗ trợ khách hàng'}
+                            </span>
+                            {isUnread && (
+                              <span className="manager-unread-badge">
+                                Chưa đọc{conv.unread_count > 1 ? ` (${conv.unread_count})` : ''}
+                              </span>
+                            )}
+                          </div>
 
                           <div style={{ marginTop: 2 }}>
                             <span
+                              className={`manager-conv-preview ${isUnread ? 'unread-preview' : ''}`}
                               style={{
                                 fontSize: 11,
-                                color: '#78716C',
+                                color: isUnread ? '#1C1917' : '#78716C',
+                                fontWeight: isUnread ? 700 : 400,
                                 display: 'block',
                                 whiteSpace: 'nowrap',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                               }}
                             >
-                              {conv.last_message || 'Chưa có tin nhắn...'}
+                              {conv.last_message || "Chưa có tin nhắn..."}
                             </span>
                           </div>
                         </div>
@@ -1187,20 +1330,29 @@ export default function ChatManagement() {
                   {/* Header cuộc trò chuyện */}
                   <div className="manager-chat-top-bar">
                     <div className="manager-client-details">
-                      <div className="customer-avatar-img" style={{ width: 44, height: 44 }}>
-                        {getInitials(activeConv.customer_name || 'Khách Hàng')}
+                      <div
+                        className="customer-avatar-img"
+                        style={{ width: 44, height: 44 }}
+                      >
+                        {getInitials(activeConv.customer_name || "Khách Hàng")}
                       </div>
                       <div>
                         <div className="manager-client-name">
-                          {activeConv.customer_name || 'Khách Hàng'}
+                          {activeConv.customer_name || "Khách Hàng"}
                         </div>
                         <div className="manager-client-contact">
                           <span>
-                            <Mail size={12} style={{ display: 'inline', marginRight: 4 }} />
-                            {activeConv.customer_email || 'khachhang@youthfashion.vn'}
+                            <Mail
+                              size={12}
+                              style={{ display: "inline", marginRight: 4 }}
+                            />
+                            {activeConv.customer_email ||
+                              "khachhang@youthfashion.vn"}
                           </span>
                           <span>&bull;</span>
-                          <span>Chủ đề: <strong>{activeConv.title}</strong></span>
+                          <span>
+                            Chủ đề: <strong>{activeConv.title}</strong>
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -1209,20 +1361,52 @@ export default function ChatManagement() {
                   {/* Context Bar nếu có sản phẩm hoặc đơn hàng */}
                   {activeConv.attached_product && (
                     <div className="manager-context-strip">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                        }}
+                      >
                         <img
                           src={activeConv.attached_product.image}
                           alt=""
-                          style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover', border: '1px solid #ECE7E1', flexShrink: 0 }}
+                          style={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: 6,
+                            objectFit: "cover",
+                            border: "1px solid #ECE7E1",
+                            flexShrink: 0,
+                          }}
                         />
                         <div>
-                          <div style={{ fontSize: 13, color: '#111827' }}>
-                            Mã hàng: <strong>{activeConv.attached_product.sku || `YF-${activeConv.attached_product.id}`}</strong> &bull;{' '}
-                            <strong>{activeConv.attached_product.name}</strong> &bull; Giá:{' '}
-                            <strong style={{ color: '#16A34A' }}>{Number(activeConv.attached_product.price).toLocaleString('vi-VN')}₫</strong>
+                          <div style={{ fontSize: 13, color: "#111827" }}>
+                            Mã hàng:{" "}
+                            <strong>
+                              {activeConv.attached_product.sku ||
+                                `YF-${activeConv.attached_product.id}`}
+                            </strong>{" "}
+                            &bull;{" "}
+                            <strong>{activeConv.attached_product.name}</strong>{" "}
+                            &bull; Giá:{" "}
+                            <strong style={{ color: "#16A34A" }}>
+                              {Number(
+                                activeConv.attached_product.price,
+                              ).toLocaleString("vi-VN")}
+                              ₫
+                            </strong>
                           </div>
                           {activeConv.attached_product.description && (
-                            <div style={{ fontSize: 11.5, color: '#57534E', marginTop: 3, lineHeight: 1.4, maxWidth: 560 }}>
+                            <div
+                              style={{
+                                fontSize: 11.5,
+                                color: "#57534E",
+                                marginTop: 3,
+                                lineHeight: 1.4,
+                                maxWidth: 560,
+                              }}
+                            >
                               {activeConv.attached_product.description}
                             </div>
                           )}
@@ -1232,7 +1416,12 @@ export default function ChatManagement() {
                         href={`/products/${activeConv.attached_product.id}`}
                         target="_blank"
                         rel="noreferrer"
-                        style={{ color: '#111', fontWeight: 600, textDecoration: 'underline', flexShrink: 0 }}
+                        style={{
+                          color: "#111",
+                          fontWeight: 600,
+                          textDecoration: "underline",
+                          flexShrink: 0,
+                        }}
                       >
                         Xem sản phẩm ↗
                       </a>
@@ -1241,10 +1430,20 @@ export default function ChatManagement() {
 
                   {activeConv.attached_order && (
                     <div className="manager-context-strip">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
                         <Package size={16} color="#1E40AF" />
                         <span>
-                          Đơn hàng liên quan: <strong>{activeConv.attached_order.order_number}</strong> &bull; Trạng thái:{' '}
+                          Đơn hàng liên quan:{" "}
+                          <strong>
+                            {activeConv.attached_order.order_number}
+                          </strong>{" "}
+                          &bull; Trạng thái:{" "}
                           <strong>{activeConv.attached_order.status}</strong>
                         </span>
                       </div>
@@ -1252,57 +1451,106 @@ export default function ChatManagement() {
                   )}
 
                   {/* Vùng tin nhắn: ref để cuộn lên đầu khi chuyển đoạn chat */}
-                  <div className="manager-messages-stream" ref={messagesScrollRef}>
+                  <div
+                    className="manager-messages-stream"
+                    ref={messagesScrollRef}
+                  >
                     {messages.length === 0 ? (
-                      <div style={{ margin: 'auto', textAlign: 'center', color: '#9CA3AF' }}>
+                      <div
+                        style={{
+                          margin: "auto",
+                          textAlign: "center",
+                          color: "#9CA3AF",
+                        }}
+                      >
                         Chưa có lịch sử tin nhắn trong cuộc trò chuyện này.
                       </div>
                     ) : (
                       messages.map((m) => {
-                        const isFromCustomer = m.sender === 'CUSTOMER';
+                        const isFromCustomer = m.sender === "CUSTOMER";
                         return (
                           <div
                             key={m.id}
-                            className={`manager-msg-item ${isFromCustomer ? 'from-customer' : 'from-staff'}`}
+                            className={`manager-msg-item ${isFromCustomer ? "from-customer" : "from-staff"}`}
                           >
                             <span className="manager-msg-meta">
                               {isFromCustomer
-                                ? `${activeConv.customer_name || 'Khách hàng'} • ${m.time || 'Gần đây'}`
-                                : `Bạn (Quản lý) • ${m.time || 'Gần đây'}`}
+                                ? `${activeConv.customer_name || "Khách hàng"} • ${m.time || "Gần đây"}`
+                                : `Bạn (Quản lý) • ${m.time || "Gần đây"}`}
                             </span>
                             <div className="manager-bubble">
-                              <div style={{ whiteSpace: 'pre-wrap' }}>{m.text}</div>
+                              <div style={{ whiteSpace: "pre-wrap" }}>
+                                {m.text}
+                              </div>
 
                               {/* Thẻ mã hàng kèm hình ảnh và mô tả sản phẩm */}
-                              {m.product_card && (
-                                <div className="manager-bubble-product-card">
-                                  <img
-                                    src={m.product_card.image}
-                                    alt={m.product_card.name}
-                                    className="manager-product-thumb"
-                                  />
-                                  <div className="manager-product-details">
-                                    <div className="manager-product-badge">
-                                      MÃ HÀNG: {m.product_card.sku || `YF-${m.product_card.id}`}
-                                    </div>
-                                    <div className="manager-product-name">{m.product_card.name}</div>
-                                    <div className="manager-product-price">
-                                      {Number(m.product_card.price).toLocaleString('vi-VN')}₫
-                                    </div>
-                                    {m.product_card.description && (
-                                      <div className="manager-product-desc">
-                                        {m.product_card.description}
-                                      </div>
-                                    )}
-                                    <a
-                                      href={`/products/${m.product_card.id}`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="manager-product-link"
+                              {(m.product_cards?.length > 0 ||
+                                m.product_card) && (
+                                <div
+                                  className="manager-bubble-products-scroll-list"
+                                  style={{
+                                    maxHeight:
+                                      (m.product_cards?.length || 1) > 2
+                                        ? 230
+                                        : "none",
+                                    overflowY:
+                                      (m.product_cards?.length || 1) > 2
+                                        ? "auto"
+                                        : "visible",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 8,
+                                    marginTop: 8,
+                                    paddingRight:
+                                      (m.product_cards?.length || 1) > 2
+                                        ? 4
+                                        : 0,
+                                  }}
+                                >
+                                  {(m.product_cards &&
+                                  m.product_cards.length > 0
+                                    ? m.product_cards
+                                    : [m.product_card]
+                                  ).map((pCard, pIdx) => (
+                                    <div
+                                      key={pIdx}
+                                      className="manager-bubble-product-card"
                                     >
-                                      Xem sản phẩm chi tiết ↗
-                                    </a>
-                                  </div>
+                                      <img
+                                        src={pCard.image}
+                                        alt={pCard.name}
+                                        className="manager-product-thumb"
+                                      />
+                                      <div className="manager-product-details">
+                                        <div className="manager-product-badge">
+                                          MÃ HÀNG:{" "}
+                                          {pCard.sku || `YF-${pCard.id}`}
+                                        </div>
+                                        <div className="manager-product-name">
+                                          {pCard.name}
+                                        </div>
+                                        <div className="manager-product-price">
+                                          {Number(pCard.price).toLocaleString(
+                                            "vi-VN",
+                                          )}
+                                          ₫
+                                        </div>
+                                        {pCard.description && (
+                                          <div className="manager-product-desc">
+                                            {pCard.description}
+                                          </div>
+                                        )}
+                                        <a
+                                          href={`/products/${pCard.id}`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="manager-product-link"
+                                        >
+                                          Xem sản phẩm chi tiết ↗
+                                        </a>
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                               )}
 
@@ -1310,7 +1558,12 @@ export default function ChatManagement() {
                                 <img
                                   src={m.attachment_url}
                                   alt="Attachment"
-                                  style={{ maxWidth: 220, maxHeight: 160, borderRadius: 8, marginTop: 8 }}
+                                  style={{
+                                    maxWidth: 220,
+                                    maxHeight: 160,
+                                    borderRadius: 8,
+                                    marginTop: 8,
+                                  }}
                                 />
                               )}
                             </div>
@@ -1323,7 +1576,16 @@ export default function ChatManagement() {
 
                   {/* Thanh mẫu câu trả lời nhanh */}
                   <div className="manager-quick-replies-bar">
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#8C857B', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "#8C857B",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
                       <Sparkles size={12} />
                       Mẫu trả lời:
                     </span>
@@ -1341,7 +1603,10 @@ export default function ChatManagement() {
 
                   {/* Thanh nhập tin nhắn phản hồi của Quản lý */}
                   <div className="manager-chat-footer">
-                    <form onSubmit={handleSendMessage} className="manager-input-row">
+                    <form
+                      onSubmit={handleSendMessage}
+                      className="manager-input-row"
+                    >
                       <textarea
                         rows={1}
                         placeholder="Nhập câu trả lời cho khách hàng (Enter để gửi)..."
@@ -1364,12 +1629,22 @@ export default function ChatManagement() {
                 </>
               ) : (
                 <div className="manager-empty-state">
-                  <MessageSquare size={36} style={{ marginBottom: 10, color: '#A8A29E' }} />
-                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px 0' }}>
+                  <MessageSquare
+                    size={36}
+                    style={{ marginBottom: 10, color: "#A8A29E" }}
+                  />
+                  <h3
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 700,
+                      margin: "0 0 4px 0",
+                    }}
+                  >
                     Chọn một cuộc trò chuyện
                   </h3>
                   <p style={{ fontSize: 13, margin: 0 }}>
-                    Chọn khách hàng từ danh sách bên trái để xem nội dung và gửi câu trả lời.
+                    Chọn khách hàng từ danh sách bên trái để xem nội dung và gửi
+                    câu trả lời.
                   </p>
                 </div>
               )}

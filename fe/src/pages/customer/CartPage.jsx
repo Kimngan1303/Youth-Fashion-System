@@ -33,6 +33,7 @@ export default function CartPage() {
   const [orderNote, setOrderNote] = useState('');
   const [availableVouchers, setAvailableVouchers] = useState(() => voucherService.getCustomerVouchers());
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+  const [cartInquiryError, setCartInquiryError] = useState('');
 
   // Lắng nghe cập nhật danh sách voucher từ Trang cá nhân / Quản lý và CSDL MySQL
   useEffect(() => {
@@ -77,12 +78,14 @@ export default function CartPage() {
   const allSelected = cartItems.length > 0 && cartItems.every(i => i.selected);
 
   const handleToggleSelectAll = () => {
+    if (cartInquiryError) setCartInquiryError('');
     if (toggleSelectAllCart) {
       toggleSelectAllCart(!allSelected);
     }
   };
 
   const handleToggleItem = (id) => {
+    if (cartInquiryError) setCartInquiryError('');
     if (toggleCartItemSelection) {
       toggleCartItemSelection(id);
     }
@@ -220,36 +223,74 @@ export default function CartPage() {
   // Voucher saved calculation
   const totalOriginalSaving = voucherDiscount;
 
-  // Điều hướng sang Chat để tư vấn đơn hàng kèm thông tin giỏ hàng hiện tại
+  // Điều hướng sang Chat để tư vấn đơn hàng kèm thông tin các sản phẩm đã được tích chọn
   const handleContactOrderInquiry = (e) => {
     e.preventDefault();
     if (!user) {
-      showInfo('Vui lòng đăng nhập để kết nối với chuyên viên tư vấn!');
-      navigate('/login', { state: { from: '/cart' } });
+      setCartInquiryError('Vui lòng đăng nhập tài khoản Khách hàng để kết nối chuyên viên tư vấn!');
       return;
     }
 
-    const itemsSummary = (cart || [])
-      .map((i) => `${i.title || i.name} (SL: ${i.quantity}, Size: ${i.size || 'M'})`)
+    if (
+      user.role === 'MANAGER' ||
+      user.role === 'ADMIN' ||
+      user.user_type === 'EMPLOYEE' ||
+      user.employee_role === 'ADMIN' ||
+      user.employee_role === 'MANAGER'
+    ) {
+      setCartInquiryError('Tài khoản Quản lý không thể tạo yêu cầu tư vấn khách hàng. Vui lòng đăng nhập tài khoản Khách hàng.');
+      return;
+    }
+
+    const currentSelected = cartItems.filter((i) => i.selected);
+    if (currentSelected.length === 0) {
+      setCartInquiryError('Vui lòng tích chọn ít nhất 1 sản phẩm trong giỏ hàng để yêu cầu tư vấn!');
+      return;
+    }
+
+    setCartInquiryError('');
+
+    const selectedProducts = currentSelected.map((item) => ({
+      id: String(item.productId || item.product_id || item.id),
+      name: item.title || item.product_name || item.name,
+      price: Number(item.price),
+      image: item.image,
+      size: item.size || 'M',
+      quantity: item.quantity || 1,
+      sku: item.sku || `YF-${item.productId || item.id || 'PROD'}`,
+      category: item.categoryTag || 'Thời trang',
+      description: `Sản phẩm trong giỏ hàng (SL: ${item.quantity || 1}, Size: ${item.size || 'M'}${item.colorName ? `, Màu: ${item.colorName}` : ''})`,
+    }));
+
+    const itemsSummary = selectedProducts
+      .map((i) => `${i.name} (SL: ${i.quantity}, Size: ${i.size})`)
       .join(', ');
-    const firstItem = (cart || [])[0];
+
+    const selectedTotal = currentSelected.reduce(
+      (sum, item) => sum + Number(item.price) * (item.quantity || 1),
+      0
+    );
+
+    const initialTitle =
+      selectedProducts.length === 1
+        ? `Tư vấn ${selectedProducts[0].name}`
+        : `Tư vấn ${selectedProducts.length} sản phẩm giỏ hàng`;
+
+    const initialMessage =
+      selectedProducts.length === 1
+        ? `Chào shop, mình quan tâm đến sản phẩm "${selectedProducts[0].name}" (SL: ${selectedProducts[0].quantity}, Size: ${selectedProducts[0].size}). Shop tư vấn giúp mình nhé!`
+        : `Chào shop, mình cần tư vấn về ${selectedProducts.length} sản phẩm đã chọn trong giỏ hàng: ${itemsSummary}. Tổng tạm tính: ${selectedTotal.toLocaleString('vi-VN')}₫. Đội ngũ tư vấn hỗ trợ giúp mình nhé!`;
+
+    const inquiryKey = `cart_inquiry_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
     navigate('/chat', {
       state: {
         inquiryType: 'ORDER_INQUIRY',
-        initialTitle: 'Tư vấn đơn hàng & giỏ hàng',
-        initialMessage: `Chào shop, mình cần tư vấn về các sản phẩm đang có trong giỏ hàng: ${itemsSummary || 'giỏ hàng hiện tại'}. Tổng tiền tạm tính: ${finalTotal?.toLocaleString('vi-VN')}₫. Đội ngũ tư vấn hỗ trợ giúp mình nhé!`,
-        initialProduct: firstItem
-          ? {
-              id: firstItem.product_id || firstItem.id,
-              name: firstItem.title || firstItem.name,
-              price: firstItem.price,
-              image: firstItem.image,
-              category: firstItem.categoryTag || 'Thời trang',
-              sku: firstItem.sku || `YF-${firstItem.id || 'PROD'}`,
-              description: `Sản phẩm trong giỏ hàng (${firstItem.quantity} cái - ${firstItem.colorName || firstItem.color || 'Camel'})`,
-            }
-          : null,
+        inquiryKey,
+        initialTitle,
+        initialMessage,
+        initialProduct: selectedProducts[0],
+        selectedProducts,
       },
     });
   };
@@ -558,6 +599,30 @@ export default function CartPage() {
                   className="note-input"
                 />
               </div>
+
+              {/* Inline Error Banner (strictly no alert) */}
+              {cartInquiryError && (
+                <div
+                  className="cart-inline-error-banner"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '10px 14px',
+                    backgroundColor: '#FEF2F2',
+                    border: '1px solid #FECACA',
+                    borderRadius: 8,
+                    color: '#DC2626',
+                    fontSize: 13,
+                    lineHeight: 1.4,
+                    marginBottom: 12,
+                    fontWeight: 500,
+                  }}
+                >
+                  <AlertCircle size={16} style={{ flexShrink: 0, color: '#DC2626' }} />
+                  <span>{cartInquiryError}</span>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="summary-action-btns">
