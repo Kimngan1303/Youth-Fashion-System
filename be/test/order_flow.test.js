@@ -143,6 +143,7 @@ describe('Youth Fashion Order Flow & Bug Fix Test Suite', () => {
 
     const dbOrderConfirmedByCust = await prisma.order.findUnique({ where: { order_id: BigInt(orderId) } });
     assert.ok(dbOrderConfirmedByCust.customer_received_at, 'Phải có customer_received_at');
+    assert.equal(dbOrderConfirmedByCust.order_status, 'COMPLETED', 'Đơn hàng phải chuyển sang COMPLETED khi khách bấm nhận hàng');
 
     // 9. Giờ Manager bấm Hoàn thành thành công: DELIVERED -> COMPLETED
     const completeRes = await request(app)

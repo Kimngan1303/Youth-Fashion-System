@@ -653,14 +653,81 @@ export const customerConfirmDeliveredService = async (orderIdOrNumber, customerI
     throw createServiceError('Chỉ có thể xác nhận nhận hàng khi đơn hàng đang ở trạng thái Đã giao', 400);
   }
 
-  const updated = await prisma.order.update({
+  const now = new Date();
+
+  // 1. Cập nhật trạng thái đơn hàng sang COMPLETED, ghi nhận customer_received_at và completed_at
+  await prisma.order.update({
     where: { order_id: existingOrder.order_id },
     data: {
-      customer_received_at: new Date(),
+      customer_received_at: now,
+      completed_at: now,
+      order_status: 'COMPLETED',
     },
   });
 
-  return updated;
+  // 2. Nếu đơn COD chưa đánh dấu thanh toán, cập nhật payment sang SUCCESS/PAID
+  try {
+    const codPayment = existingOrder.payments?.find(p => p.payment_method === 'COD');
+    if (codPayment && codPayment.payment_status === 'PENDING') {
+      await prisma.payment.update({
+        where: { payment_id: codPayment.payment_id },
+        data: {
+          payment_status: 'SUCCESS',
+          paid_at: now,
+        },
+      });
+    }
+  } catch (payErr) {}
+
+  // 3. Ghi nhận lịch sử OrderStatusHistory
+  try {
+    await prisma.orderStatusHistory.create({
+      data: {
+        order_id: existingOrder.order_id,
+        from_status: 'DELIVERED',
+        to_status: 'COMPLETED',
+        note: 'Khách hàng xác nhận đã nhận được hàng - Đơn hàng hoàn thành',
+      },
+    });
+  } catch (hErr) {}
+
+  // 4. Tạo bản ghi thông báo Web cho khách hàng
+  try {
+    await prisma.notification.create({
+      data: {
+        customer_id: existingOrder.customer_id,
+        notification_type: 'ORDER',
+        title: 'Đơn hàng đã hoàn tất',
+        message: `Đơn hàng #${existingOrder.order_number} đã hoàn tất thành công. Cảm ơn Quý khách đã mua sắm tại Youth Fashion!`,
+        badge_text: 'HOÀN TẤT',
+        link_url: `/profile?tab=orders&highlight=${existingOrder.order_id}`,
+      },
+    });
+  } catch (nErr) {}
+
+  // 5. Gửi email xác nhận đơn hàng hoàn thành
+  try {
+    const fullOrder = await orderRepo.findOrderAny(existingOrder.order_id);
+    let targetEmail = null;
+    if (fullOrder?.recipient_email && fullOrder.recipient_email.includes('@')) {
+      targetEmail = fullOrder.recipient_email.trim();
+    } else if (fullOrder?.customer?.email && fullOrder.customer.email.includes('@')) {
+      targetEmail = fullOrder.customer.email.trim();
+    }
+    if (targetEmail) {
+      sendOrderNotificationEmail({
+        toEmail: targetEmail,
+        order: fullOrder,
+        status: 'COMPLETED',
+        extraData: { note: 'Khách hàng xác nhận đã nhận hàng - Đơn hàng hoàn tất thành công' },
+      }).catch((emailErr) => {
+        console.error('Lỗi khi gửi email thông báo hoàn thành đơn hàng:', emailErr.message);
+      });
+    }
+  } catch (eErr) {}
+
+  const result = await orderRepo.findOrderByIdOrNumber(existingOrder.order_id);
+  return result;
 };
 
 /**

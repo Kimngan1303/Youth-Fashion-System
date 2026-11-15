@@ -2885,15 +2885,72 @@ const ProfilePage = () => {
     }
     try {
       await orderService.customerConfirmDelivered(tId);
+      const nowIso = new Date().toISOString();
+      const formattedDate = new Date().toLocaleDateString('vi-VN');
+      const newLabel = `HOÀN THÀNH (${formattedDate})`;
+      const digits = (ord.order_number || ord.order_code || ord.order_id || '').replace(/\D/g, '');
+
       setCustomerOrders(prev => prev.map(o => {
         if (String(o.order_id) === String(tId) || String(o.order_number) === String(tId) || String(o.order_code) === String(tId)) {
-          return { ...o, customer_received_at: new Date().toISOString() };
+          return {
+            ...o,
+            status: 'COMPLETED',
+            order_status: 'COMPLETED',
+            status_label: newLabel,
+            customer_received_at: nowIso,
+            completed_at: nowIso,
+          };
         }
         return o;
       }));
+
+      // Đồng bộ vào localStorage để duy trì trạng thái COMPLETED
+      try {
+        const rawOv = localStorage.getItem('yf_order_status_overrides');
+        const overrides = rawOv ? JSON.parse(rawOv) : {};
+        const ovEntry = {
+          status: 'COMPLETED',
+          order_status: 'COMPLETED',
+          status_label: 'Hoàn thành',
+          status_label_manager: 'Hoàn thành',
+          status_label_customer: newLabel,
+          customer_received_at: nowIso,
+          completed_at: nowIso,
+          delivered_date: formattedDate,
+          updated_at: Date.now(),
+        };
+        if (digits) {
+          overrides[digits] = { ...(overrides[digits] || {}), ...ovEntry };
+          overrides[`YF-${digits}`] = { ...(overrides[`YF-${digits}`] || {}), ...ovEntry };
+        }
+        if (tId) overrides[tId] = { ...(overrides[tId] || {}), ...ovEntry };
+        localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
+      } catch (e) {}
+
+      // Đồng bộ sang trang Quản lý đơn hàng (OrderManager) qua BroadcastChannel & Storage Event
+      try {
+        const syncPayload = {
+          orderId: tId,
+          orderNumber: ord.order_number || ord.order_code || tId,
+          digits,
+          status: 'COMPLETED',
+          statusLabel: 'Hoàn thành',
+          customerLabel: newLabel,
+          customer_received_at: nowIso,
+          completed_at: nowIso,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem('yf_last_status_event', JSON.stringify(syncPayload));
+        const bc = new BroadcastChannel('yf_orders_sync_channel');
+        bc.postMessage(syncPayload);
+        bc.close();
+      } catch (e) {}
+      window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: { orderId: tId, status: 'COMPLETED' } }));
+      window.dispatchEvent(new Event('order_status_updated'));
+
       setOrderAlert({
         type: 'success',
-        message: `Cảm ơn bạn! Đã ghi nhận bạn đã nhận được đơn hàng #${orderDisplayCode}.`,
+        message: `Cảm ơn bạn! Đơn hàng #${orderDisplayCode} đã hoàn tất thành công.`,
       });
       setTimeout(() => setOrderAlert({ type: '', message: '' }), 4000);
     } catch (err) {
