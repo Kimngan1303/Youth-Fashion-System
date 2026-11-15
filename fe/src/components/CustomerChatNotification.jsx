@@ -34,6 +34,18 @@ export default function CustomerChatNotification() {
         // 1. Phát âm thanh thông báo du dương
         playNotificationSound();
 
+        // Nếu người dùng đang mở trang /chat và đang xem chính cuộc trò chuyện này,
+        // tin nhắn đã hiển thị trực tiếp trong khung chat, không cần hiển thị popup toast
+        const activeChatConv = sessionStorage.getItem('active_chat_conv_id');
+        const isViewingThis =
+          location.pathname === '/chat' &&
+          (String(activeChatConv) === String(newMsg.conversation_id) ||
+            new URLSearchParams(location.search).get('convId') === String(newMsg.conversation_id));
+
+        if (isViewingThis) {
+          return;
+        }
+
         // 2. Định dạng nội dung tin nhắn hiển thị
         let displayContent = newMsg.content || '';
         if (displayContent.startsWith('{') && displayContent.endsWith('}')) {

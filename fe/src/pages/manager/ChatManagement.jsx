@@ -808,11 +808,44 @@ export default function ChatManagement() {
 
   const messagesScrollRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
   const activeConversationIdRef = useRef(activeConversationId);
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId;
+    if (activeConversationId) {
+      sessionStorage.setItem('active_manager_conv_id', String(activeConversationId));
+    } else {
+      sessionStorage.removeItem('active_manager_conv_id');
+    }
   }, [activeConversationId]);
+
+  // Tự động cuộn khung chat xuống dưới cùng để xem tin nhắn mới nhất
+  const scrollToBottom = (behavior = "auto") => {
+    if (messagesScrollRef.current) {
+      const container = messagesScrollRef.current;
+      if (behavior === "smooth") {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: "smooth",
+        });
+      } else {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+  };
+
+  // Tự động cuộn xuống tin nhắn mới nhất mỗi khi tin nhắn thay đổi
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom("auto");
+      const timer = setTimeout(() => {
+        scrollToBottom("smooth");
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [messages]);
 
   // 1. Initial Load of all Customer Conversations
   const fetchConversations = async () => {
@@ -848,6 +881,10 @@ export default function ChatManagement() {
         });
         conversationService.markConversationAsRead(selectedId);
         await loadMessages(selectedId);
+        setTimeout(() => {
+          scrollToBottom("auto");
+          textareaRef.current?.focus();
+        }, 80);
       } else {
         const stillHasUnread = list.some((c) => Boolean(c.is_unread || (c.unread_count > 0)));
         window.dispatchEvent(new CustomEvent('manager_chat:unread_updated', { detail: { hasUnread: stillHasUnread } }));
@@ -914,7 +951,17 @@ export default function ChatManagement() {
           // Cập nhật tin nhắn vào khung chat nếu đang mở đúng cuộc trò chuyện
           if (isViewingThis) {
             setMessages((prev) => {
-              if (prev.some((m) => String(m.id) === String(newMsg.message_id))) return prev;
+              if (
+                prev.some(
+                  (m) =>
+                    String(m.id) === String(newMsg.message_id) ||
+                    (m.sender === "CUSTOMER" &&
+                      m.text === (newMsg.content || "") &&
+                      Math.abs(new Date(m.created_at || 0) - new Date(newMsg.created_at || 0)) < 3000),
+                )
+              ) {
+                return prev;
+              }
               return [
                 ...prev,
                 {
@@ -1029,18 +1076,23 @@ export default function ChatManagement() {
     conversationService.markConversationAsRead(convId);
 
     await loadMessages(convId);
-    if (messagesScrollRef.current) {
-      messagesScrollRef.current.scrollTop = 0;
-    }
+    setTimeout(() => {
+      scrollToBottom("auto");
+      textareaRef.current?.focus();
+    }, 60);
   };
 
   // Manager Send Message
   const handleSendMessage = async (e, customText = null) => {
     e?.preventDefault();
+    if (isSubmittingRef.current || sending) return;
+
     const textToSend = customText !== null ? customText : inputText.trim();
     if (!textToSend || !activeConversationId) return;
 
+    isSubmittingRef.current = true;
     setInputText("");
+    textareaRef.current?.focus();
     setSending(true);
 
     try {
@@ -1051,8 +1103,20 @@ export default function ChatManagement() {
       );
 
       const savedMsg = res.data;
-      // Cập nhật tin nhắn vào danh sách, giữ vị trí cố định không tự động trượt xuống
-      setMessages((prev) => [...prev, savedMsg]);
+      setMessages((prev) => {
+        if (
+          prev.some(
+            (m) =>
+              String(m.id) === String(savedMsg.id) ||
+              (m.sender === savedMsg.sender &&
+                m.text === savedMsg.text &&
+                Math.abs(new Date(m.created_at || 0) - new Date(savedMsg.created_at || 0)) < 3000),
+          )
+        ) {
+          return prev;
+        }
+        return [...prev, savedMsg];
+      });
 
       // Cập nhật preview trong danh sách hội thoại
       setConversations((prev) =>
@@ -1066,10 +1130,19 @@ export default function ChatManagement() {
             : c,
         ),
       );
+
+      setTimeout(() => {
+        scrollToBottom("smooth");
+        textareaRef.current?.focus();
+      }, 50);
     } catch (err) {
       console.error("Error sending manager message:", err);
     } finally {
+      isSubmittingRef.current = false;
       setSending(false);
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 50);
     }
   };
 
@@ -1608,13 +1681,13 @@ export default function ChatManagement() {
                       className="manager-input-row"
                     >
                       <textarea
+                        ref={textareaRef}
                         rows={1}
                         placeholder="Nhập câu trả lời cho khách hàng (Enter để gửi)..."
                         className="manager-textarea"
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        disabled={sending}
                       />
                       <button
                         type="submit"

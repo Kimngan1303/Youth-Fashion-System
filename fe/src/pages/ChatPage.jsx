@@ -1232,11 +1232,18 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
   const messagesScrollContainerRef = useRef(null);
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
   const handledInquiryRef = useRef(false);
   const activeConversationIdRef = useRef(activeConversationId);
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId;
+    if (activeConversationId) {
+      sessionStorage.setItem('active_chat_conv_id', String(activeConversationId));
+    } else {
+      sessionStorage.removeItem('active_chat_conv_id');
+    }
   }, [activeConversationId]);
 
   // Tài khoản Quản lý / Nhân viên không được vào chat tư vấn khách hàng, chuyển hướng sang /manager/chats
@@ -1251,8 +1258,31 @@ export default function ChatPage() {
     }
   }, [user, navigate]);
 
-  // Giữ màn hình và khung chat cố định, không tự ý trượt xuống dưới
-  const scrollToBottom = () => {};
+  // Tự động cuộn khung chat xuống dưới cùng để xem tin nhắn mới nhất
+  const scrollToBottom = (behavior = "auto") => {
+    if (messagesScrollContainerRef.current) {
+      const container = messagesScrollContainerRef.current;
+      if (behavior === "smooth") {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: "smooth",
+        });
+      } else {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+  };
+
+  // Tự động cuộn xuống tin nhắn mới nhất mỗi khi danh sách tin nhắn thay đổi hoặc nhận tin nhắn mới
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom("auto");
+      const timer = setTimeout(() => {
+        scrollToBottom("smooth");
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [messages]);
 
   // Load store products for attachment
   const fetchStoreProducts = async () => {
@@ -1345,6 +1375,10 @@ export default function ChatPage() {
             );
             conversationService.markConversationAsRead(activeId);
             await loadMessages(activeId);
+            setTimeout(() => {
+              scrollToBottom("auto");
+              textareaRef.current?.focus();
+            }, 80);
           }
           return;
         }
@@ -1389,6 +1423,10 @@ export default function ChatPage() {
           );
           conversationService.markConversationAsRead(selectedId);
           await loadMessages(selectedId);
+          setTimeout(() => {
+            scrollToBottom("auto");
+            textareaRef.current?.focus();
+          }, 80);
         }
       } catch (err) {
         console.error("Error loading conversations:", err);
@@ -1451,14 +1489,20 @@ export default function ChatPage() {
 
     const unsubscribe = conversationService.subscribeToChatStream(
       (newMsg) => {
-        if (!isManagerViewer && newMsg.sender_type === "EMPLOYEE") {
-          playNotificationSound();
-        }
         setActiveConversationId((currId) => {
           if (String(currId) === String(newMsg.conversation_id)) {
             setMessages((prev) => {
-              if (prev.some((m) => String(m.id) === String(newMsg.message_id)))
+              if (
+                prev.some(
+                  (m) =>
+                    String(m.id) === String(newMsg.message_id) ||
+                    (m.sender === newMsg.sender_type &&
+                      m.text === (newMsg.content || "") &&
+                      Math.abs(new Date(m.created_at || 0) - new Date(newMsg.created_at || 0)) < 3000),
+                )
+              ) {
                 return prev;
+              }
               const isMe = isManagerViewer
                 ? newMsg.sender_type === "EMPLOYEE"
                 : newMsg.sender_type === "CUSTOMER";
@@ -1586,15 +1630,18 @@ export default function ChatPage() {
     conversationService.markConversationAsRead(convId);
 
     await loadMessages(convId);
-    // Khi mở đoạn chat khác, giữ ở đầu trang tin nhắn để đọc từ đầu, KHÔNG tự động trượt xuống
-    if (messagesScrollContainerRef.current) {
-      messagesScrollContainerRef.current.scrollTop = 0;
-    }
+    // Tự động cuộn xuống tin nhắn mới nhất và đưa con trỏ vào ô nhập
+    setTimeout(() => {
+      scrollToBottom("auto");
+      textareaRef.current?.focus();
+    }, 60);
   };
 
   // Send Message
   const handleSendMessage = async (e, customPayload = null) => {
     e?.preventDefault();
+    if (isSubmittingRef.current || sending) return;
+
     const content =
       customPayload?.content !== undefined
         ? customPayload.content
@@ -1605,7 +1652,10 @@ export default function ChatPage() {
     if (!content && !attachmentUrl && !productCard) return;
     if (!activeConversationId) return;
 
+    isSubmittingRef.current = true;
     setInputText("");
+    // Giữ focus ngay lập tức vào ô nhập tin nhắn để người dùng tiếp tục nhập không gián đoạn
+    textareaRef.current?.focus();
     setSending(true);
 
     try {
@@ -1625,8 +1675,21 @@ export default function ChatPage() {
       );
 
       const savedMsg = res.data;
-      // Cập nhật tin nhắn vào danh sách, TUYỆT ĐỐI KHÔNG tự động trượt màn hình xuống dưới
-      setMessages((prev) => [...prev, savedMsg]);
+      // Chống thêm trùng lặp nếu tin nhắn đã được nhận qua SSE trước đó
+      setMessages((prev) => {
+        if (
+          prev.some(
+            (m) =>
+              String(m.id) === String(savedMsg.id) ||
+              (m.sender === savedMsg.sender &&
+                m.text === savedMsg.text &&
+                Math.abs(new Date(m.created_at || 0) - new Date(savedMsg.created_at || 0)) < 3000),
+          )
+        ) {
+          return prev;
+        }
+        return [...prev, savedMsg];
+      });
 
       // Update last message in list
       setConversations((prev) =>
@@ -1640,10 +1703,20 @@ export default function ChatPage() {
             : c,
         ),
       );
+
+      // Cuộn xuống tin nhắn mới nhất
+      setTimeout(() => {
+        scrollToBottom("smooth");
+        textareaRef.current?.focus();
+      }, 50);
     } catch (err) {
       console.error("Error sending message:", err);
     } finally {
+      isSubmittingRef.current = false;
       setSending(false);
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 50);
     }
   };
 
@@ -2260,13 +2333,13 @@ export default function ChatPage() {
                     className="input-container-shell"
                   >
                     <textarea
+                      ref={textareaRef}
                       rows={1}
                       placeholder="Nhập câu hỏi hoặc yêu cầu tư vấn..."
                       className="chat-textarea-field"
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      disabled={sending}
                     />
 
                     <div className="input-actions-cluster">

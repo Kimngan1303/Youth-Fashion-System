@@ -35,6 +35,18 @@ export default function ManagerChatNotification() {
         // 1. Phát âm thanh chuông thông báo
         playNotificationSound();
 
+        // Nếu Quản lý đang mở trang /manager/chat và đang xem chính cuộc trò chuyện này,
+        // tin nhắn đã hiển thị trực tiếp trong khung chat, không cần hiển thị popup toast
+        const activeMgrConv = sessionStorage.getItem('active_manager_conv_id');
+        const isViewingThis =
+          location.pathname.startsWith('/manager/chat') &&
+          (String(activeMgrConv) === String(newMsg.conversation_id) ||
+            new URLSearchParams(location.search).get('convId') === String(newMsg.conversation_id));
+
+        if (isViewingThis) {
+          return;
+        }
+
         // 2. Định dạng nội dung tin nhắn hiển thị
         let displayContent = newMsg.content || '';
         if (displayContent.startsWith('{') && displayContent.endsWith('}')) {

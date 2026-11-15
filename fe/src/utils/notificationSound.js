@@ -1,8 +1,17 @@
 /**
  * Utility phát âm thanh thông báo nhẹ nhàng, thanh lịch chuẩn Web Audio API
  * Tự động tạo 3 nốt nhạc du dương (C5 -> E5 -> G5) mà không cần file mp3 ngoài
+ * Tích hợp cơ chế throttle chống phát âm thanh lặp lại 2 lần liên tiếp
  */
+let lastSoundPlayTime = 0;
+
 export const playNotificationSound = () => {
+  const now = Date.now();
+  if (now - lastSoundPlayTime < 1200) {
+    return; // Không phát lại âm thanh nếu vừa phát trong vòng 1.2 giây
+  }
+  lastSoundPlayTime = now;
+
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
