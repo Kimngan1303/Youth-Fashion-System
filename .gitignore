@@ -29,8 +29,22 @@ Thumbs.db
 # Reports & Documentation
 docs/
 ai-log.md
-README.md
-ReadmeN.md
 SWP391_AI_Usage_Report_YouthFashion.docx
 Template4_AI-Usage-Report.docx
 
+# Non-project files & Documentation
+README*
+Readme*
+readme*
+FIX_REPORT*
+*agentic*
+*.mjs
+
+# Tests & Benchmarks
+test/
+tests/
+test_*.js
+*.test.js
+*.spec.js
+measure_latency_audit.js
+print_benchmark_table.js
