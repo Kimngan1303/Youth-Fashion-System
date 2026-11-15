@@ -2,7 +2,7 @@
   "model_id": "Xenova/clip-vit-base-patch32",
   "embedding_dimension": 512,
   "normalization_method": "L2",
-  "updated_at": "2026-11-10T09:32:56.018Z",
+  "updated_at": "2026-11-15T18:39:33.570Z",
   "total_products": 49,
   "vectors": [
     {
@@ -25827,7 +25827,7 @@
         -0.03340804225006494,
         0.05125889193703766
       ],
-      "updated_at": "2026-11-10T09:09:41.770Z"
+      "updated_at": "2026-11-15T18:39:33.569Z"
     }
   ]
 }
