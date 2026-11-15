@@ -1,10 +1,11 @@
-import { describe, it, before, after } from 'node:test';
+import { describe, it, before, after, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import app from '../src/app.js';
 import { prisma } from '../src/repositories/prisma.js';
 import { generateAccessToken } from '../src/helpers/jwt.helper.js';
 import { processExpiredPayosOrders, processAutoCompleteOrders } from '../src/config/paymentExpiration.job.js';
+import { emailHooks } from '../src/services/email.service.js';
 
 describe('Youth Fashion Order Flow & Bug Fix Test Suite', () => {
   let managerToken;
@@ -75,7 +76,7 @@ describe('Youth Fashion Order Flow & Bug Fix Test Suite', () => {
         shippingCity: 'Ha Noi',
         shippingMethod: 'STANDARD',
         paymentMethod: 'COD',
-        items: [{ variantId: Number(testVariant.variant_id), quantity: 1 }],
+        items: [{ variant_id: Number(testVariant.variant_id), quantity: 1 }],
       });
 
     assert.equal(orderRes.status, 201, 'Tạo đơn hàng phải trả về 201');
@@ -174,7 +175,7 @@ describe('Youth Fashion Order Flow & Bug Fix Test Suite', () => {
         shippingCity: 'Ha Noi',
         shippingMethod: 'STANDARD',
         paymentMethod: 'COD',
-        items: [{ variantId: Number(testVariant.variant_id), quantity: 1 }],
+        items: [{ variant_id: Number(testVariant.variant_id), quantity: 1 }],
       });
     const orderId = orderRes.body.data.order?.order_id || orderRes.body.data.order_id;
     assert.ok(orderId);
@@ -343,7 +344,7 @@ describe('Youth Fashion Order Flow & Bug Fix Test Suite', () => {
         shippingCity: 'Ha Noi',
         shippingMethod: 'STANDARD',
         paymentMethod: 'COD',
-        items: [{ variantId: Number(testVariant.variant_id), quantity: 1 }],
+        items: [{ variant_id: Number(testVariant.variant_id), quantity: 1 }],
       });
     const orderId = orderRes.body.data.order?.order_id || orderRes.body.data.order_id;
     assert.ok(orderId);
@@ -405,7 +406,7 @@ describe('Youth Fashion Order Flow & Bug Fix Test Suite', () => {
         paymentMethod: 'COD',
         voucherCode: vCode,
         discountAmount: 10000,
-        items: [{ variantId: Number(testVariant.variant_id), quantity: 1 }],
+        items: [{ variant_id: Number(testVariant.variant_id), quantity: 1 }],
       });
     const orderId = orderRes.body.data.order?.order_id || orderRes.body.data.order_id;
     assert.ok(orderId);
@@ -502,5 +503,110 @@ describe('Youth Fashion Order Flow & Bug Fix Test Suite', () => {
     const listAfter = getAgainRes.body.data;
     const stillExists = listAfter.some((n) => String(n.id) === String(notif.notification_id));
     assert.equal(stillExists, false, 'Thông báo đã xóa không được xuất hiện lại');
+  });
+
+  // TEST 10: GET /api/orders/my-orders trả đúng đơn của khách và ẩn địa chỉ/SĐT đối với khách vãng lai
+  it('Scenario 10: GET /api/orders/my-orders returns customer orders & GET /:orderNumber masks data for strangers', async () => {
+    // 1. Tạo đơn hàng mới cho Customer A
+    const orderRes = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${customerAToken}`)
+      .send({
+        recipientName: 'Khach Hang A',
+        recipientPhone: '0988776655',
+        recipientEmail: 'customera@example.com',
+        shippingAddressLine: 'Số 99 Phố Tràng Tiền',
+        shippingWard: 'Tràng Tiền',
+        shippingDistrict: 'Hoàn Kiếm',
+        shippingCity: 'Hà Nội',
+        paymentMethod: 'COD',
+        items: [{ variant_id: Number(testVariant.variant_id), quantity: 1, unit_price: 200000 }],
+      });
+    assert.equal(orderRes.status, 201);
+    const orderNumber = orderRes.body.data.orderNumber || orderRes.body.data.order?.order_number;
+    const orderId = orderRes.body.data.order?.order_id || orderRes.body.data.order_id;
+
+    // 2. Customer A gọi /api/orders/my-orders: Phải thấy đơn của mình
+    const myOrdersRes = await request(app)
+      .get('/api/orders/my-orders')
+      .set('Authorization', `Bearer ${customerAToken}`);
+    assert.equal(myOrdersRes.status, 200);
+    const myOrders = myOrdersRes.body.data;
+    const hasMyOrder = myOrders.some(o => String(o.order_id) === String(orderId) || o.order_number === orderNumber);
+    assert.ok(hasMyOrder, 'Customer A phải nhìn thấy đơn hàng của chính mình trong /my-orders');
+
+    // 3. Customer B gọi /api/orders/my-orders: KHÔNG được thấy đơn của Customer A
+    const customerBOrdersRes = await request(app)
+      .get('/api/orders/my-orders')
+      .set('Authorization', `Bearer ${customerBToken}`);
+    assert.equal(customerBOrdersRes.status, 200);
+    const bOrders = customerBOrdersRes.body.data;
+    const hasOrderInB = bOrders.some(o => String(o.order_id) === String(orderId) || o.order_number === orderNumber);
+    assert.equal(hasOrderInB, false, 'Customer B không được thấy đơn hàng của Customer A');
+
+    // 4. Khách vãng lai gọi GET /api/orders/:orderNumber: Phải ẩn địa chỉ và SĐT
+    const guestGetRes = await request(app).get(`/api/orders/${orderNumber}`);
+    assert.equal(guestGetRes.status, 200);
+    const guestOrder = guestGetRes.body.data;
+    assert.ok(guestOrder.recipient_phone.includes('****') || guestOrder.recipient_phone === '***', 'SĐT phải được ẩn đối với khách vãng lai');
+    assert.ok(guestOrder.shipping_address_line.includes('***'), 'Địa chỉ chi tiết phải được ẩn đối với khách vãng lai');
+
+    // 5. Chủ đơn hàng (Customer A) gọi GET /:orderNumber: Phải thấy đầy đủ thông tin không che
+    const ownerGetRes = await request(app)
+      .get(`/api/orders/${orderNumber}`)
+      .set('Authorization', `Bearer ${customerAToken}`);
+    assert.equal(ownerGetRes.status, 200);
+    const ownerOrder = ownerGetRes.body.data;
+    assert.equal(ownerOrder.recipient_phone, '0988776655', 'Chủ đơn phải xem được SĐT đầy đủ');
+    assert.equal(ownerOrder.shipping_address_line, 'Số 99 Phố Tràng Tiền', 'Chủ đơn phải xem được địa chỉ đầy đủ');
+  });
+
+  // TEST 11: Đổi trạng thái đơn hàng gửi đúng 1 email (mock sendOrderNotificationEmail)
+  it('Scenario 11: Status update triggers EXACTLY 1 email notification', async () => {
+    // 1. Tạo đơn hàng mới
+    const orderRes = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${customerAToken}`)
+      .send({
+        recipientName: 'Nguoi Nhan Duy Nhat',
+        recipientPhone: '0933221100',
+        recipientEmail: 'recipient.single@example.com',
+        shippingAddressLine: '456 Le Duan',
+        shippingCity: 'Da Nang',
+        paymentMethod: 'COD',
+        items: [{ variant_id: Number(testVariant.variant_id), quantity: 1, unit_price: 150000 }],
+      });
+    assert.equal(orderRes.status, 201);
+    const orderId = orderRes.body.data.order?.order_id || orderRes.body.data.order_id;
+
+    // 2. Mock sendOrderNotificationEmail để đếm số lần gọi
+    let emailsSent = [];
+    emailHooks.sendOrderNotificationEmail = mock.fn(async (params) => {
+      emailsSent.push(params);
+      return { success: true };
+    });
+
+    try {
+      // 3. Manager cập nhật trạng thái sang CONFIRMED
+      const updateRes = await request(app)
+        .patch(`/api/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({ status: 'CONFIRMED', note: 'Xac nhan don hang' });
+      assert.equal(updateRes.status, 200);
+
+      // Chờ một khoảng tick để các promise async trong service hoàn tất
+      await new Promise(r => setTimeout(r, 100));
+
+      // 4. Kiểm tra số email được gửi đúng bằng 1
+      assert.equal(
+        emailsSent.length,
+        1,
+        `Mỗi lần cập nhật trạng thái chỉ gửi đúng 1 email, thực tế đã gửi: ${emailsSent.length}`
+      );
+      assert.equal(emailsSent[0].toEmail, 'recipient.single@example.com', 'Email gửi tới đúng địa chỉ người nhận');
+    } finally {
+      // Dọn dẹp mock
+      emailHooks.sendOrderNotificationEmail = null;
+    }
   });
 });
