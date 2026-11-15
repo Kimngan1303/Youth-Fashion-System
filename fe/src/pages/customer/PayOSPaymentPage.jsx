@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Clock, Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { orderService } from '../../services/orderService';
@@ -10,7 +10,8 @@ export default function PayOSPaymentPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { showSuccess, showError, showInfo } = useToast();
-  const { setCart, removePurchasedItems } = useAuth();
+  const { user, setCart, removePurchasedItems } = useAuth();
+  const isNavigatingRef = useRef(false);
 
   // Khởi tạo thông tin đơn thanh toán từ state hoặc sessionStorage
   const [paymentData, setPaymentData] = useState(() => {
@@ -86,19 +87,23 @@ export default function PayOSPaymentPage() {
     return () => clearInterval(timer);
   }, []);
 
-  // Tự động kiểm tra trạng thái thanh toán từ PayOS mỗi 2.5 giây
+  // Tự động kiểm tra trạng thái thanh toán từ PayOS liên tục mỗi 2 giây
   useEffect(() => {
-    if (!orderCode || timeLeft <= 0) return;
+    if (!orderCode) return;
 
     let isMounted = true;
-    const interval = setInterval(async () => {
+
+    const checkStatus = async () => {
+      if (isNavigatingRef.current) return;
       try {
         const res = await orderService.checkPayosStatus(orderCode);
-        if (!isMounted) return;
+        if (!isMounted || isNavigatingRef.current) return;
 
-        if (res?.data?.status === 'PAID') {
-          clearInterval(interval);
+        const status = res?.data?.status || res?.status;
+        if (status === 'PAID') {
+          isNavigatingRef.current = true;
           showSuccess('Thanh toán thành công! Đang chuyển đến xác nhận đơn hàng...');
+
           try {
             const rawPending = sessionStorage.getItem('yf_pending_checkout_items');
             if (rawPending) {
@@ -107,26 +112,57 @@ export default function PayOSPaymentPage() {
                 removePurchasedItems(pendingItems);
               }
             }
+
+            const pendingSummary = sessionStorage.getItem('yf_pending_order_summary');
+            if (pendingSummary) {
+              sessionStorage.setItem('yf_last_completed_order', pendingSummary);
+            }
+
+            const pendingOrder = sessionStorage.getItem('yf_pending_payos_order');
+            if (pendingOrder) {
+              const parsedOrder = JSON.parse(pendingOrder);
+              parsedOrder.payment_status = 'PAID';
+              parsedOrder.payments = [{ payment_method: 'PAYOS', payment_status: 'SUCCESS' }];
+              const userOrderKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : 'yf_customer_orders';
+              const rawExisting = JSON.parse(localStorage.getItem(userOrderKey) || localStorage.getItem('yf_customer_orders') || '[]');
+              const existingOrders = Array.isArray(rawExisting) ? rawExisting.filter(o => String(o.order_id) !== String(orderCode) && String(o.order_number) !== `YF-${orderCode}`) : [];
+              const updatedList = [parsedOrder, ...existingOrders];
+              localStorage.setItem(userOrderKey, JSON.stringify(updatedList));
+              localStorage.setItem('yf_customer_orders', JSON.stringify(updatedList));
+            }
           } catch (e) {}
+
           sessionStorage.removeItem('yf_current_payos_payment');
           navigate(`/order-success?orderCode=${orderCode}&orderNumber=${paymentData?.orderNumber || `YF-${orderCode}`}&status=PAID`);
-        } else if (res?.data?.status === 'CANCELLED') {
-          clearInterval(interval);
+        } else if (status === 'CANCELLED') {
+          isNavigatingRef.current = true;
           handleCancel('Giao dịch đã được hủy trên hệ thống.');
         }
       } catch (e) {}
-    }, 2500);
+    };
+
+    // Kiểm tra tức thì khi mở trang
+    checkStatus();
+
+    // Lặp lại kiểm tra mỗi 2 giây
+    const interval = setInterval(checkStatus, 2000);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [orderCode, timeLeft, paymentData, navigate, showSuccess]);
+  }, [orderCode, paymentData, navigate, removePurchasedItems, showSuccess, user]);
 
   // Xử lý khi hết hạn 5 phút: Hủy đơn, hoàn kho, về màn checkout
   const handleTimeout = async () => {
     try {
       if (orderCode) {
+        // Kiểm tra PayOS lần cuối trước khi tuyên bố hết hạn
+        const finalCheck = await orderService.checkPayosStatus(orderCode);
+        if (finalCheck?.data?.status === 'PAID' || finalCheck?.status === 'PAID') {
+          navigate(`/order-success?orderCode=${orderCode}&orderNumber=${paymentData?.orderNumber || `YF-${orderCode}`}&status=PAID`);
+          return;
+        }
         await orderService.deleteOrder(orderCode);
         await orderService.deleteOrder(`YF-${orderCode}`);
       }

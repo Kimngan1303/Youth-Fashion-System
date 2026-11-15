@@ -161,12 +161,13 @@ const purgeMockOrders = (list) => {
     if (deletedSet.has(rawCode)) return false;
     if (digitsOnly && deletedSet.has(digitsOnly)) return false;
 
-    // Không tính các đơn hàng PayOS chưa thanh toán thành công hoặc đã bị hủy
+    // Chỉ ẩn các đơn PayOS nháp đang chờ quét mã thanh toán (PENDING và chưa thanh toán)
     const isPayosOrder = o.payment_method === 'PAYOS' || String(o.payment_method || '').includes('VietQR') || String(o.payment_method || '').includes('PAYOS') || String(o.payment_label || '').includes('PayOS');
     if (isPayosOrder) {
       const pStatus = String(o.payment_status || '').toUpperCase();
       const oStatus = String(o.order_status || o.status || '').toUpperCase();
-      if (pStatus === 'PENDING' || pStatus === 'CANCELLED' || pStatus === 'FAILED' || pStatus === 'UNPAID' || oStatus === 'CANCELLED') {
+      const isPaid = pStatus === 'SUCCESS' || pStatus === 'PAID';
+      if (oStatus === 'PENDING' && !isPaid) {
         return false;
       }
     }
@@ -184,13 +185,14 @@ const STATUS_RANK = {
   DELIVERING: 4,
   SHIPPED: 4,
   IN_TRANSIT: 4,
-  COMPLETED: 5,
+  DELIVERY_FAILED: 4.5,
   DELIVERED: 5,
-  SUCCESS: 5,
-  RETURNED: 6,
-  REFUNDED: 6,
-  CANCELLED: 7,
-  FAILED: 7
+  COMPLETED: 6,
+  SUCCESS: 6,
+  RETURNED: 7,
+  REFUNDED: 7,
+  CANCELLED: 8,
+  FAILED: 8
 };
 
 // Phân giải chính xác trạng thái hoàn tiền (ĐỒNG Ý / TỪ CHỐI HOÀN) dựa trên đa nguồn dữ liệu (Quản lý & Overrides)
@@ -206,16 +208,7 @@ const resolveOrderRefundStatus = (ord) => {
   let labelStr = String(ord.status_label || '').toUpperCase();
   const noteLow = noteStr.toLowerCase();
 
-  // 0. Kiểm tra trực tiếp từ chính thuộc tính của ord (bao gồm cả note, payment_status, payments và return_requests từ MySQL)
-  if (!decision || decision === 'PENDING') {
-    if (labelStr.includes('ĐÃ HOÀN') || noteLow.includes('đã xác nhận hoàn tiền') || noteLow.includes('đã hoàn tiền') || ord.payment_status === 'REFUNDED' || ord.payments?.some(p => p.payment_status === 'REFUNDED') || ord.return_requests?.some(r => r.status === 'COMPLETED' || r.status === 'APPROVED')) {
-      decision = 'APPROVED';
-    } else if (labelStr.includes('TỪ CHỐI') || noteLow.includes('từ chối hoàn') || ord.return_requests?.some(r => r.status === 'REJECTED')) {
-      decision = 'REJECTED';
-    }
-  }
-
-  // 1. Kiểm tra trực tiếp từ yf_manager_orders (quyết định thực tế từ phía Quản lý Shop)
+  // 1. Kiểm tra trực tiếp từ yf_manager_orders (quyết định thực tế mới nhất từ phía Quản lý Shop)
   try {
     const rawMgr = localStorage.getItem('yf_manager_orders');
     if (rawMgr) {
@@ -233,10 +226,12 @@ const resolveOrderRefundStatus = (ord) => {
         if (mMatch) {
           const mL = String(mMatch.status_label || '').toUpperCase();
           const mN = String(mMatch.note || '').toLowerCase();
-          if (mMatch.refund_decision === 'APPROVED' || mL.includes('ĐÃ HOÀN') || mN.includes('đã xác nhận hoàn tiền') || mN.includes('đã hoàn tiền') || mMatch.payment_status === 'REFUNDED') {
-            decision = 'APPROVED';
-          } else if (mMatch.refund_decision === 'REJECTED' || mL.includes('TỪ CHỐI') || mN.includes('từ chối hoàn')) {
+          const isMRej = mMatch.refund_decision === 'REJECTED' || mL.includes('TỪ CHỐI') || mN.includes('từ chối hoàn tiền') || mN.includes('từ chối hoàn');
+          const isMApp = !isMRej && (mMatch.refund_decision === 'APPROVED' || mL.includes('ĐÃ HOÀN') || mN.includes('đã xác nhận hoàn tiền') || mN.includes('đã hoàn tiền'));
+          if (isMRej) {
             decision = 'REJECTED';
+          } else if (isMApp) {
+            decision = 'APPROVED';
           }
           if (mMatch.reject_reason) rejectReason = mMatch.reject_reason;
           if (mMatch.note) noteStr = mMatch.note;
@@ -268,10 +263,12 @@ const resolveOrderRefundStatus = (ord) => {
         if (ov) {
           const ovL = String(ov.status_label_customer || ov.status_label || '').toUpperCase();
           const ovN = String(ov.note || '').toLowerCase();
-          if (ov.refund_decision === 'APPROVED' || ovL.includes('ĐÃ HOÀN') || ovN.includes('đã xác nhận hoàn tiền') || ovN.includes('đã hoàn tiền')) {
-            decision = 'APPROVED';
-          } else if (ov.refund_decision === 'REJECTED' || ovL.includes('TỪ CHỐI') || ovN.includes('từ chối hoàn')) {
+          const isOvRej = ov.refund_decision === 'REJECTED' || ovL.includes('TỪ CHỐI') || ovN.includes('từ chối hoàn tiền') || ovN.includes('từ chối hoàn');
+          const isOvApp = !isOvRej && (ov.refund_decision === 'APPROVED' || ovL.includes('ĐÃ HOÀN') || ovN.includes('đã xác nhận hoàn tiền') || ovN.includes('đã hoàn tiền'));
+          if (isOvRej) {
             decision = 'REJECTED';
+          } else if (isOvApp) {
+            decision = 'APPROVED';
           }
           if (ov.reject_reason) rejectReason = rejectReason || ov.reject_reason;
           if (ov.note) noteStr = noteStr || ov.note;
@@ -301,10 +298,12 @@ const resolveOrderRefundStatus = (ord) => {
         if (cMatch) {
           const cL = String(cMatch.status_label || '').toUpperCase();
           const cN = String(cMatch.note || '').toLowerCase();
-          if (cMatch.refund_decision === 'APPROVED' || cL.includes('ĐÃ HOÀN') || cN.includes('đã xác nhận hoàn tiền') || cN.includes('đã hoàn tiền')) {
-            decision = 'APPROVED';
-          } else if (cMatch.refund_decision === 'REJECTED' || cL.includes('TỪ CHỐI') || cN.includes('từ chối hoàn')) {
+          const isCRej = cMatch.refund_decision === 'REJECTED' || cL.includes('TỪ CHỐI') || cN.includes('từ chối hoàn tiền') || cN.includes('từ chối hoàn');
+          const isCApp = !isCRej && (cMatch.refund_decision === 'APPROVED' || cL.includes('ĐÃ HOÀN') || cN.includes('đã xác nhận hoàn tiền') || cN.includes('đã hoàn tiền'));
+          if (isCRej) {
             decision = 'REJECTED';
+          } else if (isCApp) {
+            decision = 'APPROVED';
           }
           if (cMatch.reject_reason) rejectReason = rejectReason || cMatch.reject_reason;
           if (cMatch.note) noteStr = noteStr || cMatch.note;
@@ -314,10 +313,15 @@ const resolveOrderRefundStatus = (ord) => {
     } catch (e) {}
   }
 
-  // 4. Kiểm tra từ chính ord note và status_label
-  if (!decision) {
-    if (ord.refund_decision === 'APPROVED' || labelStr.includes('ĐÃ HOÀN') || noteLow.includes('đã xác nhận hoàn tiền') || noteLow.includes('đã hoàn tiền')) decision = 'APPROVED';
-    else if (ord.refund_decision === 'REJECTED' || labelStr.includes('TỪ CHỐI') || noteLow.includes('từ chối hoàn')) decision = 'REJECTED';
+  // 4. Kiểm tra trực tiếp từ chính thuộc tính của ord (bao gồm return_requests, note, payment_status từ MySQL)
+  if (!decision || decision === 'PENDING') {
+    const isOrdRej = ord.refund_decision === 'REJECTED' || labelStr.includes('TỪ CHỐI') || noteLow.includes('từ chối hoàn tiền') || noteLow.includes('từ chối hoàn') || ord.return_requests?.some(r => r.status === 'REJECTED');
+    const isOrdApp = !isOrdRej && (ord.refund_decision === 'APPROVED' || labelStr.includes('ĐÃ HOÀN') || noteLow.includes('đã xác nhận hoàn tiền') || noteLow.includes('đã hoàn tiền') || ord.return_requests?.some(r => r.status === 'COMPLETED' || r.status === 'APPROVED') || ord.payment_status === 'REFUNDED' || ord.payments?.some(p => p.payment_status === 'REFUNDED'));
+    if (isOrdRej) {
+      decision = 'REJECTED';
+    } else if (isOrdApp) {
+      decision = 'APPROVED';
+    }
   }
 
   if (!rejectReason && noteStr.includes('Từ chối hoàn tiền:')) {
@@ -346,12 +350,22 @@ const pickAuthoritativeStatus = (statusA, statusB, labelA, labelB, noteA = '', n
   }
 
   // Nếu là đơn hoàn/đổi trả: ưu tiên trạng thái đã được Shop quyết định (ĐÃ HOÀN TIỀN / TỪ CHỐI HOÀN)
-  if (sA === 'RETURNED' || sB === 'RETURNED' || lA.includes('ĐỔI TRẢ') || lB.includes('ĐỔI TRẢ') || lA.includes('HOÀN') || lB.includes('HOÀN')) {
+  if (sA === 'RETURNED' || sB === 'RETURNED' || lA.includes('ĐỔI TRẢ') || lB.includes('ĐỔI TRẢ') || lA.includes('HOÀN') || lB.includes('HOÀN') || lA.includes('TỪ CHỐI') || lB.includes('TỪ CHỐI')) {
     const nA = String(noteA || '').toLowerCase();
     const nB = String(noteB || '').toLowerCase();
-    const isAppr = rA === 'APPROVED' || rB === 'APPROVED' || lA.includes('ĐÃ HOÀN') || lB.includes('ĐÃ HOÀN') || nA.includes('đã xác nhận hoàn tiền') || nB.includes('đã xác nhận hoàn tiền') || nA.includes('đã hoàn tiền') || nB.includes('đã hoàn tiền');
-    const isRej = !isAppr && (rA === 'REJECTED' || rB === 'REJECTED' || lA.includes('TỪ CHỐI') || lB.includes('TỪ CHỐI') || nA.includes('từ chối hoàn') || nB.includes('từ chối hoàn'));
-    const bestLabel = isAppr ? 'ĐÃ HOÀN TIỀN' : (isRej ? 'TỪ CHỐI HOÀN' : 'ĐỔI TRẢ');
+
+    // Ưu tiên quyết định mới nhất từ backend A
+    if (nA.includes('từ chối hoàn') || rA === 'REJECTED') {
+      return { status: 'RETURNED', label: 'TỪ CHỐI HOÀN' };
+    }
+    if (nA.includes('đã xác nhận hoàn tiền') || nA.includes('đã hoàn tiền') || rA === 'APPROVED') {
+      return { status: 'RETURNED', label: 'ĐÃ HOÀN TIỀN' };
+    }
+
+    // Nếu backend chưa có quyết định, đối chiếu từ bộ nhớ B
+    const isRej = rB === 'REJECTED' || lB.includes('TỪ CHỐI') || nB.includes('từ chối hoàn tiền') || nB.includes('từ chối hoàn');
+    const isAppr = !isRej && (rB === 'APPROVED' || lB.includes('ĐÃ HOÀN') || nB.includes('đã xác nhận hoàn tiền') || nB.includes('đã hoàn tiền'));
+    const bestLabel = isRej ? 'TỪ CHỐI HOÀN' : (isAppr ? 'ĐÃ HOÀN TIỀN' : 'ĐỔI TRẢ');
     return { status: 'RETURNED', label: bestLabel };
   }
 
@@ -521,13 +535,43 @@ const applyStatusOverrides = (ordersList) => {
         return ord;
       }
 
-      // Nếu Manager đã từ chối hoặc hoàn tiền trong yf_manager_orders thì ưu tiên áp dụng ngay
+      // Nếu Manager đã hủy, từ chối hoặc hoàn tiền trong yf_manager_orders thì ưu tiên áp dụng ngay
       if (mgrOrd) {
+        const mgrS = String(mgrOrd.status || mgrOrd.order_status || '').toUpperCase();
         const mgrL = String(mgrOrd.status_label || '').toUpperCase();
         const mgrN = String(mgrOrd.note || '').toLowerCase();
-        const isMgrRej = mgrOrd.refund_decision === 'REJECTED' || mgrL.includes('TỪ CHỐI') || mgrN.includes('từ chối hoàn tiền') || mgrN.includes('từ chối hoàn');
-        const isMgrApp = !isMgrRej && (mgrOrd.refund_decision === 'APPROVED' || mgrL.includes('ĐÃ HOÀN') || mgrN.includes('đã xác nhận hoàn tiền') || mgrN.includes('đã hoàn tiền') || mgrOrd.payment_status === 'REFUNDED');
-        if (isMgrRej) {
+        const isMgrCancelled = mgrS === 'CANCELLED' || mgrL.includes('ĐÃ HỦY') || mgrN.includes('shop hủy');
+        const isMgrRej = !isMgrCancelled && (mgrOrd.refund_decision === 'REJECTED' || mgrL.includes('TỪ CHỐI') || mgrN.includes('từ chối hoàn tiền') || mgrN.includes('từ chối hoàn'));
+        const isMgrApp = !isMgrCancelled && !isMgrRej && (mgrOrd.refund_decision === 'APPROVED' || mgrL.includes('ĐÃ HOÀN') || mgrN.includes('đã xác nhận hoàn tiền') || mgrN.includes('đã hoàn tiền') || mgrOrd.payment_status === 'REFUNDED');
+        if (isMgrCancelled) {
+          const isShop = (mgrOrd.cancelled_by === 'SHOP') || mgrN.includes('shop hủy');
+          const bestCancelReason = mgrOrd.cancel_reason || (isShop ? 'Sản phẩm tạm thời hết hàng trong kho' : 'Đổi ý, không muốn mua nữa');
+          ov = {
+            ...(ov || {}),
+            status: 'CANCELLED',
+            order_status: 'CANCELLED',
+            status_label: 'Đã hủy',
+            status_label_manager: 'Đã hủy',
+            status_label_customer: 'ĐÃ HỦY',
+            cancel_reason: bestCancelReason,
+            cancelled_by: isShop ? 'SHOP' : (mgrOrd.cancelled_by || 'SHOP'),
+            note: mgrOrd.note || (isShop ? `Shop hủy đơn: ${bestCancelReason}` : 'Khách hủy đơn'),
+            updated_at: Date.now()
+          };
+          if (digits) {
+            overrides[digits] = ov;
+            overrides[`YF-${digits}`] = ov;
+            overrides[`#YF-${digits}`] = ov;
+            overrides[`YF - ${digits}`] = ov;
+            overrides[`#YF - ${digits}`] = ov;
+            overrides[`YF – ${digits}`] = ov;
+            overrides[`#YF – ${digits}`] = ov;
+            overrides[`#${digits}`] = ov;
+          }
+          if (rawId) overrides[rawId] = ov;
+          if (rawCode) overrides[rawCode] = ov;
+          overridesModified = true;
+        } else if (isMgrRej) {
           const mgrRejectReason = mgrOrd.reject_reason || (mgrOrd.note?.includes('Từ chối hoàn tiền:') ? mgrOrd.note.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim() : 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop');
           ov = {
             ...(ov || {}),
@@ -624,12 +668,24 @@ const applyStatusOverrides = (ordersList) => {
         const ovDecision = String(ov.refund_decision || '').toUpperCase();
 
         let resolvedLabel = ov.status_label_customer || ov.status_label;
+        let isActuallyApproved = false;
+        let isActuallyRejected = false;
+
         if (ovStatus === 'RETURNED') {
           const effectiveDecision = ovDecision || String(ord.refund_decision || '').toUpperCase();
           const effectiveLabel = ovLabel || String(ord.status_label || '').toUpperCase();
           const effectiveNote = String(ov.note || ord.note || '').toLowerCase();
           const ordNoteLow = String(ord.note || '').toLowerCase();
-          const isActuallyApproved =
+          isActuallyRejected =
+            effectiveDecision === 'REJECTED' ||
+            effectiveLabel.includes('TỪ CHỐI') ||
+            effectiveNote.includes('từ chối hoàn tiền') ||
+            effectiveNote.includes('từ chối hoàn') ||
+            ordNoteLow.includes('từ chối hoàn tiền') ||
+            ordNoteLow.includes('từ chối hoàn') ||
+            ord.return_requests?.some(r => r.status === 'REJECTED');
+
+          isActuallyApproved = !isActuallyRejected && (
             effectiveDecision === 'APPROVED' ||
             effectiveLabel.includes('ĐÃ HOÀN') ||
             effectiveNote.includes('đã xác nhận hoàn tiền') ||
@@ -638,14 +694,7 @@ const applyStatusOverrides = (ordersList) => {
             ordNoteLow.includes('đã hoàn tiền') ||
             ord.payment_status === 'REFUNDED' ||
             ord.payments?.some(p => p.payment_status === 'REFUNDED') ||
-            ord.return_requests?.some(r => r.status === 'COMPLETED' || r.status === 'APPROVED');
-
-          const isActuallyRejected = !isActuallyApproved && (
-            effectiveDecision === 'REJECTED' ||
-            effectiveLabel.includes('TỪ CHỐI') ||
-            effectiveNote.includes('từ chối hoàn') ||
-            ordNoteLow.includes('từ chối hoàn') ||
-            ord.return_requests?.some(r => r.status === 'REJECTED')
+            ord.return_requests?.some(r => r.status === 'COMPLETED' || r.status === 'APPROVED')
           );
 
           if (isActuallyApproved) {
@@ -670,10 +719,14 @@ const applyStatusOverrides = (ordersList) => {
             resolvedLabel = 'ĐỔI TRẢ';
           }
         } else if (!resolvedLabel) {
-          resolvedLabel = ovStatus === 'COMPLETED' ? 'ĐÃ GIAO' : (
-            ovStatus === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
-              ovStatus === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
-                ovStatus === 'CANCELLED' ? 'ĐÃ HỦY' : 'CHỜ XÁC NHẬN'
+          resolvedLabel = ovStatus === 'COMPLETED' ? 'HOÀN THÀNH' : (
+            ovStatus === 'DELIVERED' ? 'ĐÃ GIAO' : (
+              ovStatus === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
+                ovStatus === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
+                  ovStatus === 'DELIVERY_FAILED' ? 'GIAO THẤT BẠI' : (
+                    ovStatus === 'CANCELLED' ? 'ĐÃ HỦY' : 'CHỜ XÁC NHẬN'
+                  )
+                )
               )
             )
           );
@@ -708,7 +761,7 @@ const applyStatusOverrides = (ordersList) => {
           retry_date: ov.retry_date || ord.retry_date,
           delivery_attempts: ov.delivery_attempts || ord.delivery_attempts,
           note: effectiveFinalNote,
-          payment_status: isActuallyApproved ? 'REFUNDED' : (ord.payment_status || ov.payment_status),
+          payment_status: isActuallyApproved ? 'REFUNDED' : (isActuallyRejected ? 'PAID' : (ord.payment_status || ov.payment_status)),
           payments: ord.payments,
           return_requests: ord.return_requests,
         };
@@ -749,9 +802,11 @@ const normalizeInitialOrderStatus = (order) => {
     noteStr.includes('yêu cầu hoàn tiền') ||
     (noteStr.includes('stk:') && !noteStr.includes('khách hủy đơn:'));
   const isCancelled = !isReturned && (['CANCELLED', 'FAILED'].includes(s) || label.includes('HỦY'));
-  const isCompleted = !isReturned && !isCancelled && (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s) || label.includes('ĐÃ GIAO') || label.includes('GIAO THÀNH CÔNG'));
-  const isShipping = !isReturned && !isCancelled && !isCompleted && (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s) || (label.includes('VẬN CHUYỂN') && !label.includes('CHỜ VẬN CHUYỂN')) || label.includes('ĐANG GIAO'));
-  const isConfirmed = !isReturned && !isCancelled && !isCompleted && !isShipping && (['CONFIRMED'].includes(s) || label.includes('ĐÃ XÁC NHẬN'));
+  const isCompleted = !isReturned && !isCancelled && (s === 'COMPLETED' || label.includes('HOÀN THÀNH'));
+  const isDelivered = !isReturned && !isCancelled && !isCompleted && (['DELIVERED', 'SUCCESS'].includes(s) || label.includes('ĐÃ GIAO') || label.includes('GIAO THÀNH CÔNG'));
+  const isDeliveryFailed = !isReturned && !isCancelled && !isCompleted && !isDelivered && (['DELIVERY_FAILED', 'FAILED_DELIVERY'].includes(s) || label.includes('GIAO THẤT BẠI'));
+  const isShipping = !isReturned && !isCancelled && !isCompleted && !isDelivered && !isDeliveryFailed && (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s) || (label.includes('VẬN CHUYỂN') && !label.includes('CHỜ VẬN CHUYỂN')) || label.includes('ĐANG GIAO'));
+  const isConfirmed = !isReturned && !isCancelled && !isCompleted && !isDelivered && !isDeliveryFailed && !isShipping && (['CONFIRMED'].includes(s) || label.includes('ĐÃ XÁC NHẬN'));
 
   let normalizedStatus = 'PENDING';
   let normalizedLabel = 'CHỜ XÁC NHẬN';
@@ -759,31 +814,37 @@ const normalizeInitialOrderStatus = (order) => {
   if (isReturned) {
     normalizedStatus = 'RETURNED';
     const refSt = resolveOrderRefundStatus(order);
-    const isAppr = refSt.isApproved ||
+    const isRej = refSt.isRejected ||
+      order.refund_decision === 'REJECTED' ||
+      label.includes('TỪ CHỐI') ||
+      noteStr.includes('từ chối hoàn tiền') ||
+      noteStr.includes('từ chối hoàn') ||
+      order.return_requests?.some(r => r.status === 'REJECTED');
+    const isAppr = !isRej && (
+      refSt.isApproved ||
       order.refund_decision === 'APPROVED' ||
       label.includes('ĐÃ HOÀN') ||
       noteStr.includes('đã xác nhận hoàn tiền') ||
       noteStr.includes('đã hoàn tiền') ||
       order.payment_status === 'REFUNDED' ||
       order.payments?.some(p => p.payment_status === 'REFUNDED') ||
-      order.return_requests?.some(r => r.status === 'COMPLETED' || r.status === 'APPROVED');
-    const isRej = !isAppr && (
-      refSt.isRejected ||
-      order.refund_decision === 'REJECTED' ||
-      label.includes('TỪ CHỐI') ||
-      noteStr.includes('từ chối hoàn tiền') ||
-      noteStr.includes('từ chối hoàn') ||
-      order.return_requests?.some(r => r.status === 'REJECTED')
+      order.return_requests?.some(r => r.status === 'COMPLETED' || r.status === 'APPROVED')
     );
-    if (isAppr) normalizedLabel = 'ĐÃ HOÀN TIỀN';
-    else if (isRej) normalizedLabel = 'TỪ CHỐI HOÀN';
+    if (isRej) normalizedLabel = 'TỪ CHỐI HOÀN';
+    else if (isAppr) normalizedLabel = 'ĐÃ HOÀN TIỀN';
     else normalizedLabel = 'ĐỔI TRẢ';
   } else if (isCancelled) {
     normalizedStatus = 'CANCELLED';
     normalizedLabel = (order.status_label && !order.status_label.toUpperCase().includes('CHỜ XÁC NHẬN')) ? order.status_label : 'ĐÃ HỦY';
   } else if (isCompleted) {
     normalizedStatus = 'COMPLETED';
+    normalizedLabel = (order.status_label && !order.status_label.toUpperCase().includes('CHỜ XÁC NHẬN') && !order.status_label.toUpperCase().includes('ĐỔI TRẢ')) ? order.status_label : (order.delivered_date ? `HOÀN THÀNH (${order.delivered_date})` : 'HOÀN THÀNH');
+  } else if (isDelivered) {
+    normalizedStatus = 'DELIVERED';
     normalizedLabel = (order.status_label && !order.status_label.toUpperCase().includes('CHỜ XÁC NHẬN') && !order.status_label.toUpperCase().includes('ĐỔI TRẢ')) ? order.status_label : (order.delivered_date ? `ĐÃ GIAO (${order.delivered_date})` : 'ĐÃ GIAO');
+  } else if (isDeliveryFailed) {
+    normalizedStatus = 'DELIVERY_FAILED';
+    normalizedLabel = 'GIAO THẤT BẠI';
   } else if (isShipping) {
     normalizedStatus = 'SHIPPING';
     normalizedLabel = 'ĐANG VẬN CHUYỂN';
@@ -880,7 +941,9 @@ const ProfilePage = () => {
                 let mStatus = rawMStatus;
                 if (['SHIPPING', 'SHIPPED', 'DELIVERING', 'IN_TRANSIT'].includes(rawMStatus)) mStatus = 'SHIPPING';
                 else if (['CONFIRMED'].includes(rawMStatus)) mStatus = 'CONFIRMED';
-                else if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(rawMStatus)) mStatus = 'COMPLETED';
+                else if (['DELIVERY_FAILED', 'FAILED_DELIVERY'].includes(rawMStatus)) mStatus = 'DELIVERY_FAILED';
+                else if (['DELIVERED'].includes(rawMStatus)) mStatus = 'DELIVERED';
+                else if (['COMPLETED', 'SUCCESS'].includes(rawMStatus)) mStatus = 'COMPLETED';
                 else if (['CANCELLED', 'FAILED'].includes(rawMStatus)) mStatus = 'CANCELLED';
                 else if (['RETURNED', 'REFUNDED', 'EXCHANGE'].includes(rawMStatus)) mStatus = 'RETURNED';
                 else mStatus = 'PENDING';
@@ -896,6 +959,12 @@ const ProfilePage = () => {
                   } else {
                     mLabel = 'ĐỔI TRẢ';
                   }
+                } else if (mStatus === 'DELIVERED') {
+                  mLabel = 'ĐÃ GIAO';
+                } else if (mStatus === 'COMPLETED') {
+                  mLabel = 'HOÀN THÀNH';
+                } else if (mStatus === 'DELIVERY_FAILED') {
+                  mLabel = 'GIAO THẤT BẠI';
                 }
                 const rejReason = m.reject_reason || loc.reject_reason || (m.note?.includes('Từ chối hoàn tiền:') ? m.note.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim() : 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop');
                 return {
@@ -908,6 +977,10 @@ const ProfilePage = () => {
                   refund_reason: m.refund_reason || loc.refund_reason,
                   refund_bank: m.refund_bank || loc.refund_bank,
                   note: m.note || loc.note,
+                  customer_received_at: m.customer_received_at || loc.customer_received_at || null,
+                  delivered_at: m.delivered_at || loc.delivered_at || null,
+                  completed_at: m.completed_at || loc.completed_at || null,
+                  delivery_attempts: m.delivery_attempts ?? loc.delivery_attempts ?? 0,
                 };
               }
               return loc;
@@ -1046,7 +1119,6 @@ const ProfilePage = () => {
   const loadOrders = useCallback(() => {
     if (localStorage.getItem('yf_orders_reset_all_v3') !== 'true') {
       try {
-        orderService.clearAllOrders().catch(() => { });
         localStorage.removeItem('yf_manager_orders');
         localStorage.removeItem('yf_customer_orders');
         localStorage.removeItem('yf_deleted_order_ids');
@@ -1109,7 +1181,9 @@ const ProfilePage = () => {
               let mStatus = rawMStatus;
               if (['SHIPPING', 'SHIPPED', 'DELIVERING', 'IN_TRANSIT'].includes(rawMStatus)) mStatus = 'SHIPPING';
               else if (['CONFIRMED'].includes(rawMStatus)) mStatus = 'CONFIRMED';
-              else if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(rawMStatus)) mStatus = 'COMPLETED';
+              else if (['DELIVERY_FAILED', 'FAILED_DELIVERY'].includes(rawMStatus)) mStatus = 'DELIVERY_FAILED';
+              else if (['DELIVERED'].includes(rawMStatus)) mStatus = 'DELIVERED';
+              else if (['COMPLETED', 'SUCCESS'].includes(rawMStatus)) mStatus = 'COMPLETED';
               else if (['CANCELLED', 'FAILED'].includes(rawMStatus)) mStatus = 'CANCELLED';
               else if (['RETURNED', 'REFUNDED', 'EXCHANGE'].includes(rawMStatus)) mStatus = 'RETURNED';
               else mStatus = 'PENDING';
@@ -1126,13 +1200,17 @@ const ProfilePage = () => {
                 } else {
                   mLabel = 'ĐỔI TRẢ';
                 }
+              } else if (mStatus === 'DELIVERED') {
+                mLabel = `ĐÃ GIAO (${formattedDate})`;
+              } else if (mStatus === 'COMPLETED') {
+                mLabel = `HOÀN THÀNH (${formattedDate})`;
+              } else if (mStatus === 'DELIVERY_FAILED') {
+                mLabel = 'GIAO THẤT BẠI';
               } else if (!mLabel) {
                 mLabel = (
-                  mStatus === 'COMPLETED' ? `ĐÃ GIAO (${formattedDate})` : (
-                    mStatus === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
-                      mStatus === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
-                        mStatus === 'CANCELLED' ? 'ĐÃ HỦY' : 'CHỜ XÁC NHẬN'
-                      )
+                  mStatus === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
+                    mStatus === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
+                      mStatus === 'CANCELLED' ? 'ĐÃ HỦY' : 'CHỜ XÁC NHẬN'
                     )
                   )
                 );
@@ -1153,7 +1231,11 @@ const ProfilePage = () => {
                 refund_reason: m.refund_reason || loc.refund_reason,
                 refund_bank: m.refund_bank || loc.refund_bank,
                 note: m.note || loc.note,
-                delivered_date: mStatus === 'COMPLETED' ? (loc.delivered_date || formattedDate) : loc.delivered_date,
+                customer_received_at: m.customer_received_at || loc.customer_received_at || null,
+                delivered_at: m.delivered_at || loc.delivered_at || null,
+                completed_at: m.completed_at || loc.completed_at || null,
+                delivery_attempts: m.delivery_attempts ?? loc.delivery_attempts ?? 0,
+                delivered_date: (mStatus === 'COMPLETED' || mStatus === 'DELIVERED') ? (loc.delivered_date || formattedDate) : loc.delivered_date,
               };
             }
             return loc;
@@ -1166,9 +1248,9 @@ const ProfilePage = () => {
       localStorage.setItem('yf_customer_orders', JSON.stringify(local));
     } catch (e) { }
 
-    // Cập nhật giao diện ngay lập tức từ local storage (luôn sắp xếp đơn mới nhất lên đầu)
+    // Cập nhật giao diện từ local storage nếu state đang trống (tránh chớp tắt giao diện khi polling)
     if (local && local.length > 0) {
-      setCustomerOrders(sortOrdersDesc(local));
+      setCustomerOrders(prev => (!prev || prev.length === 0 ? sortOrdersDesc(local) : prev));
     }
 
     // Gọi API lấy các đơn hàng thực tế đã lưu trong MySQL
@@ -1176,15 +1258,17 @@ const ProfilePage = () => {
       .then((res) => {
         if (res?.status && Array.isArray(res.data)) {
           const apiFormatted = res.data.map((apiOrd) => {
+            const s = String(apiOrd.order_status || '').toUpperCase();
             const isPayos = apiOrd.payments?.[0]?.payment_method === 'PAYOS' || String(apiOrd.payment_method || '').includes('PAYOS') || String(apiOrd.payment_method || '').includes('VietQR');
             const isPayosPaid = isPayos && (apiOrd.payments?.[0]?.payment_status === 'SUCCESS' || apiOrd.payments?.[0]?.payment_status === 'PAID');
-            // Nếu đơn PayOS chưa thanh toán thành công hoặc đã bị hủy thì không tính là đơn hàng đặt
-            if (isPayos && !isPayosPaid) {
+            // Chỉ ẩn đơn PayOS nháp đang chờ quét mã thanh toán (PENDING và chưa thanh toán)
+            if (isPayos && s === 'PENDING' && !isPayosPaid) {
               return null;
             }
 
-            const s = String(apiOrd.order_status || '').toUpperCase();
-            const isCompleted = ['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s);
+            const isCompleted = ['COMPLETED', 'SUCCESS'].includes(s);
+            const isDelivered = ['DELIVERED'].includes(s);
+            const isDeliveryFailed = ['DELIVERY_FAILED', 'FAILED_DELIVERY'].includes(s);
             const isShipping = ['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s);
             const isConfirmed = ['CONFIRMED'].includes(s);
             const isReturned = ['RETURNED', 'REFUNDED', 'EXCHANGE', 'RETURN'].includes(s);
@@ -1192,19 +1276,34 @@ const ProfilePage = () => {
             const orderDateStr = new Date(apiOrd.created_at).toLocaleDateString('vi-VN');
             const apiNote = String(apiOrd.note || '');
 
+            const isShopCancelled = isCancelled && (apiNote.toLowerCase().includes('shop hủy') || apiOrd.cancelled_by === 'SHOP');
+            const parsedCancelReason = isCancelled
+              ? (isShopCancelled
+                ? (apiNote.includes('Shop hủy đơn:') ? apiNote.split('Shop hủy đơn:')[1]?.trim() : (apiOrd.cancel_reason || 'Sản phẩm tạm thời hết hàng trong kho'))
+                : (apiNote.includes('Khách hủy đơn:') ? apiNote.split('Khách hủy đơn:')[1]?.trim() : (apiOrd.cancel_reason || 'Đổi ý, không muốn mua nữa')))
+              : '';
+
             let currentStatus = isCompleted
               ? 'COMPLETED'
-              : (isReturned
-                ? 'RETURNED'
-                : (isCancelled
-                  ? 'CANCELLED'
-                  : (isShipping ? 'SHIPPING' : (isConfirmed ? 'CONFIRMED' : 'PENDING'))));
+              : (isDelivered
+                ? 'DELIVERED'
+                : (isDeliveryFailed
+                  ? 'DELIVERY_FAILED'
+                  : (isReturned
+                    ? 'RETURNED'
+                    : (isCancelled
+                      ? 'CANCELLED'
+                      : (isShipping ? 'SHIPPING' : (isConfirmed ? 'CONFIRMED' : 'PENDING'))))));
 
             let currentStatusLabel = isCompleted
-              ? `ĐÃ GIAO (${orderDateStr})`
-              : (isCancelled
-                ? 'ĐÃ HỦY'
-                : (isShipping ? 'ĐANG VẬN CHUYỂN' : (isConfirmed ? 'ĐÃ XÁC NHẬN' : 'CHỜ XÁC NHẬN')));
+              ? `HOÀN THÀNH (${orderDateStr})`
+              : (isDelivered
+                ? `ĐÃ GIAO (${orderDateStr})`
+                : (isDeliveryFailed
+                  ? 'GIAO THẤT BẠI'
+                  : (isCancelled
+                    ? 'ĐÃ HỦY'
+                    : (isShipping ? 'ĐANG VẬN CHUYỂN' : (isConfirmed ? 'ĐÃ XÁC NHẬN' : 'CHỜ XÁC NHẬN')))));
 
             let refundDecision = undefined;
             let rejectReason = '';
@@ -1214,17 +1313,19 @@ const ProfilePage = () => {
             if (isReturned) {
               const apiNoteLow = apiNote.toLowerCase();
               const retReq = apiOrd.return_requests?.[0];
-              const isRetCompleted = retReq && (retReq.status === 'COMPLETED' || retReq.status === 'APPROVED' || retReq.status === 'REFUNDED');
               const isRetRejected = retReq && retReq.status === 'REJECTED';
-              const isPaymentRefunded = apiOrd.payment_status === 'REFUNDED' || apiOrd.payments?.some(p => p.payment_status === 'REFUNDED');
+              const isNoteRejected = apiNoteLow.includes('từ chối hoàn tiền') || apiNoteLow.includes('từ chối hoàn');
+              const isRetCompleted = !isRetRejected && retReq && (retReq.status === 'COMPLETED' || retReq.status === 'APPROVED' || retReq.status === 'REFUNDED');
+              const isNoteApproved = !isNoteRejected && (apiNoteLow.includes('đã xác nhận hoàn tiền') || apiNoteLow.includes('đã hoàn tiền'));
+              const isPaymentRefunded = !isRetRejected && !isNoteRejected && (apiOrd.payment_status === 'REFUNDED' || apiOrd.payments?.some(p => p.payment_status === 'REFUNDED'));
 
-              if (apiNoteLow.includes('đã xác nhận hoàn tiền') || apiNoteLow.includes('đã hoàn tiền') || isRetCompleted || isPaymentRefunded) {
-                refundDecision = 'APPROVED';
-                currentStatusLabel = 'ĐÃ HOÀN TIỀN';
-              } else if (apiNoteLow.includes('từ chối hoàn tiền') || apiNoteLow.includes('từ chối hoàn') || isRetRejected) {
+              if (isNoteRejected || isRetRejected) {
                 refundDecision = 'REJECTED';
                 currentStatusLabel = 'TỪ CHỐI HOÀN';
-                rejectReason = retReq?.reject_reason || (apiNote.includes('Từ chối hoàn tiền:') ? apiNote.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim() : '');
+                rejectReason = retReq?.reject_reason || (apiNote.includes('Từ chối hoàn tiền:') ? apiNote.split('Từ chối hoàn tiền:')[1]?.split('|')[0]?.trim() : 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop');
+              } else if (isNoteApproved || isRetCompleted || isPaymentRefunded) {
+                refundDecision = 'APPROVED';
+                currentStatusLabel = 'ĐÃ HOÀN TIỀN';
               } else {
                 currentStatusLabel = 'ĐỔI TRẢ';
               }
@@ -1251,10 +1352,16 @@ const ProfilePage = () => {
               delivered_date: isCompleted ? orderDateStr : null,
               total_amount: Number(apiOrd.total_amount || 0),
               note: apiNote,
+              cancelled_by: isShopCancelled ? 'SHOP' : (apiOrd.cancelled_by || (isCancelled ? 'CUSTOMER' : null)),
+              cancel_reason: parsedCancelReason,
               refund_decision: refundDecision,
               reject_reason: rejectReason,
               refund_reason: refundReason,
               refund_bank: refundBank,
+              customer_received_at: apiOrd.customer_received_at || null,
+              delivered_at: apiOrd.delivered_at || null,
+              completed_at: apiOrd.completed_at || null,
+              delivery_attempts: Number(apiOrd.delivery_attempts || 0),
               payment_status: apiOrd.payment_status || apiOrd.payments?.[0]?.payment_status,
               payments: apiOrd.payments,
               return_requests: apiOrd.return_requests,
@@ -1306,23 +1413,23 @@ const ProfilePage = () => {
               const authoritativeNote = (merged[idx].note && (merged[idx].note.includes('Đã xác nhận hoàn tiền') || merged[idx].note.includes('Từ chối hoàn tiền')))
                 ? merged[idx].note
                 : (item.note || merged[idx].note);
+              const noteLowAuth = authoritativeNote.toLowerCase();
 
-              const isRefundApproved =
+              const isRefundRejected =
+                noteLowAuth.includes('từ chối hoàn') ||
+                merged[idx].refund_decision === 'REJECTED' ||
+                merged[idx].return_requests?.some(r => r.status === 'REJECTED') ||
+                (!noteLowAuth.includes('đã xác nhận hoàn tiền') && (best.label === 'TỪ CHỐI HOÀN' || item.refund_decision === 'REJECTED'));
+
+              const isRefundApproved = !isRefundRejected && (
                 best.label === 'ĐÃ HOÀN TIỀN' ||
                 merged[idx].refund_decision === 'APPROVED' ||
                 item.refund_decision === 'APPROVED' ||
-                authoritativeNote.toLowerCase().includes('đã xác nhận hoàn tiền') ||
-                authoritativeNote.toLowerCase().includes('đã hoàn tiền') ||
+                noteLowAuth.includes('đã xác nhận hoàn tiền') ||
+                noteLowAuth.includes('đã hoàn tiền') ||
                 merged[idx].payment_status === 'REFUNDED' ||
                 merged[idx].payments?.some(p => p.payment_status === 'REFUNDED') ||
-                merged[idx].return_requests?.some(r => r.status === 'COMPLETED' || r.status === 'APPROVED');
-
-              const isRefundRejected = !isRefundApproved && (
-                best.label === 'TỪ CHỐI HOÀN' ||
-                merged[idx].refund_decision === 'REJECTED' ||
-                item.refund_decision === 'REJECTED' ||
-                authoritativeNote.toLowerCase().includes('từ chối hoàn') ||
-                merged[idx].return_requests?.some(r => r.status === 'REJECTED')
+                merged[idx].return_requests?.some(r => r.status === 'COMPLETED' || r.status === 'APPROVED')
               );
 
               const finalDecision = isRefundApproved ? 'APPROVED' : (isRefundRejected ? 'REJECTED' : (item.refund_decision || merged[idx].refund_decision));
@@ -1340,7 +1447,11 @@ const ProfilePage = () => {
                 refund_reason: item.refund_reason || merged[idx].refund_reason,
                 reject_reason: isRefundRejected ? (item.reject_reason || merged[idx].reject_reason || 'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop') : '',
                 note: authoritativeNote,
-                payment_status: isRefundApproved ? 'REFUNDED' : (merged[idx].payment_status || item.payment_status),
+                customer_received_at: merged[idx].customer_received_at || item.customer_received_at || null,
+                delivered_at: merged[idx].delivered_at || item.delivered_at || null,
+                completed_at: merged[idx].completed_at || item.completed_at || null,
+                delivery_attempts: merged[idx].delivery_attempts ?? item.delivery_attempts ?? 0,
+                payment_status: isRefundApproved ? 'REFUNDED' : (isRefundRejected ? 'PAID' : (merged[idx].payment_status || item.payment_status)),
                 payments: merged[idx].payments || item.payments,
                 return_requests: merged[idx].return_requests || item.return_requests,
               };
@@ -1355,7 +1466,12 @@ const ProfilePage = () => {
               image: resolveOrderItemImage(it),
             }))
           })));
-          setCustomerOrders(finalOrders);
+          setCustomerOrders(prev => {
+            const prevSign = (prev || []).map(o => `${o.order_id}_${o.status || o.order_status}_${o.status_label}_${o.customer_received_at || ''}`).join('|');
+            const nextSign = (finalOrders || []).map(o => `${o.order_id}_${o.status || o.order_status}_${o.status_label}_${o.customer_received_at || ''}`).join('|');
+            if (prevSign === nextSign) return prev;
+            return finalOrders;
+          });
           if (userKey) localStorage.setItem(userKey, JSON.stringify(finalOrders));
           localStorage.setItem('yf_customer_orders', JSON.stringify(finalOrders));
         } else {
@@ -2052,11 +2168,17 @@ const ProfilePage = () => {
         (noteStr.includes('stk:') && !noteStr.includes('khách hủy đơn:'))) {
       return 'RETURNED';
     }
+    if (['DELIVERY_FAILED', 'FAILED_DELIVERY'].includes(s) || label.includes('GIAO THẤT BẠI')) {
+      return 'DELIVERY_FAILED';
+    }
     if (['CANCELLED', 'FAILED'].includes(s) || label.includes('HỦY')) {
       return 'CANCELLED';
     }
-    if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s) || label.includes('ĐÃ GIAO') || label.includes('GIAO THÀNH CÔNG')) {
+    if (s === 'COMPLETED' || label.includes('HOÀN THÀNH')) {
       return 'COMPLETED';
+    }
+    if (['DELIVERED', 'SUCCESS'].includes(s) || label.includes('ĐÃ GIAO') || label.includes('GIAO THÀNH CÔNG')) {
+      return 'DELIVERED';
     }
     if (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT', 'PROCESSING', 'PREPARING'].includes(s) || label.includes('VẬN CHUYỂN') || label.includes('ĐANG GIAO')) {
       return 'SHIPPING';
@@ -2075,14 +2197,18 @@ const ProfilePage = () => {
     PENDING: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'PENDING').length,
     CONFIRMED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'CONFIRMED').length,
     SHIPPING: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'SHIPPING').length,
+    DELIVERED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'DELIVERED').length,
     COMPLETED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'COMPLETED').length,
     CANCELLED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'CANCELLED').length,
     RETURNED: customerOrders.filter(o => getOrderStatusCategory(o.status, o) === 'RETURNED').length,
   };
 
-  // Chỉ tính những đơn hàng có trạng thái ĐÃ GIAO cho mục Tổng chi tiêu ở Profile
+  // Tính những đơn hàng có trạng thái ĐÃ GIAO hoặc HOÀN THÀNH cho mục Tổng chi tiêu ở Profile
   const deliveredOrders = useMemo(() => {
-    return customerOrders.filter((ord) => getOrderStatusCategory(ord.status, ord) === 'COMPLETED');
+    return customerOrders.filter((ord) => {
+      const cat = getOrderStatusCategory(ord.status, ord);
+      return cat === 'COMPLETED' || cat === 'DELIVERED';
+    });
   }, [customerOrders]);
 
   const deliveredSpent = useMemo(() => {
@@ -2553,11 +2679,8 @@ const ProfilePage = () => {
 
       // 6. Gửi API backend cập nhật CSDL MySQL
       try {
-        if (tId) orderService.cancelOrder(tId, finalReason).catch(() => {});
-        if (tNum && tNum !== tId) orderService.cancelOrder(tNum, finalReason).catch(() => {});
-        if (orderDigits && orderDigits !== tId && orderDigits !== tNum) orderService.cancelOrder(orderDigits, finalReason).catch(() => {});
-        if (tId) orderService.updateOrderStatus(tId, 'CANCELLED').catch(() => {});
-        if (orderDigits && orderDigits !== tId) orderService.updateOrderStatus(orderDigits, 'CANCELLED').catch(() => {});
+        const cancelTarget = tId || tNum || orderDigits;
+        await orderService.customerCancelOrder(cancelTarget, finalReason);
       } catch (err) {
         console.warn('Cập nhật hủy đơn DB:', err?.message);
       }
@@ -2611,7 +2734,24 @@ const ProfilePage = () => {
     const tNum = String(orderDisplayCode || '').trim();
     const refundNote = `Khách yêu cầu hoàn tiền: ${finalReason} | STK: ${bankTrimmed}`;
 
-    // 1. Cập nhật state customerOrders ngay lập tức sang RETURNED (Đổi trả)
+    // 1. Gọi backend API trước, bắt buộc await và dừng nếu lỗi
+    const refundTarget = tId || tNum || orderDigits;
+    try {
+      await orderService.customerRequestRefund(refundTarget, {
+        reason: finalReason,
+        bank_info: bankTrimmed
+      });
+    } catch (apiErr) {
+      console.error('Lỗi API yêu cầu hoàn tiền:', apiErr);
+      setOrderAlert({
+        type: 'error',
+        message: apiErr?.response?.data?.message || apiErr?.message || 'Không thể gửi yêu cầu hoàn tiền lên máy chủ!',
+      });
+      setTimeout(() => setOrderAlert({ type: '', message: '' }), 4500);
+      return;
+    }
+
+    // 2. Cập nhật state customerOrders sang RETURNED (Đổi trả) sau khi backend thành công
     const updatedOrders = customerOrders.map((o) => {
       const oId = String(o.order_id || '').trim();
       const oNum = String(o.order_code || o.order_number || '').trim();
@@ -2637,7 +2777,7 @@ const ProfilePage = () => {
 
     setCustomerOrders(updatedOrders);
 
-    // 2. Lưu vào localStorage & đồng bộ sang Manager
+    // 3. Lưu vào localStorage & đồng bộ sang Manager
     try {
       const userKey = user ? `yf_customer_orders_${user.customer_id || user.id || user.email}` : null;
       if (userKey) localStorage.setItem(userKey, JSON.stringify(updatedOrders));
@@ -2767,29 +2907,6 @@ const ProfilePage = () => {
       console.warn('Lỗi lưu localStorage khi hoàn tiền:', e);
     }
 
-    // 3. Đồng bộ lên Backend MySQL CSDL
-    try {
-      if (orderService.updateOrderStatus) {
-        const payloadExtra = {
-          refund_reason: finalReason,
-          refund_bank: bankTrimmed,
-          reason: finalReason,
-          bank_info: bankTrimmed,
-          returnRequest: {
-            reason: finalReason,
-            bank_info: bankTrimmed,
-            status: 'PENDING',
-            type: 'REFUND'
-          }
-        };
-        if (tId) await orderService.updateOrderStatus(tId, 'RETURNED', refundNote, payloadExtra).catch((e) => console.warn('Cập nhật DB tId:', e));
-        if (tNum && tNum !== tId) await orderService.updateOrderStatus(tNum, 'RETURNED', refundNote, payloadExtra).catch((e) => console.warn('Cập nhật DB tNum:', e));
-        if (orderDigits && orderDigits !== tId && orderDigits !== tNum) await orderService.updateOrderStatus(orderDigits, 'RETURNED', refundNote, payloadExtra).catch((e) => console.warn('Cập nhật DB orderDigits:', e));
-      }
-    } catch (err) {
-      console.warn('Cập nhật hoàn tiền DB:', err?.message);
-    }
-
     // 4. Gửi thông báo đến chuông thông báo & gửi email Gmail
     try {
       sendOrderStatusNotification(ord, 'RETURNED', {
@@ -2811,6 +2928,93 @@ const ProfilePage = () => {
     } finally {
       setIsRefunding(false);
       setRefundModalOrder(null);
+    }
+  };
+
+  // Khách hàng bấm "Đã nhận được hàng"
+  const handleCustomerConfirmDelivered = async (ord) => {
+    if (!ord) return;
+    const orderDisplayCode = ord.order_code || ord.order_number || ord.order_id;
+    const tId = String(ord.order_id || ord.order_number || '').trim();
+    if (!window.confirm(`Bạn có chắc chắn đã nhận được toàn bộ sản phẩm của đơn hàng #${orderDisplayCode}?`)) {
+      return;
+    }
+    try {
+      await orderService.customerConfirmDelivered(tId);
+      const nowIso = new Date().toISOString();
+      const formattedDate = new Date().toLocaleDateString('vi-VN');
+      const newLabel = `HOÀN THÀNH (${formattedDate})`;
+      const digits = (ord.order_number || ord.order_code || ord.order_id || '').replace(/\D/g, '');
+
+      setCustomerOrders(prev => prev.map(o => {
+        if (String(o.order_id) === String(tId) || String(o.order_number) === String(tId) || String(o.order_code) === String(tId)) {
+          return {
+            ...o,
+            status: 'COMPLETED',
+            order_status: 'COMPLETED',
+            status_label: newLabel,
+            customer_received_at: nowIso,
+            completed_at: nowIso,
+          };
+        }
+        return o;
+      }));
+
+      // Đồng bộ vào localStorage để duy trì trạng thái COMPLETED
+      try {
+        const rawOv = localStorage.getItem('yf_order_status_overrides');
+        const overrides = rawOv ? JSON.parse(rawOv) : {};
+        const ovEntry = {
+          status: 'COMPLETED',
+          order_status: 'COMPLETED',
+          status_label: 'Hoàn thành',
+          status_label_manager: 'Hoàn thành',
+          status_label_customer: newLabel,
+          customer_received_at: nowIso,
+          completed_at: nowIso,
+          delivered_date: formattedDate,
+          updated_at: Date.now(),
+        };
+        if (digits) {
+          overrides[digits] = { ...(overrides[digits] || {}), ...ovEntry };
+          overrides[`YF-${digits}`] = { ...(overrides[`YF-${digits}`] || {}), ...ovEntry };
+        }
+        if (tId) overrides[tId] = { ...(overrides[tId] || {}), ...ovEntry };
+        localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
+      } catch (e) {}
+
+      // Đồng bộ sang trang Quản lý đơn hàng (OrderManager) qua BroadcastChannel & Storage Event
+      try {
+        const syncPayload = {
+          orderId: tId,
+          orderNumber: ord.order_number || ord.order_code || tId,
+          digits,
+          status: 'COMPLETED',
+          statusLabel: 'Hoàn thành',
+          customerLabel: newLabel,
+          customer_received_at: nowIso,
+          completed_at: nowIso,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem('yf_last_status_event', JSON.stringify(syncPayload));
+        const bc = new BroadcastChannel('yf_orders_sync_channel');
+        bc.postMessage(syncPayload);
+        bc.close();
+      } catch (e) {}
+      window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: { orderId: tId, status: 'COMPLETED' } }));
+      window.dispatchEvent(new Event('order_status_updated'));
+
+      setOrderAlert({
+        type: 'success',
+        message: `Cảm ơn bạn! Đơn hàng #${orderDisplayCode} đã hoàn tất thành công.`,
+      });
+      setTimeout(() => setOrderAlert({ type: '', message: '' }), 4000);
+    } catch (err) {
+      setOrderAlert({
+        type: 'error',
+        message: err?.response?.data?.message || err?.message || 'Có lỗi khi xác nhận nhận hàng',
+      });
+      setTimeout(() => setOrderAlert({ type: '', message: '' }), 4000);
     }
   };
 
@@ -3345,7 +3549,8 @@ const ProfilePage = () => {
                     { key: 'PENDING', label: `Chờ xác nhận (${String(orderCounts.PENDING).padStart(2, '0')})`, type: 'pending' },
                     { key: 'CONFIRMED', label: `Đã xác nhận (${String(orderCounts.CONFIRMED).padStart(2, '0')})`, type: 'confirmed' },
                     { key: 'SHIPPING', label: `Đang vận chuyển (${String(orderCounts.SHIPPING).padStart(2, '0')})`, type: 'shipping' },
-                    { key: 'COMPLETED', label: `Đã giao (${String(orderCounts.COMPLETED).padStart(2, '0')})`, type: 'completed' },
+                    { key: 'DELIVERED', label: `Đã giao (${String(orderCounts.DELIVERED).padStart(2, '0')})`, type: 'delivered' },
+                    { key: 'COMPLETED', label: `Hoàn thành (${String(orderCounts.COMPLETED).padStart(2, '0')})`, type: 'completed' },
                     { key: 'CANCELLED', label: `Đã hủy (${String(orderCounts.CANCELLED).padStart(2, '0')})`, type: 'cancelled' },
                     { key: 'RETURNED', label: `Đổi trả (${String(orderCounts.RETURNED).padStart(2, '0')})`, type: 'returned' }
                   ].map(st => (
@@ -3386,7 +3591,7 @@ const ProfilePage = () => {
                     currentOrders.map(ord => {
                       const statusCat = getOrderStatusCategory(ord.status, ord);
                       return (
-                        <div key={ord.order_id} className="order-item-card animate-fade-in">
+                        <div key={ord.order_id} className="order-item-card">
                           {/* Header Bar */}
                           <div className="order-card-header">
                             <div className="order-header-meta">
@@ -3407,7 +3612,11 @@ const ProfilePage = () => {
 
                             <div className="order-status-badge">
                               {statusCat === 'COMPLETED' ? (
-                                <span className="status-badge-pill badge-completed">
+                                <span className="status-badge-pill badge-completed" style={{ background: '#DCFCE7', color: '#15803D', border: '1.5px solid #BBF7D0' }}>
+                                  <Check size={14} strokeWidth={2.5} /> {ord.status_label ? (ord.status_label.includes('HOÀN THÀNH') ? ord.status_label : (ord.delivered_date ? `HOÀN THÀNH (${ord.delivered_date})` : 'HOÀN THÀNH')) : 'HOÀN THÀNH'}
+                                </span>
+                              ) : statusCat === 'DELIVERED' ? (
+                                <span className="status-badge-pill badge-completed" style={{ background: '#DCFCE7', color: '#15803D', border: '1.5px solid #BBF7D0' }}>
                                   <Check size={14} strokeWidth={2.5} /> {ord.status_label ? ord.status_label.replace('GIAO THÀNH CÔNG', 'ĐÃ GIAO') : (ord.delivered_date ? `ĐÃ GIAO (${ord.delivered_date})` : 'ĐÃ GIAO')}
                                 </span>
                               ) : statusCat === 'RETURNED' ? (
@@ -3415,8 +3624,8 @@ const ProfilePage = () => {
                                   const { isApproved, isRejected } = resolveOrderRefundStatus(ord);
                                   const ordL = String(ord.status_label || '').toUpperCase();
                                   const ordN = String(ord.note || '').toLowerCase();
-                                  const isActuallyApproved = isApproved || ord.refund_decision === 'APPROVED' || ordL.includes('ĐÃ HOÀN') || ordN.includes('đã xác nhận hoàn tiền') || ordN.includes('đã hoàn tiền') || ord.payment_status === 'REFUNDED' || ord.payments?.some(p => p.payment_status === 'REFUNDED') || ord.return_requests?.some(r => r.status === 'COMPLETED' || r.status === 'APPROVED');
-                                  const isActuallyRejected = !isActuallyApproved && (isRejected || ord.refund_decision === 'REJECTED' || ordL.includes('TỪ CHỐI') || ordN.includes('từ chối hoàn tiền') || ordN.includes('từ chối hoàn') || ord.return_requests?.some(r => r.status === 'REJECTED'));
+                                  const isActuallyRejected = isRejected || ord.refund_decision === 'REJECTED' || ordL.includes('TỪ CHỐI') || ordN.includes('từ chối hoàn tiền') || ordN.includes('từ chối hoàn') || ord.return_requests?.some(r => r.status === 'REJECTED');
+                                  const isActuallyApproved = !isActuallyRejected && (isApproved || ord.refund_decision === 'APPROVED' || ordL.includes('ĐÃ HOÀN') || ordN.includes('đã xác nhận hoàn tiền') || ordN.includes('đã hoàn tiền') || ord.payment_status === 'REFUNDED' || ord.payments?.some(p => p.payment_status === 'REFUNDED') || ord.return_requests?.some(r => r.status === 'COMPLETED' || r.status === 'APPROVED'));
 
                                   if (isActuallyApproved) {
                                     return (
@@ -3558,9 +3767,11 @@ const ProfilePage = () => {
 
                           {/* Khối thông báo nếu Shop đã đồng ý & hoàn tiền thành công */}
                           {statusCat === 'RETURNED' && (() => {
-                            const { isApproved } = resolveOrderRefundStatus(ord);
+                            const { isApproved, isRejected } = resolveOrderRefundStatus(ord);
                             const ordL = String(ord.status_label || '').toUpperCase();
                             const ordN = String(ord.note || '').toLowerCase();
+                            const isActuallyRejected = isRejected || ord.refund_decision === 'REJECTED' || ordL.includes('TỪ CHỐI') || ordN.includes('từ chối hoàn tiền') || ordN.includes('từ chối hoàn') || ord.return_requests?.some(r => r.status === 'REJECTED');
+                            if (isActuallyRejected) return null;
                             const isActuallyApproved = isApproved || ord.refund_decision === 'APPROVED' || ordL.includes('ĐÃ HOÀN') || ordN.includes('đã xác nhận hoàn tiền') || ordN.includes('đã hoàn tiền') || ord.payment_status === 'REFUNDED' || ord.payments?.some(p => p.payment_status === 'REFUNDED') || ord.return_requests?.some(r => r.status === 'COMPLETED' || r.status === 'APPROVED');
                             if (!isActuallyApproved) return null;
                             const bankInfo = ord.refund_bank || (ord.note && ord.note.includes('STK:') ? ord.note.split('STK:')[1]?.trim() : '');
@@ -3683,7 +3894,7 @@ const ProfilePage = () => {
                             </div>
 
                             <div className="order-actions-group">
-                              {(statusCat === 'PENDING' || statusCat === 'CONFIRMED') && (
+                              {statusCat === 'PENDING' && (
                                 <>
                                   <button
                                     type="button"
@@ -3706,6 +3917,18 @@ const ProfilePage = () => {
                                 </>
                               )}
 
+                              {statusCat === 'CONFIRMED' && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn-order-action btn-black-solid"
+                                    onClick={() => handleOpenTrackingModal(ord)}
+                                  >
+                                    THEO DÕI HÀNH TRÌNH CHI TIẾT
+                                  </button>
+                                </>
+                              )}
+
                               {(statusCat === 'SHIPPING' || statusCat === 'DELIVERING') && (
                                 <>
                                   <button
@@ -3718,6 +3941,51 @@ const ProfilePage = () => {
                                 </>
                               )}
 
+                              {statusCat === 'DELIVERED' && (
+                                <>
+                                  <button
+                                    className="btn-order-action btn-neutral-outline"
+                                    onClick={() => handleOpenTrackingModal(ord)}
+                                  >
+                                    Xem Chi Tiết
+                                  </button>
+                                  {!ord.customer_received_at ? (
+                                    <button
+                                      type="button"
+                                      className="btn-order-action btn-green-solid"
+                                      style={{ backgroundColor: '#15803D', color: '#FFFFFF', border: 'none', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      onClick={() => handleCustomerConfirmDelivered(ord)}
+                                      title="Bấm để xác nhận bạn đã nhận được gói hàng"
+                                    >
+                                      <CheckCircle size={14} />
+                                      <span>ĐÃ NHẬN ĐƯỢC HÀNG</span>
+                                    </button>
+                                  ) : (
+                                    <span style={{ fontSize: '11px', color: '#15803D', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                      <CheckCircle size={13} /> Đã nhận hàng
+                                    </span>
+                                  )}
+                                  <button
+                                    className="btn-order-action btn-neutral-outline"
+                                    onClick={() => {
+                                      setRefundReason('Sản phẩm không vừa kích cỡ (Size)');
+                                      setCustomRefundReason('');
+                                      setRefundBankInfo('');
+                                      setRefundBankError('');
+                                      setRefundModalOrder(ord);
+                                    }}
+                                  >
+                                    Yêu Cầu Hoàn Tiền
+                                  </button>
+                                  <button
+                                    className="btn-order-action btn-dark-outline"
+                                    onClick={() => handleReorder(ord)}
+                                  >
+                                    {ord.items.length > 1 ? 'MUA LẠI ĐƠN NÀY' : 'MUA LẠI'}
+                                  </button>
+                                </>
+                              )}
+
                               {statusCat === 'COMPLETED' && (
                                 <>
                                   <button
@@ -3725,6 +3993,18 @@ const ProfilePage = () => {
                                     onClick={() => handleOpenTrackingModal(ord)}
                                   >
                                     Xem Chi Tiết
+                                  </button>
+                                  <button
+                                    className="btn-order-action btn-neutral-outline"
+                                    onClick={() => {
+                                      setRefundReason('Sản phẩm không vừa kích cỡ (Size)');
+                                      setCustomRefundReason('');
+                                      setRefundBankInfo('');
+                                      setRefundBankError('');
+                                      setRefundModalOrder(ord);
+                                    }}
+                                  >
+                                    Yêu Cầu Hoàn Tiền
                                   </button>
                                   {(() => {
                                     const reviewedCount = getOrderReviewedCount(ord);
@@ -3741,18 +4021,6 @@ const ProfilePage = () => {
                                       </button>
                                     );
                                   })()}
-                                  <button
-                                    className="btn-order-action btn-neutral-outline"
-                                    onClick={() => {
-                                      setRefundReason('Sản phẩm không vừa kích cỡ (Size)');
-                                      setCustomRefundReason('');
-                                      setRefundBankInfo('');
-                                      setRefundBankError('');
-                                      setRefundModalOrder(ord);
-                                    }}
-                                  >
-                                    Yêu Cầu Hoàn Tiền
-                                  </button>
                                   <button
                                     className="btn-order-action btn-dark-outline"
                                     onClick={() => handleReorder(ord)}
@@ -3796,7 +4064,7 @@ const ProfilePage = () => {
                                       : 'Chi Tiết Hủy Đơn'}
                                   </button>
 
-                                  {/* Nếu Shop hủy đơn của khách (đặc biệt khi đang chờ xác nhận), hiển thị thêm nút Yêu Cầu Hoàn Tiền */}
+                                  {/* Nếu Shop hủy đơn của khách (đặc biệt khi đang chờ xác nhận), chỉ hiển thị nút Yêu Cầu Hoàn Tiền nếu là PayOS đã thanh toán */}
                                   {statusCat === 'CANCELLED' && (() => {
                                     const cancelInfo = resolveCancelInfo(ord);
                                     const isShopCanc = cancelInfo.isShopCancelled ||
@@ -3804,7 +4072,20 @@ const ProfilePage = () => {
                                                        ord.cancelled_by === 'MANAGER' ||
                                                        String(ord.note || '').toLowerCase().includes('shop hủy') ||
                                                        String(ord.cancel_reason || '').toLowerCase().includes('shop hủy');
-                                    return isShopCanc;
+
+                                    if (!isShopCanc) return false;
+
+                                    const payMethod = String(ord.payment_method || ord.paymentMethod || ord.payments?.[0]?.payment_method || '').toUpperCase();
+                                    const isPayos = payMethod === 'PAYOS' || payMethod.includes('PAYOS') || payMethod.includes('VIETQR') || ord.payments?.some(p => String(p.payment_method).toUpperCase() === 'PAYOS') || String(ord.payment_label || '').toUpperCase().includes('PAYOS');
+                                    if (!isPayos) return false;
+
+                                    // Đơn COD tuyệt đối không hiện nút yêu cầu hoàn tiền
+                                    const isCod = payMethod === 'COD' || ord.payments?.some(p => String(p.payment_method).toUpperCase() === 'COD');
+                                    if (isCod) return false;
+
+                                    // Nếu đã yêu cầu hoàn tiền hoặc đơn đã ở trạng thái đổi trả thì không hiện lại
+                                    const alreadyRequested = isOrderReturned(ord.status, ord.status_label, ord.note, ord) || (ord.return_requests && ord.return_requests.length > 0);
+                                    return !alreadyRequested;
                                   })() && (
                                     <button
                                       className="btn-order-action btn-purple-outline"
@@ -4080,7 +4361,7 @@ const ProfilePage = () => {
 
         const statusBadgeStyle = isDeliveryRetry
           ? { background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }
-          : (modalCat === 'COMPLETED'
+          : ((modalCat === 'COMPLETED' || modalCat === 'DELIVERED')
           ? { background: '#dcfce7', color: '#15803d' }
           : (modalCat === 'SHIPPING'
             ? { background: '#dbeafe', color: '#1d4ed8' }
@@ -4099,6 +4380,8 @@ const ProfilePage = () => {
         const statusText = isDeliveryRetry
           ? (trackingModalOrder.status_label || 'GIAO THẤT BẠI - HẸN GIAO LẠI')
           : (modalCat === 'COMPLETED'
+          ? 'HOÀN THÀNH'
+          : (modalCat === 'DELIVERED'
           ? 'ĐÃ GIAO HÀNG'
           : (modalCat === 'SHIPPING'
             ? 'ĐANG VẬN CHUYỂN'
@@ -4108,7 +4391,7 @@ const ProfilePage = () => {
                 ? 'ĐÃ HỦY'
                 : (modalCat === 'RETURNED'
                   ? (isApproved ? 'ĐÃ HOÀN TIỀN' : (isRejected ? 'TỪ CHỐI HOÀN TIỀN' : 'ĐỔI TRẢ'))
-                  : 'CHỜ XÁC NHẬN')))));
+                  : 'CHỜ XÁC NHẬN'))))));
 
         return (
           <div className="profile-modal-overlay animate-fade-in" onClick={() => setTrackingModalOrder(null)}>
@@ -4371,7 +4654,7 @@ const ProfilePage = () => {
               <div className="tracking-history-timeline">
                 <h4 className="timeline-section-title">Nhật ký hành trình đơn hàng:</h4>
                 {(() => {
-                  if (modalCat === 'COMPLETED') {
+                  if (modalCat === 'COMPLETED' || modalCat === 'DELIVERED') {
                     return (
                       <>
                         <div className="history-step active">
@@ -4501,21 +4784,21 @@ const ProfilePage = () => {
                     const refSt = resolveOrderRefundStatus(trackingModalOrder);
                     const tmLabel = String(trackingModalOrder.status_label || '').toUpperCase();
                     const tmNote = String(trackingModalOrder.note || '').toLowerCase();
-                    const isApproved = refSt.isApproved ||
+                    const isRejected = refSt.isRejected ||
+                      trackingModalOrder.refund_decision === 'REJECTED' ||
+                      tmLabel.includes('TỪ CHỐI') ||
+                      tmNote.includes('từ chối hoàn tiền') ||
+                      tmNote.includes('từ chối hoàn') ||
+                      trackingModalOrder.return_requests?.some(r => r.status === 'REJECTED');
+                    const isApproved = !isRejected && (
+                      refSt.isApproved ||
                       trackingModalOrder.refund_decision === 'APPROVED' ||
                       tmLabel.includes('ĐÃ HOÀN') ||
                       tmNote.includes('đã xác nhận hoàn tiền') ||
                       tmNote.includes('đã hoàn tiền') ||
                       trackingModalOrder.payment_status === 'REFUNDED' ||
                       trackingModalOrder.payments?.some(p => p.payment_status === 'REFUNDED') ||
-                      trackingModalOrder.return_requests?.some(r => r.status === 'COMPLETED' || r.status === 'APPROVED');
-                    const isRejected = !isApproved && (
-                      refSt.isRejected ||
-                      trackingModalOrder.refund_decision === 'REJECTED' ||
-                      tmLabel.includes('TỪ CHỐI') ||
-                      tmNote.includes('từ chối hoàn tiền') ||
-                      tmNote.includes('từ chối hoàn') ||
-                      trackingModalOrder.return_requests?.some(r => r.status === 'REJECTED')
+                      trackingModalOrder.return_requests?.some(r => r.status === 'COMPLETED' || r.status === 'APPROVED')
                     );
                     const originalReason = trackingModalOrder.refund_reason || (trackingModalOrder.note && trackingModalOrder.note.includes('STK:') ? trackingModalOrder.note.split('STK:')[0].replace('Khách yêu cầu hoàn tiền:', '').replace('|', '').trim() : (trackingModalOrder.note ? trackingModalOrder.note.replace('Khách yêu cầu hoàn tiền:', '').trim() : 'Khách yêu cầu hoàn tiền sau khi nhận hàng'));
                     return (

@@ -79,12 +79,13 @@ const purgeMockOrders = (list) => {
     if (deletedSet.has(rawCode)) return false;
     if (digitsOnly && deletedSet.has(digitsOnly)) return false;
 
-    // Không tính các đơn hàng PayOS chưa thanh toán thành công hoặc đã bị hủy
+    // Chỉ ẩn các đơn PayOS nháp đang chờ quét mã thanh toán (PENDING và chưa thanh toán)
     const isPayosOrder = o.payment_method === 'PAYOS' || String(o.payment_method || '').includes('VietQR') || String(o.payment_method || '').includes('PAYOS') || String(o.payment_label || '').includes('PayOS');
     if (isPayosOrder) {
       const pStatus = String(o.payment_status || '').toUpperCase();
       const oStatus = String(o.order_status || o.status || '').toUpperCase();
-      if (pStatus === 'PENDING' || pStatus === 'CANCELLED' || pStatus === 'FAILED' || pStatus === 'UNPAID' || oStatus === 'CANCELLED') {
+      const isPaid = pStatus === 'SUCCESS' || pStatus === 'PAID';
+      if (oStatus === 'PENDING' && !isPaid) {
         return false;
       }
     }
@@ -136,13 +137,14 @@ const STATUS_RANK = {
   DELIVERING: 4,
   SHIPPED: 4,
   IN_TRANSIT: 4,
-  COMPLETED: 5,
+  DELIVERY_FAILED: 4.5,
   DELIVERED: 5,
-  SUCCESS: 5,
-  RETURNED: 6,
-  REFUNDED: 6,
-  CANCELLED: 7,
-  FAILED: 7
+  COMPLETED: 6,
+  SUCCESS: 6,
+  RETURNED: 7,
+  REFUNDED: 7,
+  CANCELLED: 8,
+  FAILED: 8
 };
 
 // Helper kiểm tra chuỗi có phải ghi chú hoàn tiền không
@@ -405,7 +407,15 @@ const applyStatusOverrides = (ordersList) => {
       if (isRet) {
         let bestLabel = 'Đổi trả';
         const rawL = String(ov?.status_label_manager || ov?.status_label || ord.status_label || '').toUpperCase();
-        if (ov?.refund_decision === 'APPROVED' || rawL.includes('ĐÃ HOÀN')) {
+        const isPayosOrd = ord.payments?.[0]?.payment_method === 'PAYOS' ||
+          String(ord.payment_method || '').toUpperCase().includes('PAYOS') ||
+          String(ord.payment_method || '').toUpperCase().includes('VIETQR') ||
+          String(ord.payment_label || '').toUpperCase().includes('PAYOS');
+
+        if (isPayosOrd && (ov?.refund_decision === 'REJECTED' || rawL.includes('TỪ CHỐI'))) {
+          // Đơn PayOS không thể từ chối hoàn tiền
+          bestLabel = 'Đổi trả';
+        } else if (ov?.refund_decision === 'APPROVED' || rawL.includes('ĐÃ HOÀN')) {
           bestLabel = 'Đã hoàn tiền';
         } else if (ov?.refund_decision === 'REJECTED' || rawL.includes('TỪ CHỐI')) {
           bestLabel = 'Từ chối hoàn';
@@ -422,10 +432,12 @@ const applyStatusOverrides = (ordersList) => {
           status_label: bestLabel,
           payment_status: isCodOrd ? 'PAID' : (ord.payment_status || 'PAID'),
           payment_label: isCodOrd ? 'COD - Đã thanh toán' : (ord.payment_label || 'COD - Đã thanh toán'),
-          refund_decision: ov?.refund_decision || ord.refund_decision || (bestLabel === 'Đã hoàn tiền' ? 'APPROVED' : (bestLabel === 'Từ chối hoàn' ? 'REJECTED' : 'PENDING')),
+          refund_decision: isPayosOrd && (ov?.refund_decision === 'REJECTED' || bestLabel === 'Từ chối hoàn')
+            ? 'PENDING'
+            : (ov?.refund_decision || ord.refund_decision || (bestLabel === 'Đã hoàn tiền' ? 'APPROVED' : (bestLabel === 'Từ chối hoàn' ? 'REJECTED' : 'PENDING'))),
           refund_reason: ov?.refund_reason || ord.refund_reason,
           refund_bank: ov?.refund_bank || ord.refund_bank,
-          reject_reason: ov?.reject_reason || ord.reject_reason,
+          reject_reason: isPayosOrd ? '' : (ov?.reject_reason || ord.reject_reason),
           cancel_reason: '',
           note: cleanNote || ord.note,
         };
@@ -612,7 +624,9 @@ export default function OrderManager() {
             if (isRet) s = 'RETURNED';
             else if (['CONFIRMED'].includes(sRaw)) s = 'CONFIRMED';
             else if (['SHIPPING', 'SHIPPED', 'DELIVERING', 'IN_TRANSIT', 'PROCESSING', 'PREPARING'].includes(sRaw)) s = 'SHIPPING';
-            else if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(sRaw)) s = 'COMPLETED';
+            else if (['DELIVERY_FAILED', 'FAILED_DELIVERY'].includes(sRaw)) s = 'DELIVERY_FAILED';
+            else if (['DELIVERED'].includes(sRaw)) s = 'DELIVERED';
+            else if (['COMPLETED', 'SUCCESS'].includes(sRaw)) s = 'COMPLETED';
             else if (['CANCELLED', 'FAILED'].includes(sRaw)) s = 'CANCELLED';
             else if (['RETURNED', 'REFUNDED', 'EXCHANGE'].includes(sRaw)) s = 'RETURNED';
             else s = 'PENDING';
@@ -623,8 +637,10 @@ export default function OrderManager() {
               else if (ordNoteLow.includes('từ chối hoàn tiền')) statusLabel = 'Từ chối hoàn';
               else statusLabel = 'Đổi trả';
             } else if (s === 'CONFIRMED') statusLabel = 'Đã xác nhận';
-            else if (s === 'COMPLETED') statusLabel = 'Đã giao';
             else if (s === 'SHIPPING') statusLabel = 'Đang vận chuyển';
+            else if (s === 'DELIVERY_FAILED') statusLabel = 'Giao thất bại';
+            else if (s === 'DELIVERED') statusLabel = 'Đã giao';
+            else if (s === 'COMPLETED') statusLabel = 'Hoàn thành';
             else if (s === 'CANCELLED') statusLabel = 'Đã hủy';
 
             const isPayos = ord.payments?.[0]?.payment_method === 'PAYOS' || String(ord.payment_method || '').includes('PAYOS') || String(ord.payment_method || '').includes('VietQR');
@@ -632,8 +648,8 @@ export default function OrderManager() {
             const isCod = !isPayos && !isDirect;
             const isPayosPaid = isPayos && (ord.payments?.[0]?.payment_status === 'SUCCESS' || ord.payments?.[0]?.payment_status === 'PAID');
 
-            // Nếu đơn PayOS chưa thanh toán thành công hoặc đã bị hủy thì không tính là đơn hàng đặt
-            if (isPayos && !isPayosPaid) {
+            // Chỉ ẩn đơn PayOS nháp đang chờ quét mã thanh toán (PENDING và chưa thanh toán)
+            if (isPayos && s === 'PENDING' && !isPayosPaid) {
               return null;
             }
 
@@ -692,6 +708,10 @@ export default function OrderManager() {
               refund_bank: ord.return_requests?.[0]?.bank_info || (ord.note && ord.note.includes('STK:') ? ord.note.split('STK:')[1]?.trim() : ''),
               refund_reason: ord.return_requests?.[0]?.reason || (ord.note && ord.note.includes('Khách yêu cầu hoàn tiền:') ? ord.note.replace('Khách yêu cầu hoàn tiền:', '').split('STK:')[0].replace('|', '').trim() : ''),
               reject_reason: ord.return_requests?.[0]?.reject_reason || '',
+              customer_received_at: ord.customer_received_at || null,
+              delivered_at: ord.delivered_at || null,
+              completed_at: ord.completed_at || null,
+              delivery_attempts: Number(ord.delivery_attempts || 0),
             };
           });
 
@@ -725,6 +745,10 @@ export default function OrderManager() {
                   refund_reason: merged[mIdx].refund_reason || p.refund_reason,
                   reject_reason: merged[mIdx].reject_reason || p.reject_reason,
                   note: merged[mIdx].note || p.note,
+                  customer_received_at: merged[mIdx].customer_received_at || p.customer_received_at || null,
+                  delivered_at: merged[mIdx].delivered_at || p.delivered_at || null,
+                  completed_at: merged[mIdx].completed_at || p.completed_at || null,
+                  delivery_attempts: merged[mIdx].delivery_attempts ?? p.delivery_attempts ?? 0,
                   delivered_date: best.status === 'COMPLETED' ? (merged[mIdx].delivered_date || p.delivered_date || new Date().toLocaleDateString('vi-VN')) : (merged[mIdx].delivered_date || p.delivered_date),
                 };
               }
@@ -1074,8 +1098,10 @@ export default function OrderManager() {
     if (isOrderCancelled(status, label, note, ord)) return 'CANCELLED';
     const s = String(status || '').toUpperCase();
     const l = String(label || '').toUpperCase();
-    if (['COMPLETED', 'DELIVERED', 'SUCCESS'].includes(s) || l.includes('ĐÃ GIAO')) return 'COMPLETED';
-    if (['SHIPPING', 'DELIVERING', 'IN_TRANSIT'].includes(s) || (l.includes('VẬN CHUYỂN') && !l.includes('CHỜ VẬN CHUYỂN'))) return 'SHIPPING';
+    if (s === 'COMPLETED' || l.includes('HOÀN THÀNH')) return 'COMPLETED';
+    if (['DELIVERY_FAILED', 'FAILED_DELIVERY'].includes(s) || l.includes('GIAO THẤT BẠI')) return 'DELIVERY_FAILED';
+    if (['DELIVERED', 'SUCCESS'].includes(s) || l.includes('ĐÃ GIAO')) return 'DELIVERED';
+    if (['SHIPPING', 'DELIVERING', 'SHIPPED', 'IN_TRANSIT'].includes(s) || (l.includes('VẬN CHUYỂN') && !l.includes('CHỜ VẬN CHUYỂN'))) return 'SHIPPING';
     if (['CONFIRMED'].includes(s) || l.includes('ĐÃ XÁC NHẬN')) return 'CONFIRMED';
     if (['PENDING'].includes(s) || l.includes('CHỜ XÁC NHẬN')) return 'PENDING';
     return 'PENDING';
@@ -1088,6 +1114,8 @@ export default function OrderManager() {
       PENDING: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'PENDING').length,
       CONFIRMED: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'CONFIRMED').length,
       SHIPPING: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'SHIPPING').length,
+      DELIVERY_FAILED: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'DELIVERY_FAILED').length,
+      DELIVERED: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'DELIVERED').length,
       COMPLETED: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'COMPLETED').length,
       CANCELLED: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'CANCELLED').length,
       RETURNED: orders.filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'RETURNED').length,
@@ -1096,16 +1124,17 @@ export default function OrderManager() {
 
   // Doanh thu và thống kê (chỉ tính các đơn hàng đã hoàn thành / đã giao)
   const stats = useMemo(() => {
-    const completedOrders = orders.filter(
-      o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'COMPLETED'
-    );
-    const totalRev = completedOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    const revenueOrders = orders.filter(o => {
+      const cat = getCategoryFromStatus(o.order_status, o.status_label, o.note, o);
+      return cat === 'COMPLETED' || cat === 'DELIVERED';
+    });
+    const totalRev = revenueOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
     const pendingRevenue = orders
       .filter(o => getCategoryFromStatus(o.order_status, o.status_label, o.note, o) === 'PENDING')
       .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
-    const completedCount = counts.COMPLETED;
+    const completedCount = counts.COMPLETED + counts.DELIVERED;
     const pendingCount = counts.PENDING;
     const aov = completedCount > 0 ? Math.round(totalRev / completedCount) : 0;
 
@@ -1269,11 +1298,13 @@ export default function OrderManager() {
     // Quy tắc chuyển trạng thái hợp lệ tuần tự từng bước 1 (đồng bộ với Backend Order State Machine)
     const allowedTransitionsUI = {
       PENDING: ['CONFIRMED', 'CANCELLED'],
-      CONFIRMED: ['SHIPPING', 'CANCELLED'],
-      PROCESSING: ['SHIPPING', 'CANCELLED'],
-      SHIPPING: ['COMPLETED', 'CANCELLED'],
-      COMPLETED: ['RETURNED'],
-      CANCELLED: [],
+      CONFIRMED: ['SHIPPING'],
+      PROCESSING: ['SHIPPING'],
+      SHIPPING: ['DELIVERED', 'DELIVERY_FAILED'],
+      DELIVERY_FAILED: ['SHIPPING', 'CANCELLED'],
+      DELIVERED: ['COMPLETED'],
+      CANCELLED: ['RETURNED'],
+      COMPLETED: [],
       RETURNED: ['RETURNED'],
     };
     const normalizedTarget = ['APPROVED', 'REJECTED', 'RETURNED'].includes(newStatus) ? 'RETURNED' : newStatus;
@@ -1285,7 +1316,9 @@ export default function OrderManager() {
           CONFIRMED: 'Đã xác nhận',
           PROCESSING: 'Đang xử lý',
           SHIPPING: 'Đang vận chuyển',
-          COMPLETED: 'Đã giao',
+          DELIVERY_FAILED: 'Giao thất bại',
+          DELIVERED: 'Đã giao',
+          COMPLETED: 'Hoàn thành',
           CANCELLED: 'Đã hủy',
           RETURNED: 'Đổi trả',
         };
@@ -1301,9 +1334,22 @@ export default function OrderManager() {
     if (newStatus === 'CONFIRMED') {
       newStatusLabel = 'Đã xác nhận';
       customerLabel = 'ĐÃ XÁC NHẬN';
-    } else if (newStatus === 'COMPLETED') {
+    } else if (newStatus === 'DELIVERED') {
       newStatusLabel = 'Đã giao';
       customerLabel = `ĐÃ GIAO (${formattedDate})`;
+    } else if (newStatus === 'COMPLETED') {
+      const hasCustomerConfirmed = Boolean(targetOrder.customer_received_at);
+      const delDate = targetOrder.delivered_at || targetOrder.delivered_date;
+      const isPastCutoff = delDate ? (Date.now() - new Date(delDate).getTime()) >= 3 * 24 * 60 * 60 * 1000 : false;
+      if (!hasCustomerConfirmed && !isPastCutoff) {
+        showError("Chỉ có thể bấm 'Hoàn thành' khi khách hàng đã bấm 'Đã nhận được hàng' hoặc đơn hàng đã giao quá 3 ngày!");
+        return;
+      }
+      newStatusLabel = 'Hoàn thành';
+      customerLabel = 'HOÀN THÀNH';
+    } else if (newStatus === 'DELIVERY_FAILED') {
+      newStatusLabel = 'Giao thất bại';
+      customerLabel = 'GIAO THẤT BẠI';
     } else if (newStatus === 'SHIPPING') {
       newStatusLabel = 'Đang vận chuyển';
       customerLabel = 'ĐANG VẬN CHUYỂN';
@@ -1330,7 +1376,17 @@ export default function OrderManager() {
     const tNum = String(targetOrder.order_number || targetOrder.order_code || '').trim();
     const digits = (tNum || tId).replace(/\D/g, '');
 
-    // 1. Lưu đè vĩnh viễn vào yf_order_status_overrides để ĐẢM BẢO không bao giờ bị F5 hay API làm mất trạng thái
+    // 1. Gửi API backend cập nhật CSDL MySQL trước (chỉ gọi 1 lần duy nhất theo order_id/order_number)
+    const targetApiId = tId || tNum || digits;
+    try {
+      await orderService.updateOrderStatus(targetApiId, newStatus);
+    } catch (apiErr) {
+      console.error('Lỗi API cập nhật trạng thái đơn hàng:', apiErr);
+      showError(apiErr?.response?.data?.message || 'Không thể cập nhật trạng thái đơn hàng trên máy chủ!');
+      return;
+    }
+
+    // 2. Lưu đè vào yf_order_status_overrides
     try {
       const rawOv = localStorage.getItem('yf_order_status_overrides');
       const overrides = rawOv ? JSON.parse(rawOv) : {};
@@ -1372,7 +1428,7 @@ export default function OrderManager() {
       localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
     } catch (e) {}
 
-    // 2. Cập nhật state danh sách đơn hàng Manager
+    // 3. Cập nhật state danh sách đơn hàng Manager
     const updated = orders.map(o => {
       const oId = String(o.order_id || '').trim();
       const oNum = String(o.order_number || o.order_code || '').trim();
@@ -1397,15 +1453,8 @@ export default function OrderManager() {
 
     saveOrders(updated);
 
-    // 3. Đồng bộ trực tiếp vào tất cả các key localStorage của khách hàng
+    // 4. Đồng bộ trực tiếp vào tất cả các key localStorage của khách hàng
     syncCustomerOrdersStorage(tId, tNum, newStatus, newStatusLabel, customerLabel);
-
-    // 4. Gửi API backend cập nhật CSDL MySQL
-    try {
-      if (tId) orderService.updateOrderStatus(tId, newStatus).catch(() => {});
-      if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus).catch(() => {});
-      if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus).catch(() => {});
-    } catch (e) {}
 
     // 5. Phát sự kiện toàn cục và ghi sự kiện cross-tab để trang hồ sơ khách hàng nhận được ngay
     const statusPayload = {
@@ -1468,8 +1517,8 @@ export default function OrderManager() {
     const formattedDate = new Date().toLocaleDateString('vi-VN');
 
     if (deliveryResult === 'SUCCESS') {
-      // 1. Trường hợp GIAO HÀNG THÀNH CÔNG
-      await updateSingleOrderStatus(targetOrder, 'COMPLETED');
+      // 1. Trường hợp GIAO HÀNG THÀNH CÔNG -> Chuyển sang DELIVERED (Đã giao)
+      await updateSingleOrderStatus(targetOrder, 'DELIVERED');
       setIsDeliveryModalOpen(false);
       setDeliveryOrder(null);
       if (isEditModalOpen) setIsEditModalOpen(false);
@@ -1485,7 +1534,7 @@ export default function OrderManager() {
     const newAttempts = willRetry ? prevAttempts + 1 : prevAttempts;
     const formattedRetryDate = retryDate ? new Date(retryDate).toLocaleDateString('vi-VN') : 'ngày làm việc tiếp theo';
 
-    const newStatus = willRetry ? 'SHIPPING' : 'CANCELLED';
+    const newStatus = willRetry ? 'DELIVERY_FAILED' : 'CANCELLED';
     const newStatusLabel = willRetry
       ? `Giao thất bại (Hẹn giao lại: ${formattedRetryDate})`
       : 'Giao thất bại (Chuyển hoàn)';
@@ -1507,7 +1556,18 @@ export default function OrderManager() {
 
     const updatedNote = `[Giao thất bại lần ${prevAttempts}]: ${finalReason}${willRetry ? ` | Hẹn giao lại: ${formattedRetryDate}` : ' | Chuyển hoàn về kho'}${deliveryNote.trim() ? ` | Ghi chú: ${deliveryNote.trim()}` : ''}`;
 
-    // Lưu đè vĩnh viễn vào yf_order_status_overrides
+    // 1. Gửi API backend cập nhật CSDL MySQL trước (chỉ 1 lần duy nhất)
+    const targetApiId = tId || tNum || digits;
+    const backendStatus = willRetry ? 'DELIVERY_FAILED' : 'CANCELLED';
+    try {
+      await orderService.updateOrderStatus(targetApiId, backendStatus, updatedNote);
+    } catch (apiErr) {
+      console.error('Lỗi API cập nhật giao hàng thất bại:', apiErr);
+      showError(apiErr?.response?.data?.message || 'Không thể lưu trạng thái giao thất bại trên máy chủ!');
+      return;
+    }
+
+    // 2. Lưu đè vĩnh viễn vào yf_order_status_overrides
     try {
       const rawOv = localStorage.getItem('yf_order_status_overrides');
       const overrides = rawOv ? JSON.parse(rawOv) : {};
@@ -1536,7 +1596,7 @@ export default function OrderManager() {
       localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
     } catch (e) {}
 
-    // Cập nhật state danh sách đơn hàng Manager
+    // 3. Cập nhật state danh sách đơn hàng Manager
     const updated = orders.map(o => {
       const oId = String(o.order_id || '').trim();
       const oNum = String(o.order_number || o.order_code || '').trim();
@@ -1564,16 +1624,8 @@ export default function OrderManager() {
 
     saveOrders(updated);
 
-    // Đồng bộ storage phía khách hàng
+    // 4. Đồng bộ storage phía khách hàng
     syncCustomerOrdersStorage(tId, tNum, newStatus, newStatusLabel, customerLabel);
-
-    // Gửi API backend cập nhật CSDL MySQL
-    try {
-      const backendStatus = willRetry ? 'SHIPPED' : 'CANCELLED';
-      if (tId) orderService.updateOrderStatus(tId, backendStatus, updatedNote).catch(() => {});
-      if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, backendStatus, updatedNote).catch(() => {});
-      if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, backendStatus, updatedNote).catch(() => {});
-    } catch (e) {}
 
     // Phát sự kiện toàn cục cross-tab
     const statusPayload = {
@@ -1626,8 +1678,8 @@ export default function OrderManager() {
   const handleOpenShopCancelModal = (ord) => {
     if (!ord) return;
     const cat = getCategoryFromStatus(ord.order_status, ord.status_label, ord.note, ord);
-    if (!['PENDING', 'CONFIRMED', 'PROCESSING'].includes(cat)) {
-      showError('Chỉ có thể hủy đơn hàng khi đang ở trạng thái Chờ xác nhận hoặc Đã xác nhận!');
+    if (!['PENDING', 'PROCESSING'].includes(cat)) {
+      showError('Chỉ có thể hủy đơn hàng khi đang ở trạng thái Chờ xác nhận!');
       return;
     }
     setShopCancelOrder(ord);
@@ -1663,7 +1715,34 @@ export default function OrderManager() {
     const customerLabel = 'ĐÃ HỦY';
     const updatedNote = cancelledBy === 'SHOP' ? `Shop hủy đơn: ${reason}` : `Khách hủy đơn: ${reason}`;
 
-    // 1. Lưu đè vĩnh viễn vào yf_order_status_overrides
+    // 1. Gửi API backend cập nhật CSDL MySQL trước (chỉ 1 lần duy nhất)
+    const targetApiId = tId || tNum || digits;
+    try {
+      let activeUserEmail = '';
+      try {
+        const rawUser = localStorage.getItem('user');
+        if (rawUser) {
+          const u = JSON.parse(rawUser);
+          if (u?.email && u.email.includes('@')) activeUserEmail = u.email;
+        }
+      } catch (e) {}
+
+      const cancelOptions = {
+        cancelReason: reason,
+        cancelledBy,
+        isShopCancelled: cancelledBy === 'SHOP',
+        recipientEmail: targetOrder.recipient_email || targetOrder.customer?.email,
+        userEmail: activeUserEmail
+      };
+
+      await orderService.updateOrderStatus(targetApiId, newStatus, updatedNote, cancelOptions);
+    } catch (apiErr) {
+      console.error('Lỗi API hủy đơn hàng:', apiErr);
+      showError(apiErr?.response?.data?.message || 'Không thể hủy đơn hàng trên máy chủ!');
+      return;
+    }
+
+    // 2. Lưu đè vĩnh viễn vào yf_order_status_overrides
     try {
       const rawOv = localStorage.getItem('yf_order_status_overrides');
       const overrides = rawOv ? JSON.parse(rawOv) : {};
@@ -1699,7 +1778,7 @@ export default function OrderManager() {
       localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
     } catch (e) {}
 
-    // 2. Cập nhật state danh sách đơn hàng Manager
+    // 3. Cập nhật state danh sách đơn hàng Manager
     const updated = orders.map(o => {
       const oId = String(o.order_id || '').trim();
       const oNum = String(o.order_number || o.order_code || '').trim();
@@ -1724,32 +1803,8 @@ export default function OrderManager() {
     });
     saveOrders(updated);
 
-    // 3. Đồng bộ storage của khách hàng
+    // 4. Đồng bộ storage của khách hàng
     syncCustomerOrdersStorage(tId, tNum, newStatus, newStatusLabel, customerLabel, reason, cancelledBy, updatedNote, currentCat);
-
-    // 4. Gửi API backend cập nhật CSDL MySQL kèm thông tin gửi Email hủy đơn
-    try {
-      let activeUserEmail = '';
-      try {
-        const rawUser = localStorage.getItem('user');
-        if (rawUser) {
-          const u = JSON.parse(rawUser);
-          if (u?.email && u.email.includes('@')) activeUserEmail = u.email;
-        }
-      } catch (e) {}
-
-      const cancelOptions = {
-        cancelReason: reason,
-        cancelledBy,
-        isShopCancelled: cancelledBy === 'SHOP',
-        recipientEmail: targetOrder.recipient_email || targetOrder.customer?.email,
-        userEmail: activeUserEmail
-      };
-
-      if (tId) orderService.updateOrderStatus(tId, newStatus, updatedNote, cancelOptions).catch(() => {});
-      if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus, updatedNote, cancelOptions).catch(() => {});
-      if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus, updatedNote, cancelOptions).catch(() => {});
-    } catch (e) {}
 
     // 5. Phát sự kiện toàn cục và ghi sự kiện cross-tab
     const statusPayload = {
@@ -1828,11 +1883,15 @@ export default function OrderManager() {
       const tNum = String(orderNumber || '').trim();
       const formattedDate = new Date().toLocaleDateString('vi-VN');
       const finalCustomerLabel = customerLabel || (
-        newStatus === 'COMPLETED' ? `ĐÃ GIAO (${formattedDate})` : (
-          newStatus === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
-            newStatus === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
-              newStatus === 'CANCELLED' ? 'ĐÃ HỦY' : (
-                newStatus === 'RETURNED' ? 'ĐỔI TRẢ' : 'CHỜ XÁC NHẬN'
+        newStatus === 'COMPLETED' ? `HOÀN THÀNH (${formattedDate})` : (
+          newStatus === 'DELIVERED' ? `ĐÃ GIAO (${formattedDate})` : (
+            newStatus === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
+              newStatus === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
+                newStatus === 'DELIVERY_FAILED' ? 'GIAO THẤT BẠI' : (
+                  newStatus === 'CANCELLED' ? 'ĐÃ HỦY' : (
+                    newStatus === 'RETURNED' ? 'ĐỔI TRẢ' : 'CHỜ XÁC NHẬN'
+                  )
+                )
               )
             )
           )
@@ -2254,6 +2313,7 @@ export default function OrderManager() {
                   reject_reason: rejectReason || cOrd.reject_reason,
                   refund_reason: refundReason || cOrd.refund_reason,
                   refund_bank: refundBank || cOrd.refund_bank,
+                  payment_status: decision === 'APPROVED' ? 'REFUNDED' : 'PAID',
                   note: updatedNote,
                 };
               }
@@ -2280,6 +2340,7 @@ export default function OrderManager() {
               reject_reason: rejectReason || lastObj.reject_reason,
               refund_reason: refundReason || lastObj.refund_reason,
               refund_bank: refundBank || lastObj.refund_bank,
+              payment_status: decision === 'APPROVED' ? 'REFUNDED' : 'PAID',
               note: updatedNote,
             }));
           }
@@ -2306,7 +2367,29 @@ export default function OrderManager() {
     const extraNote = overrideNote && String(overrideNote).trim() ? ` | Ghi chú: ${String(overrideNote).trim()}` : '';
     const updatedNote = `Đã xác nhận hoàn tiền: ${refundAmt}₫ | ${targetOrder.refund_reason ? `Lý do: ${targetOrder.refund_reason} | ` : ''}STK: ${bankInfo}${extraNote}`;
 
-    // 1. Lưu overrides vĩnh viễn với tất cả biến thể mã đơn
+    // 1. Cập nhật MySQL DB backend trước, bắt buộc await và dừng nếu lỗi
+    const targetApiId = tId || tNum || digits;
+    const extraPayload = {
+      refund_decision: 'APPROVED',
+      refundBank: bankInfo,
+      bank_info: bankInfo,
+      recipientEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
+      customerEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
+      userEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
+      returnRequest: {
+        status: 'APPROVED',
+        bank_info: bankInfo,
+      }
+    };
+    try {
+      await orderService.updateOrderStatus(targetApiId, newStatus, updatedNote, extraPayload);
+    } catch (apiErr) {
+      console.error('Lỗi API xác nhận hoàn tiền:', apiErr);
+      showError(apiErr?.response?.data?.message || 'Không thể xác nhận hoàn tiền trên máy chủ!');
+      return;
+    }
+
+    // 2. Lưu overrides vĩnh viễn với tất cả biến thể mã đơn
     try {
       const rawOv = localStorage.getItem('yf_order_status_overrides');
       const overrides = rawOv ? JSON.parse(rawOv) : {};
@@ -2341,7 +2424,7 @@ export default function OrderManager() {
       localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
     } catch (e) {}
 
-    // 2. Cập nhật state orders của Manager
+    // 3. Cập nhật state orders của Manager
     const updatedOrders = orders.map(o => {
       const oId = String(o.order_id || '').trim();
       const oNum = String(o.order_number || o.order_code || '').trim();
@@ -2366,27 +2449,8 @@ export default function OrderManager() {
     });
     saveOrders(updatedOrders);
 
-    // 3. Đồng bộ customer orders storage
+    // 4. Đồng bộ customer orders storage
     syncCustomerRefundDecision(tId, tNum, 'APPROVED', newStatusLabel, customerLabel, updatedNote, '', targetOrder.refund_reason || '', bankInfo);
-
-    // 4. Cập nhật MySQL DB backend
-    try {
-      const extraPayload = {
-        refund_decision: 'APPROVED',
-        refundBank: bankInfo,
-        bank_info: bankInfo,
-        recipientEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
-        customerEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
-        userEmail: targetOrder.recipient_email || targetOrder.customer?.email || '',
-        returnRequest: {
-          status: 'APPROVED',
-          bank_info: bankInfo,
-        }
-      };
-      if (tId) orderService.updateOrderStatus(tId, newStatus, updatedNote, extraPayload).catch(() => {});
-      else if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus, updatedNote, extraPayload).catch(() => {});
-      else if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus, updatedNote, extraPayload).catch(() => {});
-    } catch (e) {}
 
     // 5. Phát sự kiện toàn cục & BroadcastChannel
     const statusPayload = {
@@ -2449,6 +2513,14 @@ export default function OrderManager() {
   // Xác nhận từ chối hoàn tiền với lý do cụ thể do Shop nhập
   const handleConfirmRejectWithReason = async (targetOrder, customReason) => {
     if (!targetOrder) return;
+    const isDirectPay = targetOrder.payment_method === 'DIRECT';
+    const isCodPay = targetOrder.payment_method === 'COD' || !targetOrder.payment_method || String(targetOrder.payment_method || '').toUpperCase().includes('COD');
+    const isPayosOrder = targetOrder.payments?.[0]?.payment_method === 'PAYOS' ||
+      String(targetOrder.payment_method || '').toUpperCase().includes('PAYOS') ||
+      String(targetOrder.payment_method || '').toUpperCase().includes('VIETQR') ||
+      String(targetOrder.payment_label || '').toUpperCase().includes('PAYOS') ||
+      (!isDirectPay && !isCodPay);
+
     const tId = String(targetOrder.order_id || '').trim();
     const tNum = String(targetOrder.order_number || targetOrder.order_code || '').trim();
     const digits = (tNum || tId).replace(/\D/g, '');
@@ -2515,7 +2587,31 @@ export default function OrderManager() {
       }
     };
 
-    // 1. Lưu overrides với tất cả biến thể mã đơn
+    // 1. Cập nhật MySQL DB backend trước, bắt buộc await và dừng nếu lỗi
+    const targetApiId = tId || tNum || digits;
+    const extraPayload = {
+      refund_decision: 'REJECTED',
+      rejectReason,
+      reject_reason: rejectReason,
+      reason: rejectReason,
+      recipientEmail: buyerEmail,
+      customerEmail: buyerEmail,
+      userEmail: buyerEmail,
+      recipientName: buyerName,
+      returnRequest: {
+        status: 'REJECTED',
+        reject_reason: rejectReason,
+      }
+    };
+    try {
+      await orderService.updateOrderStatus(targetApiId, newStatus, updatedNote, extraPayload);
+    } catch (apiErr) {
+      console.error('Lỗi API từ chối hoàn tiền:', apiErr);
+      showError(apiErr?.response?.data?.message || 'Không thể từ chối hoàn tiền trên máy chủ!');
+      return;
+    }
+
+    // 2. Lưu overrides với tất cả biến thể mã đơn
     try {
       const rawOv = localStorage.getItem('yf_order_status_overrides');
       const overrides = rawOv ? JSON.parse(rawOv) : {};
@@ -2547,7 +2643,7 @@ export default function OrderManager() {
       localStorage.setItem('yf_order_status_overrides', JSON.stringify(overrides));
     } catch (e) {}
 
-    // 2. Cập nhật state orders
+    // 3. Cập nhật state orders
     const updatedOrders = orders.map(o => {
       const oId = String(o.order_id || '').trim();
       const oNum = String(o.order_number || o.order_code || '').trim();
@@ -2563,6 +2659,8 @@ export default function OrderManager() {
           status_label: newStatusLabel,
           refund_decision: 'REJECTED',
           reject_reason: rejectReason,
+          payment_status: 'PAID',
+          payment_label: (o.payment_method === 'PAYOS' || String(o.payment_label || '').includes('PayOS')) ? 'PayOS - Đã thanh toán' : 'COD - Đã thanh toán',
           note: updatedNote,
           recipient_email: buyerEmail || o.recipient_email,
         };
@@ -2571,29 +2669,8 @@ export default function OrderManager() {
     });
     saveOrders(updatedOrders);
 
-    // 3. Đồng bộ customer orders storage
+    // 4. Đồng bộ customer orders storage
     syncCustomerRefundDecision(tId, tNum, 'REJECTED', newStatusLabel, customerLabel, updatedNote, rejectReason, targetOrder.refund_reason || '', targetOrder.refund_bank || '');
-
-    // 4. Cập nhật DB
-    try {
-      const extraPayload = {
-        refund_decision: 'REJECTED',
-        rejectReason,
-        reject_reason: rejectReason,
-        reason: rejectReason,
-        recipientEmail: buyerEmail,
-        customerEmail: buyerEmail,
-        userEmail: buyerEmail,
-        recipientName: buyerName,
-        returnRequest: {
-          status: 'REJECTED',
-          reject_reason: rejectReason,
-        }
-      };
-      if (tId) orderService.updateOrderStatus(tId, newStatus, updatedNote, extraPayload).catch(() => {});
-      else if (tNum && tNum !== tId) orderService.updateOrderStatus(tNum, newStatus, updatedNote, extraPayload).catch(() => {});
-      else if (digits && digits !== tId && digits !== tNum) orderService.updateOrderStatus(digits, newStatus, updatedNote, extraPayload).catch(() => {});
-    } catch (e) {}
 
     // 5. Phát sự kiện toàn cục
     const statusPayload = {
@@ -2605,6 +2682,7 @@ export default function OrderManager() {
       customerLabel,
       refund_decision: 'REJECTED',
       reject_reason: rejectReason,
+      payment_status: 'PAID',
       note: updatedNote,
       recipient_email: buyerEmail,
       timestamp: Date.now()
@@ -2640,6 +2718,8 @@ export default function OrderManager() {
       status_label: newStatusLabel,
       refund_decision: 'REJECTED',
       reject_reason: rejectReason,
+      payment_status: 'PAID',
+      payment_label: (prev.payment_method === 'PAYOS' || String(prev.payment_label || '').includes('PayOS')) ? 'PayOS - Đã thanh toán' : 'COD - Đã thanh toán',
       note: updatedNote,
       recipient_email: buyerEmail || prev.recipient_email,
     } : null);
@@ -2658,8 +2738,17 @@ export default function OrderManager() {
       return;
     }
     setReturnOrder(ord);
+    const isDirectPay = ord.payment_method === 'DIRECT';
+    const isCodPay = ord.payment_method === 'COD' || !ord.payment_method || String(ord.payment_method || '').toUpperCase().includes('COD');
+    const isPayosOrder = ord.payments?.[0]?.payment_method === 'PAYOS' ||
+      String(ord.payment_method || '').toUpperCase().includes('PAYOS') ||
+      String(ord.payment_method || '').toUpperCase().includes('VIETQR') ||
+      String(ord.payment_label || '').toUpperCase().includes('PAYOS') ||
+      (!isDirectPay && !isCodPay);
+
     const isRej = ord.refund_decision === 'REJECTED' || String(ord.status_label || '').toUpperCase().includes('TỪ CHỐI') || String(ord.note || '').toLowerCase().includes('từ chối hoàn tiền');
-    setReturnResult(forceResult || (isRej ? 'REJECTED' : 'APPROVED'));
+    const effectiveResult = forceResult || (isRej ? 'REJECTED' : 'APPROVED');
+    setReturnResult(effectiveResult);
 
     const standardReasons = [
       'Sản phẩm không đáp ứng điều kiện đổi trả theo chính sách của shop',
@@ -2943,7 +3032,9 @@ export default function OrderManager() {
                 { key: 'PENDING', label: `Chờ xác nhận (${counts.PENDING})`, type: 'pending' },
                 { key: 'CONFIRMED', label: `Đã xác nhận (${counts.CONFIRMED})`, type: 'confirmed' },
                 { key: 'SHIPPING', label: `Đang vận chuyển (${counts.SHIPPING})`, type: 'shipping' },
-                { key: 'COMPLETED', label: `Đã giao (${counts.COMPLETED})`, type: 'completed' },
+                { key: 'DELIVERY_FAILED', label: `Giao thất bại (${counts.DELIVERY_FAILED})`, type: 'failed' },
+                { key: 'DELIVERED', label: `Đã giao (${counts.DELIVERED})`, type: 'delivered' },
+                { key: 'COMPLETED', label: `Hoàn thành (${counts.COMPLETED})`, type: 'completed' },
                 { key: 'CANCELLED', label: `Đã hủy (${counts.CANCELLED})`, type: 'cancelled' },
                 { key: 'RETURNED', label: `Đổi trả (${counts.RETURNED})`, type: 'returned' },
               ].map(tab => (
@@ -3166,89 +3257,48 @@ export default function OrderManager() {
                                 </span>
                               ) : cat === 'RETURNED' ? (
                                 (() => {
+                                  const isDirectPay = ord.payment_method === 'DIRECT';
+                                  const isCodPay = ord.payment_method === 'COD' || !ord.payment_method || String(ord.payment_method || '').toUpperCase().includes('COD');
+                                  const isPayosOrder = ord.payments?.[0]?.payment_method === 'PAYOS' ||
+                                    String(ord.payment_method || '').toUpperCase().includes('PAYOS') ||
+                                    String(ord.payment_method || '').toUpperCase().includes('VIETQR') ||
+                                    String(ord.payment_label || '').toUpperCase().includes('PAYOS') ||
+                                    (!isDirectPay && !isCodPay);
+
                                   const isRej = ord.refund_decision === 'REJECTED' || String(ord.status_label || '').toUpperCase().includes('TỪ CHỐI') || String(ord.note || '').toLowerCase().includes('từ chối hoàn tiền');
                                   const isApp = !isRej && (ord.refund_decision === 'APPROVED' || String(ord.status_label || '').toUpperCase().includes('ĐÃ HOÀN') || String(ord.note || '').toLowerCase().includes('đã xác nhận hoàn tiền'));
-
-                                  if (isApp) {
-                                    return (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenReturnModal(ord)}
-                                        className="status-select-pill status-pill-approved status-pill-completed"
-                                        style={{
-                                          fontWeight: 700,
-                                          cursor: 'pointer',
-                                          padding: '5px 14px',
-                                          borderRadius: '20px',
-                                          fontSize: '11.5px',
-                                          textAlign: 'center',
-                                          border: '1.5px solid #BBF7D0',
-                                          backgroundColor: '#DCFCE7',
-                                          color: '#15803D',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '5px'
-                                        }}
-                                        title="Đã hoàn tiền thành công - Bấm để xem chi tiết"
-                                      >
-                                        <Check size={12} strokeWidth={2.5} />
-                                        Đã hoàn tiền
-                                      </button>
-                                    );
-                                  }
-
-                                  if (isRej) {
-                                    return (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenReturnModal(ord)}
-                                        className="status-select-pill status-pill-rejected status-pill-cancelled"
-                                        style={{
-                                          fontWeight: 700,
-                                          cursor: 'pointer',
-                                          padding: '5px 14px',
-                                          borderRadius: '20px',
-                                          fontSize: '11.5px',
-                                          textAlign: 'center',
-                                          border: '1.5px solid #FECACA',
-                                          backgroundColor: '#FEF2F2',
-                                          color: '#DC2626',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '5px'
-                                        }}
-                                        title={ord.reject_reason ? `Lý do: ${ord.reject_reason} (Bấm để xem chi tiết & cập nhật)` : "Đã từ chối hoàn tiền"}
-                                      >
-                                        <X size={12} strokeWidth={2.5} />
-                                        Từ chối hoàn
-                                      </button>
-                                    );
-                                  }
+                                  const currentVal = isApp ? 'APPROVED' : (isRej ? 'REJECTED' : 'PENDING');
 
                                   return (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenReturnModal(ord)}
-                                      className="status-select-pill status-pill-returned"
+                                    <select
+                                      className={`status-select-pill ${isApp ? 'status-pill-approved status-pill-completed' : isRej ? 'status-pill-rejected status-pill-cancelled' : 'status-pill-returned'}`}
+                                      value={currentVal}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === currentVal) return;
+                                        if (val === 'APPROVED') {
+                                          handleOpenReturnModal(ord, 'APPROVED');
+                                        } else if (val === 'REJECTED') {
+                                          handleOpenReturnModal(ord, 'REJECTED');
+                                        } else {
+                                          handleOpenReturnModal(ord);
+                                        }
+                                      }}
                                       style={{
                                         fontWeight: 700,
                                         cursor: 'pointer',
-                                        padding: '5px 14px',
+                                        padding: '5px 12px',
                                         borderRadius: '20px',
                                         fontSize: '11.5px',
-                                        textAlign: 'center',
-                                        border: '1.5px solid #D8B4FE',
-                                        backgroundColor: '#FAF5FF',
-                                        color: '#7E22CE',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '5px'
+                                        border: isApp ? '1.5px solid #BBF7D0' : isRej ? '1.5px solid #FECACA' : '1.5px solid #D8B4FE',
+                                        backgroundColor: isApp ? '#DCFCE7' : isRej ? '#FEF2F2' : '#FAF5FF',
+                                        color: isApp ? '#15803D' : isRej ? '#DC2626' : '#7E22CE',
                                       }}
-                                      title="Khách yêu cầu hoàn tiền - Bấm để mở form xử lý hoàn tiền hoặc từ chối"
                                     >
-                                      <RotateCcw size={12} />
-                                      Chờ hoàn tiền
-                                    </button>
+                                      <option value="PENDING">Chờ hoàn tiền</option>
+                                      <option value="APPROVED">Đồng ý hoàn</option>
+                                      <option value="REJECTED">Từ chối hoàn</option>
+                                    </select>
                                   );
                                 })()
                               ) : (
@@ -3266,18 +3316,27 @@ export default function OrderManager() {
                                           return [
                                             { val: 'CONFIRMED', label: 'Đã xác nhận' },
                                             { val: 'SHIPPING', label: 'Đang vận chuyển' },
-                                            { val: 'CANCELLED', label: 'Hủy đơn hàng' },
                                           ];
                                         case 'SHIPPING':
                                           return [
                                             { val: 'SHIPPING', label: 'Đang vận chuyển' },
-                                            { val: 'COMPLETED', label: 'Đã giao' },
-                                            { val: 'CANCELLED', label: 'Hủy đơn (Giao thất bại)' },
+                                            { val: 'DELIVERED', label: 'Đã giao' },
+                                            { val: 'DELIVERY_FAILED', label: 'Giao thất bại' },
+                                          ];
+                                        case 'DELIVERY_FAILED':
+                                          return [
+                                            { val: 'DELIVERY_FAILED', label: 'Giao thất bại' },
+                                            { val: 'SHIPPING', label: 'Giao lại (Đang vận chuyển)' },
+                                            { val: 'CANCELLED', label: 'Chuyển hoàn (Hủy)' },
+                                          ];
+                                        case 'DELIVERED':
+                                          return [
+                                            { val: 'DELIVERED', label: 'Đã giao' },
+                                            { val: 'COMPLETED', label: 'Hoàn thành' },
                                           ];
                                         case 'COMPLETED':
                                           return [
-                                            { val: 'COMPLETED', label: 'Đã giao' },
-                                            { val: 'RETURNED', label: 'Đổi trả / Hoàn tiền' },
+                                            { val: 'COMPLETED', label: 'Hoàn thành' },
                                           ];
                                         default:
                                           return [
@@ -3302,11 +3361,22 @@ export default function OrderManager() {
                                           }
                                           if (val === 'CANCELLED') {
                                             handleOpenShopCancelModal(ord);
-                                          } else if (val === 'COMPLETED') {
+                                          } else if (val === 'DELIVERED') {
                                             handleOpenDeliveryModal(ord);
+                                          } else if (val === 'DELIVERY_FAILED') {
+                                            handleOpenDeliveryModal(ord);
+                                          } else if (val === 'COMPLETED') {
+                                            const hasCustomerConfirmed = Boolean(ord.customer_received_at);
+                                            const delDate = ord.delivered_at || ord.delivered_date;
+                                            const isPastCutoff = delDate ? (Date.now() - new Date(delDate).getTime()) >= 3 * 24 * 60 * 60 * 1000 : false;
+                                            if (!hasCustomerConfirmed && !isPastCutoff) {
+                                              showError("Chỉ có thể bấm 'Hoàn thành' khi khách hàng đã bấm 'Đã nhận được hàng' hoặc đơn hàng đã giao quá 3 ngày!");
+                                              return;
+                                            }
+                                            updateSingleOrderStatus(ord, 'COMPLETED');
                                           } else if (val === 'RETURNED') {
-                                            if (cat !== 'COMPLETED' && cat !== 'RETURNED') {
-                                              showError('Chỉ đơn hàng đã giao thành công (COMPLETED) mới có thể chuyển sang Đổi trả / Hoàn tiền!');
+                                            if (cat !== 'DELIVERED' && cat !== 'COMPLETED' && cat !== 'RETURNED') {
+                                              showError('Chỉ đơn hàng đã giao (DELIVERED) hoặc hoàn thành mới có thể chuyển sang Đổi trả / Hoàn tiền!');
                                               return;
                                             }
                                             handleOpenReturnModal(ord);
@@ -3344,26 +3414,6 @@ export default function OrderManager() {
                                       >
                                         <Clock size={10} /> Hẹn giao lại
                                       </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenDeliveryModal(ord)}
-                                        style={{
-                                          fontSize: '10px',
-                                          padding: '2px 6px',
-                                          background: '#0F172A',
-                                          color: '#FFFFFF',
-                                          borderRadius: '4px',
-                                          border: 'none',
-                                          cursor: 'pointer',
-                                          fontWeight: 600,
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '2px',
-                                        }}
-                                        title="Cập nhật kết quả giao hàng"
-                                      >
-                                        <Truck size={10} /> Giao lại
-                                      </button>
                                     </div>
                                   )}
                                 </div>
@@ -3385,6 +3435,47 @@ export default function OrderManager() {
                                   <Truck size={14} />
                                 </button>
                               )}
+                              {cat === 'DELIVERY_FAILED' && (
+                                <button
+                                  type="button"
+                                  className="action-icon-btn"
+                                  style={{ color: '#D97706', background: '#FEF3C7', border: '1px solid #FCD34D' }}
+                                  title="Giao lại (Đưa về trạng thái Đang vận chuyển)"
+                                  onClick={() => updateSingleOrderStatus(ord, 'SHIPPING')}
+                                >
+                                  <RotateCcw size={14} />
+                                </button>
+                              )}
+                              {cat === 'DELIVERED' && (() => {
+                                const hasCustomerConfirmed = Boolean(ord.customer_received_at);
+                                const delDate = ord.delivered_at || ord.delivered_date;
+                                const isPastCutoff = delDate ? (Date.now() - new Date(delDate).getTime()) >= 3 * 24 * 60 * 60 * 1000 : false;
+                                const canComplete = hasCustomerConfirmed || isPastCutoff;
+                                return (
+                                  <button
+                                    type="button"
+                                    className="action-icon-btn"
+                                    style={{
+                                      color: canComplete ? '#15803D' : '#9CA3AF',
+                                      background: canComplete ? '#F0FDF4' : '#F3F4F6',
+                                      border: `1px solid ${canComplete ? '#BBF7D0' : '#E5E7EB'}`,
+                                      cursor: canComplete ? 'pointer' : 'not-allowed',
+                                      opacity: canComplete ? 1 : 0.6
+                                    }}
+                                    disabled={!canComplete}
+                                    title={canComplete ? "Hoàn thành đơn hàng" : "Chờ khách xác nhận nhận hàng hoặc sau 3 ngày hệ thống tự hoàn tất"}
+                                    onClick={() => {
+                                      if (!canComplete) {
+                                        showError("Chỉ có thể bấm 'Hoàn thành' khi khách hàng đã bấm 'Đã nhận được hàng' hoặc đơn hàng đã giao quá 3 ngày!");
+                                        return;
+                                      }
+                                      updateSingleOrderStatus(ord, 'COMPLETED');
+                                    }}
+                                  >
+                                    <CheckCircle size={14} />
+                                  </button>
+                                );
+                              })()}
                               <button
                                 type="button"
                                 className="action-icon-btn edit-btn"
@@ -3895,18 +3986,21 @@ export default function OrderManager() {
                               return [
                                 { val: 'CONFIRMED', label: 'Đã xác nhận' },
                                 { val: 'SHIPPING', label: 'Đang vận chuyển' },
-                                { val: 'CANCELLED', label: 'Hủy đơn hàng' },
                               ];
                             case 'SHIPPING':
                               return [
                                 { val: 'SHIPPING', label: 'Đang vận chuyển' },
-                                { val: 'COMPLETED', label: 'Đã giao' },
-                                { val: 'CANCELLED', label: 'Hủy đơn (Giao thất bại)' },
+                                { val: 'DELIVERED', label: 'Đã giao' },
+                                { val: 'DELIVERY_FAILED', label: 'Giao thất bại' },
+                              ];
+                            case 'DELIVERED':
+                              return [
+                                { val: 'DELIVERED', label: 'Đã giao' },
+                                { val: 'COMPLETED', label: 'Hoàn thành' },
                               ];
                             case 'COMPLETED':
                               return [
-                                { val: 'COMPLETED', label: 'Đã giao' },
-                                { val: 'RETURNED', label: 'Đổi trả / Hoàn tiền' },
+                                { val: 'COMPLETED', label: 'Hoàn thành' },
                               ];
                             default:
                               return [
@@ -4770,37 +4864,49 @@ export default function OrderManager() {
                   </div>
 
                   {/* Option 2: Từ chối hoàn */}
-                  <div
-                    onClick={() => setReturnResult('REJECTED')}
-                    style={{
-                      border: returnResult === 'REJECTED' ? '2px solid #DC2626' : '1.5px solid #E5E7EB',
-                      background: returnResult === 'REJECTED' ? '#FEF2F2' : '#FFFFFF',
-                      borderRadius: '10px',
-                      padding: '12px 14px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '10px'
-                    }}
-                  >
-                    <div style={{
-                      width: '18px',
-                      height: '18px',
-                      borderRadius: '50%',
-                      border: returnResult === 'REJECTED' ? '6px solid #DC2626' : '2px solid #D1D5DB',
-                      marginTop: '2px',
-                      flexShrink: 0
-                    }} />
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '13.5px', color: returnResult === 'REJECTED' ? '#B91C1C' : '#1F2937' }}>
-                        ✕ Từ Chối Hoàn
+                  {(() => {
+                    const isDirectPay = returnOrder.payment_method === 'DIRECT';
+                    const isCodPay = returnOrder.payment_method === 'COD' || !returnOrder.payment_method || String(returnOrder.payment_method || '').toUpperCase().includes('COD');
+                    const isPayosOrder = returnOrder.payments?.[0]?.payment_method === 'PAYOS' ||
+                      String(returnOrder.payment_method || '').toUpperCase().includes('PAYOS') ||
+                      String(returnOrder.payment_method || '').toUpperCase().includes('VIETQR') ||
+                      String(returnOrder.payment_label || '').toUpperCase().includes('PAYOS') ||
+                      (!isDirectPay && !isCodPay);
+
+                    return (
+                      <div
+                        onClick={() => setReturnResult('REJECTED')}
+                        style={{
+                          border: returnResult === 'REJECTED' ? '2px solid #DC2626' : '1.5px solid #E5E7EB',
+                          background: returnResult === 'REJECTED' ? '#FEF2F2' : '#FFFFFF',
+                          borderRadius: '10px',
+                          padding: '12px 14px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '10px'
+                        }}
+                      >
+                        <div style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '50%',
+                          border: returnResult === 'REJECTED' ? '6px solid #DC2626' : '2px solid #D1D5DB',
+                          marginTop: '2px',
+                          flexShrink: 0
+                        }} />
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '13.5px', color: returnResult === 'REJECTED' ? '#B91C1C' : '#1F2937' }}>
+                            ✕ Từ Chối Hoàn
+                          </div>
+                          <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px', lineHeight: 1.4 }}>
+                            Từ chối yêu cầu đổi trả, gửi lý do thông báo cho khách.
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px', lineHeight: 1.4 }}>
-                        Từ chối yêu cầu, gửi lý do thông báo cho khách.
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
               </div>
 

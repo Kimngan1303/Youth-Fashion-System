@@ -109,7 +109,7 @@ export default function ProductDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, wishlist, toggleWishlist, addToCart } = useAuth();
-  const { showSuccess, showInfo } = useToast();
+  const { showSuccess, showInfo, showError } = useToast();
 
   const [product, setProduct] = useState(FIGMA_COAT_DATA);
   const [loading, setLoading] = useState(false);

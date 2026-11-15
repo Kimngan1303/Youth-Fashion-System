@@ -115,5 +115,41 @@ export const orderService = {
       return { status: false };
     }
   },
+
+  /**
+   * Khách hàng hủy đơn hàng (chỉ khi đơn đang PENDING)
+   */
+  customerCancelOrder: async (orderIdOrNumber, reason) => {
+    try {
+      const res = await axiosClient.patch(`/orders/customer/${orderIdOrNumber}/cancel`, { reason });
+      return res.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Khách hàng gửi yêu cầu hoàn tiền (cho đơn PayOS bị shop hủy)
+   */
+  customerRequestRefund: async (orderIdOrNumber, refundData) => {
+    try {
+      const res = await axiosClient.post(`/orders/customer/${orderIdOrNumber}/refund-request`, refundData);
+      return res.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Khách hàng xác nhận đã nhận được hàng
+   */
+  customerConfirmDelivered: async (orderIdOrNumber) => {
+    try {
+      const res = await axiosClient.patch(`/orders/customer/${orderIdOrNumber}/confirm-delivered`);
+      return res.data;
+    } catch (error) {
+      throw error;
+    }
+  },
 };
 

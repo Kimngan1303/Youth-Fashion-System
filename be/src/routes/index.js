@@ -10,6 +10,7 @@ import voucherRoutes from './voucher.routes.js';
 import cartRoutes from './cart.routes.js';
 import wishlistRoutes from './wishlist.routes.js';
 import orderRoutes from './order.routes.js';
+import notificationRoutes from './notification.routes.js';
 import aiRoutes from './ai.routes.js';
 
 const router = Router();
@@ -46,6 +47,9 @@ router.use('/wishlist', wishlistRoutes);
 
 // Order & Payment Routes (Hỗ trợ COD và PayOS)
 router.use('/orders', orderRoutes);
+
+// Notification Routes
+router.use('/notifications', notificationRoutes);
 
 // Admin Routes (Users & System Configuration)
 router.use('/admin', adminRoutes);

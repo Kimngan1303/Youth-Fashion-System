@@ -17,8 +17,10 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
   getNotificationsForUser,
+  fetchNotificationsFromApi,
   markAllNotificationsAsRead,
   markNotificationAsRead,
+  deleteNotification,
   clearAllNotifications
 } from '../../services/notificationService';
 
@@ -31,9 +33,13 @@ export default function NotificationPage() {
   const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'UNREAD' | 'READ'
 
   // Tải danh sách thông báo của người dùng
-  const refreshNotifications = useCallback(() => {
+  const refreshNotifications = useCallback(async () => {
     const list = getNotificationsForUser(user);
     setNotifications(list);
+    const fresh = await fetchNotificationsFromApi(user);
+    if (fresh) {
+      setNotifications(fresh);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -98,23 +104,30 @@ export default function NotificationPage() {
     return notifications || [];
   }, [notifications, activeFilter]);
 
-  const handleMarkAllRead = () => {
+  const handleMarkAllRead = async () => {
     if (unreadCount === 0) {
       showInfo('Tất cả thông báo đều đã được đọc!');
       return;
     }
-    markAllNotificationsAsRead(user);
+    await markAllNotificationsAsRead(user);
     refreshNotifications();
     showSuccess('Đã đánh dấu tất cả thông báo là đã đọc!');
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (notifications.length === 0) return;
     if (window.confirm('Bạn có chắc chắn muốn xóa toàn bộ thông báo không? Thao tác này không thể hoàn tác.')) {
-      clearAllNotifications(user);
+      await clearAllNotifications(user);
       refreshNotifications();
       showSuccess('Đã xóa toàn bộ thông báo thành công!');
     }
+  };
+
+  const handleDeleteSingle = async (notifId, e) => {
+    if (e) e.stopPropagation();
+    await deleteNotification(notifId, user);
+    refreshNotifications();
+    showSuccess('Đã xóa thông báo thành công!');
   };
 
   const handleNotificationClick = (item) => {
@@ -310,14 +323,23 @@ export default function NotificationPage() {
                       <button
                         type="button"
                         className="btn-mark-single-read"
-                        onClick={() => {
-                          markNotificationAsRead(item.id, user);
+                        onClick={async () => {
+                          await markNotificationAsRead(item.id, user);
                           refreshNotifications();
                         }}
                       >
                         Đánh dấu đã đọc
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className="btn-delete-single"
+                      onClick={(e) => handleDeleteSingle(item.id, e)}
+                      title="Xóa thông báo này"
+                    >
+                      <Trash2 size={13} />
+                      <span>Xóa</span>
+                    </button>
                     <button
                       type="button"
                       className="btn-view-order-link"
@@ -644,6 +666,27 @@ export default function NotificationPage() {
 
         .btn-mark-single-read:hover {
           color: #111827;
+        }
+
+        .btn-delete-single {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          background: none;
+          border: 1px solid #FECACA;
+          color: #DC2626;
+          font-size: 11.5px;
+          font-weight: 500;
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 4px;
+          transition: all 0.2s ease;
+        }
+
+        .btn-delete-single:hover {
+          background: #FEF2F2;
+          color: #991B1B;
+          border-color: #F87171;
         }
 
         .btn-view-order-link {

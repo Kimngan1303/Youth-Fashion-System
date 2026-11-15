@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Search, Heart, ShoppingBag, User, Bell, MessageSquare, Globe, Sun, Star } from 'lucide-react';
+import { Search, Heart, ShoppingBag, User, Bell, MessageSquare, Globe, Sun, Star, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirmModal } from '../context/ConfirmModalContext';
 import {
   getNotificationsForUser,
+  fetchNotificationsFromApi,
   markAllNotificationsAsRead,
-  markNotificationAsRead
+  markNotificationAsRead,
+  deleteNotification
 } from '../services/notificationService';
 
 const Header = ({ onOpenAISearch }) => {
@@ -27,6 +29,7 @@ const Header = ({ onOpenAISearch }) => {
     )
   );
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showSearchInput, setShowSearchInput] = useState(false);
@@ -35,9 +38,13 @@ const Header = ({ onOpenAISearch }) => {
   const notificationsRef = useRef(null);
 
   // Tải và đồng bộ thông báo thời gian thực cho người dùng
-  const refreshNotifications = useCallback(() => {
+  const refreshNotifications = useCallback(async () => {
     const list = getNotificationsForUser(user);
     setNotifications(list);
+    const fresh = await fetchNotificationsFromApi(user);
+    if (fresh) {
+      setNotifications(fresh);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -361,9 +368,34 @@ const Header = ({ onOpenAISearch }) => {
                                 {item.badge}
                               </span>
                             )}
-                            <span className="notif-time" style={{ fontSize: '11px', color: '#9CA3AF', marginLeft: 'auto' }}>
-                              {item.time}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                              <span className="notif-time" style={{ fontSize: '11px', color: '#9CA3AF' }}>
+                                {item.time}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  await deleteNotification(item.id, user);
+                                  refreshNotifications();
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#9CA3AF',
+                                  cursor: 'pointer',
+                                  padding: '2px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  borderRadius: '3px'
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.color = '#EF4444'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.color = '#9CA3AF'; }}
+                                title="Xóa thông báo"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
                           </div>
                           <div className="notif-title" style={{ fontSize: '12.5px', fontWeight: isUnread ? 700 : 600, color: '#1C1917', marginBottom: '3px', lineHeight: '17px' }}>
                             {item.title}
