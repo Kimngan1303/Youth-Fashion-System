@@ -1667,8 +1667,8 @@ export default function OrderManager() {
   const handleOpenShopCancelModal = (ord) => {
     if (!ord) return;
     const cat = getCategoryFromStatus(ord.order_status, ord.status_label, ord.note, ord);
-    if (!['PENDING', 'CONFIRMED', 'PROCESSING'].includes(cat)) {
-      showError('Chỉ có thể hủy đơn hàng khi đang ở trạng thái Chờ xác nhận hoặc Đã xác nhận!');
+    if (!['PENDING', 'PROCESSING'].includes(cat)) {
+      showError('Chỉ có thể hủy đơn hàng khi đang ở trạng thái Chờ xác nhận!');
       return;
     }
     setShopCancelOrder(ord);
@@ -1872,11 +1872,15 @@ export default function OrderManager() {
       const tNum = String(orderNumber || '').trim();
       const formattedDate = new Date().toLocaleDateString('vi-VN');
       const finalCustomerLabel = customerLabel || (
-        newStatus === 'COMPLETED' ? `ĐÃ GIAO (${formattedDate})` : (
-          newStatus === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
-            newStatus === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
-              newStatus === 'CANCELLED' ? 'ĐÃ HỦY' : (
-                newStatus === 'RETURNED' ? 'ĐỔI TRẢ' : 'CHỜ XÁC NHẬN'
+        newStatus === 'COMPLETED' ? `HOÀN THÀNH (${formattedDate})` : (
+          newStatus === 'DELIVERED' ? `ĐÃ GIAO (${formattedDate})` : (
+            newStatus === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : (
+              newStatus === 'SHIPPING' ? 'ĐANG VẬN CHUYỂN' : (
+                newStatus === 'DELIVERY_FAILED' ? 'GIAO THẤT BẠI' : (
+                  newStatus === 'CANCELLED' ? 'ĐÃ HỦY' : (
+                    newStatus === 'RETURNED' ? 'ĐỔI TRẢ' : 'CHỜ XÁC NHẬN'
+                  )
+                )
               )
             )
           )
@@ -3318,7 +3322,6 @@ export default function OrderManager() {
                                           return [
                                             { val: 'CONFIRMED', label: 'Đã xác nhận' },
                                             { val: 'SHIPPING', label: 'Đang vận chuyển' },
-                                            { val: 'CANCELLED', label: 'Hủy đơn hàng' },
                                           ];
                                         case 'SHIPPING':
                                           return [
@@ -4010,7 +4013,6 @@ export default function OrderManager() {
                               return [
                                 { val: 'CONFIRMED', label: 'Đã xác nhận' },
                                 { val: 'SHIPPING', label: 'Đang vận chuyển' },
-                                { val: 'CANCELLED', label: 'Hủy đơn hàng' },
                               ];
                             case 'SHIPPING':
                               return [
