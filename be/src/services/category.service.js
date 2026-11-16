@@ -1,4 +1,5 @@
 import * as categoryRepo from '../repositories/category.repository.js';
+import { vectorSearchService } from './ai/vectorSearch.service.js';
 
 /**
  * Format Category object để serialize BigInt an toàn
@@ -72,12 +73,12 @@ export const deleteCategoryService = async (id) => {
     throw error;
   }
 
-  if (category._count && category._count.products > 0) {
-    const error = new Error(`Không thể xóa danh mục "${category.category_name}" vì còn ${category._count.products} sản phẩm liên quan`);
-    error.statusCode = 400;
-    throw error;
+  // Cho phép xóa danh mục kể cả khi còn sản phẩm và xóa sạch toàn bộ sản phẩm bên trong
+  const { deleted, deletedProductIds } = await categoryRepo.deleteCategory(id);
+
+  if (deletedProductIds && deletedProductIds.length > 0) {
+    vectorSearchService.removeProducts(deletedProductIds);
   }
 
-  const deleted = await categoryRepo.deleteCategory(id);
   return formatCategory(deleted);
 };

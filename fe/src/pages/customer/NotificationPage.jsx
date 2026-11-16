@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useConfirmModal } from '../../context/ConfirmModalContext';
 import {
   getNotificationsForUser,
   fetchNotificationsFromApi,
@@ -27,6 +28,7 @@ import {
 export default function NotificationPage() {
   const { user } = useAuth();
   const { showSuccess, showInfo } = useToast();
+  const { confirmModal } = useConfirmModal();
   const navigate = useNavigate();
 
   const [notifications, setNotifications] = useState([]);
@@ -122,7 +124,14 @@ export default function NotificationPage() {
 
   const handleClearAll = async () => {
     if (notifications.length === 0) return;
-    if (window.confirm('Bạn có chắc chắn muốn xóa toàn bộ thông báo không? Thao tác này không thể hoàn tác.')) {
+    const confirmed = await confirmModal({
+      title: 'Xóa toàn bộ thông báo?',
+      message: 'Bạn có chắc chắn muốn xóa toàn bộ thông báo không? Thao tác này không thể hoàn tác.',
+      confirmText: 'Xóa tất cả',
+      cancelText: 'Hủy bỏ',
+      variant: 'danger',
+    });
+    if (confirmed) {
       await clearAllNotifications(user);
       refreshNotifications();
       showSuccess('Đã xóa toàn bộ thông báo thành công!');

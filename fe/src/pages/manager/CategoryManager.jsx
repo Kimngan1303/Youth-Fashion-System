@@ -1138,15 +1138,11 @@ export default function CategoryManager() {
     let failCount = 0;
 
     for (const id of selectedCategoryIds) {
-      const cat = categories.find((c) => String(c.category_id) === String(id));
-      if (cat && cat.product_count > 0) {
-        failCount++;
-        continue;
-      }
       try {
         await categoryService.deleteCategory(id);
         successCount++;
       } catch (e) {
+        console.error("Lỗi xóa danh mục ID:", id, e);
         failCount++;
       }
     }
@@ -1157,11 +1153,11 @@ export default function CategoryManager() {
     fetchCategories();
 
     if (successCount > 0) {
-      showSuccess(`Đã xóa thành công ${successCount} danh mục.`);
+      showSuccess(`Đã xóa thành công ${successCount} danh mục cùng toàn bộ sản phẩm bên trong.`);
     }
     if (failCount > 0) {
       showError(
-        `${failCount} danh mục không thể xóa do còn chứa sản phẩm liên kết.`,
+        `Có ${failCount} danh mục không thể xóa do ràng buộc hệ thống.`,
       );
     }
   };
@@ -1698,7 +1694,7 @@ export default function CategoryManager() {
             <p className="confirm-subtext">
               Bạn có chắc chắn muốn xóa danh mục{" "}
               <strong>"{categoryToDelete.category_name}"</strong> khỏi hệ thống?
-              {categoryToDelete.product_count > 0 && (
+              {categoryToDelete.product_count > 0 ? (
                 <span
                   style={{
                     display: "block",
@@ -1707,9 +1703,12 @@ export default function CategoryManager() {
                     marginTop: "6px",
                   }}
                 >
-                  ⚠️ Danh mục này hiện đang có {categoryToDelete.product_count} sản
-                  phẩm liên kết. Bạn cần chuyển hoặc xóa các sản phẩm trước khi xóa
-                  danh mục!
+                  ⚠️ Lưu ý: Danh mục này đang chứa {categoryToDelete.product_count} sản
+                  phẩm. Khi xác nhận xóa, toàn bộ các sản phẩm này cũng sẽ bị xóa vĩnh viễn khỏi hệ thống!
+                </span>
+              ) : (
+                <span style={{ display: "block", marginTop: "4px" }}>
+                  Hành động này không thể hoàn tác.
                 </span>
               )}
             </p>
@@ -1726,7 +1725,7 @@ export default function CategoryManager() {
                 type="button"
                 className="btn-confirm-delete"
                 onClick={handleConfirmDelete}
-                disabled={isDeleting || categoryToDelete.product_count > 0}
+                disabled={isDeleting}
               >
                 {isDeleting ? (
                   <>
@@ -1761,8 +1760,7 @@ export default function CategoryManager() {
             <h3 className="confirm-title">Xóa Hàng Loạt Danh Mục</h3>
             <p className="confirm-subtext">
               Bạn đã chọn <strong>{selectedCategoryIds.length}</strong> danh mục để
-              xóa. Những danh mục đang có sản phẩm liên kết sẽ tự động được giữ
-              lại để bảo đảm an toàn dữ liệu.
+              xóa. Khi xác nhận xóa, toàn bộ danh mục đã chọn và tất cả các sản phẩm liên kết bên trong sẽ bị xóa vĩnh viễn khỏi hệ thống.
             </p>
             <div className="confirm-actions-row">
               <button

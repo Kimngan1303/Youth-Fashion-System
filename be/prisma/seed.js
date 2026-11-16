@@ -1,5 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { productsCatalog as newProductsPart1 } from '../seed_new_products_part1.js';
+import { productsCatalogPart2 as newProductsPart2 } from '../seed_new_products_part2.js';
+import { productsCatalogPart3 as newProductsPart3 } from '../seed_new_products_part3.js';
 
 const prisma = new PrismaClient();
 
@@ -53,9 +56,11 @@ async function main() {
   const categoriesData = [
     { category_name: 'Áo thun', description: 'Áo thun phong cách trẻ trung, thoáng mát, chất liệu 100% cotton cao cấp', status: 'ACTIVE' },
     { category_name: 'Áo sơ mi', description: 'Áo sơ mi thanh lịch, hiện đại dành cho công sở và dạo phố', status: 'ACTIVE' },
+    { category_name: 'Áo khoác', description: 'Áo khoác thời trang chống nắng, măng tô, áo phao giữ ấm tốt', status: 'ACTIVE' },
     { category_name: 'Áo khoác & Jacket', description: 'Áo khoác thời trang chống nắng, bomber, măng tô giữ ấm tốt', status: 'ACTIVE' },
     { category_name: 'Áo Hoodie & Sweater', description: 'Áo hoodie nỉ bông ấm áp, sweater phong cách streetwear năng động', status: 'ACTIVE' },
     { category_name: 'Áo Vest & Blazer', description: 'Áo vest và blazer thời thượng chuẩn phom phong cách Châu Âu', status: 'ACTIVE' },
+    { category_name: 'Áo Vest & Blazer Atelier', description: 'Dòng sản phẩm áo vest, tuxedo và blazer may đo cao cấp độc bản', status: 'ACTIVE' },
     { category_name: 'Quần Jeans', description: 'Quần jeans chất liệu bền đẹp, chuẩn phom suông và đứng dáng', status: 'ACTIVE' },
     { category_name: 'Quần Short', description: 'Quần short ngắn năng động, thoải mái cho các hoạt động ngoài trời', status: 'ACTIVE' },
     { category_name: 'Quần Kaki & Chino', description: 'Quần kaki chino lịch lãm, dễ phối đồ cho nam và nữ', status: 'ACTIVE' },
@@ -64,7 +69,7 @@ async function main() {
     { category_name: 'Váy & Đầm Thiết Kế', description: 'Váy đầm thiết kế độc quyền tôn dáng thanh lịch và quyến rũ', status: 'ACTIVE' },
     { category_name: 'Chân Váy', description: 'Chân váy chữ A, xếp ly, dáng midi thời trang phong cách Hàn Quốc', status: 'ACTIVE' },
     { category_name: 'Áo Polo', description: 'Áo polo dệt kim thanh lịch, năng động phù hợp mọi hoàn cảnh', status: 'ACTIVE' },
-    { category_name: 'Đồ Lót & Đồ Mặc Nhà', description: 'Trang phục mặc nhà lụa silk và đồ lót co giãn êm ái', status: 'ACTIVE' },
+    { category_name: 'Đồ Mặc Nhà', description: 'Trang phục mặc nhà lụa silk và pijama thoáng mát êm ái', status: 'ACTIVE' },
     { category_name: 'Bộ Đồ Thể Thao', description: 'Set đồ tập gym, yoga và thể thao năng động co giãn cực tốt', status: 'ACTIVE' },
     { category_name: 'Túi Xách & Balo', description: 'Balo laptop canvas, túi xách da thêu thời thượng cao cấp', status: 'ACTIVE' },
     { category_name: 'Giày & Sandal', description: 'Sneaker retro, sandal đế trấu thời trang phong cách hiện đại', status: 'ACTIVE' },
@@ -72,8 +77,8 @@ async function main() {
     { category_name: 'Thắt Lưng & Ví Da', description: 'Thắt lưng da bò thật, ví da nam nữ khóa kim sang trọng', status: 'ACTIVE' },
     { category_name: 'Kính Mát Thời Trang', description: 'Kính mát gọng kim loại chống tia UV bảo vệ mắt tối ưu', status: 'ACTIVE' },
     { category_name: 'Khăn Quàng & Phụ Kiện', description: 'Khăn quàng cashmere, phụ kiện phối đồ thời trang mùa đông', status: 'ACTIVE' },
+    { category_name: 'Phụ Kiện Thời Trang', description: 'Trang sức titan, vòng tay da, trâm cài vest và phụ kiện thời trang', status: 'ACTIVE' },
     { category_name: 'Đồ Đông & Áo Len', description: 'Áo len cổ lọ dệt kim mềm mịn giữ ấm thu đông hiệu quả', status: 'ACTIVE' },
-    { category_name: 'Đồ Bơi & Mùa Hè', description: 'Bộ bơi bikini 2 mảnh rực rỡ cho kỳ nghỉ biển mùa hè', status: 'ACTIVE' },
     { category_name: 'Trang Phục Dạ Hội', description: 'Đầm dạ hội dạ tiệc sang trọng đính đá thủ công tinh xảo', status: 'ACTIVE' },
   ];
 
@@ -1606,8 +1611,9 @@ async function main() {
 ];
 
   const createdProductsMap = {};
+  const allProductsToSeed = [...productsData, ...newProductsPart1, ...newProductsPart2, ...newProductsPart3];
 
-  for (const item of productsData) {
+  for (const item of allProductsToSeed) {
     const category = categories[item.category_name];
     const brand = brands[item.brand_name];
 

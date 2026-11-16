@@ -1347,6 +1347,11 @@ export default function ProductManager() {
 
   // Modal Xóa Sản phẩm
   const [deleteProductItem, setDeleteProductItem] = useState(null);
+  const [deletingProduct, setDeletingProduct] = useState(false);
+
+  // Modal Xóa Hàng Loạt Sản Phẩm
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // Modal Xóa Ảnh sản phẩm
   const [deleteImageId, setDeleteImageId] = useState(null);
@@ -1460,28 +1465,32 @@ export default function ProductManager() {
     );
   };
 
-  const handleBulkDelete = async () => {
+  const handleOpenBulkDeleteModal = () => {
     if (selectedProductIds.length === 0) return;
-    if (
-      !window.confirm(
-        `Bạn có chắc chắn muốn xóa ${selectedProductIds.length} sản phẩm đã chọn khỏi hệ thống?`,
-      )
-    ) {
-      return;
-    }
-    setLoading(true);
+    setIsBulkDeleteModalOpen(true);
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    if (selectedProductIds.length === 0) return;
+    setIsBulkDeleting(true);
     try {
-      for (const id of selectedProductIds) {
-        await productService.deleteProduct(id);
+      if (typeof productService.bulkDeleteProducts === 'function') {
+        await productService.bulkDeleteProducts(selectedProductIds);
+      } else {
+        for (const id of selectedProductIds) {
+          await productService.deleteProduct(id);
+        }
       }
       showSuccess(`Đã xóa thành công ${selectedProductIds.length} sản phẩm`);
       setSelectedProductIds([]);
+      setIsBulkDeleteModalOpen(false);
       fetchMeta();
       fetchProducts();
     } catch (err) {
-      showError("Có lỗi xảy ra khi xóa sản phẩm");
+      console.error("Lỗi khi xóa hàng loạt sản phẩm:", err);
+      showError(err.response?.data?.message || "Có lỗi xảy ra khi xóa các sản phẩm đã chọn");
     } finally {
-      setLoading(false);
+      setIsBulkDeleting(false);
     }
   };
 
@@ -1827,13 +1836,18 @@ export default function ProductManager() {
   // Xác nhận Xóa Sản phẩm
   const handleConfirmDelete = async () => {
     if (!deleteProductItem) return;
+    setDeletingProduct(true);
     try {
       await productService.deleteProduct(deleteProductItem.product_id);
       setDeleteProductItem(null);
+      fetchMeta();
       fetchProducts();
       showSuccess("Đã xóa sản phẩm thành công");
     } catch (err) {
+      console.error("Lỗi khi xóa sản phẩm:", err);
       showError(err.response?.data?.message || "Không thể xóa sản phẩm");
+    } finally {
+      setDeletingProduct(false);
     }
   };
 
@@ -1998,7 +2012,7 @@ export default function ProductManager() {
                     type="button"
                     className="btn-bulk-delete"
                     disabled={selectedProductIds.length === 0}
-                    onClick={handleBulkDelete}
+                    onClick={handleOpenBulkDeleteModal}
                   >
                     <Trash2 size={14} />
                     <span>Xóa các mục đã chọn</span>
@@ -2950,7 +2964,7 @@ export default function ProductManager() {
       {deleteProductItem && (
         <div
           className="modal-overlay"
-          onClick={() => setDeleteProductItem(null)}
+          onClick={() => !deletingProduct && setDeleteProductItem(null)}
         >
           <div
             className="confirm-modal-box"
@@ -2967,16 +2981,73 @@ export default function ProductManager() {
             </div>
             <div className="modal-actions-row">
               <button
+                type="button"
                 className="btn-secondary"
+                disabled={deletingProduct}
                 onClick={() => setDeleteProductItem(null)}
               >
                 Hủy bỏ
               </button>
               <button
+                type="button"
                 className="btn-danger-confirm"
+                disabled={deletingProduct}
                 onClick={handleConfirmDelete}
+                style={{ display: "flex", alignItems: "center", gap: "6px" }}
               >
-                Xác nhận xóa
+                {deletingProduct && (
+                  <Loader2
+                    size={14}
+                    style={{ animation: "spin 1s linear infinite" }}
+                  />
+                )}
+                {deletingProduct ? "Đang xóa..." : "Xác nhận xóa"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM BULK DELETE MODAL */}
+      {isBulkDeleteModalOpen && (
+        <div
+          className="modal-overlay"
+          onClick={() => !isBulkDeleting && setIsBulkDeleteModalOpen(false)}
+        >
+          <div
+            className="confirm-modal-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-warning-icon">
+              <Trash2 size={24} />
+            </div>
+            <div className="modal-title">Xác nhận xóa hàng loạt sản phẩm?</div>
+            <div className="modal-subtext">
+              Bạn có chắc chắn muốn xóa <strong>{selectedProductIds.length}</strong> sản phẩm đã chọn khỏi CSDL MySQL không? Hành động này không thể hoàn tác.
+            </div>
+            <div className="modal-actions-row">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={isBulkDeleting}
+                onClick={() => setIsBulkDeleteModalOpen(false)}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                className="btn-danger-confirm"
+                disabled={isBulkDeleting}
+                onClick={handleConfirmBulkDelete}
+                style={{ display: "flex", alignItems: "center", gap: "6px" }}
+              >
+                {isBulkDeleting && (
+                  <Loader2
+                    size={14}
+                    style={{ animation: "spin 1s linear infinite" }}
+                  />
+                )}
+                {isBulkDeleting ? "Đang xóa..." : "Xác nhận xóa"}
               </button>
             </div>
           </div>

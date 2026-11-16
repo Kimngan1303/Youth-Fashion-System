@@ -1,0 +1,64 @@
+classDiagram
+    direction TB
+
+    class OrderFulfillmentController {
+        +confirmOrder(req, res)
+        +cancelOrder(req, res)
+        +shipOrder(req, res)
+        +updateDeliveryResult(req, res)
+        +confirmDelivery(req, res)
+        +handleReturnOrder(req, res)
+    }
+
+    class OrderFulfillmentService {
+        -carrierClient: ShippingGateway
+        +processConfirmOrder(orderId: BigInt, employeeId: BigInt): OrderResponseDto
+        +processCancelOrder(orderId: BigInt, reason: String, employeeId: BigInt): OrderResponseDto
+        +processShipOrder(orderId: BigInt, employeeId: BigInt): OrderResponseDto
+        +processDeliveryResult(orderId: BigInt, isSuccess: Boolean, canRetry: Boolean): OrderResponseDto
+        +confirmDelivery(orderId: BigInt, customerId: BigInt): OrderResponseDto
+        +processReturnOrder(orderId: BigInt, reason: String): OrderResponseDto
+        +processReturnDecision(orderId: BigInt, isApproved: Boolean, reason: String): OrderResponseDto
+    }
+
+    class OrderRepository {
+        +findById(orderId: BigInt): Order
+        +findPendingOrders(): List~Order~
+        +updateOrderStatus(orderId: BigInt, status: OrderStatus, employeeId: BigInt): Order
+    }
+
+    class NotificationRepository {
+        +create(data: NotificationCreateInput): Notification
+        +findByCustomerId(customerId: BigInt): List~Notification~
+    }
+
+    class Order {
+        +BigInt order_id
+        +String order_number
+        +BigInt customer_id
+        +BigInt managed_by_employee_id
+        +Decimal total_amount
+        +OrderStatus order_status
+        +String cancel_reason
+        +Int delivery_attempts
+        +DateTime created_at
+        +DateTime updated_at
+    }
+
+    class Notification {
+        +BigInt notification_id
+        +BigInt customer_id
+        +NotificationType notification_type
+        +String title
+        +String message
+        +Boolean is_read
+        +DateTime created_at
+    }
+
+    %% Relationships
+    OrderFulfillmentController --> OrderFulfillmentService : "calls"
+    OrderFulfillmentService --> OrderRepository : "uses"
+    OrderFulfillmentService --> NotificationRepository : "uses"
+    OrderRepository --> Order : "manages"
+    NotificationRepository --> Notification : "manages"
+    Order "1" --> "0..*" Notification : "triggers"

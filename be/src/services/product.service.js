@@ -409,6 +409,26 @@ export const deleteProductService = async (productId) => {
 };
 
 /**
+ * Xóa hàng loạt sản phẩm
+ */
+export const bulkDeleteProductsService = async (productIds) => {
+  if (!Array.isArray(productIds) || productIds.length === 0) {
+    const error = new Error('Danh sách ID sản phẩm không hợp lệ');
+    error.statusCode = 400;
+    throw error;
+  }
+  const result = await productRepo.deleteProducts(productIds);
+
+  // Xóa vector khỏi RAM và file cache 1 lần
+  vectorSearchService.removeProducts(productIds);
+
+  return {
+    message: `Đã xóa thành công ${result.count || productIds.length} sản phẩm`,
+    deleted_count: result.count || productIds.length,
+  };
+};
+
+/**
  * Upload và thêm 1 ảnh cho sản phẩm
  */
 export const addProductImageService = async (productId, file, isPrimary = false) => {

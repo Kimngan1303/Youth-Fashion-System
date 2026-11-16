@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
+import { useConfirmModal } from '../../context/ConfirmModalContext';
 import ManagerSidebar from '../../components/ManagerSidebar';
 import ManagerHeader from '../../components/ManagerHeader';
 import { orderService } from '../../services/orderService';
@@ -526,6 +527,7 @@ export default function OrderManager() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { showSuccess, showError, showInfo } = useToast();
+  const { confirmModal } = useConfirmModal();
 
   // Danh sách đơn hàng (Bắt đầu hoàn toàn trống để chờ đơn thật từ tài khoản khách hàng)
   const [orders, setOrders] = useState(() => {
@@ -1239,8 +1241,15 @@ export default function OrderManager() {
   // Xóa các mục đã chọn
   const handleBulkDelete = async () => {
     if (selectedOrderIds.length === 0) return;
-    if (window.confirm(`Bạn có chắc chắn muốn xóa ${selectedOrderIds.length} đơn hàng đã chọn không?`)) {
-      const idsToDelete = [...selectedOrderIds];
+    const confirmed = await confirmModal({
+      title: 'Xóa hàng loạt đơn hàng',
+      message: `Bạn có chắc chắn muốn xóa ${selectedOrderIds.length} đơn hàng đã chọn không? Thao tác này không thể hoàn tác.`,
+      confirmText: 'Xác nhận xóa',
+      cancelText: 'Hủy bỏ',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+    const idsToDelete = [...selectedOrderIds];
 
       for (const id of idsToDelete) {
         const idStr = String(id || '').trim();
@@ -1280,7 +1289,6 @@ export default function OrderManager() {
       window.dispatchEvent(new CustomEvent('yf_order_status_changed', { detail: { action: 'BULK_DELETE' } }));
 
       showSuccess(`Đã xóa thành công ${idsToDelete.length} đơn hàng!`);
-    }
   };
 
   // Cập nhật trạng thái một đơn hàng nhanh chóng (hỗ trợ cả Dropdown trực tiếp trên bảng và Modal chỉnh sửa)

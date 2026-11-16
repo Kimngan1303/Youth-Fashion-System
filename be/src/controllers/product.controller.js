@@ -62,6 +62,16 @@ export const deleteProduct = async (req, res, next) => {
   }
 };
 
+export const bulkDeleteProducts = async (req, res, next) => {
+  try {
+    const { product_ids } = req.body;
+    const result = await productService.bulkDeleteProductsService(product_ids);
+    return BaseResponse.success(res, result.message, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const addProductImage = async (req, res, next) => {
   try {
     const file = req.file;

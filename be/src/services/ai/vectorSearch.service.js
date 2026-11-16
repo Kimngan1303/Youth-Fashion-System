@@ -392,6 +392,20 @@ class VectorSearchService {
       console.log(`[VectorSearch] Đã xóa Vector của SP ${productId} khỏi RAM và file cache.`);
     }
   }
+
+  /**
+   * Xóa hàng loạt sản phẩm khỏi RAM và file JSON (1 lần lưu file)
+   */
+  removeProducts(productIds) {
+    if (!productIds || productIds.length === 0) return;
+    const idSet = new Set(productIds.map(String));
+    const beforeCount = this.vectorsCache.length;
+    this.vectorsCache = this.vectorsCache.filter((item) => !idSet.has(String(item.product_id)));
+    if (this.vectorsCache.length !== beforeCount) {
+      this.saveVectors();
+      console.log(`[VectorSearch] Đã xóa ${beforeCount - this.vectorsCache.length} Vector khỏi RAM và file cache.`);
+    }
+  }
 }
 
 export const vectorSearchService = new VectorSearchService();

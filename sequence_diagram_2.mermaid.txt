@@ -1,0 +1,188 @@
+sequenceDiagram
+    autonumber
+    actor Customer
+    actor Manager
+    participant Web as <<user interaction>><br/>:React Web
+    participant Controller as <<controller>><br/>:Order Controller
+    participant Service as <<service>><br/>:Order Service
+    participant OrderRepo as <<repository>><br/>:Order Repository
+    participant NotifRepo as <<repository>><br/>:Notification Repository
+    participant DB as <<database>><br/>Database
+
+    %% ==========================================
+    %% GIAI ĐOẠN 1: XÁC NHẬN / HỦY ĐƠN HÀNG
+    %% ==========================================
+    Note over Manager, DB: Phase 1: Order Confirmation / Cancellation by Manager
+    Manager->>Web: View pending orders
+    Web->>Controller: getPendingOrders()
+    Controller->>Service: getPendingOrders()
+    Service->>OrderRepo: findPendingOrders()
+    OrderRepo->>DB: SELECT * FROM orders WHERE status = 'PENDING'
+    DB-->>OrderRepo: Return order list
+    OrderRepo-->>Service: Return order list
+    Service-->>Controller: Return order list
+    Controller-->>Web: HTTP 200 (Order list)
+    Web-->>Manager: Display pending orders
+
+    alt Manager từ chối đơn (Confirm order? = No)
+        Manager->>Web: Click "Reject Order" (Enter reason)
+        Web->>Controller: cancelOrder(orderId, reason)
+        Controller->>Service: processCancelOrder(orderId, reason)
+        Service->>OrderRepo: updateOrderStatus(orderId, "CANCELLED")
+        OrderRepo->>DB: UPDATE orders SET status = 'CANCELLED'
+        DB-->>OrderRepo: OK
+        OrderRepo-->>Service: Return updated order
+        Service->>NotifRepo: createNotification(customerId, "CANCELLED")
+        NotifRepo->>DB: INSERT INTO notifications
+        DB-->>NotifRepo: OK
+        NotifRepo-->>Service: Return notification
+        Service-->>Controller: Return response
+        Controller-->>Web: HTTP 200 OK
+        Web-->>Manager: Display "Order Cancelled"
+        Web-->>Customer: Notification "Order Cancelled with reason"
+    else Manager xác nhận đơn (Confirm order? = Yes)
+        Manager->>Web: Click "Confirm Order"
+        Web->>Controller: confirmOrder(orderId)
+        Controller->>Service: processConfirmOrder(orderId)
+        Service->>OrderRepo: updateOrderStatus(orderId, "CONFIRMED")
+        OrderRepo->>DB: UPDATE orders SET status = 'CONFIRMED'
+        DB-->>OrderRepo: OK
+        OrderRepo-->>Service: Return updated order
+        Service->>NotifRepo: createNotification(customerId, "CONFIRMED")
+        NotifRepo->>DB: INSERT INTO notifications
+        DB-->>NotifRepo: OK
+        NotifRepo-->>Service: Return notification
+        Service-->>Controller: Return confirmation
+        Controller-->>Web: HTTP 200 OK
+        Web-->>Manager: Display "Order Confirmed"
+        Web-->>Customer: Notification "Order Confirmed"
+    end
+
+    %% ==========================================
+    %% GIAI ĐOẠN 2: KHÁCH HỦY ĐƠN HOẶC GIAO HÀNG
+    %% ==========================================
+    Note over Customer, DB: Phase 2: Customer Cancel Check & Shipping
+    alt Khách hàng muốn hủy đơn (Customer wants to cancel? = Yes)
+        Customer->>Web: Click "Cancel Order" (Enter reason)
+        Web->>Controller: cancelOrderByCustomer(orderId, reason)
+        Controller->>Service: processCancelOrder(orderId, reason)
+        Service->>OrderRepo: updateOrderStatus(orderId, "CANCELLED")
+        OrderRepo->>DB: UPDATE orders SET status = 'CANCELLED'
+        DB-->>OrderRepo: OK
+        OrderRepo-->>Service: Return updated order
+        Service->>NotifRepo: createNotification(customerId, "CANCELLED")
+        NotifRepo->>DB: INSERT INTO notifications
+        DB-->>NotifRepo: OK
+        NotifRepo-->>Service: Return notification
+        Service-->>Controller: Return response
+        Controller-->>Web: HTTP 200 OK
+        Web-->>Customer: Display "Order Cancelled Successfully"
+    else Khách hàng không hủy (Tiến hành giao hàng)
+        Note over Manager: Package products
+        Manager->>Web: Click "Hand over to Shipping"
+        Web->>Controller: shipOrder(orderId)
+        Controller->>Service: processShipOrder(orderId)
+        Service->>OrderRepo: updateOrderStatus(orderId, "SHIPPED")
+        OrderRepo->>DB: UPDATE orders SET status = 'SHIPPED'
+        DB-->>OrderRepo: OK
+        OrderRepo-->>Service: Return updated order
+        Service->>NotifRepo: createNotification(customerId, "SHIPPED")
+        NotifRepo->>DB: INSERT INTO notifications
+        DB-->>NotifRepo: OK
+        NotifRepo-->>Service: Return notification
+        Service-->>Controller: Return shipment confirmation
+        Controller-->>Web: HTTP 200 OK
+        Web-->>Manager: Display "Order Shipped Successfully"
+        Web-->>Customer: Notification "Order is on the way"
+    end
+
+    %% ==========================================
+    %% GIAI ĐOẠN 3: KẾT QUẢ GIAO HÀNG & NHẬN HÀNG
+    %% ==========================================
+    Note over Customer, DB: Phase 3: Delivery Results & Completion
+    loop Giao hàng thất bại và cho phép giao lại (Re-delivery? = Yes)
+        Manager->>Web: Update delivery result (Failed - Retry)
+        Web->>Controller: updateDeliveryResult(orderId, retry=true)
+        Controller->>Service: processDeliveryResult(orderId, retry=true)
+        Service->>OrderRepo: incrementDeliveryAttempts(orderId)
+        OrderRepo->>DB: UPDATE orders SET delivery_attempts = delivery_attempts + 1
+        DB-->>OrderRepo: OK
+    end
+
+    alt Giao hàng thất bại hoàn toàn (Delivery successful? = No & Re-delivery? = No)
+        Manager->>Web: Update delivery result (Failed - Returned to warehouse)
+        Web->>Controller: updateDeliveryResult(orderId, retry=false)
+        Controller->>Service: processDeliveryResult(orderId, retry=false)
+        Service->>OrderRepo: updateOrderStatus(orderId, "CANCELLED")
+        OrderRepo->>DB: UPDATE orders SET status = 'CANCELLED'
+        DB-->>OrderRepo: OK
+        Service->>NotifRepo: createNotification(customerId, "DELIVERY_FAILED")
+        NotifRepo->>DB: INSERT INTO notifications
+        DB-->>NotifRepo: OK
+        Web-->>Customer: Notification "Delivery Failed - Order Returned"
+    else Giao hàng thành công (Delivery successful? = Yes)
+        Customer->>Customer: Receive physical package
+        Manager->>Web: Update delivery result (Delivered)
+        Web->>Controller: updateOrderStatus(orderId, "DELIVERED")
+        Controller->>Service: confirmDelivery(orderId)
+        Service->>OrderRepo: updateOrderStatus(orderId, "DELIVERED")
+        OrderRepo->>DB: UPDATE orders SET status = 'DELIVERED'
+        DB-->>OrderRepo: OK
+        Service->>NotifRepo: createNotification(customerId, "DELIVERED")
+        NotifRepo->>DB: INSERT INTO notifications
+        DB-->>NotifRepo: OK
+        Web-->>Customer: Notification "Package Delivered"
+
+        Customer->>Web: Click "Confirm Received"
+        Web->>Controller: confirmReceived(orderId)
+        Controller->>Service: completeOrder(orderId)
+        Service->>OrderRepo: updateOrderStatus(orderId, "COMPLETED")
+        OrderRepo->>DB: UPDATE orders SET status = 'COMPLETED'
+        DB-->>OrderRepo: OK
+        Service->>NotifRepo: createNotification(customerId, "COMPLETED")
+        NotifRepo->>DB: INSERT INTO notifications
+        DB-->>NotifRepo: OK
+        Web-->>Customer: Display "Order Completed"
+    end
+
+    %% ==========================================
+    %% GIAI ĐOẠN 4: YÊU CẦU HOÀN TRẢ (RETURN REQUEST)
+    %% ==========================================
+    Note over Customer, DB: Phase 4: Return Processing
+    opt Khách hàng yêu cầu đổi trả (Request return? = Yes)
+        Customer->>Web: Submit Return Request (reason)
+        Web->>Controller: handleReturnOrder(orderId, reason)
+        Controller->>Service: processReturnOrder(orderId, reason)
+        Service->>OrderRepo: updateOrderStatus(orderId, "RETURN_PENDING")
+        OrderRepo->>DB: UPDATE orders SET status = 'RETURN_PENDING'
+        DB-->>OrderRepo: OK
+        Service->>NotifRepo: createNotification(customerId, "RETURN_PENDING")
+        NotifRepo->>DB: INSERT INTO notifications
+        DB-->>NotifRepo: OK
+        Web-->>Customer: Display "Return Request Submitted"
+
+        Manager->>Web: Check return request
+        alt Quản lý từ chối hoàn trả (Approve return? = No)
+            Manager->>Web: Reject Return (reason)
+            Web->>Controller: reviewReturn(orderId, approved=false, reason)
+            Controller->>Service: processReturnDecision(orderId, false, reason)
+            Service->>OrderRepo: updateOrderStatus(orderId, "RETURN_REJECTED")
+            OrderRepo->>DB: UPDATE orders SET status = 'RETURN_REJECTED'
+            DB-->>OrderRepo: OK
+            Service->>NotifRepo: createNotification(customerId, "RETURN_REJECTED")
+            NotifRepo->>DB: INSERT INTO notifications
+            DB-->>NotifRepo: OK
+            Web-->>Customer: Notification "Return Request Rejected"
+        else Quản lý đồng ý hoàn trả (Approve return? = Yes)
+            Manager->>Web: Approve Return
+            Web->>Controller: reviewReturn(orderId, approved=true)
+            Controller->>Service: processReturnDecision(orderId, true)
+            Service->>OrderRepo: updateOrderStatus(orderId, "RETURN_APPROVED")
+            OrderRepo->>DB: UPDATE orders SET status = 'RETURN_APPROVED'
+            DB-->>OrderRepo: OK
+            Service->>NotifRepo: createNotification(customerId, "RETURN_APPROVED")
+            NotifRepo->>DB: INSERT INTO notifications
+            DB-->>NotifRepo: OK
+            Web-->>Customer: Notification "Return Request Approved"
+        end
+    end

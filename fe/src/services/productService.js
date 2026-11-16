@@ -68,6 +68,14 @@ export const productService = {
   },
 
   /**
+   * Xóa nhiều sản phẩm cùng lúc
+   */
+  bulkDeleteProducts: async (productIds) => {
+    const response = await axiosClient.post('/products/bulk-delete', { product_ids: productIds });
+    return response.data;
+  },
+
+  /**
    * Upload ảnh mới cho sản phẩm
    */
   addProductImage: async (productId, formData) => {

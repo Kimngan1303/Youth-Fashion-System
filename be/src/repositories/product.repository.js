@@ -257,11 +257,127 @@ export const updateProduct = async (product_id, { product_name, description, cat
 };
 
 /**
- * Xóa sản phẩm theo ID (Tự động xóa variants và images liên quan nhờ Cascade)
+ * Xóa sản phẩm theo ID (Tự động xóa CartItem, Wishlist, Embeddings, Images, Variants và Product an toàn trong transaction)
  */
 export const deleteProduct = async (product_id) => {
-  return await prisma.product.delete({
-    where: { product_id: BigInt(product_id) },
+  const pId = BigInt(product_id);
+  return await prisma.$transaction(async (tx) => {
+    // 1. Tìm các variants của sản phẩm để xóa cart_items liên quan
+    const variants = await tx.productVariant.findMany({
+      where: { product_id: pId },
+      select: { variant_id: true },
+    });
+    const variantIds = variants.map((v) => v.variant_id);
+
+    if (variantIds.length > 0) {
+      await tx.cartItem.deleteMany({
+        where: { variant_id: { in: variantIds } },
+      });
+
+      await tx.orderItem.deleteMany({
+        where: { variant_id: { in: variantIds } },
+      });
+
+      const emptyOrders = await tx.order.findMany({
+        where: {
+          order_items: {
+            none: {},
+          },
+        },
+        select: { order_id: true },
+      });
+      if (emptyOrders.length > 0) {
+        await tx.order.deleteMany({
+          where: {
+            order_id: { in: emptyOrders.map((o) => o.order_id) },
+          },
+        });
+      }
+    }
+
+    await tx.wishlist.deleteMany({
+      where: { product_id: pId },
+    });
+
+    await tx.productEmbedding.deleteMany({
+      where: { product_id: pId },
+    });
+
+    await tx.productImage.deleteMany({
+      where: { product_id: pId },
+    });
+
+    if (variantIds.length > 0) {
+      await tx.productVariant.deleteMany({
+        where: { variant_id: { in: variantIds } },
+      });
+    }
+
+    return await tx.product.delete({
+      where: { product_id: pId },
+    });
+  });
+};
+
+/**
+ * Xóa hàng loạt sản phẩm theo danh sách IDs
+ */
+export const deleteProducts = async (product_ids) => {
+  const pIds = product_ids.map((id) => BigInt(id));
+  return await prisma.$transaction(async (tx) => {
+    const variants = await tx.productVariant.findMany({
+      where: { product_id: { in: pIds } },
+      select: { variant_id: true },
+    });
+    const variantIds = variants.map((v) => v.variant_id);
+
+    if (variantIds.length > 0) {
+      await tx.cartItem.deleteMany({
+        where: { variant_id: { in: variantIds } },
+      });
+
+      await tx.orderItem.deleteMany({
+        where: { variant_id: { in: variantIds } },
+      });
+
+      const emptyOrders = await tx.order.findMany({
+        where: {
+          order_items: {
+            none: {},
+          },
+        },
+        select: { order_id: true },
+      });
+      if (emptyOrders.length > 0) {
+        await tx.order.deleteMany({
+          where: {
+            order_id: { in: emptyOrders.map((o) => o.order_id) },
+          },
+        });
+      }
+    }
+
+    await tx.wishlist.deleteMany({
+      where: { product_id: { in: pIds } },
+    });
+
+    await tx.productEmbedding.deleteMany({
+      where: { product_id: { in: pIds } },
+    });
+
+    await tx.productImage.deleteMany({
+      where: { product_id: { in: pIds } },
+    });
+
+    if (variantIds.length > 0) {
+      await tx.productVariant.deleteMany({
+        where: { variant_id: { in: variantIds } },
+      });
+    }
+
+    return await tx.product.deleteMany({
+      where: { product_id: { in: pIds } },
+    });
   });
 };
 

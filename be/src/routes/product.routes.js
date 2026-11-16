@@ -35,6 +35,13 @@ router.put(
   productController.updateProduct
 );
 
+router.post(
+  '/bulk-delete',
+  authenticateToken,
+  authorizeRoles('MANAGER', 'ADMIN'),
+  productController.bulkDeleteProducts
+);
+
 router.delete(
   '/:id',
   authenticateToken,

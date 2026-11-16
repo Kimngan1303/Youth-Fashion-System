@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { vectorSearchService } from '../services/ai/vectorSearch.service.js';
 import { prisma } from '../repositories/prisma.js';
 
